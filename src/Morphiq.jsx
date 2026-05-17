@@ -2,8 +2,8 @@ import { createContext, useContext, useState, useEffect, useRef } from "react";
 
 // ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
 // Replace these with your actual Supabase project URL and anon key.
-const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
-const SUPABASE_ANON = "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll";
+const SUPABASE_URL  = "https://YOUR_PROJECT.supabase.co";
+const SUPABASE_ANON = "YOUR_ANON_KEY";
 
 // Thin REST wrapper — avoids requiring the npm package inside a JSX artifact.
 // Uses Supabase's PostgREST + Auth REST APIs directly.
@@ -224,13 +224,11 @@ function AppProvider({ children }) {
   // When Supabase redirects back after clicking the magic link, the URL contains
   // #access_token=...&refresh_token=...  We detect this once on mount and sign in.
   useEffect(() => {
-    const hash = window.location.hash;
+ const hash = window.location.hash;
     if (!hash.includes("access_token=")) return;
     const params = new URLSearchParams(hash.replace("#", "?"));
     const accessToken = params.get("access_token");
     if (!accessToken) return;
-    // Remove the token from the URL bar immediately (security hygiene)
-    window.history.replaceState(null, "", window.location.pathname);
     // Decode the JWT to get the user's Supabase UUID (sub claim)
     try {
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
