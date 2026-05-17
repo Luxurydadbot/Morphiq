@@ -2,8 +2,8 @@ import { createContext, useContext, useState, useEffect, useRef } from "react";
 
 // ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
 // Replace these with your actual Supabase project URL and anon key.
-const SUPABASE_URL  = "https://YOUR_PROJECT.supabase.co";
-const SUPABASE_ANON = "YOUR_ANON_KEY";
+const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
+const SUPABASE_ANON = "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll";
 
 // Thin REST wrapper — avoids requiring the npm package inside a JSX artifact.
 // Uses Supabase's PostgREST + Auth REST APIs directly.
