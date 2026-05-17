@@ -235,7 +235,7 @@ function AppProvider({ children }) {
       const email = payload.email || "";
       const uid = payload.sub || "";
       if (uid) signIn(email, "member", null, uid);
-    } catch { /* malformed token — fall through to normal auth screen */ }
+   } catch(e) { console.error("Magic link error:", e); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
