@@ -174,11 +174,19 @@ const MOCK_RETURNING_PLAN = {
   tip: "Consistency over perfection — show up, even on hard days.",
 };
 
+const SESSION_KEY = "morphiq_session";
+
 function AppProvider({ children }) {
+  // ── Restore session from localStorage on first load ──────────────────────
+  const savedSession = (() => {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
+  })();
+
   const [screen, setScreen] = useState(
     DEV_SKIP === "owner" ? "owner" :
     DEV_SKIP === "member_returning" ? "home" :
-    DEV_SKIP === "member_new" ? "onboarding" : "auth"
+    DEV_SKIP === "member_new" ? "onboarding" :
+    savedSession ? "loading" : "auth"   // if saved session exists, start at loading while we verify
   );
   const [user, setUser] = useState(
     DEV_SKIP === "member_returning"
@@ -188,6 +196,23 @@ function AppProvider({ children }) {
   const [plan, setPlan] = useState(DEV_SKIP === "member_returning" ? MOCK_RETURNING_PLAN : null);
   const [supabaseUser, setSupabaseUser] = useState(DEV_SKIP ? { email: "dev@morphiq.app", id: "dev-001" } : null);
   const [gymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", units: "imperial" });
+
+  // ── On mount: if we have a saved session, restore it from Supabase ────────
+  useEffect(() => {
+    if (DEV_SKIP || !savedSession?.uid) return;
+    sb.getProfile(savedSession.uid).then(profile => {
+      if (profile?.plan) {
+        setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
+        setUser({ name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" });
+        setPlan(profile.plan);
+        setScreen("home");
+      } else {
+        localStorage.removeItem(SESSION_KEY);
+        setScreen("auth");
+      }
+    }).catch(() => { localStorage.removeItem(SESSION_KEY); setScreen("auth"); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Called after successful auth. role = "member" | "owner".
   // hasPlan=true|false = dev shortcut (bypasses DB). hasPlan=null = production path (reads DB).
@@ -211,8 +236,11 @@ function AppProvider({ children }) {
     try {
       const profile = await sb.getProfile(uid);
       if (profile?.plan) {
-        setUser({ name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" });
+        const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
+        setUser(u);
         setPlan(profile.plan);
+        // Save session so next open skips login
+        try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
         setScreen("home");
       } else {
         setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding");
@@ -224,7 +252,7 @@ function AppProvider({ children }) {
   // When Supabase redirects back after clicking the magic link, the URL contains
   // #access_token=...&refresh_token=...  We detect this once on mount and sign in.
   useEffect(() => {
- const hash = window.location.hash;
+    const hash = window.location.hash;
     if (!hash.includes("access_token=")) return;
     const params = new URLSearchParams(hash.replace("#", "?"));
     const accessToken = params.get("access_token");
@@ -235,11 +263,12 @@ function AppProvider({ children }) {
       const email = payload.email || "";
       const uid = payload.sub || "";
       if (uid) signIn(email, "member", null, uid);
-   } catch(e) { console.error("Magic link error:", e); }
+    } catch(e) { console.error("Magic link error:", e); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function signOut() {
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
     setSupabaseUser(null);
     setUser(DEFAULT_USER);
     setPlan(null);
