@@ -1,5 +1,141 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 
+// ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
+// Replace these with your actual Supabase project URL and anon key.
+const SUPABASE_URL  = "https://YOUR_PROJECT.supabase.co";
+const SUPABASE_ANON = "YOUR_ANON_KEY";
+
+// Thin REST wrapper — avoids requiring the npm package inside a JSX artifact.
+// Uses Supabase's PostgREST + Auth REST APIs directly.
+const sb = {
+  // ── AUTH ──────────────────────────────────────────────────────────────────
+  async sendMagicLink(email) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+      method: "POST",
+      headers: { "apikey": SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    return res.ok;
+  },
+
+  // ── PROFILES ──────────────────────────────────────────────────────────────
+  async getProfile(supabaseUserId) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&limit=1`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      return rows?.[0] || null;
+    } catch { return null; }
+  },
+
+  async upsertProfile(supabaseUserId, userData, planData, gymId = "demo-gym") {
+    try {
+      const body = {
+        supabase_user_id: supabaseUserId,
+        gym_id: gymId,
+        name: userData.name,
+        goal: userData.goal,
+        sex: userData.sex,
+        height: userData.height,
+        weight: userData.weight,
+        age: userData.age,
+        days_per_week: userData.daysPerWeek,
+        injuries: userData.injuries || "",
+        plan: planData,                         // full plan JSON stored in jsonb column
+        updated_at: new Date().toISOString(),
+      };
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates",   // upsert on supabase_user_id unique key
+        },
+        body: JSON.stringify(body),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  // Resolves supabase_user_id → profiles.id (UUID used as FK in workout/meal logs)
+  async getProfileId(supabaseUserId) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&select=id&limit=1`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      return rows?.[0]?.id || null;
+    } catch { return null; }
+  },
+
+  // ── WORKOUT LOGS ──────────────────────────────────────────────────────────
+  async insertWorkoutLog(supabaseUserId, { exerciseName, setNumber, reps, weight }) {
+    try {
+      // Resolve to profiles.id so the FK constraint is satisfied
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: profileId,           // ← profiles.id, not auth.users.id
+          exercise_name: exerciseName,
+          set_number: setNumber,
+          reps,
+          weight,
+          workout_date: new Date().toISOString().slice(0, 10),
+        }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // Fetch recent workout logs for the progress screen
+  async getWorkoutLogs(supabaseUserId, limit = 20) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&order=logged_at.desc&limit=${limit}`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      return await res.json();
+    } catch { return []; }
+  },
+
+  // ── MEAL LOGS ─────────────────────────────────────────────────────────────
+  async insertMealLog(supabaseUserId, { mealId, status, loggedName, loggedCal, loggedProtein }) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/meal_logs`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: profileId,           // ← profiles.id, not auth.users.id
+          meal_id: mealId,
+          date: new Date().toISOString().slice(0, 10),
+          status,
+          logged_name: loggedName,
+          logged_cal: loggedCal,
+          logged_protein: loggedProtein,
+        }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+};
+
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const theme = {
   accent: "#00D4B1", accentDim: "rgba(0,212,177,0.10)", accentBorder: "rgba(0,212,177,0.25)",
@@ -15,29 +151,105 @@ const theme = {
   },
 };
 
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+// Set DEV_SKIP to "member_new", "member_returning", "owner", or null for real auth.
+const DEV_SKIP = null; // null = shows real auth screen
+
 // ─── CONTEXT ──────────────────────────────────────────────────────────────────
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 
+const DEFAULT_USER = { name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" };
+const MOCK_RETURNING_PLAN = {
+  calories: 1800, protein: 140, carbs: 160, fat: 55,
+  workoutDays: ["Monday","Wednesday","Friday"], workoutType: "Full Body",
+  workoutDuration: 40, weeklyFocus: "Build your movement foundation.",
+  exercises: [
+    { name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" },
+    { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" },
+    { name: "Incline Press", sets: 3, reps: 10, weight: 35, muscle: "Chest / Shoulders" },
+    { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 65, muscle: "Hamstrings" },
+    { name: "Shoulder Press", sets: 3, reps: 10, weight: 25, muscle: "Shoulders" },
+  ],
+  tip: "Consistency over perfection — show up, even on hard days.",
+};
+
 function AppProvider({ children }) {
-  const [screen, setScreen] = useState("onboarding");
-  const [user, setUser] = useState({ name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" });
-  const [plan, setPlan] = useState(null);
+  const [screen, setScreen] = useState(
+    DEV_SKIP === "owner" ? "owner" :
+    DEV_SKIP === "member_returning" ? "home" :
+    DEV_SKIP === "member_new" ? "onboarding" : "auth"
+  );
+  const [user, setUser] = useState(
+    DEV_SKIP === "member_returning"
+      ? { name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" }
+      : DEFAULT_USER
+  );
+  const [plan, setPlan] = useState(DEV_SKIP === "member_returning" ? MOCK_RETURNING_PLAN : null);
+  const [supabaseUser, setSupabaseUser] = useState(DEV_SKIP ? { email: "dev@morphiq.app", id: "dev-001" } : null);
   const [gymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", units: "imperial" });
-  const CAL_GOAL = 1840, PROTEIN_GOAL = 140;
-  const [meals, setMeals] = useState([
-    { id: "breakfast", label: "Breakfast", time: "7-9 AM",  suggested: { name: "Greek yogurt & berries", cal: 320, protein: 28, carbs: 36, fat: 6 },  status: "done",     logged: null },
-    { id: "lunch",     label: "Lunch",     time: "12-1 PM", suggested: { name: "Grilled chicken wrap",  cal: 480, protein: 38, carbs: 44, fat: 12 }, status: "upcoming", logged: null },
-    { id: "dinner",    label: "Dinner",    time: "6-7 PM",  suggested: { name: "Light salmon salad",    cal: 380, protein: 36, carbs: 22, fat: 16 }, originalSuggested: { name: "Salmon & roasted veg", cal: 540, protein: 44 }, status: "upcoming", logged: null },
-    { id: "snack",     label: "Snack",     time: "3-4 PM",  suggested: { name: "Protein shake + banana", cal: 240, protein: 26, carbs: 28, fat: 3 }, status: "upcoming", logged: null },
-  ]);
-  const mealTotals = meals.reduce((acc, m) => {
-    const src = (m.status === "done" || m.status === "swapped") ? (m.logged || m.suggested) : null;
-    if (!src) return acc;
-    return { cal: acc.cal + src.cal, protein: acc.protein + src.protein };
-  }, { cal: 0, protein: 0 });
+
+  // Called after successful auth. role = "member" | "owner".
+  // hasPlan=true|false = dev shortcut (bypasses DB). hasPlan=null = production path (reads DB).
+  async function signIn(email, role, hasPlan = null, realAuthUserId = null) {
+    const uid = realAuthUserId || ("sim-" + Date.now());
+    setSupabaseUser({ email, id: uid });
+    if (role === "owner") { setScreen("owner"); return; }
+
+    if (hasPlan === true) {
+      setUser({ name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" });
+      setPlan(MOCK_RETURNING_PLAN);
+      setScreen("home");
+      return;
+    }
+    if (hasPlan === false) {
+      setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding"); return;
+    }
+
+    // Production: query profile from Supabase using the real auth UID
+    setScreen("loading");
+    try {
+      const profile = await sb.getProfile(uid);
+      if (profile?.plan) {
+        setUser({ name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" });
+        setPlan(profile.plan);
+        setScreen("home");
+      } else {
+        setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding");
+      }
+    } catch { setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding"); }
+  }
+
+  // ── REAL SUPABASE MAGIC-LINK CALLBACK ─────────────────────────────────────
+  // When Supabase redirects back after clicking the magic link, the URL contains
+  // #access_token=...&refresh_token=...  We detect this once on mount and sign in.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.includes("access_token=")) return;
+    const params = new URLSearchParams(hash.replace("#", "?"));
+    const accessToken = params.get("access_token");
+    if (!accessToken) return;
+    // Remove the token from the URL bar immediately (security hygiene)
+    window.history.replaceState(null, "", window.location.pathname);
+    // Decode the JWT to get the user's Supabase UUID (sub claim)
+    try {
+      const payload = JSON.parse(atob(accessToken.split(".")[1]));
+      const email = payload.email || "";
+      const uid = payload.sub || "";
+      if (uid) signIn(email, "member", null, uid);
+    } catch { /* malformed token — fall through to normal auth screen */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function signOut() {
+    setSupabaseUser(null);
+    setUser(DEFAULT_USER);
+    setPlan(null);
+    setScreen("auth");
+  }
+
   return (
-    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, gymBranding, meals, setMeals, mealTotals, CAL_GOAL, PROTEIN_GOAL }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, signIn, signOut }}>
       {children}
     </AppContext.Provider>
   );
@@ -141,6 +353,133 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   );
 }
 
+// ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
+function AuthScreen() {
+  const { signIn, gymBranding } = useApp();
+  const a = gymBranding.accent;
+  const ob = theme.ob;
+
+  const [mode, setMode] = useState("member");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authStep, setAuthStep] = useState("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleMemberLogin() {
+    if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
+    setAuthStep("sending"); setErrorMsg("");
+    // In production, this sends a real Supabase magic link.
+    // sb.sendMagicLink(email) is called but we still show the "sent" state regardless of response
+    // (to avoid leaking whether the email exists in our system).
+    try { await sb.sendMagicLink(email); } catch { /* network issues — still show sent */ }
+    await new Promise(r => setTimeout(r, 400));
+    setAuthStep("sent");
+  }
+
+  async function handleOwnerLogin() {
+    if (!email.includes("@") || password.length < 6) { setErrorMsg("Check your email and password."); return; }
+    setAuthStep("loading"); setErrorMsg("");
+    await new Promise(r => setTimeout(r, 1400));
+    if (email.toLowerCase().includes("owner") || email.toLowerCase().includes("gym")) {
+      signIn(email, "owner");
+    } else {
+      setAuthStep("error");
+      setErrorMsg("Demo: use an email containing 'owner' or 'gym'.");
+    }
+  }
+
+  // Simulates clicking the magic link — in prod this is the Supabase redirect callback
+  function clickMagicLink(hasPlan) {
+    setAuthStep("loading");
+    setTimeout(() => signIn(email || "demo@morphiq.app", "member", hasPlan), 900);
+  }
+
+  const inp = { width: "100%", background: ob.card, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: ob.white, outline: "none", fontFamily: ob.font, marginBottom: 10 };
+  const btn = (dis) => ({ width: "100%", background: dis ? "#1A2332" : a, color: dis ? ob.muted : ob.tealDk, border: "none", borderRadius: 10, padding: "11px", fontSize: 13, fontWeight: 600, cursor: dis ? "default" : "pointer", fontFamily: ob.font, marginTop: 4 });
+
+  return (
+    <div style={{ background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, overflow: "hidden" }}>
+      <div style={{ padding: "28px 20px 20px", textAlign: "center" }}>
+        <div style={{ width: 52, height: 52, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>M</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
+        <div style={{ fontSize: 11, color: ob.muted }}>Powered by Morphiq</div>
+      </div>
+      <div style={{ display: "flex", margin: "0 20px 20px", background: ob.card, borderRadius: 10, padding: 3 }}>
+        {[["member","I'm a Member"],["owner","Gym Owner"]].map(([id, label]) => (
+          <button key={id} onClick={() => { setMode(id); setAuthStep("idle"); setErrorMsg(""); }}
+            style={{ flex: 1, padding: "8px", background: mode === id ? a : "transparent", color: mode === id ? ob.tealDk : ob.muted, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, transition: "all .2s" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div style={{ flex: 1, padding: "0 20px 20px" }}>
+        {mode === "member" && (
+          <div className="mq-fade">
+            {authStep === "idle" || authStep === "sending" ? (
+              <>
+                <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>Enter your email and we'll send you a one-tap sign-in link. No password needed.</div>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleMemberLogin()} placeholder="your@email.com" style={inp} />
+                {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
+                <button onClick={handleMemberLogin} style={btn(!email.includes("@") || authStep === "sending")}>{authStep === "sending" ? "Sending…" : "Send magic link →"}</button>
+                <div style={{ marginTop: 18, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
+                  <div style={{ fontSize: 10, color: "#333", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Dev shortcuts</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"New member
+(onboarding)"}</button>
+                    <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"Returning
+(has plan)"}</button>
+                    <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#1A1040", border: "1px dashed rgba(167,139,250,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: "#A78BFA", cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"Owner
+dashboard"}</button>
+                  </div>
+                </div>
+              </>
+            ) : authStep === "sent" ? (
+              <div className="mq-fade" style={{ textAlign: "center", paddingTop: 20 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📬</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: ob.white, marginBottom: 8 }}>Check your inbox</div>
+                <div style={{ fontSize: 12, color: ob.body, marginBottom: 20, lineHeight: 1.6 }}>We sent a sign-in link to <span style={{ color: a }}>{email}</span>. Tap it to continue.</div>
+                <div style={{ background: ob.card, borderRadius: 10, padding: "10px 14px", marginBottom: 12, border: "1px dashed rgba(0,212,177,0.3)" }}>
+                  <div style={{ fontSize: 10, color: ob.muted, marginBottom: 8 }}>DEV — simulate clicking the email link:</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 9, padding: "8px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font }}>New member</button>
+                    <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: a, border: "none", borderRadius: 9, padding: "8px 6px", fontSize: 11, color: ob.tealDk, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>Returning member</button>
+                  </div>
+                </div>
+                <button onClick={() => setAuthStep("idle")} style={{ fontSize: 11, color: ob.muted, background: "none", border: "none", cursor: "pointer" }}>Use a different email</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 40 }}>
+                <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+                <div style={{ fontSize: 12, color: ob.body }}>Signing you in…</div>
+              </div>
+            )}
+          </div>
+        )}
+        {mode === "owner" && (
+          <div className="mq-fade">
+            {authStep !== "loading" ? (
+              <>
+                <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>Sign in to your gym dashboard with your admin credentials.</div>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="gym@ironhouse.com" style={inp} />
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleOwnerLogin()} placeholder="Password" style={{ ...inp, marginBottom: 4 }} />
+                {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
+                <button onClick={handleOwnerLogin} style={btn(!email.includes("@") || password.length < 6)}>{authStep === "sending" ? "Signing in…" : "Sign in →"}</button>
+                <div style={{ fontSize: 11, color: ob.muted, marginTop: 12, textAlign: "center", lineHeight: 1.6 }}>Demo: use any email containing "owner" or "gym" with any 6+ char password.</div>
+              </>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 40 }}>
+                <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+                <div style={{ fontSize: 12, color: ob.body }}>Verifying credentials…</div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: ".5px", padding: "4px 0 10px" }}>POWERED BY MORPHIQ</div>
+    </div>
+  );
+}
+
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
 const GOAL_OPTIONS = [
   { id: "lose_fat", icon: "🔥", label: "Lose fat", sub: "Burn calories, drop weight" },
@@ -150,7 +489,7 @@ const GOAL_OPTIONS = [
 ];
 
 function OnboardingScreen() {
-  const { navigate, setUser, setPlan, gymBranding } = useApp();
+  const { navigate, setUser, setPlan, gymBranding, supabaseUser } = useApp();
   const ob = theme.ob;
   const a = gymBranding.accent || ob.teal;
   const [step, setStep] = useState(0);
@@ -167,16 +506,48 @@ function OnboardingScreen() {
   const [checklist, setChecklist] = useState([false, false, false, false]);
 
   useEffect(() => {
-    if (step === 8) {
-      [0, 1, 2, 3].forEach(i => setTimeout(() => setChecklist(c => c.map((v, idx) => idx <= i ? true : v)), i * 550 + 300));
-      const t = setTimeout(() => {
-        setUser({ name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, unit });
-        setPlan({ weekly: [] });
-        setStep(9);
-      }, 2800);
-      return () => clearTimeout(t);
+    if (step !== 8) return;
+    let cancelled = false;
+    [0,1,2,3].forEach(i => setTimeout(() => { if(!cancelled) setChecklist(c => c.map((v,idx) => idx<=i ? true : v)); }, i*550+300));
+
+    async function generatePlan() {
+      const prompt = `You are a certified personal trainer. Return ONLY valid JSON (no markdown, no preamble) for this member: name=${name}, goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, injuries=${injuries||"none"}.\nJSON shape exactly: {"calories":<number>,"protein":<number>,"carbs":<number>,"fat":<number>,"workoutDays":[<${daysPerWeek} day names>],"workoutType":"<string>","workoutDuration":<minutes>,"weeklyFocus":"<1 sentence>","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<starting lbs>,"muscle":"<string>"}],"tip":"<1 sentence>"}\nInclude 5-6 exercises. All numeric fields must be plain numbers.`;
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
+        });
+        const data = await res.json();
+        const raw = (data.content || []).map(b => b.text || "").join("").replace(/```json|```/g, "").trim();
+        const parsed = JSON.parse(raw);
+        if (!cancelled) {
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, unit };
+          setUser(userData);
+          setPlan(parsed);
+          // Persist to Supabase profiles table (fire-and-forget — UI doesn't block on this)
+          if (supabaseUser?.id) {
+            sb.upsertProfile(supabaseUser.id, userData, parsed).catch(() => {});
+          }
+          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
+        }
+      } catch (_) {
+        if (!cancelled) {
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, unit };
+          const fallbackPlan = { calories: goal === "lose_fat" ? 1800 : goal === "build_muscle" ? 2800 : 2200, protein: 140, carbs: 160, fat: 55, workoutDays: ["Monday","Wednesday","Friday","Saturday","Tuesday","Thursday"].slice(0, daysPerWeek || 3), workoutType: "Full Body", workoutDuration: 40, weeklyFocus: "Build your movement foundation with compound lifts.", exercises: [{ name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" }, { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" }, { name: "Incline Press", sets: 3, reps: 10, weight: 35, muscle: "Chest / Shoulders" }, { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 65, muscle: "Hamstrings" }, { name: "Shoulder Press", sets: 3, reps: 10, weight: 25, muscle: "Shoulders" }], tip: "Consistency over perfection — show up, even on hard days." };
+          setUser(userData);
+          setPlan(fallbackPlan);
+          if (supabaseUser?.id) {
+            sb.upsertProfile(supabaseUser.id, userData, fallbackPlan).catch(() => {});
+          }
+          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
+        }
+      }
     }
+
+    Promise.all([generatePlan(), new Promise(r => setTimeout(r, 2600))]);
+    return () => { cancelled = true; };
   }, [step]);
+
 
   const bodyValid = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && weight && parseFloat(weight) > 0;
   const ageValid = age && parseInt(age) >= 13 && parseInt(age) <= 100;
@@ -337,30 +708,31 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 9 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 9 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ textAlign: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>Your plan is ready</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}'s {goalLabel} Plan</div>
-            <div style={{ fontSize: 9, color: ob.muted }}>Built by Morphiq · Week 1</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}&apos;s {goalLabel} Plan</div>
+            <div style={{ fontSize: 9, color: ob.muted }}>Built by Morphiq AI · Week 1</div>
           </div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
-            <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Workouts</div>
-            {["Monday", "Wednesday", "Friday"].slice(0, daysPerWeek || 3).map((day, i, arr) => (
+            <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Workouts — {plan.workoutType}</div>
+            {(plan.workoutDays || []).map((day, i, arr) => (
               <div key={day} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                 <span style={{ fontSize: 11, color: ob.white }}>{day}</span>
-                <Pill>Full body · 35 min</Pill>
+                <Pill>{plan.workoutType} · {plan.workoutDuration} min</Pill>
               </div>
             ))}
           </div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
             <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Daily targets</div>
-            {[["Calories", "1,840/day"], ["Protein", "140g/day"], ["Water", "8 glasses"]].map(([k, v]) => (
+            {[["Calories", `${plan.calories?.toLocaleString()}/day`], ["Protein", `${plan.protein}g/day`], ["Carbs", `${plan.carbs}g/day`], ["Fat", `${plan.fat}g/day`]].map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
                 <span style={{ fontSize: 11, color: ob.white }}>{k}</span>
                 <span style={{ fontSize: 11, color: a, fontWeight: 600 }}>{v}</span>
               </div>
             ))}
           </div>
+          {plan.tip && <div style={{ background: "#0A1628", borderLeft: `2px solid ${a}`, borderRadius: "0 8px 8px 0", padding: "7px 10px", marginBottom: 8, fontSize: 11, color: ob.body, lineHeight: 1.5 }}>{plan.tip}</div>}
           <button onClick={() => navigate("plan")} style={{ ...s.tealBtn(false), marginTop: "auto", padding: 10, fontSize: 12 }}>Start Day 1 →</button>
         </div>}
       </div>
@@ -427,8 +799,14 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
 }
 
 function WorkoutScreen() {
-  const { navigate, user, gymBranding } = useApp();
+  const { navigate, user, gymBranding, plan, supabaseUser } = useApp();
   const a = gymBranding.accent;
+
+  // Use AI-generated exercises if available, else fall back to defaults
+  const exercises = (plan?.exercises || WORKOUT_EXERCISES).map(e => ({
+    name: e.name, muscle: e.muscle, sets: e.sets,
+    targetReps: e.reps || e.targetReps, weight: e.weight,
+  }));
 
   const [exIdx, setExIdx] = useState(0);
   const [setIdx, setSetIdx] = useState(0);
@@ -444,9 +822,9 @@ function WorkoutScreen() {
 
   const [nudgedWeight, setNudgedWeight] = useState(null);
 
-  const ex = WORKOUT_EXERCISES[exIdx];
+  const ex = exercises[exIdx];
   const currentWeight = nudgedWeight ?? ex.weight;
-  const nextEx = WORKOUT_EXERCISES[exIdx + 1];
+  const nextEx = exercises[exIdx + 1];
 
   useEffect(() => {
     if (state === "rest") {
@@ -468,6 +846,16 @@ function WorkoutScreen() {
     setVoiceTranscript("");
     setListening(false);
 
+    // Persist to Supabase workout_logs (fire-and-forget)
+    if (supabaseUser?.id) {
+      sb.insertWorkoutLog(supabaseUser.id, {
+        exerciseName: ex.name,
+        setNumber: setIdx + 1,
+        reps,
+        weight: currentWeight,
+      }).catch(() => {});
+    }
+
     const prevSets = newLogs.filter(l => l.exIdx === exIdx);
     const exceeded = prevSets.filter(l => l.reps > ex.targetReps).length;
     const isLastSet = setIdx === ex.sets - 1;
@@ -485,7 +873,7 @@ function WorkoutScreen() {
     if (setIdx < ex.sets - 1) {
       setSetIdx(s => s + 1);
       setState("active");
-    } else if (exIdx < WORKOUT_EXERCISES.length - 1) {
+    } else if (exIdx < exercises.length - 1) {
       setExIdx(i => i + 1);
       setSetIdx(0);
       setState("active");
@@ -731,14 +1119,15 @@ function PlanOverviewScreen() {
 
 // ─── HOME DASHBOARD ────────────────────────────────────────────────────────────
 function HomeDashboardScreen() {
-  const { navigate, user, gymBranding, meals, setMeals, mealTotals, CAL_GOAL, PROTEIN_GOAL } = useApp();
+  const { navigate, user, gymBranding } = useApp();
   const a = gymBranding.accent;
+  const [done, setDone] = useState(0);
+  const [cals, setCals] = useState(1100);
+  const [logged, setLogged] = useState(false);
+  const calGoal = 1840;
   const h = new Date().getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   const sL = { fontSize: 11, color: theme.textDim, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" };
-  const nextMeal = meals.find(m => m.status === "upcoming");
-  const calPct = Math.min(100, Math.round((mealTotals.cal / CAL_GOAL) * 100));
-  const proteinPct = Math.min(100, Math.round((mealTotals.protein / PROTEIN_GOAL) * 100));
 
   return (
     <Layout activeNav="home">
@@ -759,9 +1148,13 @@ function HomeDashboardScreen() {
           <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 8, flexWrap: "wrap" }}>
             {["3 sets each", "Beginner", "Week 2"].map(t => <div key={t} style={{ background: "#1E1E1E", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: theme.textMuted, display: "flex", alignItems: "center", gap: 5 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: a }} />{t}</div>)}
           </div>
+          <div style={{ margin: "0 1.25rem .5rem", height: 3, background: "#1A1A1A", borderRadius: 2 }}>
+            <div style={{ height: 3, borderRadius: 2, background: done === 5 ? theme.success : a, width: `${Math.round((done / 5) * 100)}%`, transition: "width .5s" }} />
+          </div>
+          <div style={{ padding: "0 1.25rem .5rem", fontSize: 12, color: done === 5 ? theme.success : theme.textDim }}>{done === 5 ? "Workout complete! ✓" : `${done} of 5 exercises done`}</div>
           <div style={{ padding: "0 1.25rem 1.25rem" }}>
-            <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-              Start workout →
+            <button onClick={() => navigate("workout")} style={{ width: "100%", background: done === 5 ? theme.success : a, color: done === 5 ? "#E1F5EE" : "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+              {done === 0 ? "Start workout" : done === 5 ? "View summary →" : "Continue workout →"}
             </button>
           </div>
         </div>
@@ -780,55 +1173,69 @@ function HomeDashboardScreen() {
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Nutrition today</div>
         <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: ".9rem 1.25rem .75rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>{mealTotals.cal.toLocaleString()} <span style={{ fontSize: 12, color: theme.textDim, fontWeight: 400 }}>/ {CAL_GOAL.toLocaleString()} cal</span></div>
-            <div style={{ fontSize: 13, color: mealTotals.cal >= CAL_GOAL ? "#F59E0B" : a, fontWeight: 500 }}>{Math.max(0, CAL_GOAL - mealTotals.cal)} remaining</div>
+          <div style={{ padding: ".9rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>Calories</div>
+            <div style={{ fontSize: 13, color: a, fontWeight: 500 }}>{calGoal - cals} remaining</div>
           </div>
-          <div style={{ padding: "0 1.25rem .75rem" }}>
-            <div style={{ height: 6, background: "#1E1E1E", borderRadius: 3, marginBottom: 8 }}>
-              <div style={{ height: 6, borderRadius: 3, background: mealTotals.cal >= CAL_GOAL ? "#F59E0B" : a, width: `${calPct}%`, transition: "width .6s" }} />
+          <div style={{ padding: ".75rem 1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: theme.textDim, marginBottom: 6 }}>
+              <span>{cals.toLocaleString()} eaten</span><span>{calGoal.toLocaleString()} goal</span>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 1, background: "#1A1A1A", borderRadius: 8, padding: "6px 10px" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#F59E0B" }}>{mealTotals.protein}g <span style={{ fontSize: 10, color: theme.textDim, fontWeight: 400 }}>/ {PROTEIN_GOAL}g</span></div>
-                <div style={{ fontSize: 10, color: theme.textDim, marginTop: 2 }}>Protein</div>
-                <div style={{ height: 3, background: "#2A2A2A", borderRadius: 2, marginTop: 4 }}>
-                  <div style={{ height: 3, borderRadius: 2, background: "#F59E0B", width: `${proteinPct}%`, transition: "width .6s" }} />
-                </div>
-              </div>
-              <div style={{ flex: 1, background: "#1A1A1A", borderRadius: 8, padding: "6px 10px" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#818cf8" }}>{meals.filter(m => m.status === "done" || m.status === "swapped").length} <span style={{ fontSize: 10, color: theme.textDim, fontWeight: 400 }}>/ {meals.length} meals</span></div>
-                <div style={{ fontSize: 10, color: theme.textDim, marginTop: 2 }}>Logged today</div>
-                <div style={{ height: 3, background: "#2A2A2A", borderRadius: 2, marginTop: 4 }}>
-                  <div style={{ height: 3, borderRadius: 2, background: "#818cf8", width: `${Math.round((meals.filter(m => m.status === "done" || m.status === "swapped").length / meals.length) * 100)}%`, transition: "width .6s" }} />
-                </div>
-              </div>
+            <div style={{ height: 6, background: "#1E1E1E", borderRadius: 3 }}>
+              <div style={{ height: 6, borderRadius: 3, background: a, width: `${Math.round((cals / calGoal) * 100)}%`, transition: "width .5s" }} />
             </div>
           </div>
-          {nextMeal && <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 2 }}>Next meal</div>
-              <div style={{ fontSize: 14, color: "#D0D0D0", fontWeight: 500 }}>{nextMeal.suggested.name}</div>
-              <div style={{ fontSize: 11, color: theme.textDim }}>{nextMeal.suggested.cal} cal · {nextMeal.suggested.protein}g protein</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 2 }}>Next suggested meal</div>
+              <div style={{ fontSize: 14, color: "#D0D0D0", fontWeight: 500 }}>Grilled chicken + rice</div>
+              <div style={{ fontSize: 12, color: theme.textDim }}>~480 cal · 42g protein</div>
             </div>
-            <button onClick={() => { setMeals(prev => prev.map(m => m.id === nextMeal.id ? { ...m, status: "done" } : m)); }} style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "6px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-              Log ✓
+            <button onClick={() => { if (!logged) { setCals(1580); setLogged(true); } }} style={{ background: "transparent", border: `0.5px solid ${logged ? a : "#2A2A2A"}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, color: logged ? a : theme.textMuted, cursor: "pointer", fontFamily: "inherit" }}>
+              {logged ? "Logged ✓" : "Log meal"}
             </button>
-          </div>}
-          {!nextMeal && <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, fontSize: 13, color: a, fontWeight: 500 }}>All meals logged today ✓</div>}
+          </div>
         </div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => navigate("meals")} style={{ flex: 1, background: "transparent", border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem", fontSize: 13, color: a, cursor: "pointer", fontFamily: "inherit" }}>Meal plan →</button>
-          <button onClick={() => navigate("owner")} style={{ flex: 1, background: "transparent", border: "0.5px solid rgba(167,139,250,0.3)", borderRadius: 12, padding: ".85rem", fontSize: 13, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit" }}>Owner dash →</button>
-        </div>
+        <button onClick={() => navigate("meals")} style={{ width: "100%", background: "transparent", border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+          View full meal plan →
+        </button>
+      </div>
+      <div style={{ padding: ".75rem 1.25rem 0" }}>
+        <button onClick={() => navigate("owner")} style={{ width: "100%", background: "transparent", border: `0.5px solid rgba(167,139,250,0.3)`, borderRadius: 12, padding: ".75rem", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit" }}>
+          ⚙️ Gym owner dashboard →
+        </button>
       </div>
     </Layout>
   );
 }
 
-// ─── MEAL PLAN DATA — now lives in AppContext ─────────────────────────────────
+// ─── MEAL PLAN DATA ────────────────────────────────────────────────────────────
+const MEAL_DATA = [
+  {
+    id: "breakfast", label: "Breakfast", time: "7–9 AM",
+    suggested: { name: "Greek yogurt & berries", cal: 320, protein: 28, carbs: 36, fat: 6 },
+    status: "done", logged: null,
+  },
+  {
+    id: "lunch", label: "Lunch", time: "12–1 PM",
+    suggested: { name: "Grilled chicken wrap", cal: 480, protein: 38, carbs: 44, fat: 12 },
+    status: "upcoming",
+    logged: null,
+  },
+  {
+    id: "dinner", label: "Dinner", time: "6–7 PM",
+    suggested: { name: "Light salmon salad", cal: 380, protein: 36, carbs: 22, fat: 16 },
+    originalSuggested: { name: "Salmon & roasted veg", cal: 540, protein: 44 },
+    status: "upcoming", logged: null,
+  },
+  {
+    id: "snack", label: "Snack", time: "3–4 PM",
+    suggested: { name: "Protein shake + banana", cal: 240, protein: 26, carbs: 28, fat: 3 },
+    status: "upcoming", logged: null,
+  },
+];
 
 const GROCERY_DATA = [
   { category: "Protein", emoji: "🥩", items: [
@@ -1094,40 +1501,61 @@ function GroceryList({ groceries, onToggle }) {
 
 // ─── MEAL PLAN SCREEN ─────────────────────────────────────────────────────────
 function MealPlanScreen() {
-  const { gymBranding, meals, setMeals, CAL_GOAL, PROTEIN_GOAL } = useApp();
+  const { gymBranding, supabaseUser } = useApp();
   const a = gymBranding.accent;
 
   const [tab, setTab] = useState("today");
+  const [meals, setMeals] = useState(MEAL_DATA);
   const [groceries, setGroceries] = useState(GROCERY_DATA);
-  const [detailMeal, setDetailMeal] = useState(null);
+  const [detailMeal, setDetailMeal] = useState(null); // null = list view, meal obj = detail view
 
-  const CARBS_GOAL = 160, FAT_GOAL = 55;
+  const CAL_GOAL = 1840, PROTEIN_GOAL = 140, CARBS_GOAL = 160, FAT_GOAL = 55;
 
-  // Recalculate macros from shared meals state
-  const macros = meals.reduce((acc, m) => {
+  const calcMacros = (mealList) => mealList.reduce((acc, m) => {
     const src = (m.status === "done" || m.status === "swapped") ? (m.logged || m.suggested) : null;
     if (!src) return acc;
     return { cal: acc.cal + src.cal, protein: acc.protein + src.protein, carbs: acc.carbs + (src.carbs || 0), fat: acc.fat + (src.fat || 0) };
   }, { cal: 0, protein: 0, carbs: 0, fat: 0 });
 
-
+  const macros = calcMacros(meals);
 
   function markDone(id) {
+    const meal = meals.find(m => m.id === id);
     setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done" } : m));
+    if (supabaseUser?.id && meal) {
+      sb.insertMealLog(supabaseUser.id, {
+        mealId: id, status: "done",
+        loggedName: meal.suggested.name, loggedCal: meal.suggested.cal, loggedProtein: meal.suggested.protein,
+      }).catch(() => {});
+    }
   }
   function skipMeal(id) {
     setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "skipped" } : m));
+    if (supabaseUser?.id) {
+      sb.insertMealLog(supabaseUser.id, { mealId: id, status: "skipped", loggedName: null, loggedCal: 0, loggedProtein: 0 }).catch(() => {});
+    }
   }
   function confirmSalad(id) {
+    const meal = meals.find(m => m.id === id);
     setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done" } : m));
     setDetailMeal(null);
+    if (supabaseUser?.id && meal) {
+      sb.insertMealLog(supabaseUser.id, {
+        mealId: id, status: "done",
+        loggedName: meal.suggested.name, loggedCal: meal.suggested.cal, loggedProtein: meal.suggested.protein,
+      }).catch(() => {});
+    }
   }
   function logSwap(id) {
-    setMeals(prev => prev.map(m => m.id === id ? {
-      ...m, status: "swapped",
-      logged: { name: "Burger & fries", cal: 820, protein: 28, carbs: 72, fat: 38 }
-    } : m));
+    const swapped = { name: "Burger & fries", cal: 820, protein: 28, carbs: 72, fat: 38 };
+    setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "swapped", logged: swapped } : m));
     setDetailMeal(null);
+    if (supabaseUser?.id) {
+      sb.insertMealLog(supabaseUser.id, {
+        mealId: id, status: "swapped",
+        loggedName: swapped.name, loggedCal: swapped.cal, loggedProtein: swapped.protein,
+      }).catch(() => {});
+    }
   }
   function toggleGrocery(category, idx) {
     setGroceries(prev => prev.map(cat => cat.category !== category ? cat : {
@@ -1514,10 +1942,56 @@ function StreakCalendar({ accent }) {
 }
 
 function ProgressScreen() {
-  const { gymBranding } = useApp();
+  const { gymBranding, supabaseUser } = useApp();
   const a = gymBranding.accent;
   const [tab, setTab] = useState("body");
   const sL = { fontSize:10, color:"#6B7A8D", textTransform:"uppercase", letterSpacing:"1.2px", marginBottom:10, fontWeight:500 };
+
+  // ── Real data from Supabase workout_logs ──────────────────────────────────
+  const [realLogs, setRealLogs] = useState(null); // null = loading, [] = none yet
+  useEffect(() => {
+    if (!supabaseUser?.id || supabaseUser.id.startsWith("sim-") || supabaseUser.id === "dev-001") {
+      setRealLogs([]); return; // dev/sim mode — fall through to mock data
+    }
+    sb.getWorkoutLogs(supabaseUser.id, 30).then(rows => setRealLogs(Array.isArray(rows) ? rows : []));
+  }, [supabaseUser?.id]);
+
+  // Derive stats from real logs if available, otherwise use mock data
+  const useRealData = realLogs !== null && realLogs.length > 0;
+
+  // Build recent session list from real logs (group by workout_date)
+  const realSessions = useRealData ? (() => {
+    const byDate = {};
+    realLogs.forEach(row => {
+      if (!byDate[row.workout_date]) byDate[row.workout_date] = { date: row.workout_date, sets: 0, exercises: new Set(), totalVol: 0 };
+      byDate[row.workout_date].sets++;
+      byDate[row.workout_date].exercises.add(row.exercise_name);
+      byDate[row.workout_date].totalVol += (row.weight || 0) * (row.reps || 0);
+    });
+    return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map(s => ({
+      date: new Date(s.date + "T12:00:00").toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" }),
+      name: "Full body",
+      sets: s.sets,
+      vol: s.totalVol > 0 ? s.totalVol.toLocaleString() + " lbs" : "—",
+      pbs: 0,
+    }));
+  })() : WORKOUT_LOG;
+
+  const totalWorkouts = useRealData ? realSessions.length : 14;
+
+  // Derive personal bests from real logs
+  const realPBs = useRealData ? (() => {
+    const best = {};
+    realLogs.forEach(row => {
+      const key = row.exercise_name;
+      if (!best[key] || row.weight > best[key].weight) {
+        best[key] = { exercise: key, weight: `${row.weight} lbs`, reps: row.reps, date: row.workout_date };
+      }
+    });
+    return Object.values(best).slice(0, 6);
+  })() : PERSONAL_BESTS;
+
+  // Weight chart still uses mock data until we add a weight_logs table
   const lost = (WEIGHT_DATA[0].weight - WEIGHT_DATA[WEIGHT_DATA.length-1].weight).toFixed(1);
   const curr = WEIGHT_DATA[WEIGHT_DATA.length-1].weight;
 
@@ -1602,7 +2076,7 @@ function ProgressScreen() {
           <div className="mq-fade">
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
               {[
-                { val:"14",      lbl:"Total workouts",       color:a },
+                { val: String(totalWorkouts), lbl:"Total workouts", color:a },
                 { val:"98%",     lbl:"Completion rate",      color:a },
                 { val:"67,330",  lbl:"Total volume (lbs)",   color:"#F59E0B" },
                 { val:"40 min",  lbl:"Avg duration",         color:"#818cf8" },
@@ -1615,8 +2089,8 @@ function ProgressScreen() {
             </div>
             <div style={sL}>Recent sessions</div>
             <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden" }}>
-              {WORKOUT_LOG.map((w, i) => (
-                <div key={w.date} style={{ padding:"10px 14px", borderBottom: i < WORKOUT_LOG.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+              {realSessions.map((w, i) => (
+                <div key={w.date} style={{ padding:"10px 14px", borderBottom: i < realSessions.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                     <div>
                       <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{w.name}</div>
@@ -1643,8 +2117,8 @@ function ProgressScreen() {
             </div>
             <div style={sL}>Current bests</div>
             <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
-              {PERSONAL_BESTS.map((pb, i) => (
-                <div key={pb.exercise} style={{ padding:"11px 14px", borderBottom: i < PERSONAL_BESTS.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+              {realPBs.map((pb, i) => (
+                <div key={pb.exercise} style={{ padding:"11px 14px", borderBottom: i < realPBs.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                     <div>
                       <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
@@ -1688,7 +2162,7 @@ function ProgressScreen() {
 
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
 function ProfileScreen() {
-  const { navigate, user, gymBranding } = useApp();
+  const { navigate, user, gymBranding, signOut } = useApp();
   const a = gymBranding.accent;
   const [editGoal, setEditGoal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(user.goal || "lose_fat");
@@ -1790,6 +2264,9 @@ function ProfileScreen() {
         {/* Danger zone */}
         <button onClick={() => navigate("onboarding")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: "10px", fontSize: 13, color: "#F87171", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
           Restart onboarding quiz
+        </button>
+        <button onClick={signOut} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+          Sign out
         </button>
       </div>
     </Layout>
@@ -2003,9 +2480,26 @@ function GymOwnerDashboard() {
   );
 }
 
+// ─── LOADING SCREEN ───────────────────────────────────────────────────────────
+function LoadingScreen() {
+  const { gymBranding } = useApp();
+  const a = gymBranding.accent;
+  const ob = theme.ob;
+  return (
+    <div style={{ background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: ob.font }}>
+      <div style={{ width: 48, height: 48, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: a }}>M</div>
+      <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+      <div style={{ fontSize: 13, color: ob.body }}>Loading your account…</div>
+      <div style={{ fontSize: 9, color: "#333", letterSpacing: ".5px", marginTop: 20 }}>POWERED BY MORPHIQ</div>
+    </div>
+  );
+}
+
 // ─── ROUTER ───────────────────────────────────────────────────────────────────
 function AppRouter() {
   const { screen } = useApp();
+  if (screen === "auth") return <AuthScreen />;
+  if (screen === "loading") return <LoadingScreen />;
   if (screen === "onboarding") return <OnboardingScreen />;
   if (screen === "plan") return <PlanOverviewScreen />;
   if (screen === "workout") return <WorkoutScreen />;
