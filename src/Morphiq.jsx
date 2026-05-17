@@ -351,6 +351,34 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   );
 }
 
+// ─── DEV SHORTCUTS (hidden — tap footer 5x to reveal) ────────────────────────
+function DevShortcuts({ clickMagicLink, signIn, ob }) {
+  const [taps, setTaps] = useState(0);
+  const [visible, setVisible] = useState(false);
+  function tap() {
+    const next = taps + 1;
+    setTaps(next);
+    if (next >= 5) { setVisible(true); setTaps(0); }
+  }
+  return (
+    <>
+      <div onClick={tap} style={{ marginTop: 18, borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 10, textAlign: "center", cursor: "default", userSelect: "none" }}>
+        <div style={{ fontSize: 9, color: "#1a1a1a", letterSpacing: "1px" }}>POWERED BY MORPHIQ</div>
+      </div>
+      {visible && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 10, color: "#333", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8, textAlign: "center" }}>Dev shortcuts</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>New member</button>
+            <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>Returning member</button>
+            <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#1A1040", border: "1px dashed rgba(167,139,250,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: "#A78BFA", cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>Owner dashboard</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
 function AuthScreen() {
   const { signIn, gymBranding } = useApp();
@@ -419,17 +447,7 @@ function AuthScreen() {
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleMemberLogin()} placeholder="your@email.com" style={inp} />
                 {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
                 <button onClick={handleMemberLogin} style={btn(!email.includes("@") || authStep === "sending")}>{authStep === "sending" ? "Sending…" : "Send magic link →"}</button>
-                <div style={{ marginTop: 18, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
-                  <div style={{ fontSize: 10, color: "#333", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Dev shortcuts</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>New member
-(onboarding)"}</button>
-                    <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>Returning member
-(has plan)"}</button>
-                    <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#1A1040", border: "1px dashed rgba(167,139,250,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: "#A78BFA", cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>Owner dashboard
-dashboard"}</button>
-                  </div>
-                </div>
+                <DevShortcuts clickMagicLink={clickMagicLink} signIn={signIn} ob={ob} />
               </>
             ) : authStep === "sent" ? (
               <div className="mq-fade" style={{ textAlign: "center", paddingTop: 20 }}>
