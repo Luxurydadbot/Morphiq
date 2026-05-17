@@ -424,11 +424,11 @@ function AuthScreen() {
                 <div style={{ marginTop: 18, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
                   <div style={{ fontSize: 10, color: "#333", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Dev shortcuts</div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"New member
+                    <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"New member (onboarding)"}
 (onboarding)"}</button>
-                    <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"Returning
+                    <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"Returning (has plan)"}
 (has plan)"}</button>
-                    <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#1A1040", border: "1px dashed rgba(167,139,250,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: "#A78BFA", cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"Owner
+                    <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#1A1040", border: "1px dashed rgba(167,139,250,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: "#A78BFA", cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>{"Owner dashboard"}
 dashboard"}</button>
                   </div>
                 </div>
@@ -489,7 +489,7 @@ const GOAL_OPTIONS = [
 ];
 
 function OnboardingScreen() {
-  const { navigate, setUser, setPlan, gymBranding, supabaseUser } = useApp();
+  const { navigate, setUser, setPlan, plan, gymBranding, supabaseUser } = useApp();
   const ob = theme.ob;
   const a = gymBranding.accent || ob.teal;
   const [step, setStep] = useState(0);
