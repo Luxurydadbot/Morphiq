@@ -351,8 +351,8 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   );
 }
 
-// ─── DEV SHORTCUTS (hidden — tap footer 5x to reveal) ────────────────────────
-function DevShortcuts({ clickMagicLink, signIn, ob }) {
+// ─── DEV SHORTCUTS (hidden — tap the M logo 5x to reveal) ───────────────────
+function DevShortcuts({ clickMagicLink, signIn, ob, children }) {
   const [taps, setTaps] = useState(0);
   const [visible, setVisible] = useState(false);
   function tap() {
@@ -362,9 +362,7 @@ function DevShortcuts({ clickMagicLink, signIn, ob }) {
   }
   return (
     <>
-      <div onClick={tap} style={{ marginTop: 18, borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 10, textAlign: "center", cursor: "default", userSelect: "none" }}>
-        <div style={{ fontSize: 9, color: "#1a1a1a", letterSpacing: "1px" }}>POWERED BY MORPHIQ</div>
-      </div>
+      <div onClick={tap} style={{ cursor: "default", userSelect: "none" }}>{children}</div>
       {visible && (
         <div style={{ marginTop: 10 }}>
           <div style={{ fontSize: 10, color: "#333", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8, textAlign: "center" }}>Dev shortcuts</div>
@@ -426,7 +424,9 @@ function AuthScreen() {
   return (
     <div style={{ background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, overflow: "hidden" }}>
       <div style={{ padding: "28px 20px 20px", textAlign: "center" }}>
-        <div style={{ width: 52, height: 52, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>M</div>
+        <DevShortcuts clickMagicLink={clickMagicLink} signIn={signIn} ob={ob}>
+          <div style={{ width: 52, height: 52, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>M</div>
+        </DevShortcuts>
         <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
         <div style={{ fontSize: 11, color: ob.muted }}>Powered by Morphiq</div>
       </div>
@@ -447,7 +447,6 @@ function AuthScreen() {
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleMemberLogin()} placeholder="your@email.com" style={inp} />
                 {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
                 <button onClick={handleMemberLogin} style={btn(!email.includes("@") || authStep === "sending")}>{authStep === "sending" ? "Sending…" : "Send magic link →"}</button>
-                <DevShortcuts clickMagicLink={clickMagicLink} signIn={signIn} ob={ob} />
               </>
             ) : authStep === "sent" ? (
               <div className="mq-fade" style={{ textAlign: "center", paddingTop: 20 }}>
