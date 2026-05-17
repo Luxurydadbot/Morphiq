@@ -351,32 +351,6 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   );
 }
 
-// ─── DEV SHORTCUTS (hidden — tap the M logo 5x to reveal) ───────────────────
-function DevShortcuts({ clickMagicLink, signIn, ob, children }) {
-  const [taps, setTaps] = useState(0);
-  const [visible, setVisible] = useState(false);
-  function tap() {
-    const next = taps + 1;
-    setTaps(next);
-    if (next >= 5) { setVisible(true); setTaps(0); }
-  }
-  return (
-    <>
-      <div onClick={tap} style={{ cursor: "default", userSelect: "none" }}>{children}</div>
-      {visible && (
-        <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 10, color: "#333", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8, textAlign: "center" }}>Dev shortcuts</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>New member</button>
-            <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>Returning member</button>
-            <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#1A1040", border: "1px dashed rgba(167,139,250,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: "#A78BFA", cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>Owner dashboard</button>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
 // ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
 function AuthScreen() {
   const { signIn, gymBranding } = useApp();
@@ -388,6 +362,8 @@ function AuthScreen() {
   const [password, setPassword] = useState("");
   const [authStep, setAuthStep] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [logoTaps, setLogoTaps] = useState(0);
+  const [showDev, setShowDev] = useState(false);
 
   async function handleMemberLogin() {
     if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
@@ -424,11 +400,21 @@ function AuthScreen() {
   return (
     <div style={{ background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, overflow: "hidden" }}>
       <div style={{ padding: "28px 20px 20px", textAlign: "center" }}>
-        <DevShortcuts clickMagicLink={clickMagicLink} signIn={signIn} ob={ob}>
+        <div onClick={() => setLogoTaps(t => { const n = t + 1; if (n >= 5) { setShowDev(true); return 0; } return n; })} style={{ cursor: "default", userSelect: "none" }}>
           <div style={{ width: 52, height: 52, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>M</div>
-        </DevShortcuts>
+        </div>
         <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
         <div style={{ fontSize: 11, color: ob.muted }}>Powered by Morphiq</div>
+        {showDev && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Dev shortcuts</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>New member</button>
+              <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>Returning member</button>
+              <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#1A1040", border: "1px dashed rgba(167,139,250,0.3)", borderRadius: 9, padding: "9px 6px", fontSize: 11, color: "#A78BFA", cursor: "pointer", fontFamily: ob.font, lineHeight: 1.4 }}>Owner dashboard</button>
+            </div>
+          </div>
+        )}
       </div>
       <div style={{ display: "flex", margin: "0 20px 20px", background: ob.card, borderRadius: 10, padding: 3 }}>
         {[["member","I'm a Member"],["owner","Gym Owner"]].map(([id, label]) => (
