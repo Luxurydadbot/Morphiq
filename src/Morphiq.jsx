@@ -307,6 +307,19 @@ const css = `
   @keyframes spin{to{transform:rotate(360deg);}}
   .mq-ring-fill{stroke-dasharray:220;transition:stroke-dashoffset 1s linear;}
   .mq-meal-tap:active{transform:scale(0.97);}
+  .mq-shell{
+    width:100%;
+    height:100vh;
+    height:100dvh;
+    overflow:hidden;
+    overflow-y:auto;
+    background:#0a0a0a;
+    position:relative;
+  }
+  .mq-shell > *{
+    min-height:100vh;
+    min-height:100dvh;
+  }
 `;
 
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
@@ -358,7 +371,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   const { navigate, gymBranding, user } = useApp();
   const a = gymBranding.accent;
   return (
-    <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, paddingBottom: "5.5rem", position: "relative", minHeight: 780, fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
+    <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, paddingBottom: "5.5rem", position: "relative", minHeight: "100dvh", fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.25rem 1.25rem 0" }}>
         <span style={{ fontSize: 13, fontWeight: 500, letterSpacing: ".1em", color: a, textTransform: "uppercase" }}>{gymBranding.name}</span>
         <button onClick={() => navigate("profile")} style={{ width: 34, height: 34, borderRadius: "50%", background: theme.accentDim, border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 500, color: a, cursor: "pointer" }}>{user.name ? user.name[0].toUpperCase() : "?"}</button>
@@ -425,7 +438,7 @@ function AuthScreen() {
   const btn = (dis) => ({ width: "100%", background: dis ? "#1A2332" : a, color: dis ? ob.muted : ob.tealDk, border: "none", borderRadius: 10, padding: "11px", fontSize: 13, fontWeight: 600, cursor: dis ? "default" : "pointer", fontFamily: ob.font, marginTop: 4 });
 
   return (
-    <div style={{ background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, overflow: "hidden" }}>
+    <div style={{ background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, overflow: "hidden" }}>
       <div style={{ padding: "28px 20px 20px", textAlign: "center" }}>
         <div style={{ width: 52, height: 52, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>M</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
@@ -577,7 +590,7 @@ function OnboardingScreen() {
   const goalLabel = GOAL_OPTIONS.find(g => g.id === goal)?.label || "";
 
   const s = {
-    root: { background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, position: "relative", overflow: "hidden" },
+    root: { background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, position: "relative", overflow: "hidden" },
     inner: { flex: 1, padding: "10px 14px 10px", display: "flex", flexDirection: "column" },
     aiBubble: { background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "9px 11px", fontSize: 12, lineHeight: 1.55, color: ob.body, marginBottom: 8 },
     tealBtn: (disabled) => ({ width: "100%", background: a, color: ob.tealDk, border: "none", borderRadius: 10, padding: 9, fontSize: 11, fontWeight: 600, cursor: "pointer", marginTop: 8, fontFamily: ob.font, opacity: disabled ? 0.35 : 1 }),
@@ -1767,7 +1780,7 @@ function ChatScreen({ fromScreen = "home" }) {
   const ctx = { home: "Dashboard", workout: "Mid-workout", meals: "Meal plan", chat: "Dashboard" }[fromScreen] || "Dashboard";
 
   return (
-    <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, minHeight: 780, fontFamily: "system-ui,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, minHeight: "100dvh", fontFamily: "system-ui,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Header */}
       <div style={{ background: "#0D1117", borderBottom: `1px solid ${theme.borderSubtle}`, padding: "14px 16px 12px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2466,7 +2479,7 @@ function GymOwnerDashboard() {
   const tabs = [["overview","Overview"],["members","Members"],["branding","Branding"]];
 
   return (
-    <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: 780, overflow: "hidden" }}>
+    <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
       {/* Header */}
       <div style={{ background: "#0D1623", borderBottom: "1px solid #1E2D42", padding: "14px 16px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -2508,7 +2521,7 @@ function LoadingScreen() {
   const a = gymBranding.accent;
   const ob = theme.ob;
   return (
-    <div style={{ background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: ob.font }}>
+    <div style={{ background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: ob.font }}>
       <div style={{ width: 48, height: 48, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: a }}>M</div>
       <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
       <div style={{ fontSize: 13, color: ob.body }}>Loading your account…</div>
@@ -2540,7 +2553,9 @@ export default function Morphiq() {
     <>
       <style>{css}</style>
       <AppProvider>
-        <AppRouter />
+        <div className="mq-shell">
+          <AppRouter />
+        </div>
       </AppProvider>
     </>
   );
