@@ -158,15 +158,8 @@ const sb = {
         },
         body: JSON.stringify({ gym_id: gymId, name, accent, welcome, updated_at: new Date().toISOString() }),
       });
-      if (!res.ok) {
-        const text = await res.text();
-        alert("Save error " + res.status + ": " + text.slice(0, 200));
-      }
       return res.ok;
-    } catch(e) {
-      alert("Save exception: " + e.message);
-      return false;
-    }
+    } catch { return false; }
   },
 };
 
