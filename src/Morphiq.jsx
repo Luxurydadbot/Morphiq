@@ -134,6 +134,33 @@ const sb = {
       return res.ok;
     } catch { return false; }
   },
+
+  // ── GYM BRANDING ─────────────────────────────────────────────────────────
+  async getGymBranding(gymId = "demo-gym") {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      return rows?.[0] || null;
+    } catch { return null; }
+  },
+
+  async saveGymBranding(gymId = "demo-gym", { name, accent, welcome }) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates",
+        },
+        body: JSON.stringify({ gym_id: gymId, name, accent, welcome, updated_at: new Date().toISOString() }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
 };
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -195,7 +222,17 @@ function AppProvider({ children }) {
   );
   const [plan, setPlan] = useState(DEV_SKIP === "member_returning" ? MOCK_RETURNING_PLAN : null);
   const [supabaseUser, setSupabaseUser] = useState(DEV_SKIP ? { email: "dev@morphiq.app", id: "dev-001" } : null);
-  const [gymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", units: "imperial" });
+  const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
+
+  // ── On mount: load gym branding from Supabase ────────────────────────────
+  useEffect(() => {
+    sb.getGymBranding("demo-gym").then(row => {
+      if (row?.name) {
+        setGymBranding({ name: row.name, accent: row.accent || "#00D4B1", welcome: row.welcome || "", units: "imperial" });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── On mount: if we have a saved session, restore it from Supabase ────────
   useEffect(() => {
@@ -276,7 +313,7 @@ function AppProvider({ children }) {
   }
 
   return (
-    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, signIn, signOut }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut }}>
       {children}
     </AppContext.Provider>
   );
@@ -2412,13 +2449,27 @@ function OwnerMembersTab() {
 }
 
 function OwnerBrandingTab() {
-  const { gymBranding } = useApp();
+  const { gymBranding, setGymBranding } = useApp();
   const [gymName, setGymName] = useState(gymBranding.name);
   const [brandColor, setBrandColor] = useState(gymBranding.accent);
-  const [welcome, setWelcome] = useState(`Welcome to ${gymBranding.name}. Your personal AI trainer is ready. Let's get to work.`);
+  const [welcome, setWelcome] = useState(gymBranding.welcome || `Welcome to ${gymBranding.name}. Your personal AI trainer is ready. Let's get to work.`);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
-  function save() { setSaved(true); setTimeout(() => setSaved(false), 1600); }
+  async function save() {
+    setSaving(true);
+    setError(null);
+    const ok = await sb.saveGymBranding("demo-gym", { name: gymName, accent: brandColor, welcome });
+    setSaving(false);
+    if (ok) {
+      setGymBranding({ name: gymName, accent: brandColor, welcome, units: gymBranding.units });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } else {
+      setError("Save failed — check your connection and try again.");
+    }
+  }
 
   return (
     <div className="mq-fade">
@@ -2463,11 +2514,12 @@ function OwnerBrandingTab() {
         </div>
       </div>
 
+      {error && <div style={{ fontSize: 12, color: "#F87171", marginBottom: 8, padding: "8px 12px", background: "#1F1010", borderRadius: 8 }}>{error}</div>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={save} style={{ flex: 2, background: saved ? "#003D35" : "#00D4B1", color: saved ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-          {saved ? "Saved ✓" : "Save changes"}
+        <button onClick={save} disabled={saving} style={{ flex: 2, background: saved ? "#003D35" : "#00D4B1", color: saved ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+          {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
         </button>
-        <button onClick={() => { setGymName(gymBranding.name); setBrandColor(gymBranding.accent); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
+        <button onClick={() => { setGymName(gymBranding.name); setBrandColor(gymBranding.accent); setWelcome(gymBranding.welcome || ""); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
       </div>
     </div>
   );
