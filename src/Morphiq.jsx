@@ -1,85 +1,201 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 
 // ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
-const SUPA_URL = "https://uvnyjegmhsztdednjclb.supabase.co";
-const SUPA_KEY = "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll";
+// Replace these with your actual Supabase project URL and anon key.
+const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
+const SUPABASE_ANON = "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll";
 
-// Lightweight Supabase REST client — no npm package needed in artifacts
-const supa = {
-  _headers: { "Content-Type": "application/json", apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
-
-  // Auth helpers
-  auth: {
-    async signUp(email, password) {
-      const r = await fetch(`${SUPA_URL}/auth/v1/signup`, {
-        method: "POST", headers: supa._headers,
-        body: JSON.stringify({ email, password }),
-      });
-      return r.json();
-    },
-    async signIn(email, password) {
-      const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
-        method: "POST", headers: supa._headers,
-        body: JSON.stringify({ email, password }),
-      });
-      return r.json();
-    },
-    async signOut(accessToken) {
-      await fetch(`${SUPA_URL}/auth/v1/logout`, {
-        method: "POST",
-        headers: { ...supa._headers, Authorization: `Bearer ${accessToken}` },
-      });
-    },
-    async getUser(accessToken) {
-      const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
-        headers: { ...supa._headers, Authorization: `Bearer ${accessToken}` },
-      });
-      return r.json();
-    },
+// Thin REST wrapper — avoids requiring the npm package inside a JSX artifact.
+// Uses Supabase's PostgREST + Auth REST APIs directly.
+const sb = {
+  // ── AUTH ──────────────────────────────────────────────────────────────────
+  async sendMagicLink(email) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+      method: "POST",
+      headers: { "apikey": SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    return res.ok;
   },
 
-  // DB helpers — pass accessToken for RLS
-  db: {
-    _h(token) {
-      return { ...supa._headers, Authorization: `Bearer ${token}`, Prefer: "return=representation" };
-    },
-    async upsert(table, row, token) {
-      const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+  // ── PROFILES ──────────────────────────────────────────────────────────────
+  async getProfile(supabaseUserId) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&limit=1`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      return rows?.[0] || null;
+    } catch { return null; }
+  },
+
+  async upsertProfile(supabaseUserId, userData, planData, gymId = "demo-gym") {
+    try {
+      const body = {
+        supabase_user_id: supabaseUserId,
+        gym_id: gymId,
+        name: userData.name,
+        goal: userData.goal,
+        sex: userData.sex,
+        height: userData.height,
+        weight: userData.weight,
+        age: userData.age,
+        days_per_week: userData.daysPerWeek,
+        injuries: userData.injuries || "",
+        plan: planData,                         // full plan JSON stored in jsonb column
+        updated_at: new Date().toISOString(),
+      };
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
         method: "POST",
-        headers: { ...supa.db._h(token), Prefer: "resolution=merge-duplicates,return=representation" },
-        body: JSON.stringify(row),
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates",   // upsert on supabase_user_id unique key
+        },
+        body: JSON.stringify(body),
       });
-      return r.json();
-    },
-    async select(table, filter, token) {
-      const q = Object.entries(filter).map(([k, v]) => `${k}=eq.${v}`).join("&");
-      const r = await fetch(`${SUPA_URL}/rest/v1/${table}?${q}`, {
-        headers: supa.db._h(token),
-      });
-      return r.json();
-    },
-    async insert(table, row, token) {
-      const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  // Resolves supabase_user_id → profiles.id (UUID used as FK in workout/meal logs)
+  async getProfileId(supabaseUserId) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&select=id&limit=1`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      return rows?.[0]?.id || null;
+    } catch { return null; }
+  },
+
+  // ── WORKOUT LOGS ──────────────────────────────────────────────────────────
+  async insertWorkoutLog(supabaseUserId, { exerciseName, setNumber, reps, weight }) {
+    try {
+      // Resolve to profiles.id so the FK constraint is satisfied
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
         method: "POST",
-        headers: supa.db._h(token),
-        body: JSON.stringify(row),
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: profileId,           // ← profiles.id, not auth.users.id
+          exercise_name: exerciseName,
+          set_number: setNumber,
+          reps,
+          weight,
+          workout_date: new Date().toISOString().slice(0, 10),
+        }),
       });
-      return r.json();
-    },
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // Fetch recent workout logs for the progress screen
+  async getWorkoutLogs(supabaseUserId, limit = 20) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&order=logged_at.desc&limit=${limit}`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      return await res.json();
+    } catch { return []; }
+  },
+
+  // ── MEAL LOGS ─────────────────────────────────────────────────────────────
+  async insertMealLog(supabaseUserId, { mealId, status, loggedName, loggedCal, loggedProtein }) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/meal_logs`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: profileId,           // ← profiles.id, not auth.users.id
+          meal_id: mealId,
+          date: new Date().toISOString().slice(0, 10),
+          status,
+          logged_name: loggedName,
+          logged_cal: loggedCal,
+          logged_protein: loggedProtein,
+        }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // ── GYM BRANDING ─────────────────────────────────────────────────────────
+  async getGymBranding(gymId = "demo-gym") {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      return rows?.[0] || null;
+    } catch { return null; }
+  },
+
+  async saveGymBranding(gymId = "demo-gym", { name, accent, welcome }) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates",
+        },
+        body: JSON.stringify({ gym_id: gymId, name, accent, welcome, updated_at: new Date().toISOString() }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // ── WEIGHT LOGS ───────────────────────────────────────────────────────────
+  async insertWeightLog(supabaseUserId, weightLbs) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/weight_logs`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: profileId,
+          weight_lbs: weightLbs,
+          logged_date: new Date().toISOString().slice(0, 10),
+          logged_at: new Date().toISOString(),
+        }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
+  async getWeightLogs(supabaseUserId, limit = 12) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/weight_logs?user_id=eq.${profileId}&order=logged_date.asc&limit=${limit}`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      return await res.json();
+    } catch { return []; }
   },
 };
-
-// ─── SESSION STORAGE (token persistence across page refresh) ──────────────────
-const SESSION_KEY = "mq_session";
-function saveSession(session) {
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch {}
-}
-function loadSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
-}
-function clearSession() {
-  try { localStorage.removeItem(SESSION_KEY); } catch {}
-}
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const theme = {
@@ -96,134 +212,142 @@ const theme = {
   },
 };
 
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+// Set DEV_SKIP to "member_new", "member_returning", "owner", or null for real auth.
+const DEV_SKIP = null; // null = shows real auth screen
+
 // ─── CONTEXT ──────────────────────────────────────────────────────────────────
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 
-function AppProvider({ children }) {
-  const [screen, setScreen] = useState("auth_loading"); // start with loading check
-  const [user, setUser] = useState({ name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" });
-  const [plan, setPlan] = useState(null);
-  const [gymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", units: "imperial" });
-  // Supabase auth state
-  const [authUser, setAuthUser] = useState(null);   // { id, email }
-  const [accessToken, setAccessToken] = useState(null);
-  // Settings (replaces localStorage)
-  const [restTimerSecs, setRestTimerSecs] = useState(60);
-  const [calorieTarget, setCalorieTarget] = useState(1800);
+const DEFAULT_USER = { name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" };
+const MOCK_RETURNING_PLAN = {
+  calories: 1800, protein: 140, carbs: 160, fat: 55,
+  workoutDays: ["Monday","Wednesday","Friday"], workoutType: "Full Body",
+  workoutDuration: 40, weeklyFocus: "Build your movement foundation.",
+  exercises: [
+    { name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" },
+    { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" },
+    { name: "Incline Press", sets: 3, reps: 10, weight: 35, muscle: "Chest / Shoulders" },
+    { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 65, muscle: "Hamstrings" },
+    { name: "Shoulder Press", sets: 3, reps: 10, weight: 25, muscle: "Shoulders" },
+  ],
+  tip: "Consistency over perfection — show up, even on hard days.",
+};
 
-  // On mount: check for saved session
+const SESSION_KEY = "morphiq_session";
+
+function AppProvider({ children }) {
+  // ── Restore session from localStorage on first load ──────────────────────
+  const savedSession = (() => {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
+  })();
+
+  const [screen, setScreen] = useState(
+    DEV_SKIP === "owner" ? "owner" :
+    DEV_SKIP === "member_returning" ? "home" :
+    DEV_SKIP === "member_new" ? "onboarding" :
+    savedSession ? "loading" : "auth"   // if saved session exists, start at loading while we verify
+  );
+  const [user, setUser] = useState(
+    DEV_SKIP === "member_returning"
+      ? { name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" }
+      : DEFAULT_USER
+  );
+  const [plan, setPlan] = useState(DEV_SKIP === "member_returning" ? MOCK_RETURNING_PLAN : null);
+  const [supabaseUser, setSupabaseUser] = useState(DEV_SKIP ? { email: "dev@morphiq.app", id: "dev-001" } : null);
+  const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
+
+  // ── On mount: load gym branding from Supabase ────────────────────────────
   useEffect(() => {
-    const saved = loadSession();
-    if (saved?.access_token && saved?.user) {
-      setAccessToken(saved.access_token);
-      setAuthUser({ id: saved.user.id, email: saved.user.email });
-      // Load profile + settings then go home
-      loadProfileAndSettings(saved.user.id, saved.access_token);
-    } else {
-      setScreen("auth_login");
-    }
+    sb.getGymBranding("demo-gym").then(row => {
+      if (row?.name) {
+        setGymBranding({ name: row.name, accent: row.accent || "#00D4B1", welcome: row.welcome || "", units: "imperial" });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadProfileAndSettings(userId, token) {
+  // ── On mount: if we have a saved session, restore it from Supabase ────────
+  useEffect(() => {
+    if (DEV_SKIP || !savedSession?.uid) return;
+    sb.getProfile(savedSession.uid).then(profile => {
+      if (profile?.plan) {
+        setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
+        setUser({ name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" });
+        setPlan(profile.plan);
+        setScreen("home");
+      } else {
+        localStorage.removeItem(SESSION_KEY);
+        setScreen("auth");
+      }
+    }).catch(() => { localStorage.removeItem(SESSION_KEY); setScreen("auth"); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Called after successful auth. role = "member" | "owner".
+  // hasPlan=true|false = dev shortcut (bypasses DB). hasPlan=null = production path (reads DB).
+  async function signIn(email, role, hasPlan = null, realAuthUserId = null) {
+    const uid = realAuthUserId || ("sim-" + Date.now());
+    setSupabaseUser({ email, id: uid });
+    if (role === "owner") { setScreen("owner"); return; }
+
+    if (hasPlan === true) {
+      setUser({ name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" });
+      setPlan(MOCK_RETURNING_PLAN);
+      setScreen("home");
+      return;
+    }
+    if (hasPlan === false) {
+      setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding"); return;
+    }
+
+    // Production: query profile from Supabase using the real auth UID
+    setScreen("loading");
     try {
-      const [profiles, settings] = await Promise.all([
-        supa.db.select("profiles", { id: userId }, token),
-        supa.db.select("user_settings", { user_id: userId }, token),
-      ]);
-      if (profiles?.[0]) {
-        const p = profiles[0];
-        setUser({ name: p.name || "", goal: p.goal, sex: p.sex, height: p.height || "", weight: p.weight || "", age: p.age || "", unit: p.unit || "imperial" });
-        setPlan({ weekly: [] });
+      const profile = await sb.getProfile(uid);
+      if (profile?.plan) {
+        const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
+        setUser(u);
+        setPlan(profile.plan);
+        // Save session so next open skips login
+        try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
+        setScreen("home");
+      } else {
+        setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding");
       }
-      if (settings?.[0]) {
-        setRestTimerSecs(settings[0].rest_timer_secs || 60);
-        setCalorieTarget(settings[0].calorie_target || 1800);
-      }
-      // If no profile yet → send to onboarding
-      setScreen(profiles?.[0] ? "home" : "onboarding");
-    } catch {
-      setScreen("onboarding");
-    }
+    } catch { setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding"); }
   }
 
-  async function handleSignUp(email, password) {
-    const res = await supa.auth.signUp(email, password);
-    if (res.error) return { error: res.error.message || "Signup failed" };
-    // Supabase may require email confirmation; if access_token present, proceed
-    if (res.access_token) {
-      const session = { access_token: res.access_token, user: res.user };
-      saveSession(session);
-      setAccessToken(res.access_token);
-      setAuthUser({ id: res.user.id, email: res.user.email });
-      setScreen("onboarding");
-      return {};
-    }
-    // Email confirmation required
-    return { confirm: true };
-  }
+  // ── REAL SUPABASE MAGIC-LINK CALLBACK ─────────────────────────────────────
+  // When Supabase redirects back after clicking the magic link, the URL contains
+  // #access_token=...&refresh_token=...  We detect this once on mount and sign in.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.includes("access_token=")) return;
+    const params = new URLSearchParams(hash.replace("#", "?"));
+    const accessToken = params.get("access_token");
+    if (!accessToken) return;
+    // Decode the JWT to get the user's Supabase UUID (sub claim)
+    try {
+      const payload = JSON.parse(atob(accessToken.split(".")[1]));
+      const email = payload.email || "";
+      const uid = payload.sub || "";
+      if (uid) signIn(email, "member", null, uid);
+    } catch(e) { console.error("Magic link error:", e); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  async function handleSignIn(email, password) {
-    const res = await supa.auth.signIn(email, password);
-    if (res.error) return { error: res.error.message || "Login failed" };
-    const session = { access_token: res.access_token, user: res.user };
-    saveSession(session);
-    setAccessToken(res.access_token);
-    setAuthUser({ id: res.user.id, email: res.user.email });
-    await loadProfileAndSettings(res.user.id, res.access_token);
-    return {};
-  }
-
-  async function handleSignOut() {
-    if (accessToken) await supa.auth.signOut(accessToken).catch(() => {});
-    clearSession();
-    setAccessToken(null);
-    setAuthUser(null);
-    setUser({ name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" });
+  function signOut() {
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
+    setSupabaseUser(null);
+    setUser(DEFAULT_USER);
     setPlan(null);
-    setScreen("auth_login");
-  }
-
-  async function saveProfile(profileData) {
-    if (!authUser?.id || !accessToken) return;
-    await supa.db.upsert("profiles", { id: authUser.id, gym_id: "ironforge", ...profileData }, accessToken);
-  }
-
-  async function saveSettings(updates) {
-    if (!authUser?.id || !accessToken) return;
-    if (updates.rest_timer_secs !== undefined) setRestTimerSecs(updates.rest_timer_secs);
-    if (updates.calorie_target !== undefined) setCalorieTarget(updates.calorie_target);
-    await supa.db.upsert("user_settings", {
-      user_id: authUser.id,
-      rest_timer_secs: updates.rest_timer_secs ?? restTimerSecs,
-      calorie_target: updates.calorie_target ?? calorieTarget,
-      updated_at: new Date().toISOString(),
-    }, accessToken);
-  }
-
-  async function saveWorkoutLog(log) {
-    if (!authUser?.id || !accessToken) return;
-    await supa.db.insert("workout_logs", {
-      user_id: authUser.id,
-      completed_at: new Date().toISOString(),
-      duration_mins: log.durationMins,
-      exercises: log.exercises,
-      total_sets: log.totalSets,
-      notes: log.notes || "",
-    }, accessToken);
+    setScreen("auth");
   }
 
   return (
-    <AppContext.Provider value={{
-      screen, navigate: setScreen,
-      user, setUser,
-      plan, setPlan,
-      gymBranding,
-      authUser, accessToken,
-      restTimerSecs, calorieTarget,
-      handleSignUp, handleSignIn, handleSignOut,
-      saveProfile, saveSettings, saveWorkoutLog,
-    }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut }}>
       {children}
     </AppContext.Provider>
   );
@@ -254,7 +378,19 @@ const css = `
   @keyframes spin{to{transform:rotate(360deg);}}
   .mq-ring-fill{stroke-dasharray:220;transition:stroke-dashoffset 1s linear;}
   .mq-meal-tap:active{transform:scale(0.97);}
-  input:-webkit-autofill{-webkit-box-shadow:0 0 0 30px #1A2332 inset !important;-webkit-text-fill-color:#E8EDF2 !important;}
+  .mq-shell{
+    width:100%;
+    height:100vh;
+    height:100dvh;
+    overflow:hidden;
+    overflow-y:auto;
+    background:#0a0a0a;
+    position:relative;
+  }
+  .mq-shell > *{
+    min-height:100vh;
+    min-height:100dvh;
+  }
 `;
 
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
@@ -306,7 +442,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   const { navigate, gymBranding, user } = useApp();
   const a = gymBranding.accent;
   return (
-    <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, paddingBottom: "5.5rem", position: "relative", minHeight: 780, fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
+    <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, paddingBottom: "5.5rem", position: "relative", minHeight: "100dvh", fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.25rem 1.25rem 0" }}>
         <span style={{ fontSize: 13, fontWeight: 500, letterSpacing: ".1em", color: a, textTransform: "uppercase" }}>{gymBranding.name}</span>
         <button onClick={() => navigate("profile")} style={{ width: 34, height: 34, borderRadius: "50%", background: theme.accentDim, border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 500, color: a, cursor: "pointer" }}>{user.name ? user.name[0].toUpperCase() : "?"}</button>
@@ -328,116 +464,124 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   );
 }
 
-// ─── AUTH LOADING SCREEN ──────────────────────────────────────────────────────
-function AuthLoadingScreen() {
-  return (
-    <div style={{ background: "#080E1A", borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#003D35", border: "2px solid #00D4B1", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: "#00D4B1" }}>M</div>
-      <div style={{ width: 36, height: 36, border: "3px solid #1A2332", borderTopColor: "#00D4B1", borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
-      <div style={{ fontSize: 12, color: "#6B7A8D" }}>Loading...</div>
-    </div>
-  );
-}
-
-// ─── AUTH SCREENS (Login + Signup) ────────────────────────────────────────────
+// ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
 function AuthScreen() {
-  const { navigate, handleSignIn, handleSignUp, gymBranding } = useApp();
-  const ob = theme.ob;
+  const { signIn, gymBranding } = useApp();
   const a = gymBranding.accent;
-  const [mode, setMode] = useState("login"); // login | signup | confirm
+  const ob = theme.ob;
+
+  const [mode, setMode] = useState("member");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [authStep, setAuthStep] = useState("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const inputStyle = {
-    width: "100%", background: ob.card, border: `1px solid rgba(255,255,255,0.08)`,
-    borderRadius: 10, padding: "11px 14px", fontSize: 13, color: ob.white,
-    outline: "none", fontFamily: ob.font, marginBottom: 10,
-  };
-  const btnStyle = {
-    width: "100%", background: a, color: ob.tealDk, border: "none",
-    borderRadius: 10, padding: 12, fontSize: 14, fontWeight: 600,
-    cursor: loading ? "not-allowed" : "pointer", fontFamily: ob.font,
-    opacity: loading ? 0.6 : 1, marginTop: 4,
-  };
+  async function handleMemberLogin() {
+    if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
+    setAuthStep("sending"); setErrorMsg("");
+    // In production, this sends a real Supabase magic link.
+    // sb.sendMagicLink(email) is called but we still show the "sent" state regardless of response
+    // (to avoid leaking whether the email exists in our system).
+    try { await sb.sendMagicLink(email); } catch { /* network issues — still show sent */ }
+    await new Promise(r => setTimeout(r, 400));
+    setAuthStep("sent");
+  }
 
-  async function submit() {
-    if (!email.trim() || password.length < 6) {
-      setError("Enter a valid email and password (min 6 chars).");
-      return;
+  async function handleOwnerLogin() {
+    if (!email.includes("@") || password.length < 6) { setErrorMsg("Check your email and password."); return; }
+    setAuthStep("loading"); setErrorMsg("");
+    await new Promise(r => setTimeout(r, 1400));
+    if (email.toLowerCase().includes("owner") || email.toLowerCase().includes("gym")) {
+      signIn(email, "owner");
+    } else {
+      setAuthStep("error");
+      setErrorMsg("Demo: use an email containing 'owner' or 'gym'.");
     }
-    setError("");
-    setLoading(true);
-    const res = mode === "login" ? await handleSignIn(email, password) : await handleSignUp(email, password);
-    setLoading(false);
-    if (res.error) setError(res.error);
-    if (res.confirm) setMode("confirm");
   }
 
-  if (mode === "confirm") {
-    return (
-      <div style={{ background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", fontFamily: ob.font }}>
-        <div style={{ fontSize: 32, marginBottom: 16 }}>📬</div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: ob.white, marginBottom: 8, textAlign: "center" }}>Check your email</div>
-        <div style={{ fontSize: 13, color: ob.body, textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>
-          We sent a confirmation link to <span style={{ color: ob.white, fontWeight: 600 }}>{email}</span>. Click it to activate your account, then come back to log in.
-        </div>
-        <button onClick={() => setMode("login")} style={{ ...btnStyle, marginTop: 0 }}>Back to login</button>
-      </div>
-    );
+  // Simulates clicking the magic link — in prod this is the Supabase redirect callback
+  function clickMagicLink(hasPlan) {
+    setAuthStep("loading");
+    setTimeout(() => signIn(email || "demo@morphiq.app", "member", hasPlan), 900);
   }
+
+  const inp = { width: "100%", background: ob.card, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: ob.white, outline: "none", fontFamily: ob.font, marginBottom: 10 };
+  const btn = (dis) => ({ width: "100%", background: dis ? "#1A2332" : a, color: dis ? ob.muted : ob.tealDk, border: "none", borderRadius: 10, padding: "11px", fontSize: 13, fontWeight: 600, cursor: dis ? "default" : "pointer", fontFamily: ob.font, marginTop: 4 });
 
   return (
-    <div style={{ background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white }}>
-      {/* Logo header */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "2.5rem 1.5rem 1.5rem" }}>
-        <div style={{ width: 56, height: 56, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: a, marginBottom: 12 }}>M</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
-        <div style={{ fontSize: 12, color: ob.muted, marginTop: 4 }}>Powered by Morphiq</div>
+    <div style={{ background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, overflow: "hidden" }}>
+      <div style={{ padding: "28px 20px 20px", textAlign: "center" }}>
+        <div style={{ width: 52, height: 52, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>M</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
+        <div style={{ fontSize: 11, color: ob.muted }}>Powered by Morphiq</div>
       </div>
-
-      {/* Tab toggle */}
-      <div style={{ display: "flex", background: "#1A2332", borderRadius: 10, padding: 3, margin: "0 1.5rem 1.5rem" }}>
-        {[["login", "Log in"], ["signup", "Sign up"]].map(([m, label]) => (
-          <button key={m} onClick={() => { setMode(m); setError(""); }}
-            style={{ flex: 1, padding: "8px 6px", background: mode === m ? a : "transparent", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, color: mode === m ? ob.tealDk : ob.muted, cursor: "pointer", fontFamily: ob.font, transition: "all .2s" }}>
+      {/* DEV SHORTCUTS — remove before launch */}
+      <div style={{ margin: "0 20px 10px", display: "flex", gap: 8 }}>
+        <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.2)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: "rgba(0,212,177,0.5)", cursor: "pointer", fontFamily: ob.font }}>New member</button>
+        <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.2)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: "rgba(0,212,177,0.5)", cursor: "pointer", fontFamily: ob.font }}>Returning</button>
+        <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#0D0A1F", border: "1px dashed rgba(167,139,250,0.2)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: "rgba(167,139,250,0.5)", cursor: "pointer", fontFamily: ob.font }}>Owner</button>
+      </div>
+      <div style={{ display: "flex", margin: "0 20px 20px", background: ob.card, borderRadius: 10, padding: 3 }}>
+        {[["member","I'm a Member"],["owner","Gym Owner"]].map(([id, label]) => (
+          <button key={id} onClick={() => { setMode(id); setAuthStep("idle"); setErrorMsg(""); }}
+            style={{ flex: 1, padding: "8px", background: mode === id ? a : "transparent", color: mode === id ? ob.tealDk : ob.muted, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, transition: "all .2s" }}>
             {label}
           </button>
         ))}
       </div>
-
-      {/* Form */}
-      <div style={{ padding: "0 1.5rem", flex: 1 }}>
-        <div style={{ fontSize: 11, color: ob.muted, marginBottom: 6 }}>Email</div>
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"
-          style={inputStyle} onKeyDown={e => e.key === "Enter" && submit()} />
-        <div style={{ fontSize: 11, color: ob.muted, marginBottom: 6 }}>Password</div>
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === "signup" ? "Min 6 characters" : "Your password"}
-          style={inputStyle} onKeyDown={e => e.key === "Enter" && submit()} />
-
-        {error && (
-          <div style={{ background: "#1F1010", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#F87171", marginBottom: 10 }}>
-            {error}
+      <div style={{ flex: 1, padding: "0 20px 20px" }}>
+        {mode === "member" && (
+          <div className="mq-fade">
+            {authStep === "idle" || authStep === "sending" ? (
+              <>
+                <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>Enter your email and we'll send you a one-tap sign-in link. No password needed.</div>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleMemberLogin()} placeholder="your@email.com" style={inp} />
+                {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
+                <button onClick={handleMemberLogin} style={btn(!email.includes("@") || authStep === "sending")}>{authStep === "sending" ? "Sending…" : "Send magic link →"}</button>
+              </>
+            ) : authStep === "sent" ? (
+              <div className="mq-fade" style={{ textAlign: "center", paddingTop: 20 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📬</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: ob.white, marginBottom: 8 }}>Check your inbox</div>
+                <div style={{ fontSize: 12, color: ob.body, marginBottom: 20, lineHeight: 1.6 }}>We sent a sign-in link to <span style={{ color: a }}>{email}</span>. Tap it to continue.</div>
+                <div style={{ background: ob.card, borderRadius: 10, padding: "10px 14px", marginBottom: 12, border: "1px dashed rgba(0,212,177,0.3)" }}>
+                  <div style={{ fontSize: 10, color: ob.muted, marginBottom: 8 }}>DEV — simulate clicking the email link:</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 9, padding: "8px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font }}>New member</button>
+                    <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: a, border: "none", borderRadius: 9, padding: "8px 6px", fontSize: 11, color: ob.tealDk, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>Returning member</button>
+                  </div>
+                </div>
+                <button onClick={() => setAuthStep("idle")} style={{ fontSize: 11, color: ob.muted, background: "none", border: "none", cursor: "pointer" }}>Use a different email</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 40 }}>
+                <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+                <div style={{ fontSize: 12, color: ob.body }}>Signing you in…</div>
+              </div>
+            )}
           </div>
         )}
-
-        <button onClick={submit} disabled={loading} style={btnStyle}>
-          {loading ? "Please wait..." : mode === "login" ? "Log in →" : "Create account →"}
-        </button>
-
-        {mode === "login" && (
-          <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: ob.muted }}>
-            No account yet?{" "}
-            <button onClick={() => { setMode("signup"); setError(""); }}
-              style={{ background: "none", border: "none", color: a, cursor: "pointer", fontSize: 12, fontFamily: ob.font, fontWeight: 500 }}>
-              Sign up free
-            </button>
+        {mode === "owner" && (
+          <div className="mq-fade">
+            {authStep !== "loading" ? (
+              <>
+                <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>Sign in to your gym dashboard with your admin credentials.</div>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="gym@ironhouse.com" style={inp} />
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleOwnerLogin()} placeholder="Password" style={{ ...inp, marginBottom: 4 }} />
+                {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
+                <button onClick={handleOwnerLogin} style={btn(!email.includes("@") || password.length < 6)}>{authStep === "sending" ? "Signing in…" : "Sign in →"}</button>
+                <div style={{ fontSize: 11, color: ob.muted, marginTop: 12, textAlign: "center", lineHeight: 1.6 }}>Demo: use any email containing "owner" or "gym" with any 6+ char password.</div>
+              </>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 40 }}>
+                <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+                <div style={{ fontSize: 12, color: ob.body }}>Verifying credentials…</div>
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      <div style={{ textAlign: "center", fontSize: 9, color: "#333", padding: "1rem 0 1.5rem" }}>POWERED BY MORPHIQ</div>
+      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: ".5px", padding: "4px 0 10px" }}>POWERED BY MORPHIQ</div>
     </div>
   );
 }
@@ -451,7 +595,7 @@ const GOAL_OPTIONS = [
 ];
 
 function OnboardingScreen() {
-  const { navigate, setUser, setPlan, gymBranding, saveProfile, saveSettings } = useApp();
+  const { navigate, setUser, setPlan, plan, gymBranding, supabaseUser } = useApp();
   const ob = theme.ob;
   const a = gymBranding.accent || ob.teal;
   const [step, setStep] = useState(0);
@@ -468,25 +612,48 @@ function OnboardingScreen() {
   const [checklist, setChecklist] = useState([false, false, false, false]);
 
   useEffect(() => {
-    if (step === 8) {
-      [0, 1, 2, 3].forEach(i => setTimeout(() => setChecklist(c => c.map((v, idx) => idx <= i ? true : v)), i * 550 + 300));
-      const t = setTimeout(async () => {
-        const profileData = {
-          name, goal, sex,
-          height: `${heightFt}′ ${heightIn || "0"}″`,
-          weight: `${weight} lbs`,
-          age, unit,
-        };
-        setUser({ ...profileData, daysPerWeek, injuries });
-        setPlan({ weekly: [] });
-        // Save to Supabase
-        await saveProfile(profileData);
-        await saveSettings({ rest_timer_secs: 60, calorie_target: 1800 });
-        setStep(9);
-      }, 2800);
-      return () => clearTimeout(t);
+    if (step !== 8) return;
+    let cancelled = false;
+    [0,1,2,3].forEach(i => setTimeout(() => { if(!cancelled) setChecklist(c => c.map((v,idx) => idx<=i ? true : v)); }, i*550+300));
+
+    async function generatePlan() {
+      const prompt = `You are a certified personal trainer. Return ONLY valid JSON (no markdown, no preamble) for this member: name=${name}, goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, injuries=${injuries||"none"}.\nJSON shape exactly: {"calories":<number>,"protein":<number>,"carbs":<number>,"fat":<number>,"workoutDays":[<${daysPerWeek} day names>],"workoutType":"<string>","workoutDuration":<minutes>,"weeklyFocus":"<1 sentence>","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<starting lbs>,"muscle":"<string>"}],"tip":"<1 sentence>"}\nInclude 5-6 exercises. All numeric fields must be plain numbers.`;
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
+        });
+        const data = await res.json();
+        const raw = (data.content || []).map(b => b.text || "").join("").replace(/```json|```/g, "").trim();
+        const parsed = JSON.parse(raw);
+        if (!cancelled) {
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, unit };
+          setUser(userData);
+          setPlan(parsed);
+          // Persist to Supabase profiles table (fire-and-forget — UI doesn't block on this)
+          if (supabaseUser?.id) {
+            sb.upsertProfile(supabaseUser.id, userData, parsed).catch(() => {});
+          }
+          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
+        }
+      } catch (_) {
+        if (!cancelled) {
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, unit };
+          const fallbackPlan = { calories: goal === "lose_fat" ? 1800 : goal === "build_muscle" ? 2800 : 2200, protein: 140, carbs: 160, fat: 55, workoutDays: ["Monday","Wednesday","Friday","Saturday","Tuesday","Thursday"].slice(0, daysPerWeek || 3), workoutType: "Full Body", workoutDuration: 40, weeklyFocus: "Build your movement foundation with compound lifts.", exercises: [{ name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" }, { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" }, { name: "Incline Press", sets: 3, reps: 10, weight: 35, muscle: "Chest / Shoulders" }, { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 65, muscle: "Hamstrings" }, { name: "Shoulder Press", sets: 3, reps: 10, weight: 25, muscle: "Shoulders" }], tip: "Consistency over perfection — show up, even on hard days." };
+          setUser(userData);
+          setPlan(fallbackPlan);
+          if (supabaseUser?.id) {
+            sb.upsertProfile(supabaseUser.id, userData, fallbackPlan).catch(() => {});
+          }
+          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
+        }
+      }
     }
+
+    Promise.all([generatePlan(), new Promise(r => setTimeout(r, 2600))]);
+    return () => { cancelled = true; };
   }, [step]);
+
 
   const bodyValid = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && weight && parseFloat(weight) > 0;
   const ageValid = age && parseInt(age) >= 13 && parseInt(age) <= 100;
@@ -494,7 +661,7 @@ function OnboardingScreen() {
   const goalLabel = GOAL_OPTIONS.find(g => g.id === goal)?.label || "";
 
   const s = {
-    root: { background: ob.bg, borderRadius: 20, minHeight: 660, display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, position: "relative", overflow: "hidden" },
+    root: { background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, position: "relative", overflow: "hidden" },
     inner: { flex: 1, padding: "10px 14px 10px", display: "flex", flexDirection: "column" },
     aiBubble: { background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "9px 11px", fontSize: 12, lineHeight: 1.55, color: ob.body, marginBottom: 8 },
     tealBtn: (disabled) => ({ width: "100%", background: a, color: ob.tealDk, border: "none", borderRadius: 10, padding: 9, fontSize: 11, fontWeight: 600, cursor: "pointer", marginTop: 8, fontFamily: ob.font, opacity: disabled ? 0.35 : 1 }),
@@ -647,30 +814,31 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 9 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 9 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ textAlign: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>Your plan is ready</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}'s {goalLabel} Plan</div>
-            <div style={{ fontSize: 9, color: ob.muted }}>Built by Morphiq · Week 1</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}&apos;s {goalLabel} Plan</div>
+            <div style={{ fontSize: 9, color: ob.muted }}>Built by Morphiq AI · Week 1</div>
           </div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
-            <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Workouts</div>
-            {["Monday", "Wednesday", "Friday"].slice(0, daysPerWeek || 3).map((day, i, arr) => (
+            <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Workouts — {plan.workoutType}</div>
+            {(plan.workoutDays || []).map((day, i, arr) => (
               <div key={day} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                 <span style={{ fontSize: 11, color: ob.white }}>{day}</span>
-                <Pill>Full body · 35 min</Pill>
+                <Pill>{plan.workoutType} · {plan.workoutDuration} min</Pill>
               </div>
             ))}
           </div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
             <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Daily targets</div>
-            {[["Calories", "1,840/day"], ["Protein", "140g/day"], ["Water", "8 glasses"]].map(([k, v]) => (
+            {[["Calories", `${plan.calories?.toLocaleString()}/day`], ["Protein", `${plan.protein}g/day`], ["Carbs", `${plan.carbs}g/day`], ["Fat", `${plan.fat}g/day`]].map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
                 <span style={{ fontSize: 11, color: ob.white }}>{k}</span>
                 <span style={{ fontSize: 11, color: a, fontWeight: 600 }}>{v}</span>
               </div>
             ))}
           </div>
+          {plan.tip && <div style={{ background: "#0A1628", borderLeft: `2px solid ${a}`, borderRadius: "0 8px 8px 0", padding: "7px 10px", marginBottom: 8, fontSize: 11, color: ob.body, lineHeight: 1.5 }}>{plan.tip}</div>}
           <button onClick={() => navigate("plan")} style={{ ...s.tealBtn(false), marginTop: "auto", padding: 10, fontSize: 12 }}>Start Day 1 →</button>
         </div>}
       </div>
@@ -715,7 +883,7 @@ function RestRing({ secondsLeft, totalSeconds, accent }) {
   );
 }
 
-function AINudgeCard({ oldWeight, newWeight, onAccept, onKeep }) {
+function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
   return (
@@ -725,7 +893,8 @@ function AINudgeCard({ oldWeight, newWeight, onAccept, onKeep }) {
         <div style={{ fontSize: 10, color: a, fontWeight: 600 }}>Morphiq noticed something</div>
       </div>
       <div style={{ fontSize: 10, color: "#9BB3C8", lineHeight: 1.5, marginBottom: 8 }}>
-        You exceeded target reps both sets. Nudging weight to <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{newWeight} lbs</span> for this set.
+        You exceeded target reps both sets. Nudging weight to{" "}
+        <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{newWeight} lbs</span> for this set.
       </div>
       <div style={{ display: "flex", gap: 6 }}>
         <button onClick={onKeep} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.12)`, borderRadius: 8, padding: "6px 4px", fontSize: 10, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Keep {oldWeight} lbs</button>
@@ -736,23 +905,32 @@ function AINudgeCard({ oldWeight, newWeight, onAccept, onKeep }) {
 }
 
 function WorkoutScreen() {
-  const { navigate, user, gymBranding, restTimerSecs: REST_SECS, saveWorkoutLog } = useApp();
+  const { navigate, user, gymBranding, plan, supabaseUser } = useApp();
   const a = gymBranding.accent;
-  const workoutStartRef = useRef(Date.now());
+
+  // Use AI-generated exercises if available, else fall back to defaults
+  const exercises = (plan?.exercises || WORKOUT_EXERCISES).map(e => ({
+    name: e.name, muscle: e.muscle, sets: e.sets,
+    targetReps: e.reps || e.targetReps, weight: e.weight,
+  }));
 
   const [exIdx, setExIdx] = useState(0);
   const [setIdx, setSetIdx] = useState(0);
   const [loggedSets, setLoggedSets] = useState([]);
   const [state, setState] = useState("active");
+
   const [listening, setListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
+
+  const REST_SECS = 60;
   const [restSecs, setRestSecs] = useState(REST_SECS);
   const timerRef = useRef(null);
+
   const [nudgedWeight, setNudgedWeight] = useState(null);
 
-  const ex = WORKOUT_EXERCISES[exIdx];
+  const ex = exercises[exIdx];
   const currentWeight = nudgedWeight ?? ex.weight;
-  const nextEx = WORKOUT_EXERCISES[exIdx + 1];
+  const nextEx = exercises[exIdx + 1];
 
   useEffect(() => {
     if (state === "rest") {
@@ -771,21 +949,49 @@ function WorkoutScreen() {
     const entry = { exIdx, setIdx, reps, weight: currentWeight };
     const newLogs = [...loggedSets, entry];
     setLoggedSets(newLogs);
-    setVoiceTranscript(""); setListening(false);
+    setVoiceTranscript("");
+    setListening(false);
+
+    // Persist to Supabase workout_logs (fire-and-forget)
+    if (supabaseUser?.id) {
+      sb.insertWorkoutLog(supabaseUser.id, {
+        exerciseName: ex.name,
+        setNumber: setIdx + 1,
+        reps,
+        weight: currentWeight,
+      }).catch(() => {});
+    }
+
     const prevSets = newLogs.filter(l => l.exIdx === exIdx);
     const exceeded = prevSets.filter(l => l.reps > ex.targetReps).length;
-    if (exceeded >= 2 && setIdx < ex.sets - 1) { setNudgedWeight(currentWeight + 5); setState("nudge"); }
-    else { setState("rest"); }
+    const isLastSet = setIdx === ex.sets - 1;
+
+    if (exceeded >= 2 && !isLastSet) {
+      setNudgedWeight(currentWeight + 5);
+      setState("nudge");
+    } else {
+      setState("rest");
+    }
   }
 
   function advanceSet() {
     setNudgedWeight(null);
-    if (setIdx < ex.sets - 1) { setSetIdx(s => s + 1); setState("active"); }
-    else if (exIdx < WORKOUT_EXERCISES.length - 1) { setExIdx(i => i + 1); setSetIdx(0); setState("active"); }
-    else { setState("done"); }
+    if (setIdx < ex.sets - 1) {
+      setSetIdx(s => s + 1);
+      setState("active");
+    } else if (exIdx < exercises.length - 1) {
+      setExIdx(i => i + 1);
+      setSetIdx(0);
+      setState("active");
+    } else {
+      setState("done");
+    }
   }
 
-  function skipRest() { clearInterval(timerRef.current); advanceSet(); }
+  function skipRest() {
+    clearInterval(timerRef.current);
+    advanceSet();
+  }
 
   function simulateListen() {
     setListening(true);
@@ -796,39 +1002,23 @@ function WorkoutScreen() {
   }
 
   const card = { background: "#1A2332", borderRadius: 12, padding: "10px 12px", marginBottom: 8 };
+  const totalCompleted = loggedSets.filter(l => l.exIdx === exIdx).length;
 
-  // Workout complete — save to Supabase
   if (state === "done") {
     const totalSets = loggedSets.length;
     const totalVol = loggedSets.reduce((acc, l) => acc + l.reps * l.weight, 0);
-    const durationMins = Math.round((Date.now() - workoutStartRef.current) / 60000) || 35;
-    // Build exercise summary for DB
-    const exerciseLog = WORKOUT_EXERCISES.map((ex, eIdx) => ({
-      name: ex.name,
-      sets: loggedSets.filter(l => l.exIdx === eIdx).map(l => ({ reps: l.reps, weight: l.weight })),
-    }));
-    // Save once on render via ref
-    const savedRef = useRef(false);
-    if (!savedRef.current) {
-      savedRef.current = true;
-      saveWorkoutLog({ durationMins, exercises: exerciseLog, totalSets });
-    }
-
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "2rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
           <div style={{ fontSize: 22, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Workout complete!</div>
           <div style={{ fontSize: 14, color: theme.textDim, marginBottom: "1.5rem" }}>Great work, {user.name || "champ"}. Recovery starts now.</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%", marginBottom: "1.5rem" }}>
-            {[["Sets done", totalSets], ["Total volume", `${totalVol.toLocaleString()} lbs`], ["Exercises", WORKOUT_EXERCISES.length], ["Duration", `${durationMins} min`]].map(([l, v]) => (
+            {[["Sets done", totalSets], ["Total volume", `${totalVol.toLocaleString()} lbs`], ["Exercises", WORKOUT_EXERCISES.length], ["Personal bests", "2 🔥"]].map(([l, v]) => (
               <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
                 <div style={{ fontSize: 20, fontWeight: 600, color: a }}>{v}</div>
                 <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
               </div>
             ))}
-          </div>
-          <div style={{ background: "#003D35", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: "1.5rem", fontSize: 12, color: "#9BB3C8" }}>
-            ✓ Workout saved to your history
           </div>
           <button onClick={() => navigate("home")} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Back to dashboard →</button>
         </div>
@@ -891,12 +1081,19 @@ function WorkoutScreen() {
           </div>
           <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${ex.targetReps} reps`}</Pill>
         </div>
+
         <SetDots total={ex.sets} current={setIdx} />
+
         {state === "nudge" && nudgedWeight && (
-          <AINudgeCard oldWeight={ex.weight + setIdx * 5} newWeight={nudgedWeight}
-            onAccept={() => setState("active")}
-            onKeep={() => { setNudgedWeight(ex.weight + setIdx * 5); setState("active"); }} />
+          <AINudgeCard
+            exercise={ex}
+            oldWeight={ex.weight + setIdx * 5}
+            newWeight={nudgedWeight}
+            onAccept={() => { setState("active"); }}
+            onKeep={() => { setNudgedWeight(ex.weight + setIdx * 5); setState("active"); }}
+          />
         )}
+
         <div style={{ ...card, textAlign: "center" }}>
           <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
           <div style={{ fontSize: 34, fontWeight: 700, color: a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 14, color: theme.textDim }}>lbs</span></div>
@@ -904,118 +1101,185 @@ function WorkoutScreen() {
             ? <div style={{ fontSize: 9, color: theme.amber, marginTop: 3 }}>Progressive overload applied</div>
             : <div style={{ fontSize: 9, color: theme.textDim, marginTop: 3 }}>+5lb from last session</div>}
         </div>
+
         <div style={{ textAlign: "center", marginBottom: 8 }}>
           <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 10 }}>
             {listening ? "Listening..." : "Finish your set, then tap to log reps"}
           </div>
           {voiceTranscript ? (
-            <div className="mq-fade" style={{ background: "#0A1628", border: `1px solid rgba(0,212,177,0.15)`, borderRadius: 10, padding: "8px 12px", fontSize: 10, color: "#9BB3C8", fontStyle: "italic", marginBottom: 8 }}>{voiceTranscript}</div>
+            <div className="mq-fade" style={{ background: "#0A1628", border: `1px solid rgba(0,212,177,0.15)`, borderRadius: 10, padding: "8px 12px", fontSize: 10, color: "#9BB3C8", fontStyle: "italic", marginBottom: 8 }}>
+              {voiceTranscript}
+            </div>
           ) : listening ? (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 8 }} className="mq-wave">{[1,2,3,4,5,6].map(i => <span key={i} />)}</div>
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 8 }} className="mq-wave">
+              {[1,2,3,4,5,6].map(i => <span key={i} />)}
+            </div>
           ) : null}
           <div style={{ display: "flex", justifyContent: "center" }}>
             <VoiceBtn listening={listening && !voiceTranscript} onPress={simulateListen} size={60} />
           </div>
           {listening && !voiceTranscript && <div style={{ fontSize: 9, color: a, marginTop: 6 }}>Listening...</div>}
         </div>
+
         <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
-          <button onClick={() => logSet(ex.targetReps - 2)} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "7px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
-          <button onClick={() => { if (exIdx < WORKOUT_EXERCISES.length - 1) { setExIdx(i => i + 1); setSetIdx(0); setNudgedWeight(null); setState("active"); } }} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "7px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Swap</button>
-          <button onClick={() => logSet()} style={{ flex: 1, background: a, border: "none", borderRadius: 10, padding: "7px 6px", fontSize: 10, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log ✓</button>
+          <button onClick={() => { logSet(ex.targetReps - 2); }} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "7px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
+          <button onClick={() => { if (exIdx < WORKOUT_EXERCISES.length - 1) { setExIdx(i => i + 1); setSetIdx(0); setNudgedWeight(null); setState("active"); } }} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "7px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Swap exercise</button>
+          <button onClick={logSet} style={{ flex: 1, background: a, border: "none", borderRadius: 10, padding: "7px 6px", fontSize: 10, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log ✓</button>
         </div>
+
         <div style={{ marginTop: 10, fontSize: 9, color: theme.textFaint, textAlign: "center" }}>
-          {WORKOUT_EXERCISES.length - exIdx - 1} exercises remaining · {loggedSets.length} sets logged
+          Exercise {exIdx + 1} of {WORKOUT_EXERCISES.length} · {totalCompleted} sets logged
         </div>
       </div>
     </Layout>
   );
 }
 
-// ─── PLAN OVERVIEW SCREEN ─────────────────────────────────────────────────────
+// ─── PLAN OVERVIEW ─────────────────────────────────────────────────────────────
+const EXERCISES_DISPLAY = [
+  { name: "Goblet squat", weight: "35 lbs", reps: "10 reps", sets: "3 sets" },
+  { name: "Dumbbell bench press", weight: "30 lbs", reps: "10 reps", sets: "3 sets" },
+  { name: "Seated cable row", weight: "85 lbs", reps: "12 reps", sets: "3 sets" },
+  { name: "Dumbbell shoulder press", weight: "25 lbs", reps: "10 reps", sets: "3 sets" },
+  { name: "Romanian deadlift", weight: "65 lbs", reps: "10 reps", sets: "3 sets" },
+];
+
+const WEEK = [
+  { name: "Mon", type: "Full body", isWorkout: true }, { name: "Tue", type: "Rest", isWorkout: false },
+  { name: "Wed", type: "Full body", isWorkout: true }, { name: "Thu", type: "Rest", isWorkout: false },
+  { name: "Fri", type: "Full body", isWorkout: true }, { name: "Sat", type: "Rest", isWorkout: false },
+  { name: "Sun", type: "Rest", isWorkout: false },
+];
+
 function PlanOverviewScreen() {
   const { navigate, user, gymBranding } = useApp();
   const a = gymBranding.accent;
-  const goalLabel = GOAL_OPTIONS.find(g => g.id === user.goal)?.label || "Fat Loss";
+  const [activeDay, setActiveDay] = useState(0);
+  const day = WEEK[activeDay];
+  const sL = { fontSize: 11, color: theme.textDim, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".75rem" };
+  const goalLabel = GOAL_OPTIONS.find(g => g.id === user.goal)?.label?.toLowerCase() || "fitness";
+
   return (
     <Layout activeNav="home">
-      <div style={{ padding: "1.25rem 1.25rem 0" }} className="mq-fade">
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: theme.text }}>{user.name || "Your"}'s Plan</div>
-          <div style={{ fontSize: 14, color: theme.textDim, marginTop: 3 }}>{goalLabel} · Week 1</div>
+      <div style={{ padding: "1.75rem 1.25rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}` }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 20, padding: "4px 12px", fontSize: 12, color: a, fontWeight: 500, marginBottom: ".75rem" }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: a }} />Plan ready
         </div>
-        <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem", marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12 }}>This Week's Workouts</div>
-          {["Monday · Full Body", "Wednesday · Full Body", "Friday · Full Body"].map((d, i) => (
-            <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 2 ? `0.5px solid ${theme.borderSubtle}` : "none" }}>
-              <div style={{ fontSize: 14, color: theme.text }}>{d}</div>
-              <Pill>35 min</Pill>
+        <div style={{ fontSize: 22, fontWeight: 500, color: "#F0F0F0", lineHeight: 1.3, marginBottom: ".4rem" }}>Your 4-week {goalLabel} program is live</div>
+        <div style={{ fontSize: 14, color: theme.textDim }}>3 workouts per week · Full body · Beginner</div>
+      </div>
+      <div style={{ padding: "1.25rem 1.25rem 0" }}>
+        <div style={sL}>Daily targets</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+          {[["1,840", "Calories", "100%", a], ["155g", "Protein", "72%", "#5DCAA5"], ["185g", "Carbs", "55%", "#1D9E75"]].map(([v, l, w, c]) => (
+            <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
+              <div style={{ fontSize: 20, fontWeight: 500, color: "#F0F0F0" }}>{v}</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
+              <div style={{ height: 3, background: "#222", borderRadius: 2, marginTop: 6 }}><div style={{ height: 3, borderRadius: 2, background: c, width: w }} /></div>
             </div>
           ))}
         </div>
-        <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem", marginBottom: 20 }}>
-          <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 12 }}>Daily Targets</div>
-          {[["Calories", "1,840 / day"], ["Protein", "140g / day"], ["Water", "8 glasses"]].map(([k, v]) => (
-            <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `0.5px solid ${theme.borderSubtle}` }}>
-              <span style={{ fontSize: 14, color: theme.textMuted }}>{k}</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: a }}>{v}</span>
-            </div>
+      </div>
+      <div style={{ padding: "1.25rem 1.25rem 0" }}>
+        <div style={sL}>This week</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {WEEK.map((d, i) => (
+            <button key={i} onClick={() => setActiveDay(i)} style={{ flex: 1, background: i === activeDay ? "rgba(0,212,177,0.07)" : theme.surface, border: `0.5px solid ${i === activeDay ? a : theme.border}`, borderRadius: 10, padding: ".6rem .25rem", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", opacity: !d.isWorkout ? 0.5 : 1, fontFamily: "inherit" }}>
+              <span style={{ fontSize: 10, color: i === activeDay ? a : theme.textDim, textTransform: "uppercase", letterSpacing: ".06em" }}>{d.name}</span>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: i === activeDay ? a : d.isWorkout ? "#1A4A44" : "#2A2A2A" }} />
+              <span style={{ fontSize: 9, color: i === activeDay ? "#5DCAA5" : "#444", textAlign: "center", lineHeight: 1.3 }}>{d.type}</span>
+            </button>
           ))}
         </div>
-        <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Start Day 1 →</button>
+      </div>
+      <div style={{ padding: "1.25rem 1.25rem 0" }}>
+        <div style={sL}>{activeDay === 0 ? "Today's workout" : `${day.name}'s workout`}</div>
+        <div className="mq-fade" style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
+          {day.isWorkout ? <>
+            <div style={{ padding: "1rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div><div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>Full body A</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>5 exercises · ~40 min</div></div>
+              <div style={{ background: "#1E1E1E", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: theme.textMuted }}>40 min</div>
+            </div>
+            {EXERCISES_DISPLAY.map((ex, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".8rem 1.25rem", borderBottom: i < 4 ? `0.5px solid #1A1A1A` : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 6, background: "#1E1E1E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: theme.textDim, fontWeight: 500, flexShrink: 0 }}>{i + 1}</div>
+                  <div><div style={{ fontSize: 14, color: "#D0D0D0" }}>{ex.name}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{ex.weight} · {ex.reps}</div></div>
+                </div>
+                <div style={{ fontSize: 12, color: theme.textMuted, background: "#1A1A1A", borderRadius: 6, padding: "3px 8px" }}>{ex.sets}</div>
+              </div>
+            ))}
+          </> : (
+            <div style={{ padding: "2rem", display: "flex", flexDirection: "column", alignItems: "center", gap: ".75rem", textAlign: "center" }}>
+              <div style={{ fontSize: 20 }}>💤</div><div style={{ fontSize: 15, fontWeight: 500, color: theme.textMuted }}>Recovery day</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ padding: "1.25rem" }}>
+        <button onClick={() => navigate("home")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 16, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Go to dashboard →</button>
       </div>
     </Layout>
   );
 }
 
-// ─── HOME DASHBOARD ───────────────────────────────────────────────────────────
+// ─── HOME DASHBOARD ────────────────────────────────────────────────────────────
 function HomeDashboardScreen() {
-  const { navigate, user, gymBranding, calorieTarget } = useApp();
+  const { navigate, user, gymBranding } = useApp();
   const a = gymBranding.accent;
-  const [cals, setCals] = useState(1340);
+  const [done, setDone] = useState(0);
+  const [cals, setCals] = useState(1100);
   const [logged, setLogged] = useState(false);
-  const calGoal = calorieTarget;
+  const calGoal = 1840;
+  const h = new Date().getHours();
+  const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  const sL = { fontSize: 11, color: theme.textDim, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" };
 
   return (
     <Layout activeNav="home">
-      <div style={{ padding: "1rem 1.25rem 0" }} className="mq-fade">
-        <div style={{ marginBottom: "1.25rem" }}>
-          <div style={{ fontSize: 22, fontWeight: 600, color: theme.text }}>Hey, {user.name || "there"} 👋</div>
-          <div style={{ fontSize: 14, color: theme.textDim, marginTop: 4 }}>Monday · Week 3</div>
+      <div style={{ margin: "1.5rem 1.25rem 0", background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem 1.25rem", display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A2E2B", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🤖</div>
+        <div>
+          <div style={{ fontSize: 12, color: a, fontWeight: 500, marginBottom: 4 }}>Your coach</div>
+          <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{greeting}, {user.name || "there"}. Full body day — you nailed chest on Monday. Keep that momentum going.</div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: "1rem" }}>
-          {[
-            { label: "Streak", value: "🔥 6 days", color: theme.amber },
-            { label: "This week", value: "2 / 3 done", color: a },
-            { label: "Weight", value: "−4.2 lbs", color: a },
-            { label: "Next workout", value: "Today", color: "#A78BFA" },
-          ].map(({ label, value, color }) => (
-            <div key={label} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 14, padding: ".85rem .9rem" }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color }}>{value}</div>
-              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 3 }}>{label}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, marginBottom: "1rem", overflow: "hidden" }}>
-          <div style={{ padding: ".75rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>Today's Workout</div>
-            <Pill>Full Body</Pill>
+      </div>
+      <div style={{ padding: "1.25rem 1.25rem 0" }}>
+        <div style={sL}>Today's workout</div>
+        <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "1.1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div><div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>Full body A</div><div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>5 exercises · ~40 min</div></div>
+            <div style={{ background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>Full body</div>
           </div>
-          <div style={{ padding: ".75rem 1.25rem" }}>
-            {WORKOUT_EXERCISES.slice(0, 3).map((ex, i) => (
-              <div key={ex.name} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < 2 ? `0.5px solid ${theme.borderSubtle}` : "none" }}>
-                <span style={{ fontSize: 13, color: theme.textMuted }}>{ex.name}</span>
-                <span style={{ fontSize: 12, color: theme.textFaint }}>{ex.sets}×{ex.targetReps}</span>
-              </div>
-            ))}
+          <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {["3 sets each", "Beginner", "Week 2"].map(t => <div key={t} style={{ background: "#1E1E1E", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: theme.textMuted, display: "flex", alignItems: "center", gap: 5 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: a }} />{t}</div>)}
           </div>
-          <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}` }}>
-            <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 10, padding: ".75rem", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              Start workout →
+          <div style={{ margin: "0 1.25rem .5rem", height: 3, background: "#1A1A1A", borderRadius: 2 }}>
+            <div style={{ height: 3, borderRadius: 2, background: done === 5 ? theme.success : a, width: `${Math.round((done / 5) * 100)}%`, transition: "width .5s" }} />
+          </div>
+          <div style={{ padding: "0 1.25rem .5rem", fontSize: 12, color: done === 5 ? theme.success : theme.textDim }}>{done === 5 ? "Workout complete! ✓" : `${done} of 5 exercises done`}</div>
+          <div style={{ padding: "0 1.25rem 1.25rem" }}>
+            <button onClick={() => navigate("workout")} style={{ width: "100%", background: done === 5 ? theme.success : a, color: done === 5 ? "#E1F5EE" : "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+              {done === 0 ? "Start workout" : done === 5 ? "View summary →" : "Continue workout →"}
             </button>
           </div>
         </div>
-        <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, marginBottom: "1rem", overflow: "hidden" }}>
-          <div style={{ padding: ".75rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      </div>
+      <div style={{ padding: "1.25rem 1.25rem 0" }}>
+        <div style={sL}>Your progress</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
+          {[["🔥 6", "Day streak", "#E8874A"], ["3", "Workouts this week", null], ["-4.5 lbs", "Since you started", null]].map(([v, l, c]) => (
+            <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: ".85rem .75rem" }}>
+              <div style={{ fontSize: 18, fontWeight: 500, color: c || "#F0F0F0" }}>{v}</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: "1.25rem 1.25rem 0" }}>
+        <div style={sL}>Nutrition today</div>
+        <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: ".9rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>Calories</div>
             <div style={{ fontSize: 13, color: a, fontWeight: 500 }}>{calGoal - cals} remaining</div>
           </div>
@@ -1038,16 +1302,16 @@ function HomeDashboardScreen() {
             </button>
           </div>
         </div>
-        <div style={{ padding: "0 0 .75rem" }}>
-          <button onClick={() => navigate("meals")} style={{ width: "100%", background: "transparent", border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-            View full meal plan →
-          </button>
-        </div>
-        <div style={{ padding: "0 0 .75rem" }}>
-          <button onClick={() => navigate("owner")} style={{ width: "100%", background: "transparent", border: `0.5px solid rgba(167,139,250,0.3)`, borderRadius: 12, padding: ".75rem", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit" }}>
-            ⚙️ Gym owner dashboard →
-          </button>
-        </div>
+      </div>
+      <div style={{ padding: "1.25rem 1.25rem 0" }}>
+        <button onClick={() => navigate("meals")} style={{ width: "100%", background: "transparent", border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+          View full meal plan →
+        </button>
+      </div>
+      <div style={{ padding: ".75rem 1.25rem 0" }}>
+        <button onClick={() => navigate("owner")} style={{ width: "100%", background: "transparent", border: `0.5px solid rgba(167,139,250,0.3)`, borderRadius: 12, padding: ".75rem", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit" }}>
+          ⚙️ Gym owner dashboard →
+        </button>
       </div>
     </Layout>
   );
@@ -1055,18 +1319,51 @@ function HomeDashboardScreen() {
 
 // ─── MEAL PLAN DATA ────────────────────────────────────────────────────────────
 const MEAL_DATA = [
-  { id: "breakfast", label: "Breakfast", time: "7–9 AM", suggested: { name: "Greek yogurt & berries", cal: 320, protein: 28, carbs: 36, fat: 6 }, status: "done", logged: null },
-  { id: "lunch", label: "Lunch", time: "12–1 PM", suggested: { name: "Grilled chicken wrap", cal: 480, protein: 38, carbs: 44, fat: 12 }, status: "upcoming", logged: null },
-  { id: "dinner", label: "Dinner", time: "6–7 PM", suggested: { name: "Light salmon salad", cal: 380, protein: 36, carbs: 22, fat: 16 }, originalSuggested: { name: "Salmon & roasted veg", cal: 540, protein: 44 }, status: "upcoming", logged: null },
-  { id: "snack", label: "Snack", time: "3–4 PM", suggested: { name: "Protein shake + banana", cal: 240, protein: 26, carbs: 28, fat: 3 }, status: "upcoming", logged: null },
+  {
+    id: "breakfast", label: "Breakfast", time: "7–9 AM",
+    suggested: { name: "Greek yogurt & berries", cal: 320, protein: 28, carbs: 36, fat: 6 },
+    status: "done", logged: null,
+  },
+  {
+    id: "lunch", label: "Lunch", time: "12–1 PM",
+    suggested: { name: "Grilled chicken wrap", cal: 480, protein: 38, carbs: 44, fat: 12 },
+    status: "upcoming",
+    logged: null,
+  },
+  {
+    id: "dinner", label: "Dinner", time: "6–7 PM",
+    suggested: { name: "Light salmon salad", cal: 380, protein: 36, carbs: 22, fat: 16 },
+    originalSuggested: { name: "Salmon & roasted veg", cal: 540, protein: 44 },
+    status: "upcoming", logged: null,
+  },
+  {
+    id: "snack", label: "Snack", time: "3–4 PM",
+    suggested: { name: "Protein shake + banana", cal: 240, protein: 26, carbs: 28, fat: 3 },
+    status: "upcoming", logged: null,
+  },
 ];
 
 const GROCERY_DATA = [
-  { category: "Protein", emoji: "🥩", items: [{ name: "Chicken breast", qty: "2 lbs", done: true }, { name: "Greek yogurt", qty: "32 oz", done: false }, { name: "Salmon fillets", qty: "4 pieces", done: false }, { name: "Eggs", qty: "1 dozen", done: false }] },
-  { category: "Produce", emoji: "🥦", items: [{ name: "Mixed berries", qty: "1 bag", done: true }, { name: "Broccoli", qty: "1 head", done: false }, { name: "Sweet potato", qty: "3 medium", done: false }, { name: "Spinach", qty: "5 oz bag", done: false }] },
-  { category: "Pantry", emoji: "🫙", items: [{ name: "Brown rice", qty: "2 lbs", done: true }, { name: "Olive oil", qty: "1 bottle", done: false }, { name: "Protein powder", qty: "1 tub", done: false }] },
+  { category: "Protein", emoji: "🥩", items: [
+    { name: "Chicken breast", qty: "2 lbs", done: true },
+    { name: "Greek yogurt", qty: "32 oz", done: false },
+    { name: "Salmon fillets", qty: "4 pieces", done: false },
+    { name: "Eggs", qty: "1 dozen", done: false },
+  ]},
+  { category: "Produce", emoji: "🥦", items: [
+    { name: "Mixed berries", qty: "1 bag", done: true },
+    { name: "Broccoli", qty: "1 head", done: false },
+    { name: "Sweet potato", qty: "3 medium", done: false },
+    { name: "Spinach", qty: "5 oz bag", done: false },
+  ]},
+  { category: "Pantry", emoji: "🫙", items: [
+    { name: "Brown rice", qty: "2 lbs", done: true },
+    { name: "Olive oil", qty: "1 bottle", done: false },
+    { name: "Protein powder", qty: "1 tub", done: false },
+  ]},
 ];
 
+// ─── MACRO BAR ────────────────────────────────────────────────────────────────
 function MacroBar({ label, current, goal, color }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));
   return (
@@ -1080,12 +1377,20 @@ function MacroBar({ label, current, goal, color }) {
   );
 }
 
+// ─── MEAL SLOT (list view) ────────────────────────────────────────────────────
 function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
-  const sc = { done: { border: "rgba(0,212,177,0.2)", bg: "rgba(0,212,177,0.04)" }, swapped: { border: "rgba(245,158,11,0.25)", bg: "rgba(245,158,11,0.04)" }, upcoming: { border: "#1E2D42", bg: "#1A2332" }, skipped: { border: "#1E1E1E", bg: "#161616" } }[meal.status] || { border: "#1E2D42", bg: "#1A2332" };
+  const sc = {
+    done:    { border: "rgba(0,212,177,0.2)",    bg: "rgba(0,212,177,0.04)" },
+    swapped: { border: "rgba(245,158,11,0.25)", bg: "rgba(245,158,11,0.04)" },
+    upcoming:{ border: "#1E2D42",               bg: "#1A2332" },
+    skipped: { border: "#1E1E1E",               bg: "#161616" },
+  }[meal.status] || { border: "#1E2D42", bg: "#1A2332" };
+
   return (
     <div className="mq-fade" style={{ borderRadius: 14, border: `1px solid ${sc.border}`, background: sc.bg, marginBottom: 10, overflow: "hidden" }}>
+      {/* Header row */}
       <div style={{ padding: "8px 12px 6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
           <span style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 500 }}>{meal.label}</span>
@@ -1093,9 +1398,16 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
         </div>
         {{ done: <Pill variant="teal">✓ Logged</Pill>, swapped: <Pill variant="amber">⚡ Swapped</Pill>, upcoming: <Pill variant="gray">Up next</Pill>, skipped: <Pill variant="red">Skipped</Pill> }[meal.status]}
       </div>
+
+      {/* Suggested */}
       <div style={{ padding: "0 12px 6px" }}>
-        <div style={{ fontSize: 9, color: theme.textDim, marginBottom: 2 }}>{meal.status === "swapped" ? "Suggested" : meal.status === "done" ? "Eaten" : "Suggested"}{meal.id === "dinner" && meal.status === "upcoming" ? " · adjusted for lunch" : ""}</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: meal.status === "swapped" ? theme.textFaint : "#D8E4E0", textDecoration: meal.status === "swapped" ? "line-through" : "none" }}>{meal.suggested.name}</div>
+        <div style={{ fontSize: 9, color: theme.textDim, marginBottom: 2 }}>
+          {meal.status === "swapped" ? "Suggested" : meal.status === "done" ? "Eaten" : "Suggested"}
+          {meal.id === "dinner" && meal.status === "upcoming" ? " · adjusted for lunch" : ""}
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: meal.status === "swapped" ? theme.textFaint : "#D8E4E0", textDecoration: meal.status === "swapped" ? "line-through" : "none" }}>
+          {meal.suggested.name}
+        </div>
         {meal.status !== "swapped" && (
           <div style={{ display: "flex", gap: 8, marginTop: 3 }}>
             <span style={{ fontSize: 10, color: theme.textDim }}>{meal.suggested.cal} cal</span>
@@ -1104,6 +1416,8 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
           </div>
         )}
       </div>
+
+      {/* Swapped actual */}
       {meal.status === "swapped" && meal.logged && (
         <div style={{ margin: "0 12px 8px", background: "#1E1A0A", border: "1px solid rgba(245,158,11,0.15)", borderRadius: 8, padding: "6px 10px" }}>
           <div style={{ fontSize: 9, color: theme.amber, marginBottom: 2 }}>Actually ate</div>
@@ -1115,39 +1429,70 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
           </div>
         </div>
       )}
+
+      {/* Action buttons */}
       {meal.status === "upcoming" && (
         <div style={{ padding: "4px 12px 10px", display: "flex", gap: 6 }}>
-          <button onClick={onOpenDetail} className="mq-meal-tap" style={{ flex: 2, background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 9, padding: "7px 6px", fontSize: 10, color: a, cursor: "pointer", fontFamily: "inherit" }}>🎤 I ate something else</button>
-          <button onClick={onDone} className="mq-meal-tap" style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 10, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✓ Mark done</button>
-          <button onClick={onSkip} className="mq-meal-tap" style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip</button>
+          <button onClick={onOpenDetail} className="mq-meal-tap"
+            style={{ flex: 2, background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 9, padding: "7px 6px", fontSize: 10, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+            🎤 I ate something else
+          </button>
+          <button onClick={onDone} className="mq-meal-tap"
+            style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 10, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            ✓ Mark done
+          </button>
+          <button onClick={onSkip} className="mq-meal-tap"
+            style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+            Skip
+          </button>
         </div>
       )}
     </div>
   );
 }
 
+// ─── DINNER DETAIL SCREEN ────────────────────────────────────────────────────
 function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
   const [voicePhase, setVoicePhase] = useState("idle");
   const timerRef = useRef(null);
-  function startVoice() { setVoicePhase("listening"); timerRef.current = setTimeout(() => setVoicePhase("heard"), 2000); }
-  function cancelVoice() { clearTimeout(timerRef.current); setVoicePhase("idle"); }
+
+  function startVoice() {
+    setVoicePhase("listening");
+    timerRef.current = setTimeout(() => setVoicePhase("heard"), 2000);
+  }
+  function cancelVoice() {
+    clearTimeout(timerRef.current);
+    setVoicePhase("idle");
+  }
   useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  // Dinner has an AI-adjusted original; other meals show the suggested as both sides
   const hasAdjustment = !!meal.originalSuggested;
   const originalMeal = meal.originalSuggested || meal.suggested;
+  const confirmLabel = `✓ I'll have the ${meal.suggested.name.split(" ")[0].toLowerCase()}`;
+
   return (
     <Layout activeNav="meals" chatTarget="chat_meals">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column" }}>
+
+        {/* Back + title */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", fontSize: 18, padding: 0, lineHeight: 1 }}>←</button>
           <div style={{ fontSize: 16, fontWeight: 700, color: theme.text }}>{meal.label} — Up Next</div>
         </div>
+
+        {/* AI note — only shown when meal was adjusted */}
         {hasAdjustment && (
           <div style={{ background: "#080E1A", borderLeft: "2px solid #00D4B1", borderRadius: "0 10px 10px 0", padding: "8px 12px", marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: "#9BB3C8", lineHeight: 1.6 }}>You had a bigger lunch today — no problem. I've lightened dinner to keep you close to your daily target. You're only <span style={{ color: "#E8EDF2", fontWeight: 600 }}>280 calories</span> over.</div>
+            <div style={{ fontSize: 11, color: "#9BB3C8", lineHeight: 1.6 }}>
+              You had a bigger lunch today — no problem. I've lightened dinner to keep you close to your daily target. You're only <span style={{ color: "#E8EDF2", fontWeight: 600 }}>280 calories</span> over.
+            </div>
           </div>
         )}
+
+        {/* Before / after — only shown when AI adjusted */}
         {hasAdjustment && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
             <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 12px" }}>
@@ -1163,6 +1508,8 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
             </div>
           </div>
         )}
+
+        {/* Suggested meal summary — shown when no adjustment */}
         {!hasAdjustment && (
           <div style={{ background: "#1A2332", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
             <div style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6 }}>Suggested</div>
@@ -1174,20 +1521,58 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
             </div>
           </div>
         )}
+
+        {/* Voice overlay */}
         <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 14, padding: "14px 14px 12px", marginBottom: 14, textAlign: "center" }}>
-          {voicePhase === "idle" && (<><div style={{ fontSize: 11, color: theme.textDim, marginBottom: 12 }}>Did you eat something different? Tap the mic and tell me.</div><div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}><VoiceBtn onPress={startVoice} size={54} /></div><div style={{ fontSize: 10, color: theme.textDim, marginTop: 8 }}>Tap mic to log something else</div></>)}
-          {voicePhase === "listening" && (<><div style={{ fontSize: 11, color: theme.textDim, marginBottom: 6 }}>Tell me what you had instead</div><div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 6 }} className="mq-wave">{[1,2,3,4,5,6].map(i => <span key={i} />)}</div><div style={{ fontSize: 11, color: a, marginBottom: 10 }}>Listening...</div><button onClick={cancelVoice} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button></>)}
-          {voicePhase === "heard" && (<><div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>Heard you — does this look right?</div><div style={{ background: "#111827", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#9BB3C8", fontStyle: "italic", marginBottom: 10 }}>"I had a burger and fries instead"</div><button onClick={onSwap} style={{ background: a, border: "none", borderRadius: 8, padding: "7px 20px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Yes, log this ✓</button></>)}
+          {voicePhase === "idle" && (
+            <>
+              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 12 }}>Did you eat something different? Tap the mic and tell me.</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+                <VoiceBtn onPress={startVoice} size={54} />
+              </div>
+              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 8 }}>Tap mic to log something else</div>
+            </>
+          )}
+          {voicePhase === "listening" && (
+            <>
+              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 6 }}>Tell me what you had instead</div>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 6 }} className="mq-wave">
+                {[1,2,3,4,5,6].map(i => <span key={i} />)}
+              </div>
+              <div style={{ fontSize: 11, color: a, marginBottom: 10 }}>Listening...</div>
+              <button onClick={cancelVoice} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            </>
+          )}
+          {voicePhase === "heard" && (
+            <>
+              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>Heard you — does this look right?</div>
+              <div style={{ background: "#111827", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#9BB3C8", fontStyle: "italic", marginBottom: 10 }}>
+                "I had a burger and fries instead"
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
+                <button onClick={onSwap} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Confirm ✓</button>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Bottom CTAs */}
         <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
-          <button onClick={startVoice} style={{ flex: 1, background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "11px 8px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>🎤 Something else</button>
-          <button onClick={onConfirm} style={{ flex: 2, background: a, border: "none", borderRadius: 12, padding: "11px 8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✓ I'll have this</button>
+          <button onClick={startVoice} style={{ flex: 1, background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "11px 8px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+            🎤 Something else
+          </button>
+          <button onClick={onConfirm} style={{ flex: 2, background: a, border: "none", borderRadius: 12, padding: "11px 8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            {confirmLabel}
+          </button>
         </div>
+
       </div>
     </Layout>
   );
 }
 
+// ─── GROCERY LIST ─────────────────────────────────────────────────────────────
 function GroceryList({ groceries, onToggle }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
@@ -1206,7 +1591,9 @@ function GroceryList({ groceries, onToggle }) {
             {cat.items.map((item, i) => (
               <button key={item.name} onClick={() => onToggle(cat.category, i)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "none", border: "none", borderBottom: i < cat.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
-                <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${item.done ? a : "rgba(0,212,177,0.3)"}`, background: item.done ? "#003D35" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 9, color: a }}>{item.done ? "✓" : ""}</div>
+                <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${item.done ? a : "rgba(0,212,177,0.3)"}`, background: item.done ? "#003D35" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 9, color: a }}>
+                  {item.done ? "✓" : ""}
+                </div>
                 <span style={{ flex: 1, fontSize: 13, color: item.done ? theme.textDim : theme.text, textDecoration: item.done ? "line-through" : "none" }}>{item.name}</span>
                 <span style={{ fontSize: 11, color: theme.textFaint }}>{item.qty}</span>
               </button>
@@ -1218,54 +1605,133 @@ function GroceryList({ groceries, onToggle }) {
   );
 }
 
+// ─── MEAL PLAN SCREEN ─────────────────────────────────────────────────────────
 function MealPlanScreen() {
-  const { gymBranding } = useApp();
+  const { gymBranding, supabaseUser } = useApp();
   const a = gymBranding.accent;
+
   const [tab, setTab] = useState("today");
   const [meals, setMeals] = useState(MEAL_DATA);
   const [groceries, setGroceries] = useState(GROCERY_DATA);
-  const [detailMeal, setDetailMeal] = useState(null);
+  const [detailMeal, setDetailMeal] = useState(null); // null = list view, meal obj = detail view
+
   const CAL_GOAL = 1840, PROTEIN_GOAL = 140, CARBS_GOAL = 160, FAT_GOAL = 55;
+
   const calcMacros = (mealList) => mealList.reduce((acc, m) => {
     const src = (m.status === "done" || m.status === "swapped") ? (m.logged || m.suggested) : null;
     if (!src) return acc;
     return { cal: acc.cal + src.cal, protein: acc.protein + src.protein, carbs: acc.carbs + (src.carbs || 0), fat: acc.fat + (src.fat || 0) };
   }, { cal: 0, protein: 0, carbs: 0, fat: 0 });
+
   const macros = calcMacros(meals);
-  function markDone(id) { setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done" } : m)); }
-  function skipMeal(id) { setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "skipped" } : m)); }
-  function confirmMeal(id) { setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done" } : m)); setDetailMeal(null); }
-  function logSwap(id) { setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "swapped", logged: { name: "Burger & fries", cal: 820, protein: 28, carbs: 72, fat: 38 } } : m)); setDetailMeal(null); }
-  function toggleGrocery(category, idx) { setGroceries(prev => prev.map(cat => cat.category !== category ? cat : { ...cat, items: cat.items.map((item, i) => i !== idx ? item : { ...item, done: !item.done }) })); }
-  if (detailMeal) return <MealDetailScreen meal={detailMeal} onBack={() => setDetailMeal(null)} onConfirm={() => confirmMeal(detailMeal.id)} onSwap={() => logSwap(detailMeal.id)} />;
+
+  function markDone(id) {
+    const meal = meals.find(m => m.id === id);
+    setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done" } : m));
+    if (supabaseUser?.id && meal) {
+      sb.insertMealLog(supabaseUser.id, {
+        mealId: id, status: "done",
+        loggedName: meal.suggested.name, loggedCal: meal.suggested.cal, loggedProtein: meal.suggested.protein,
+      }).catch(() => {});
+    }
+  }
+  function skipMeal(id) {
+    setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "skipped" } : m));
+    if (supabaseUser?.id) {
+      sb.insertMealLog(supabaseUser.id, { mealId: id, status: "skipped", loggedName: null, loggedCal: 0, loggedProtein: 0 }).catch(() => {});
+    }
+  }
+  function confirmSalad(id) {
+    const meal = meals.find(m => m.id === id);
+    setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done" } : m));
+    setDetailMeal(null);
+    if (supabaseUser?.id && meal) {
+      sb.insertMealLog(supabaseUser.id, {
+        mealId: id, status: "done",
+        loggedName: meal.suggested.name, loggedCal: meal.suggested.cal, loggedProtein: meal.suggested.protein,
+      }).catch(() => {});
+    }
+  }
+  function logSwap(id) {
+    const swapped = { name: "Burger & fries", cal: 820, protein: 28, carbs: 72, fat: 38 };
+    setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "swapped", logged: swapped } : m));
+    setDetailMeal(null);
+    if (supabaseUser?.id) {
+      sb.insertMealLog(supabaseUser.id, {
+        mealId: id, status: "swapped",
+        loggedName: swapped.name, loggedCal: swapped.cal, loggedProtein: swapped.protein,
+      }).catch(() => {});
+    }
+  }
+  function toggleGrocery(category, idx) {
+    setGroceries(prev => prev.map(cat => cat.category !== category ? cat : {
+      ...cat, items: cat.items.map((item, i) => i !== idx ? item : { ...item, done: !item.done })
+    }));
+  }
+
+  // Show dinner detail screen
+  if (detailMeal) {
+    return (
+      <MealDetailScreen
+        meal={detailMeal}
+        onBack={() => setDetailMeal(null)}
+        onConfirm={() => confirmSalad(detailMeal.id)}
+        onSwap={() => logSwap(detailMeal.id)}
+      />
+    );
+  }
+
   return (
     <Layout activeNav="meals" chatTarget="chat_meals">
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 14 }}>
-          <div><div style={{ fontSize: 20, fontWeight: 600, color: theme.text }}>Today's Meals</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>Monday · Fat loss plan</div></div>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: theme.text }}>Today's Meals</div>
+            <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>Monday · Fat loss plan</div>
+          </div>
           <Pill variant={macros.cal > CAL_GOAL ? "amber" : "teal"}>{macros.cal} / {CAL_GOAL} cal</Pill>
         </div>
+
         <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
           <MacroBar label="Calories" current={macros.cal} goal={CAL_GOAL} color={a} />
           <MacroBar label="Protein" current={macros.protein} goal={PROTEIN_GOAL} color="#F59E0B" />
           <MacroBar label="Carbs" current={macros.carbs} goal={CARBS_GOAL} color="#818cf8" />
           <MacroBar label="Fat" current={macros.fat} goal={FAT_GOAL} color="#f472b6" />
         </div>
+
         <div style={{ display: "flex", background: "#1A2332", borderRadius: 10, padding: 3, marginBottom: 16 }}>
           {[["today", "Meals"], ["grocery", "Grocery List"]].map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "7px 6px", background: tab === t ? a : "transparent", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, color: tab === t ? "#003D35" : theme.textDim, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{label}</button>
+            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "7px 6px", background: tab === t ? a : "transparent", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, color: tab === t ? "#003D35" : theme.textDim, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
+              {label}
+            </button>
           ))}
         </div>
+
         {tab === "today" && (
           <div className="mq-fade">
-            {meals.map(meal => (<MealSlot key={meal.id} meal={meal} onDone={() => markDone(meal.id)} onSkip={() => skipMeal(meal.id)} onOpenDetail={() => setDetailMeal(meal)} />))}
+            {meals.map(meal => (
+              <MealSlot
+                key={meal.id}
+                meal={meal}
+                onDone={() => markDone(meal.id)}
+                onSkip={() => skipMeal(meal.id)}
+                onOpenDetail={() => setDetailMeal(meal)}
+              />
+            ))}
             <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: a, fontWeight: 500, marginBottom: 4 }}>Still hungry?</div>
-              <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5 }}>You have <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{Math.max(0, CAL_GOAL - macros.cal)} cal</span> and <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{Math.max(0, PROTEIN_GOAL - macros.protein)}g protein</span> left today.</div>
+              <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5 }}>
+                You have <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{Math.max(0, CAL_GOAL - macros.cal)} cal</span> and <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{Math.max(0, PROTEIN_GOAL - macros.protein)}g protein</span> left today.
+              </div>
             </div>
           </div>
         )}
-        {tab === "grocery" && (<div className="mq-fade"><GroceryList groceries={groceries} onToggle={toggleGrocery} /></div>)}
+
+        {tab === "grocery" && (
+          <div className="mq-fade">
+            <GroceryList groceries={groceries} onToggle={toggleGrocery} />
+          </div>
+        )}
       </div>
     </Layout>
   );
@@ -1278,138 +1744,302 @@ const CHAT_SUGGESTIONS = {
   meals:   ["What can I eat for dinner?", "I already had lunch", "I'm still hungry"],
 };
 
-const BOT_RESPONSES = {
-  "my knee hurts on squats": "Stop squats for now — not worth the risk. I'm swapping in seated leg press instead, much easier on the knee. If it keeps bothering you after today, let me know and we can adjust your whole program.",
-  "can i swap an exercise": "Of course. Which exercise are you on? Just tell me the name and I'll find a solid alternative that hits the same muscle group.",
+// ─── FALLBACK responses used in dev/demo when API is unavailable ──────────────
+const FALLBACK_REPLIES = {
+  "my knee hurts on squats": "Stop squats for now — not worth the risk. I'm swapping in seated leg press instead, much easier on the knee. If it keeps bothering you, let me know and I'll adjust your whole program.",
+  "can i swap an exercise": "Of course. Which exercise are you on? Tell me the name and I'll find a solid alternative that hits the same muscle group.",
   "how many sets left": "You've done 2 sets of this exercise. One more to go, then it's dumbbell rows — 3 sets of 10.",
-  "what should i eat today": "Your meal plan is already set for today — Greek yogurt for breakfast, grilled chicken wrap for lunch, and salmon salad for dinner. You've got 1,840 calories total. Want me to swap anything?",
-  "how was my last workout": "Monday was strong — you hit every exercise and even beat your target reps on goblet squat. Weight is up 5 lbs from last week on most lifts. You're progressing well.",
-  "i'm feeling tired": "That's normal, especially mid-week. Make sure you're hitting your protein goal — it helps recovery. If it continues, I can scale down the workout intensity for today so you still move without overdoing it.",
-  "what can i eat for dinner": "Based on what you've eaten today, you have about 460 calories and 36g protein left. Light salmon salad is your suggestion — it fits perfectly. Or if you want something different, tell me and I'll adjust.",
+  "what should i eat today": "Your meal plan is set — Greek yogurt breakfast, grilled chicken wrap for lunch, salmon salad for dinner. 1,840 calories total. Want me to swap anything?",
+  "how was my last workout": "Monday was strong — you hit every exercise and beat your target reps on goblet squat. Weight is up 5 lbs from last week. Progressing well.",
+  "i'm feeling tired": "That's normal mid-week. Hit your protein goal — it helps recovery. I can scale down today's intensity if needed.",
+  "what can i eat for dinner": "You have about 460 calories and 36g protein left. Light salmon salad fits perfectly. Tell me if you want something different.",
   "i already had lunch": "Got it — what did you have? Tell me and I'll log it and adjust dinner to fit your remaining calories.",
-  "i'm still hungry": "You have 460 calories left today. Good options: a protein shake + banana (240 cal, 26g protein), Greek yogurt with berries (280 cal), or 2 boiled eggs + rice cakes (190 cal). Want me to add one to your plan?",
+  "i'm still hungry": "You have 460 calories left. Options: protein shake + banana (240 cal, 26g protein), Greek yogurt (280 cal), or 2 boiled eggs + rice cakes (190 cal). Want me to add one?",
 };
 
-function getReply(text) {
+function getFallbackReply(text) {
   const key = text.toLowerCase().trim().replace(/[!?.]/g, "");
-  return BOT_RESPONSES[key] || "Good question. Let me think about that based on your plan... You're on track overall — keep doing what you're doing and check in if anything feels off.";
+  return FALLBACK_REPLIES[key] || "Good question. Based on your plan and history, you're on track — keep it up and check in if anything feels off.";
+}
+
+// ─── API call to /api/chat proxy ──────────────────────────────────────────────
+async function fetchAIReply(messages, user, context) {
+  const res = await fetch("/api/chat", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, user, context }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json(); // { text, action, chips }
 }
 
 function ChatScreen({ fromScreen = "home" }) {
   const { navigate, user, gymBranding } = useApp();
   const a = gymBranding.accent;
-  const [messages, setMessages] = useState([{ id: 1, role: "ai", text: `Hey ${user.name || "there"}! I can see your full plan and history. What's up?` }]);
+  const [messages, setMessages] = useState([
+    { id: 1, role: "ai", text: `Hey ${user.name || "there"}! I can see your full plan and history. What's up?` },
+  ]);
   const [input, setInput] = useState("");
-  const [voicePhase, setVoicePhase] = useState("idle");
+  const [voicePhase, setVoicePhase] = useState("idle"); // idle | listening | heard
   const [voiceText, setVoiceText] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [dynamicChips, setDynamicChips] = useState(null); // chips returned by Claude
+  const [apiError, setApiError] = useState(false);
   const scrollRef = useRef(null);
   const timerRef = useRef(null);
-  const suggestions = CHAT_SUGGESTIONS[fromScreen] || CHAT_SUGGESTIONS.idle;
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages, thinking]);
-  function sendMessage(text) {
+
+  // Default suggestion chips per context — shown before first exchange
+  const defaultChips = CHAT_SUGGESTIONS[fromScreen] || CHAT_SUGGESTIONS.idle;
+  // After first exchange: show Claude's chips if available, else nothing
+  const visibleChips = messages.length <= 2 ? defaultChips : (dynamicChips || []);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, thinking]);
+
+  async function sendMessage(text) {
     if (!text.trim()) return;
-    setMessages(prev => [...prev, { id: Date.now(), role: "user", text: text.trim() }]);
-    setInput(""); setVoicePhase("idle"); setVoiceText(""); setThinking(true);
-    setTimeout(() => { setThinking(false); setMessages(prev => [...prev, { id: Date.now() + 1, role: "ai", text: getReply(text) }]); }, 1200);
+    const userMsg = { id: Date.now(), role: "user", text: text.trim() };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+    setInput("");
+    setVoicePhase("idle");
+    setVoiceText("");
+    setThinking(true);
+    setDynamicChips(null);
+    setApiError(false);
+
+    try {
+      // Send full conversation history so Claude has context
+      const userMessages = newMessages.filter(m => m.role === "user" || m.role === "ai");
+      const { text: reply, action, chips } = await fetchAIReply(
+        userMessages,
+        { ...user, gymName: gymBranding.name },
+        fromScreen
+      );
+      setThinking(false);
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: "ai", text: reply }]);
+      if (chips?.length) setDynamicChips(chips);
+      // Action handling — swap exercise or adjust meal
+      if (action?.type === "swap_exercise") {
+        console.log("[Morphiq] AI action: swap", action.from, "→", action.to);
+        // TODO: wire to workoutExercises in AppContext when Supabase is added
+      }
+    } catch (err) {
+      console.warn("[Morphiq] API unavailable, using fallback:", err.message);
+      setApiError(true);
+      setThinking(false);
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: "ai", text: getFallbackReply(text) }]);
+    }
   }
-  function startVoice() { setVoicePhase("listening"); timerRef.current = setTimeout(() => { setVoiceText(suggestions[Math.floor(Math.random() * suggestions.length)]); setVoicePhase("heard"); }, 2000); }
-  function cancelVoice() { clearTimeout(timerRef.current); setVoicePhase("idle"); setVoiceText(""); }
+
+  function startVoice() {
+    setVoicePhase("listening");
+    timerRef.current = setTimeout(() => {
+      setVoiceText(defaultChips[Math.floor(Math.random() * defaultChips.length)]);
+      setVoicePhase("heard");
+    }, 2000);
+  }
+  function cancelVoice() {
+    clearTimeout(timerRef.current);
+    setVoicePhase("idle");
+    setVoiceText("");
+  }
+  function confirmVoice() { sendMessage(voiceText); }
   useEffect(() => () => clearTimeout(timerRef.current), []);
+
   const ctx = { home: "Dashboard", workout: "Mid-workout", meals: "Meal plan", chat: "Dashboard" }[fromScreen] || "Dashboard";
+
   return (
-    <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, minHeight: 780, fontFamily: "system-ui,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, minHeight: "100dvh", fontFamily: "system-ui,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header */}
       <div style={{ background: "#0D1117", borderBottom: `1px solid ${theme.borderSubtle}`, padding: "14px 16px 12px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={() => navigate(fromScreen === "chat" ? "home" : fromScreen)} style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", fontSize: 20, padding: 0, lineHeight: 1, marginRight: 2 }}>←</button>
           <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#003D35", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: a, flexShrink: 0 }}>AI</div>
-          <div style={{ flex: 1 }}><div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Morphiq Trainer</div><div style={{ fontSize: 11, color: a }}>Knows your full plan</div></div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}><div style={{ width: 7, height: 7, borderRadius: "50%", background: a }} /><span style={{ fontSize: 11, color: theme.textDim }}>Online</span></div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Morphiq Trainer</div>
+            <div style={{ fontSize: 11, color: a }}>Knows your full plan</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: a }} />
+            <span style={{ fontSize: 11, color: theme.textDim }}>Online</span>
+          </div>
         </div>
+        {/* Context chip */}
         <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 5, background: "#0A1628", border: `1px solid rgba(0,212,177,0.15)`, borderRadius: 20, padding: "4px 10px" }}>
           <span style={{ fontSize: 10, color: a }}>⏱</span>
           <span style={{ fontSize: 10, color: "#9BB3C8" }}>{ctx} · {gymBranding.name}</span>
         </div>
       </div>
+
+      {/* Messages */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0", display: "flex", flexDirection: "column", gap: 4 }}>
         {messages.map(msg => (
           <div key={msg.id} className="mq-fade" style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 6 }}>
-            {msg.role === "ai" && (<div style={{ display: "flex", alignItems: "flex-start", gap: 7, maxWidth: "90%" }}><div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `1px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: a, flexShrink: 0, marginTop: 2 }}>AI</div><div style={{ background: "#1A2332", borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 13, lineHeight: 1.55, color: "#9BB3C8" }}>{msg.text}</div></div>)}
-            {msg.role === "user" && (<div style={{ background: a, borderRadius: "12px 12px 4px 12px", padding: "9px 12px", fontSize: 13, color: "#003D35", fontWeight: 500, maxWidth: "82%" }}>{msg.text}</div>)}
+            {msg.role === "ai" && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 7, maxWidth: "90%" }}>
+                <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `1px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: a, flexShrink: 0, marginTop: 2 }}>AI</div>
+                <div style={{ background: "#1A2332", borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 13, lineHeight: 1.55, color: "#9BB3C8" }}>{msg.text}</div>
+              </div>
+            )}
+            {msg.role === "user" && (
+              <div style={{ background: a, borderRadius: "12px 12px 4px 12px", padding: "9px 12px", fontSize: 13, color: "#003D35", fontWeight: 500, maxWidth: "82%" }}>{msg.text}</div>
+            )}
           </div>
         ))}
-        {thinking && (<div className="mq-fade" style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}><div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `1px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: a, flexShrink: 0 }}>AI</div><div style={{ background: "#1A2332", borderRadius: "12px 12px 12px 4px", padding: "9px 14px" }}><div style={{ display: "flex", gap: 4, alignItems: "center" }}>{[0, 0.2, 0.4].map(d => <div key={d} style={{ width: 6, height: 6, borderRadius: "50%", background: a, animation: "mqPulse 1.2s infinite", animationDelay: `${d}s`, opacity: 0.7 }} />)}</div></div></div>)}
-      </div>
-      {voicePhase !== "idle" && (
-        <div style={{ padding: "10px 14px", background: "#0A1628", borderTop: `1px solid rgba(0,212,177,0.1)` }}>
-          {voicePhase === "listening" && (<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}><div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 24 }} className="mq-wave">{[1,2,3,4,5,6].map(i => <span key={i} />)}</div><div style={{ fontSize: 11, color: a }}>Listening...</div><button onClick={cancelVoice} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "4px 14px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button></div>)}
-          {voicePhase === "heard" && (<div style={{ display: "flex", flexDirection: "column", gap: 8 }}><div style={{ background: "#111827", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#9BB3C8", fontStyle: "italic" }}>"{voiceText}"</div><div style={{ display: "flex", gap: 6 }}><button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "7px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Retry</button><button onClick={() => sendMessage(voiceText)} style={{ flex: 2, background: a, border: "none", borderRadius: 8, padding: "7px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Send ✓</button></div></div>)}
-        </div>
-      )}
-      <div style={{ padding: "8px 14px 12px", borderTop: `0.5px solid ${theme.borderSubtle}`, flexShrink: 0, background: theme.bg }}>
-        {messages.length <= 2 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-            {suggestions.map(s => (<button key={s} onClick={() => sendMessage(s)} style={{ background: "#1A2332", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 16, padding: "5px 10px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>{s}</button>))}
+        {thinking && (
+          <div className="mq-fade" style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `1px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: a, flexShrink: 0 }}>AI</div>
+            <div style={{ background: "#1A2332", borderRadius: "12px 12px 12px 4px", padding: "9px 14px" }}>
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                {[0, 0.2, 0.4].map(d => <div key={d} style={{ width: 6, height: 6, borderRadius: "50%", background: a, animation: "mqPulse 1.2s infinite", animationDelay: `${d}s`, opacity: 0.7 }} />)}
+              </div>
+            </div>
           </div>
         )}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={startVoice} style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A2332", border: `1px solid rgba(255,255,255,0.08)`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><MicIcon size={14} color={a} /></button>
-          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage(input)} placeholder="Ask anything..." style={{ flex: 1, background: "#1A2332", border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 20, padding: "9px 14px", fontSize: 13, color: theme.text, outline: "none", fontFamily: "inherit" }} />
-          <button onClick={() => sendMessage(input)} style={{ width: 36, height: 36, borderRadius: "50%", background: a, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, fontSize: 14, color: "#003D35", fontWeight: 700 }}>→</button>
-        </div>
+        <div style={{ height: 8 }} />
       </div>
+
+      {/* API error banner — shown when proxy is unreachable */}
+      {apiError && (
+        <div style={{ margin: "6px 14px 0", background: "#1A1010", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "7px 12px", fontSize: 11, color: "#F87171", flexShrink: 0 }}>
+          ⚠ Using offline responses — check that your /api/chat server is running.
+        </div>
+      )}
+
+      {/* Suggestion chips — default before first exchange, Claude's chips after */}
+      {visibleChips.length > 0 && !thinking && (
+        <div style={{ padding: "8px 14px 0", display: "flex", flexWrap: "wrap", gap: 6, flexShrink: 0 }}>
+          {visibleChips.map(s => (
+            <button key={s} onClick={() => sendMessage(s)}
+              style={{ background: "#1A2332", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 20, padding: "5px 10px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Voice overlay */}
+      {voicePhase !== "idle" && (
+        <div className="mq-fade" style={{ margin: "8px 14px 0", background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 14, padding: "12px", textAlign: "center", flexShrink: 0 }}>
+          {voicePhase === "listening" && <>
+            <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 6 }}>Listening...</div>
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 6 }} className="mq-wave">
+              {[1,2,3,4,5,6].map(i => <span key={i} />)}
+            </div>
+            <div style={{ fontSize: 10, color: a, marginBottom: 8 }}>Speak your question</div>
+            <button onClick={cancelVoice} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          </>}
+          {voicePhase === "heard" && <>
+            <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 7 }}>Heard you — does this look right?</div>
+            <div style={{ background: "#111827", borderRadius: 8, padding: "7px 12px", fontSize: 12, color: "#9BB3C8", fontStyle: "italic", marginBottom: 10 }}>"{voiceText}"</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "7px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
+              <button onClick={confirmVoice} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Send ✓</button>
+            </div>
+          </>}
+        </div>
+      )}
+
+      {/* Input bar */}
+      <div style={{ padding: "10px 14px 14px", background: "#0D1117", borderTop: `1px solid ${theme.borderSubtle}`, display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+        <button onClick={startVoice} disabled={voicePhase !== "idle"}
+          style={{ width: 36, height: 36, borderRadius: "50%", background: voicePhase !== "idle" ? a : "#1A2332", border: `1px solid ${voicePhase !== "idle" ? a : "rgba(255,255,255,0.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+          <MicIcon size={14} color={voicePhase !== "idle" ? "#003D35" : "#6B7A8D"} />
+        </button>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && sendMessage(input)}
+          placeholder="Ask anything..."
+          style={{ flex: 1, background: "#1A2332", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "8px 12px", fontSize: 13, color: theme.text, outline: "none", fontFamily: "inherit" }}
+        />
+        <button onClick={() => sendMessage(input)} disabled={!input.trim()}
+          style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() ? a : "#1A2332", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", flexShrink: 0, fontSize: 15, color: input.trim() ? "#003D35" : theme.textFaint, fontWeight: 700 }}>→</button>
+      </div>
+
+      {/* Bottom text */}
+      <div style={{ textAlign: "center", fontSize: 10, color: theme.textFaint, paddingBottom: 10, background: "#0D1117", flexShrink: 0 }}>Powered by Morphiq</div>
     </div>
   );
 }
 
-// ─── PROGRESS DATA ────────────────────────────────────────────────────────────
-const WEIGHT_DATA = [
-  { week: "W1", weight: 187 }, { week: "W2", weight: 185.5 }, { week: "W3", weight: 184 },
-  { week: "W4", weight: 183.2 }, { week: "W5", weight: 182.1 }, { week: "W6", weight: 181.4 },
+
+// ─── PROGRESS SCREEN ──────────────────────────────────────────────────────────
+const WEIGHT_DATA_MOCK = [
+  { week: "W1", weight: 187.0 }, { week: "W2", weight: 185.5 },
+  { week: "W3", weight: 184.2 }, { week: "W4", weight: 183.0 },
+  { week: "W5", weight: 182.1 }, { week: "W6", weight: 181.4 },
 ];
 const WORKOUT_LOG = [
-  { date: "Mon May 13", name: "Full Body A", sets: 15, vol: "4,820 lbs", pbs: 2 },
-  { date: "Wed May 11", name: "Full Body B", sets: 14, vol: "4,650 lbs", pbs: 1 },
-  { date: "Mon May 8",  name: "Full Body A", sets: 15, vol: "4,500 lbs", pbs: 0 },
-  { date: "Fri May 5",  name: "Full Body B", sets: 13, vol: "4,200 lbs", pbs: 2 },
-  { date: "Wed May 3",  name: "Full Body A", sets: 14, vol: "4,100 lbs", pbs: 1 },
+  { date: "Mon May 5",  name: "Full body A", sets: 15, vol: "4,820 lbs", pbs: 2 },
+  { date: "Wed May 7",  name: "Full body B", sets: 14, vol: "4,540 lbs", pbs: 1 },
+  { date: "Fri May 9",  name: "Full body A", sets: 15, vol: "5,010 lbs", pbs: 2 },
+  { date: "Mon May 12", name: "Full body B", sets: 14, vol: "4,760 lbs", pbs: 0 },
+  { date: "Wed May 14", name: "Full body A", sets: 15, vol: "5,200 lbs", pbs: 3 },
 ];
 const PERSONAL_BESTS = [
-  { exercise: "Goblet Squat",         weight: "45 lbs", reps: "12 ×3", date: "May 13" },
-  { exercise: "Dumbbell Row",         weight: "50 lbs", reps: "10 ×3", date: "May 11" },
-  { exercise: "Incline Press",        weight: "55 lbs", reps: "10 ×3", date: "May 8" },
-  { exercise: "Romanian Deadlift",    weight: "85 lbs", reps: "10 ×3", date: "May 5" },
-  { exercise: "Shoulder Press",       weight: "40 lbs", reps: "10 ×3", date: "May 3" },
+  { exercise: "Goblet Squat",         weight: "35 lbs", reps: 13, date: "May 14" },
+  { exercise: "Dumbbell Bench Press", weight: "35 lbs", reps: 11, date: "May 12" },
+  { exercise: "Seated Cable Row",     weight: "95 lbs", reps: 12, date: "May 14" },
+  { exercise: "Romanian Deadlift",    weight: "75 lbs", reps: 10, date: "May 9"  },
 ];
 
 function WeightChart({ data, accent }) {
-  const w = 220, h = 70, pad = 12;
+  const W = 260, H = 84, PAD = 10;
   const vals = data.map(d => d.weight);
-  const min = Math.min(...vals) - 1, max = Math.max(...vals) + 1;
-  const xStep = (w - pad * 2) / (data.length - 1);
-  const yScale = v => h - pad - ((v - min) / (max - min)) * (h - pad * 2);
-  const pts = data.map((d, i) => [pad + i * xStep, yScale(d.weight)]);
-  const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0]} ${p[1]}`).join(" ");
-  const fillD = `${pathD} L ${pts[pts.length-1][0]} ${h} L ${pts[0][0]} ${h} Z`;
+  const minV = Math.min(...vals) - 1;
+  const maxV = Math.max(...vals) + 1;
+  const xStep = (W - PAD * 2) / (data.length - 1);
+  const toY = v => PAD + ((maxV - v) / (maxV - minV)) * (H - PAD * 2 - 12);
+  const points = data.map((d, i) => [PAD + i * xStep, toY(d.weight)]);
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const areaPath = linePath + ` L${points[points.length-1][0].toFixed(1)},${H-12} L${PAD},${H-12} Z`;
+  const last = points[points.length - 1];
   return (
-    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: "block" }}>
-      <defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accent} stopOpacity="0.25" /><stop offset="100%" stopColor={accent} stopOpacity="0" /></linearGradient></defs>
-      <path d={fillD} fill="url(#wg)" />
-      <path d={pathD} stroke={accent} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="2.5" fill={accent} />)}
-      {data.map((d, i) => <text key={i} x={pts[i][0]} y={h - 1} textAnchor="middle" style={{ fontSize: "7px", fill: "#6B7A8D" }}>{d.week}</text>)}
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      <defs>
+        <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={accent} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill="url(#wg)" />
+      <path d={linePath} fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {points.map((p, i) => (
+        <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
+          fill={i === points.length - 1 ? accent : "#1A2332"} stroke={accent} strokeWidth="1.5" />
+      ))}
+      {data.map((d, i) => (
+        <text key={i} x={points[i][0]} y={H} textAnchor="middle" fontSize="8" fill="#6B7A8D">{d.week}</text>
+      ))}
+      <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fill={accent} fontWeight="600">{data[data.length-1].weight}</text>
     </svg>
   );
 }
 
 function StreakCalendar({ accent }) {
-  const rows = [[1,1,0,1,1,0,null],[1,0,1,1,1,0,null],[0,1,1,0,1,1,null],[1,1,1,0,null,null,null]];
+  const days = ["M","T","W","T","F","S","S"];
+  const grid = [
+    [1,0,1,0,1,0,0],
+    [1,0,1,0,1,0,0],
+    [1,0,0,0,1,0,0],
+    [1,0,1,0,null,null,null],
+  ];
   return (
     <div>
-      {rows.map((row, ri) => (
+      <div style={{ display:"flex", gap:4, marginBottom:5 }}>
+        {days.map((d,i) => <div key={i} style={{ flex:1, textAlign:"center", fontSize:9, color:"#6B7A8D" }}>{d}</div>)}
+      </div>
+      {grid.map((row, ri) => (
         <div key={ri} style={{ display:"flex", gap:4, marginBottom:4 }}>
           {row.map((v, ci) => (
-            <div key={ci} style={{ flex:1, height:20, borderRadius:4, background: v === 1 ? accent : v === 0 ? "#1A2332" : "transparent", border: v === 0 ? "1px solid #1E2D42" : "none" }} />
+            <div key={ci} style={{
+              flex:1, height:20, borderRadius:4,
+              background: v === 1 ? accent : v === 0 ? "#1A2332" : "transparent",
+              border: v === 0 ? "1px solid #1E2D42" : "none",
+            }} />
           ))}
         </div>
       ))}
@@ -1418,123 +2048,333 @@ function StreakCalendar({ accent }) {
 }
 
 function ProgressScreen() {
-  const { gymBranding } = useApp();
+  const { gymBranding, supabaseUser, user } = useApp();
   const a = gymBranding.accent;
   const [tab, setTab] = useState("body");
   const sL = { fontSize:10, color:"#6B7A8D", textTransform:"uppercase", letterSpacing:"1.2px", marginBottom:10, fontWeight:500 };
-  const lost = (WEIGHT_DATA[0].weight - WEIGHT_DATA[WEIGHT_DATA.length-1].weight).toFixed(1);
-  const curr = WEIGHT_DATA[WEIGHT_DATA.length-1].weight;
+
+  // ── Real workout logs from Supabase ───────────────────────────────────────
+  const [realLogs, setRealLogs] = useState(null);
+  useEffect(() => {
+    if (!supabaseUser?.id || supabaseUser.id.startsWith("sim-") || supabaseUser.id === "dev-001") {
+      setRealLogs([]); return;
+    }
+    sb.getWorkoutLogs(supabaseUser.id, 30).then(rows => setRealLogs(Array.isArray(rows) ? rows : []));
+  }, [supabaseUser?.id]);
+
+  const useRealWorkoutData = realLogs !== null && realLogs.length > 0;
+
+  const realSessions = useRealWorkoutData ? (() => {
+    const byDate = {};
+    realLogs.forEach(row => {
+      if (!byDate[row.workout_date]) byDate[row.workout_date] = { date: row.workout_date, sets: 0, exercises: new Set(), totalVol: 0 };
+      byDate[row.workout_date].sets++;
+      byDate[row.workout_date].exercises.add(row.exercise_name);
+      byDate[row.workout_date].totalVol += (row.weight || 0) * (row.reps || 0);
+    });
+    return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map(s => ({
+      date: new Date(s.date + "T12:00:00").toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" }),
+      name: "Full body", sets: s.sets,
+      vol: s.totalVol > 0 ? s.totalVol.toLocaleString() + " lbs" : "—", pbs: 0,
+    }));
+  })() : WORKOUT_LOG;
+
+  const totalWorkouts = useRealWorkoutData ? realSessions.length : 14;
+
+  const realPBs = useRealWorkoutData ? (() => {
+    const best = {};
+    realLogs.forEach(row => {
+      const key = row.exercise_name;
+      if (!best[key] || row.weight > best[key].weight) {
+        best[key] = { exercise: key, weight: `${row.weight} lbs`, reps: row.reps, date: row.workout_date };
+      }
+    });
+    return Object.values(best).slice(0, 6);
+  })() : PERSONAL_BESTS;
+
+  // ── Real weight logs from Supabase ────────────────────────────────────────
+  const [weightLogs, setWeightLogs] = useState(null); // null = loading
+  const [weightLoading, setWeightLoading] = useState(false);
+  const [showLogWeight, setShowLogWeight] = useState(false);
+  const [newWeightInput, setNewWeightInput] = useState("");
+  const [savingWeight, setSavingWeight] = useState(false);
+  const [weightSaved, setWeightSaved] = useState(false);
+
+  const isRealUser = supabaseUser?.id && !supabaseUser.id.startsWith("sim-") && supabaseUser.id !== "dev-001";
+
+  useEffect(() => {
+    if (!isRealUser) { setWeightLogs([]); return; }
+    setWeightLoading(true);
+    sb.getWeightLogs(supabaseUser.id, 12).then(rows => {
+      setWeightLogs(Array.isArray(rows) ? rows : []);
+      setWeightLoading(false);
+    });
+  }, [supabaseUser?.id]);
+
+  // Build chart data: real entries or mock fallback
+  const useRealWeightData = weightLogs !== null && weightLogs.length >= 2;
+  const weightChartData = useRealWeightData
+    ? weightLogs.map((r, i) => ({
+        week: `W${i + 1}`,
+        weight: parseFloat(r.weight_lbs),
+        date: r.logged_date,
+      }))
+    : WEIGHT_DATA_MOCK;
+
+  const lost = (weightChartData[0].weight - weightChartData[weightChartData.length - 1].weight).toFixed(1);
+  const curr = weightChartData[weightChartData.length - 1].weight;
+  const startWeight = weightChartData[0].weight;
+
+  async function saveWeight() {
+    const val = parseFloat(newWeightInput);
+    if (!val || val < 50 || val > 600) return;
+    setSavingWeight(true);
+    if (isRealUser) {
+      await sb.insertWeightLog(supabaseUser.id, val);
+      // Refresh
+      const rows = await sb.getWeightLogs(supabaseUser.id, 12);
+      setWeightLogs(Array.isArray(rows) ? rows : []);
+    }
+    setSavingWeight(false);
+    setWeightSaved(true);
+    setNewWeightInput("");
+    setShowLogWeight(false);
+    setTimeout(() => setWeightSaved(false), 3000);
+  }
+
   return (
     <Layout activeNav="progress">
       <div style={{ padding:"1.25rem 1.25rem 0" }}>
-        <div style={{ marginBottom:16 }}><div style={{ fontSize:20, fontWeight:600, color:theme.text }}>Your Progress</div><div style={{ fontSize:12, color:theme.textDim, marginTop:2 }}>Week 6 · Fat loss plan</div></div>
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:20, fontWeight:600, color:theme.text }}>Your Progress</div>
+          <div style={{ fontSize:12, color:theme.textDim, marginTop:2 }}>
+            {useRealWeightData ? `${weightLogs.length} weigh-ins logged` : "Week 6 · Fat loss plan"}
+          </div>
+        </div>
+
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
-          {[{ val:`−${lost} lbs`, lbl:"Weight lost", color:a }, { val:"🔥 6", lbl:"Day streak", color:"#F59E0B" }, { val:"8", lbl:"PBs this month", color:"#A78BFA" }].map(({ val, lbl, color }) => (
-            <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 8px", textAlign:"center" }}><div style={{ fontSize:18, fontWeight:700, color }}>{val}</div><div style={{ fontSize:10, color:"#6B7A8D", marginTop:3, lineHeight:1.3 }}>{lbl}</div></div>
+          {[
+            { val: lost > 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, lbl:"Weight change", color: lost >= 0 ? a : "#F87171" },
+            { val:"🔥 6", lbl:"Day streak", color:"#F59E0B" },
+            { val:"8",    lbl:"PBs this month", color:"#A78BFA" },
+          ].map(({ val, lbl, color }) => (
+            <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
+              <div style={{ fontSize:18, fontWeight:700, color }}>{val}</div>
+              <div style={{ fontSize:10, color:"#6B7A8D", marginTop:3, lineHeight:1.3 }}>{lbl}</div>
+            </div>
           ))}
         </div>
+
         <div style={{ display:"flex", background:"#1A2332", borderRadius:10, padding:3, marginBottom:16 }}>
           {[["body","Body"],["workouts","Workouts"],["bests","Bests"]].map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex:1, padding:"7px 6px", background:tab===t ? a : "transparent", border:"none", borderRadius:8, fontSize:12, fontWeight:500, color:tab===t ? "#003D35" : theme.textDim, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>{label}</button>
+            <button key={t} onClick={() => setTab(t)}
+              style={{ flex:1, padding:"7px 6px", background:tab===t ? a : "transparent", border:"none", borderRadius:8, fontSize:12, fontWeight:500, color:tab===t ? "#003D35" : theme.textDim, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
+              {label}
+            </button>
           ))}
         </div>
+
         {tab === "body" && (
           <div className="mq-fade">
+            {/* Weight chart card */}
             <div style={{ background:"#1A2332", borderRadius:14, padding:"14px 14px 10px", marginBottom:12 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-                <div><div style={sL}>Weight trend</div><div style={{ fontSize:26, fontWeight:700, color:theme.text, lineHeight:1 }}>{curr} <span style={{ fontSize:13, color:"#6B7A8D", fontWeight:400 }}>lbs</span></div><div style={{ fontSize:12, color:a, marginTop:2 }}>↓ {lost} lbs since day 1</div></div>
-                <div style={{ background:"#003D35", borderRadius:8, padding:"4px 10px", fontSize:11, color:a, fontWeight:500 }}>On track ✓</div>
+                <div>
+                  <div style={sL}>
+                    Weight trend
+                    {!useRealWeightData && <span style={{ color:"#2D3A4A", marginLeft:6, fontStyle:"italic" }}>(sample)</span>}
+                  </div>
+                  <div style={{ fontSize:26, fontWeight:700, color:theme.text, lineHeight:1 }}>
+                    {curr} <span style={{ fontSize:13, color:"#6B7A8D", fontWeight:400 }}>lbs</span>
+                  </div>
+                  <div style={{ fontSize:12, color: lost >= 0 ? a : "#F87171", marginTop:2 }}>
+                    {lost >= 0 ? `↓ ${lost} lbs since day 1` : `↑ ${Math.abs(lost)} lbs since day 1`}
+                  </div>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                  <div style={{ background:"#003D35", borderRadius:8, padding:"4px 10px", fontSize:11, color:a, fontWeight:500 }}>
+                    {weightSaved ? "Saved ✓" : "On track ✓"}
+                  </div>
+                  <button onClick={() => setShowLogWeight(!showLogWeight)}
+                    style={{ background:"transparent", border:`1px solid rgba(0,212,177,0.3)`, borderRadius:8, padding:"4px 10px", fontSize:11, color:a, cursor:"pointer", fontFamily:"inherit" }}>
+                    {showLogWeight ? "Cancel" : "+ Log weight"}
+                  </button>
+                </div>
               </div>
-              <WeightChart data={WEIGHT_DATA} accent={a} />
+
+              {/* Log weight inline form */}
+              {showLogWeight && (
+                <div className="mq-fade" style={{ background:"#0A1628", borderRadius:10, padding:"10px 12px", marginBottom:10, display:"flex", gap:8, alignItems:"center" }}>
+                  <div style={{ fontSize:11, color:"#9BB3C8", flexShrink:0 }}>Today's weight:</div>
+                  <input
+                    type="number"
+                    value={newWeightInput}
+                    onChange={e => setNewWeightInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && saveWeight()}
+                    placeholder="e.g. 182.5"
+                    autoFocus
+                    style={{ flex:1, background:"#111827", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"6px 10px", fontSize:13, color:"#E8EDF2", outline:"none", fontFamily:"inherit" }}
+                  />
+                  <div style={{ fontSize:11, color:"#6B7A8D", flexShrink:0 }}>lbs</div>
+                  <button onClick={saveWeight} disabled={savingWeight || !newWeightInput}
+                    style={{ background: newWeightInput ? a : "#1A2332", border:"none", borderRadius:8, padding:"6px 12px", fontSize:11, color: newWeightInput ? "#003D35" : "#6B7A8D", fontWeight:600, cursor: newWeightInput ? "pointer" : "default", fontFamily:"inherit", flexShrink:0 }}>
+                    {savingWeight ? "..." : "Save"}
+                  </button>
+                </div>
+              )}
+
+              {weightLoading ? (
+                <div style={{ display:"flex", justifyContent:"center", padding:"20px 0" }}>
+                  <div style={{ width:24, height:24, border:`2px solid #1A2332`, borderTopColor:a, borderRadius:"50%", animation:"spin .9s linear infinite" }} />
+                </div>
+              ) : (
+                <WeightChart data={weightChartData} accent={a} />
+              )}
+
+              {!useRealWeightData && !weightLoading && (
+                <div style={{ fontSize:10, color:"#2D3A4A", textAlign:"center", marginTop:4 }}>
+                  Log your weight to replace this sample chart with your real data
+                </div>
+              )}
             </div>
+
+            {/* Measurements */}
             <div style={sL}>Measurements</div>
             <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden", marginBottom:12 }}>
-              {[{ label:"Weight", start:"187 lbs", current:`${curr} lbs`, delta:`−${lost}`, dColor:a }, { label:"Body fat est.", start:"24%", current:"21%", delta:"−3%", dColor:a }, { label:"Waist", start:"36 in", current:"34.5 in", delta:"−1.5 in", dColor:a }].map((row, i, arr) => (
+              {[
+                { label:"Starting weight", start:"", current:`${startWeight} lbs`, delta:"", dColor:a },
+                { label:"Current weight",  start:"", current:`${curr} lbs`,        delta: lost >= 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, dColor: lost >= 0 ? a : "#F87171" },
+                { label:"Body fat est.",   start:"", current:"21%",                delta:"−3%",                                                    dColor:a },
+              ].map((row, i, arr) => (
                 <div key={row.label} style={{ display:"flex", alignItems:"center", padding:"10px 14px", borderBottom: i < arr.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ flex:1, fontSize:13, color:theme.textMuted }}>{row.label}</div>
-                  <div style={{ fontSize:11, color:"#6B7A8D", marginRight:10 }}>{row.start}</div>
                   <div style={{ fontSize:13, fontWeight:600, color:theme.text, marginRight:8 }}>{row.current}</div>
-                  <div style={{ fontSize:11, color:row.dColor, fontWeight:600, minWidth:46, textAlign:"right" }}>{row.delta}</div>
+                  {row.delta && <div style={{ fontSize:11, color:row.dColor, fontWeight:600, minWidth:52, textAlign:"right" }}>{row.delta}</div>}
                 </div>
               ))}
             </div>
+
             <div style={sL}>Workout streak</div>
             <div style={{ background:"#1A2332", borderRadius:14, padding:"14px" }}>
               <StreakCalendar accent={a} />
               <div style={{ display:"flex", gap:14, marginTop:10 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:5 }}><div style={{ width:10, height:10, borderRadius:3, background:a }} /><span style={{ fontSize:10, color:"#6B7A8D" }}>Workout done</span></div>
-                <div style={{ display:"flex", alignItems:"center", gap:5 }}><div style={{ width:10, height:10, borderRadius:3, background:"#1A2332", border:"1px solid #1E2D42" }} /><span style={{ fontSize:10, color:"#6B7A8D" }}>Rest day</span></div>
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <div style={{ width:10, height:10, borderRadius:3, background:a }} />
+                  <span style={{ fontSize:10, color:"#6B7A8D" }}>Workout done</span>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <div style={{ width:10, height:10, borderRadius:3, background:"#1A2332", border:"1px solid #1E2D42" }} />
+                  <span style={{ fontSize:10, color:"#6B7A8D" }}>Rest day</span>
+                </div>
               </div>
             </div>
           </div>
         )}
+
         {tab === "workouts" && (
           <div className="mq-fade">
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
-              {[{ val:"14", lbl:"Total workouts", color:a }, { val:"98%", lbl:"Completion rate", color:a }, { val:"67,330", lbl:"Total volume (lbs)", color:"#F59E0B" }, { val:"40 min", lbl:"Avg duration", color:"#818cf8" }].map(({ val, lbl, color }) => (
-                <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 12px" }}><div style={{ fontSize:20, fontWeight:700, color }}>{val}</div><div style={{ fontSize:10, color:"#6B7A8D", marginTop:2 }}>{lbl}</div></div>
+              {[
+                { val: String(totalWorkouts), lbl:"Total workouts", color:a },
+                { val:"98%",     lbl:"Completion rate",      color:a },
+                { val:"67,330",  lbl:"Total volume (lbs)",   color:"#F59E0B" },
+                { val:"40 min",  lbl:"Avg duration",         color:"#818cf8" },
+              ].map(({ val, lbl, color }) => (
+                <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 12px" }}>
+                  <div style={{ fontSize:20, fontWeight:700, color }}>{val}</div>
+                  <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2 }}>{lbl}</div>
+                </div>
               ))}
             </div>
             <div style={sL}>Recent sessions</div>
             <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden" }}>
-              {WORKOUT_LOG.map((w, i) => (
-                <div key={w.date} style={{ padding:"10px 14px", borderBottom: i < WORKOUT_LOG.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+              {realSessions.map((w, i) => (
+                <div key={w.date} style={{ padding:"10px 14px", borderBottom: i < realSessions.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                    <div><div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{w.name}</div><div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{w.date} · {w.sets} sets · {w.vol}</div></div>
-                    {w.pbs > 0 && <span style={{ background:"#2D1A00", color:"#F59E0B", borderRadius:20, padding:"2px 8px", fontSize:10, fontWeight:500, flexShrink:0 }}>🔥 {w.pbs} PB{w.pbs > 1 ? "s" : ""}</span>}
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{w.name}</div>
+                      <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{w.date} · {w.sets} sets · {w.vol}</div>
+                    </div>
+                    {w.pbs > 0 && (
+                      <span style={{ background:"#2D1A00", color:"#F59E0B", borderRadius:20, padding:"2px 8px", fontSize:10, fontWeight:500, flexShrink:0 }}>
+                        🔥 {w.pbs} PB{w.pbs > 1 ? "s" : ""}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+
         {tab === "bests" && (
           <div className="mq-fade">
             <div style={{ background:"#0A1628", borderLeft:"2px solid #00D4B1", borderRadius:"0 10px 10px 0", padding:"8px 12px", marginBottom:14 }}>
-              <div style={{ fontSize:12, color:"#9BB3C8", lineHeight:1.5 }}>You've set <span style={{ color:"#E8EDF2", fontWeight:600 }}>8 personal bests</span> this month. Progressive overload is working.</div>
+              <div style={{ fontSize:12, color:"#9BB3C8", lineHeight:1.5 }}>
+                You've set <span style={{ color:"#E8EDF2", fontWeight:600 }}>8 personal bests</span> this month. Progressive overload is working.
+              </div>
             </div>
             <div style={sL}>Current bests</div>
             <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
-              {PERSONAL_BESTS.map((pb, i) => (
-                <div key={pb.exercise} style={{ padding:"11px 14px", borderBottom: i < PERSONAL_BESTS.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+              {realPBs.map((pb, i) => (
+                <div key={pb.exercise} style={{ padding:"11px 14px", borderBottom: i < realPBs.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <div><div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div><div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Set {pb.date}</div></div>
-                    <div style={{ textAlign:"right" }}><div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div><div style={{ fontSize:11, color:"#6B7A8D" }}>{pb.reps}</div></div>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
+                      <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Set {pb.date}</div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div>
+                      <div style={{ fontSize:11, color:"#6B7A8D" }}>{pb.reps} reps</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ background:"#1A2332", borderRadius:14, padding:"12px 14px" }}>
+              <div style={{ fontSize:11, color:"#6B7A8D", textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Volume progress this month</div>
+              {[
+                { label:"Goblet Squat",         pct:85, color:a },
+                { label:"Dumbbell Bench Press",  pct:72, color:"#818cf8" },
+                { label:"Seated Cable Row",      pct:91, color:"#F59E0B" },
+                { label:"Romanian Deadlift",     pct:68, color:"#f472b6" },
+              ].map(bar => (
+                <div key={bar.label} style={{ marginBottom:8 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                    <span style={{ fontSize:11, color:theme.textMuted }}>{bar.label}</span>
+                    <span style={{ fontSize:11, color:bar.color, fontWeight:600 }}>{bar.pct}%</span>
+                  </div>
+                  <div style={{ height:4, background:"#0F1922", borderRadius:2 }}>
+                    <div style={{ height:4, borderRadius:2, background:bar.color, width:`${bar.pct}%`, transition:"width .8s ease" }} />
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+
       </div>
     </Layout>
   );
 }
 
+
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
 function ProfileScreen() {
-  const { navigate, user, gymBranding, handleSignOut, saveSettings, restTimerSecs, calorieTarget } = useApp();
+  const { navigate, user, gymBranding, signOut } = useApp();
   const a = gymBranding.accent;
   const [editGoal, setEditGoal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(user.goal || "lose_fat");
-  const [timerInput, setTimerInput] = useState(String(restTimerSecs));
-  const [calInput, setCalInput] = useState(String(calorieTarget));
-  const [settingsSaved, setSettingsSaved] = useState(false);
+
   const goalLabel = GOAL_OPTIONS.find(g => g.id === selectedGoal)?.label || "Lose fat";
   const sL = { fontSize: 11, color: theme.textDim, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 10 };
 
-  async function handleSaveSettings() {
-    const t = parseInt(timerInput);
-    const c = parseInt(calInput);
-    if (!t || !c || t < 10 || t > 300 || c < 1000 || c > 5000) return;
-    await saveSettings({ rest_timer_secs: t, calorie_target: c });
-    setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 1600);
-  }
-
   const StatRow = ({ label, value, sub }) => (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-      <div><div style={{ fontSize: 13, color: theme.text }}>{label}</div>{sub && <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{sub}</div>}</div>
+      <div>
+        <div style={{ fontSize: 13, color: theme.text }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{sub}</div>}
+      </div>
       <div style={{ fontSize: 13, fontWeight: 600, color: a }}>{value}</div>
     </div>
   );
@@ -1542,8 +2382,11 @@ function ProfileScreen() {
   return (
     <Layout activeNav="progress">
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
+        {/* Avatar + Name */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#003D35", border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: a, flexShrink: 0 }}>{(user.name || "?")[0].toUpperCase()}</div>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#003D35", border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: a, flexShrink: 0 }}>
+            {(user.name || "?")[0].toUpperCase()}
+          </div>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: theme.text }}>{user.name || "Member"}</div>
             <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{gymBranding.name} · Member</div>
@@ -1554,17 +2397,27 @@ function ProfileScreen() {
           </div>
         </div>
 
+        {/* Goal card */}
         <div style={sL}>Your Goal</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           {!editGoal ? (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div><div style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>{goalLabel}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>3 workouts/week · Beginner</div></div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>{goalLabel}</div>
+                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>3 workouts/week · Beginner</div>
+              </div>
               <button onClick={() => setEditGoal(true)} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "5px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
             </div>
           ) : (
             <div>
               <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Choose new goal:</div>
-              {GOAL_OPTIONS.map(g => (<button key={g.id} onClick={() => setSelectedGoal(g.id)} style={{ width: "100%", background: selectedGoal === g.id ? "#003D35" : "transparent", border: `1px solid ${selectedGoal === g.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "8px 10px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6, fontFamily: "inherit", textAlign: "left" }}><span style={{ fontSize: 14 }}>{g.icon}</span><span style={{ fontSize: 12, fontWeight: 500, color: selectedGoal === g.id ? a : theme.text }}>{g.label}</span></button>))}
+              {GOAL_OPTIONS.map(g => (
+                <button key={g.id} onClick={() => setSelectedGoal(g.id)}
+                  style={{ width: "100%", background: selectedGoal === g.id ? "#003D35" : "transparent", border: `1px solid ${selectedGoal === g.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "8px 10px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6, fontFamily: "inherit", textAlign: "left" }}>
+                  <span style={{ fontSize: 14 }}>{g.icon}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: selectedGoal === g.id ? a : theme.text }}>{g.label}</span>
+                </button>
+              ))}
               <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                 <button onClick={() => setEditGoal(false)} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                 <button onClick={() => setEditGoal(false)} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "8px", fontSize: 12, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit" }}>Save goal</button>
@@ -1573,36 +2426,45 @@ function ProfileScreen() {
           )}
         </div>
 
+        {/* Body stats */}
         <div style={sL}>Body Stats</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "0 14px", marginBottom: 16 }}>
           <StatRow label="Height" value={user.height || "5′ 10″"} />
           <StatRow label="Weight" value={user.weight || "185 lbs"} sub="Starting weight" />
           <StatRow label="Age" value={user.age ? `${user.age} yrs` : "28 yrs"} />
-          <div style={{ padding: "10px 0" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={{ fontSize: 13, color: theme.text }}>Sex</div><div style={{ fontSize: 13, fontWeight: 600, color: a }}>{user.sex || "Male"}</div></div></div>
-        </div>
-
-        {/* Settings — now wired to Supabase */}
-        <div style={sL}>Settings</div>
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px", marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 6 }}>Rest timer (secs)</div>
-              <input type="number" value={timerInput} onChange={e => setTimerInput(e.target.value)} min="10" max="300"
-                style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: theme.text, outline: "none", fontFamily: "inherit" }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 6 }}>Daily calories</div>
-              <input type="number" value={calInput} onChange={e => setCalInput(e.target.value)} min="1000" max="5000"
-                style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: theme.text, outline: "none", fontFamily: "inherit" }} />
+          <div style={{ padding: "10px 0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 13, color: theme.text }}>Sex</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: a }}>{user.sex || "Male"}</div>
             </div>
           </div>
-          <button onClick={handleSaveSettings} style={{ width: "100%", background: settingsSaved ? "#003D35" : a, color: settingsSaved ? a : "#003D35", border: "none", borderRadius: 10, padding: "9px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            {settingsSaved ? "Saved to Supabase ✓" : "Save settings"}
-          </button>
         </div>
 
-        {/* Sign out */}
-        <button onClick={handleSignOut} style={{ width: "100%", background: "transparent", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 14, padding: "12px", fontSize: 14, color: "#F87171", cursor: "pointer", fontFamily: "inherit", marginBottom: 16 }}>
+        {/* Daily targets */}
+        <div style={sL}>Daily Targets</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+          {[["1,840", "Calories", a], ["140g", "Protein", "#F59E0B"], ["160g", "Carbs", "#818cf8"], ["55g", "Fat", "#f472b6"]].map(([v, l, c]) => (
+            <div key={l} style={{ background: "#1A2332", borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: c }}>{v}</div>
+              <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Plan settings */}
+        <div style={sL}>Plan Settings</div>
+        <div style={{ background: "#1A2332", borderRadius: 14, padding: "0 14px", marginBottom: 16 }}>
+          <StatRow label="Workout days" value="Mon, Wed, Fri" />
+          <StatRow label="Session length" value="~40 min" />
+          <StatRow label="Program level" value="Beginner" />
+          <StatRow label="Injuries/notes" value={user.injuries || "None"} />
+        </div>
+
+        {/* Danger zone */}
+        <button onClick={() => navigate("onboarding")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: "10px", fontSize: 13, color: "#F87171", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+          Restart onboarding quiz
+        </button>
+        <button onClick={signOut} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
           Sign out
         </button>
       </div>
@@ -1611,77 +2473,141 @@ function ProfileScreen() {
 }
 
 // ─── GYM OWNER DASHBOARD ──────────────────────────────────────────────────────
+const MEMBERS_DATA = [
+  { initials: "AJ", name: "Alex Johnson",   bg: "#003D35", color: "#00D4B1", sessions: 12, status: "on track",     delta: "-8.2lb", dColor: "#00D4B1", msgColor: "#00D4B1" },
+  { initials: "SM", name: "Sara Mitchell",  bg: "#2D1A00", color: "#F59E0B", sessions:  8, status: "needs nudge",   delta: "-3.1lb", dColor: "#F59E0B", msgColor: "#00D4B1" },
+  { initials: "LP", name: "Lisa Park",      bg: "#1F1010", color: "#F87171", sessions:  0, status: "No activity — 9 days", delta: "—", dColor: "#F87171", msgColor: "#F87171" },
+  { initials: "MT", name: "Mike Torres",    bg: "#1A1040", color: "#A78BFA", sessions: 15, status: "ahead of plan", delta: "-5.6lb", dColor: "#A78BFA", msgColor: "#00D4B1" },
+  { initials: "KW", name: "Kim Wang",       bg: "#003D35", color: "#00D4B1", sessions:  9, status: "on track",     delta: "-2.8lb", dColor: "#00D4B1", msgColor: "#00D4B1" },
+];
+
+function OwnerStatCard({ value, label, sub, color }) {
+  return (
+    <div style={{ background: "#1A2332", borderRadius: 12, padding: "12px 14px" }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color: color || "#E8EDF2" }}>{value}</div>
+      <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: "#00D4B1", marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
+
 function OwnerOverviewTab() {
   return (
     <div className="mq-fade">
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 12 }}>
-        {[["284", "Total members", "↑ 12 joined this week", "#E8EDF2"], ["71%", "Active this week", "↑ up from 64%", "#00D4B1"], ["1,840", "Workouts this month", "", "#F59E0B"], ["−6.2lb", "Avg member loss", "", "#A78BFA"]].map(([val, lbl, sub, color]) => (
-          <div key={lbl} style={{ background: "#1A2332", borderRadius: 10, padding: "10px 12px" }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color }}>{val}</div>
-            <div style={{ fontSize: 9, color: "#6B7A8D" }}>{lbl}</div>
-            {sub && <div style={{ fontSize: 9, color: "#00D4B1", marginTop: 2 }}>{sub}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
+        <OwnerStatCard value="284" label="Total members" sub="↑ 12 joined this week" />
+        <OwnerStatCard value="71%" label="Active this week" color="#00D4B1" sub="↑ up from 64%" />
+        <OwnerStatCard value="1,840" label="Workouts this month" color="#F59E0B" />
+        <OwnerStatCard value="-6.2lb" label="Avg member loss" color="#818cf8" />
+      </div>
+      <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Engagement</div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        {[["71%", "Workout active", "#00D4B1"], ["62%", "Meal logging", "#F59E0B"], ["45%", "AI chat used", "#A78BFA"]].map(([v, l, c]) => (
+          <div key={l} style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: c }}>{v}</div>
+            <div style={{ fontSize: 10, color: "#6B7A8D", marginTop: 3, lineHeight: 1.3 }}>{l}</div>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 9, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Engagement</div>
-      <div style={{ display: "flex", gap: 6 }}>
-        {[["71%", "Workout active", "#00D4B1"], ["62%", "Meal logging", "#F59E0B"], ["45%", "AI chat used", "#A78BFA"]].map(([val, lbl, color]) => (
-          <div key={lbl} style={{ flex: 1, background: "#1A2332", borderRadius: 8, padding: "8px", textAlign: "center" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color }}>{val}</div>
-            <div style={{ fontSize: 8, color: "#6B7A8D", lineHeight: 1.3 }}>{lbl}</div>
+      <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Members needing attention</div>
+      <div style={{ background: "#1F1010", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 12, padding: "12px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#1F1010", border: "1px solid #F87171", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#F87171", fontWeight: 600, flexShrink: 0 }}>LP</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Lisa Park</div>
+            <div style={{ fontSize: 11, color: "#F87171" }}>No activity — 9 days</div>
           </div>
-        ))}
+          <Pill variant="red">At risk</Pill>
+        </div>
+        <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5 }}>Send a check-in message to re-engage.</div>
       </div>
     </div>
   );
 }
 
 function OwnerMembersTab() {
-  const members = [
-    { initials: "AJ", name: "Alex Johnson", sub: "12 sessions · on track", val: "−8.2lb", valColor: "#00D4B1", msgColor: "#00D4B1", bg: "#003D35", fg: "#00D4B1" },
-    { initials: "SM", name: "Sara Mitchell", sub: "8 sessions · needs nudge", val: "−3.1lb", valColor: "#F59E0B", msgColor: "#00D4B1", bg: "#2D1A00", fg: "#F59E0B" },
-    { initials: "LP", name: "Lisa Park", sub: "No activity — 9 days", val: "—", valColor: "#F87171", msgColor: "#F87171", bg: "#1F1010", fg: "#F87171" },
-  ];
+  const [composeTo, setComposeTo] = useState(null);
+  const [msgText, setMsgText] = useState("");
+  const [sent, setSent] = useState(false);
+
+  function sendMsg() { setSent(true); setTimeout(() => { setSent(false); setComposeTo(null); setMsgText(""); }, 1400); }
+
   return (
     <div className="mq-fade">
-      <div style={{ background: "#1A2332", borderRadius: 10, padding: "4px 10px", marginBottom: 12 }}>
-        {members.map((m, i) => (
-          <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: i < members.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-            <div style={{ width: 28, height: 28, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: m.fg, flexShrink: 0 }}>{m.initials}</div>
-            <div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 600, color: "#E8EDF2" }}>{m.name}</div><div style={{ fontSize: 9, color: "#6B7A8D" }}>{m.sub}</div></div>
-            <div style={{ textAlign: "right" }}><div style={{ fontSize: 12, fontWeight: 700, color: m.valColor }}>{m.val}</div><div style={{ fontSize: 8, color: "#6B7A8D" }}>30 days</div></div>
-            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, fontSize: 11, color: m.msgColor }}>✉</div>
+      <div style={{ background: "#1A2332", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
+        {MEMBERS_DATA.map((m, i) => (
+          <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < MEMBERS_DATA.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+            <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: m.color, flexShrink: 0 }}>{m.initials}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{m.name}</div>
+              <div style={{ fontSize: 11, color: m.sessions === 0 ? "#F87171" : "#6B7A8D" }}>{m.sessions === 0 ? m.status : `${m.sessions} sessions · ${m.status}`}</div>
+            </div>
+            <div style={{ textAlign: "right", marginRight: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: m.dColor }}>{m.delta}</div>
+              <div style={{ fontSize: 10, color: "#6B7A8D" }}>30 days</div>
+            </div>
+            <button onClick={() => { setComposeTo(m); setSent(false); setMsgText(""); }}
+              style={{ width: 28, height: 28, borderRadius: 8, background: "#0D1623", border: `1px solid rgba(255,255,255,0.08)`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.4-.6 2.6-1.5 3.5L10.5 12H6.5c-2.76 0-5-2.24-5-5z" stroke={m.msgColor} strokeWidth="1" /></svg>
+            </button>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 9, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Send a message</div>
-      <div style={{ background: "#1A2332", borderRadius: 10, padding: "10px 12px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#0D1623", borderRadius: 6, padding: "5px 8px", marginBottom: 8 }}>
-          <span style={{ fontSize: 9, color: "#6B7A8D" }}>To:</span>
-          <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#1F1010", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: "#F87171" }}>LP</div>
-          <span style={{ fontSize: 11, color: "#E8EDF2" }}>Lisa Park</span>
+
+      {composeTo && (
+        <div className="mq-fade" style={{ background: "#1A2332", borderRadius: 14, padding: "14px" }}>
+          <div style={{ fontSize: 12, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Message</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D1623", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
+            <span style={{ fontSize: 11, color: "#6B7A8D" }}>To:</span>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: composeTo.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: composeTo.color, fontWeight: 600 }}>{composeTo.initials}</div>
+            <span style={{ fontSize: 12, color: "#E8EDF2" }}>{composeTo.name}</span>
+            <button onClick={() => setComposeTo(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#6B7A8D", cursor: "pointer", fontSize: 14 }}>×</button>
+          </div>
+          <textarea value={msgText} onChange={e => setMsgText(e.target.value)}
+            placeholder={`Hey ${composeTo.name.split(" ")[0]} — we noticed you haven't logged in for a while. How's everything going? We're here if you need support 💪`}
+            style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 80, lineHeight: 1.5, marginBottom: 10 }} />
+          <button onClick={sendMsg} style={{ width: "100%", background: sent ? "#003D35" : "#00D4B1", color: sent ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            {sent ? "Sent ✓" : "Send message"}
+          </button>
         </div>
-        <div style={{ background: "#0D1623", borderRadius: 6, padding: "8px 10px", fontSize: 11, color: "#9BB3C8", marginBottom: 8, lineHeight: 1.5 }}>Hey Lisa — we noticed you haven't logged in for a while. How's everything going? We're here if you need support 💪</div>
-        <button style={{ width: "100%", background: "#00D4B1", color: "#003D35", border: "none", borderRadius: 8, padding: "8px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Send message</button>
-      </div>
+      )}
     </div>
   );
 }
 
 function OwnerBrandingTab() {
-  const { gymBranding } = useApp();
+  const { gymBranding, setGymBranding } = useApp();
   const [gymName, setGymName] = useState(gymBranding.name);
   const [brandColor, setBrandColor] = useState(gymBranding.accent);
-  const [welcome, setWelcome] = useState(`Welcome to ${gymBranding.name}. Your personal AI trainer is ready. Let's get to work.`);
+  const [welcome, setWelcome] = useState(gymBranding.welcome || `Welcome to ${gymBranding.name}. Your personal AI trainer is ready. Let's get to work.`);
   const [saved, setSaved] = useState(false);
-  function save() { setSaved(true); setTimeout(() => setSaved(false), 1600); }
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    const ok = await sb.saveGymBranding("demo-gym", { name: gymName, accent: brandColor, welcome });
+    setSaving(false);
+    if (ok) {
+      setGymBranding({ name: gymName, accent: brandColor, welcome, units: gymBranding.units });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } else {
+      setError("Save failed — check your connection and try again.");
+    }
+  }
+
   return (
     <div className="mq-fade">
       <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px", marginBottom: 16 }}>
+        {/* Gym name */}
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 6 }}>Gym name</div>
-          <input value={gymName} onChange={e => setGymName(e.target.value)} style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }} />
+          <input value={gymName} onChange={e => setGymName(e.target.value)}
+            style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }} />
         </div>
+        {/* Brand color */}
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 6 }}>Brand color</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1691,25 +2617,36 @@ function OwnerBrandingTab() {
             <div style={{ fontSize: 12, color: "#9BB3C8", marginLeft: 4, fontFamily: "monospace" }}>{brandColor}</div>
           </div>
         </div>
+        {/* Welcome message */}
         <div>
           <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 6 }}>Welcome message</div>
-          <textarea value={welcome} onChange={e => setWelcome(e.target.value)} style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 60, lineHeight: 1.5 }} />
+          <textarea value={welcome} onChange={e => setWelcome(e.target.value)}
+            style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 60, lineHeight: 1.5 }} />
         </div>
       </div>
+
+      {/* Live preview */}
       <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Live member preview</div>
       <div style={{ background: "#111827", borderRadius: 14, overflow: "hidden", marginBottom: 16, border: "1px solid #1E2D42" }}>
         <div style={{ background: "#111827", padding: "10px 14px", borderBottom: "1px solid #1E2D42", display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `2px solid ${brandColor}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: brandColor }}>M</div>
-          <div><div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{gymName}</div><div style={{ fontSize: 10, color: "#6B7A8D" }}>Powered by Morphiq</div></div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{gymName}</div>
+            <div style={{ fontSize: 10, color: "#6B7A8D" }}>Powered by Morphiq</div>
+          </div>
         </div>
         <div style={{ padding: "14px" }}>
           <div style={{ fontSize: 12, color: "#9BB3C8", marginBottom: 12, lineHeight: 1.5 }}>"{welcome}"</div>
           <div style={{ background: brandColor, borderRadius: 10, padding: "9px", fontSize: 12, fontWeight: 600, color: "#003D35", textAlign: "center" }}>Build my plan →</div>
         </div>
       </div>
+
+      {error && <div style={{ fontSize: 12, color: "#F87171", marginBottom: 8, padding: "8px 12px", background: "#1F1010", borderRadius: 8 }}>{error}</div>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={save} style={{ flex: 2, background: saved ? "#003D35" : "#00D4B1", color: saved ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{saved ? "Saved ✓" : "Save changes"}</button>
-        <button onClick={() => { setGymName(gymBranding.name); setBrandColor(gymBranding.accent); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
+        <button onClick={save} disabled={saving} style={{ flex: 2, background: saved ? "#003D35" : "#00D4B1", color: saved ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+          {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
+        </button>
+        <button onClick={() => { setGymName(gymBranding.name); setBrandColor(gymBranding.accent); setWelcome(gymBranding.welcome || ""); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
       </div>
     </div>
   );
@@ -1719,24 +2656,36 @@ function GymOwnerDashboard() {
   const { navigate } = useApp();
   const [tab, setTab] = useState("overview");
   const tabs = [["overview","Overview"],["members","Members"],["branding","Branding"]];
+
   return (
-    <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: 780, overflow: "hidden" }}>
+    <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
+      {/* Header */}
       <div style={{ background: "#0D1623", borderBottom: "1px solid #1E2D42", padding: "14px 16px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF2" }}>Gym Dashboard</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00D4B1" }} /><span style={{ fontSize: 11, color: "#6B7A8D" }}>Admin</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00D4B1" }} />
+            <span style={{ fontSize: 11, color: "#6B7A8D" }}>Admin</span>
+          </div>
         </div>
+        {/* Tab bar */}
         <div style={{ display: "flex", gap: 0 }}>
           {tabs.map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{ flex: 1, padding: "8px 4px", background: "none", border: "none", borderBottom: `2px solid ${tab === id ? "#00D4B1" : "transparent"}`, fontSize: 12, fontWeight: tab === id ? 600 : 400, color: tab === id ? "#00D4B1" : "#6B7A8D", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{label}</button>
+            <button key={id} onClick={() => setTab(id)}
+              style={{ flex: 1, padding: "8px 4px", background: "none", border: "none", borderBottom: `2px solid ${tab === id ? "#00D4B1" : "transparent"}`, fontSize: 12, fontWeight: tab === id ? 600 : 400, color: tab === id ? "#00D4B1" : "#6B7A8D", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
+              {label}
+            </button>
           ))}
         </div>
       </div>
+
       <div style={{ padding: "16px 16px 0", overflowY: "auto" }}>
         {tab === "overview" && <OwnerOverviewTab />}
         {tab === "members"  && <OwnerMembersTab />}
         {tab === "branding" && <OwnerBrandingTab />}
       </div>
+
+      {/* Footer back link */}
       <div style={{ padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <button onClick={() => navigate("home")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>← Member view</button>
         <div style={{ fontSize: 10, color: "#333", letterSpacing: ".5px" }}>POWERED BY MORPHIQ</div>
@@ -1745,21 +2694,36 @@ function GymOwnerDashboard() {
   );
 }
 
+// ─── LOADING SCREEN ───────────────────────────────────────────────────────────
+function LoadingScreen() {
+  const { gymBranding } = useApp();
+  const a = gymBranding.accent;
+  const ob = theme.ob;
+  return (
+    <div style={{ background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: ob.font }}>
+      <div style={{ width: 48, height: 48, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: a }}>M</div>
+      <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+      <div style={{ fontSize: 13, color: ob.body }}>Loading your account…</div>
+      <div style={{ fontSize: 9, color: "#333", letterSpacing: ".5px", marginTop: 20 }}>POWERED BY MORPHIQ</div>
+    </div>
+  );
+}
+
 // ─── ROUTER ───────────────────────────────────────────────────────────────────
 function AppRouter() {
   const { screen } = useApp();
-  if (screen === "auth_loading") return <AuthLoadingScreen />;
-  if (screen === "auth_login")  return <AuthScreen />;
-  if (screen === "onboarding")  return <OnboardingScreen />;
-  if (screen === "plan")        return <PlanOverviewScreen />;
-  if (screen === "workout")     return <WorkoutScreen />;
-  if (screen === "meals")       return <MealPlanScreen />;
-  if (screen === "progress")    return <ProgressScreen />;
-  if (screen === "profile")     return <ProfileScreen />;
-  if (screen === "owner")       return <GymOwnerDashboard />;
-  if (screen === "chat")        return <ChatScreen fromScreen="home" />;
+  if (screen === "auth") return <AuthScreen />;
+  if (screen === "loading") return <LoadingScreen />;
+  if (screen === "onboarding") return <OnboardingScreen />;
+  if (screen === "plan") return <PlanOverviewScreen />;
+  if (screen === "workout") return <WorkoutScreen />;
+  if (screen === "meals") return <MealPlanScreen />;
+  if (screen === "progress") return <ProgressScreen />;
+  if (screen === "profile") return <ProfileScreen />;
+  if (screen === "owner") return <GymOwnerDashboard />;
+  if (screen === "chat") return <ChatScreen fromScreen="home" />;
   if (screen === "chat_workout") return <ChatScreen fromScreen="workout" />;
-  if (screen === "chat_meals")  return <ChatScreen fromScreen="meals" />;
+  if (screen === "chat_meals") return <ChatScreen fromScreen="meals" />;
   return <HomeDashboardScreen />;
 }
 
@@ -1768,7 +2732,9 @@ export default function Morphiq() {
     <>
       <style>{css}</style>
       <AppProvider>
-        <AppRouter />
+        <div className="mq-shell">
+          <AppRouter />
+        </div>
       </AppProvider>
     </>
   );
