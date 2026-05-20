@@ -2129,11 +2129,15 @@ function ProgressScreen() {
     const val = parseFloat(newWeightInput);
     if (!val || val < 50 || val > 600) return;
     setSavingWeight(true);
+    // Always update local state immediately so chart refreshes
+    const newEntry = { weight_lbs: val, logged_date: new Date().toISOString().slice(0, 10) };
+    const updatedLogs = [...(weightLogs || []), newEntry];
+    setWeightLogs(updatedLogs);
+    // Also persist to Supabase if real user
     if (isRealUser) {
       await sb.insertWeightLog(supabaseUser.id, val);
-      // Refresh
       const rows = await sb.getWeightLogs(supabaseUser.id, 12);
-      setWeightLogs(Array.isArray(rows) ? rows : []);
+      if (Array.isArray(rows) && rows.length > 0) setWeightLogs(rows);
     }
     setSavingWeight(false);
     setWeightSaved(true);
