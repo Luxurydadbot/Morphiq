@@ -2131,8 +2131,7 @@ function ProgressScreen() {
     setSavingWeight(true);
     // Always update local state immediately so chart refreshes
     const newEntry = { weight_lbs: val, logged_date: new Date().toISOString().slice(0, 10) };
-    const updatedLogs = [...(weightLogs || []), newEntry];
-    setWeightLogs(updatedLogs);
+    setWeightLogs(prev => [...(prev || []), newEntry]);
     // Also persist to Supabase if real user
     if (isRealUser) {
       await sb.insertWeightLog(supabaseUser.id, val);
