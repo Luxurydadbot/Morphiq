@@ -1988,12 +1988,15 @@ const PERSONAL_BESTS = [
 
 function WeightChart({ data, accent }) {
   const W = 260, H = 84, PAD = 10;
-  const vals = data.map(d => d.weight);
+  if (!data || data.length === 0) return null;
+  // Need at least 2 points for a line; duplicate single point so chart renders
+  const chartData = data.length === 1 ? [data[0], data[0]] : data;
+  const vals = chartData.map(d => d.weight);
   const minV = Math.min(...vals) - 1;
   const maxV = Math.max(...vals) + 1;
-  const xStep = (W - PAD * 2) / (data.length - 1);
+  const xStep = (W - PAD * 2) / Math.max(chartData.length - 1, 1);
   const toY = v => PAD + ((maxV - v) / (maxV - minV)) * (H - PAD * 2 - 12);
-  const points = data.map((d, i) => [PAD + i * xStep, toY(d.weight)]);
+  const points = chartData.map((d, i) => [PAD + i * xStep, toY(d.weight)]);
   const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
   const areaPath = linePath + ` L${points[points.length-1][0].toFixed(1)},${H-12} L${PAD},${H-12} Z`;
   const last = points[points.length - 1];
@@ -2011,10 +2014,10 @@ function WeightChart({ data, accent }) {
         <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
           fill={i === points.length - 1 ? accent : "#1A2332"} stroke={accent} strokeWidth="1.5" />
       ))}
-      {data.map((d, i) => (
+      {chartData.map((d, i) => (
         <text key={i} x={points[i][0]} y={H} textAnchor="middle" fontSize="8" fill="#6B7A8D">{d.week}</text>
       ))}
-      <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fill={accent} fontWeight="600">{data[data.length-1].weight}</text>
+      <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
     </svg>
   );
 }
@@ -2112,7 +2115,7 @@ function ProgressScreen() {
   }, [supabaseUser?.id]);
 
   // Build chart data: real entries or mock fallback
-  const useRealWeightData = weightLogs !== null && weightLogs.length >= 2;
+  const useRealWeightData = weightLogs !== null && weightLogs.length >= 1;
   const weightChartData = useRealWeightData
     ? weightLogs.map((r, i) => ({
         week: `W${i + 1}`,
