@@ -16,7 +16,12 @@ const sb = {
       headers: { "apikey": SUPABASE_ANON, "Content-Type": "application/json" },
       body: JSON.stringify({ email, options: { shouldCreateUser: true } }),
     });
-    return res.ok;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("[Morphiq] sendOTP error:", res.status, err);
+      return { ok: false, error: err?.msg || err?.message || `HTTP ${res.status}` };
+    }
+    return { ok: true };
   },
 
   // Verifies the 6-digit code typed by the user; returns { uid, email } or null
@@ -641,13 +646,13 @@ function AuthScreen() {
   async function handleSend() {
     if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
     setStep("sending"); setErrorMsg("");
-    const ok = await sb.sendOTP(email);
-    if (ok) {
+    const result = await sb.sendOTP(email);
+    if (result?.ok) {
       setStep("code");
       setTimeout(() => inputRefs[0]?.current?.focus(), 100);
     } else {
       setStep("idle");
-      setErrorMsg("Couldn't send the code. Check your email and try again.");
+      setErrorMsg(result?.error ? `Error: ${result.error}` : "Couldn't send the code. Check your email and try again.");
     }
   }
 
@@ -1694,22 +1699,61 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
   );
 }
 
-// ─── DINNER DETAIL SCREEN ────────────────────────────────────────────────────
+// ─── MEAL DETAIL SCREEN ──────────────────────────────────────────────────────
 function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
-  const { gymBranding } = useApp();
+  const { gymBranding, user } = useApp();
   const a = gymBranding.accent;
   const [voicePhase, setVoicePhase] = useState("idle");
-  const timerRef = useRef(null);
+  const [transcript, setTranscript] = useState("");
+  const [parsedMeal, setParsedMeal] = useState(null);
+  const [textInput, setTextInput] = useState("");
+  const recognitionRef = useRef(null);
 
   function startVoice() {
-    setVoicePhase("listening");
-    timerRef.current = setTimeout(() => setVoicePhase("heard"), 2000);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { setVoicePhase("text_fallback"); return; }
+    const rec = new SpeechRecognition();
+    rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
+    recognitionRef.current = rec;
+    rec.onresult = (e) => {
+      const text = e.results[0][0].transcript;
+      setTranscript(text); setVoicePhase("processing"); parseWithAI(text);
+    };
+    rec.onerror = () => setVoicePhase("error");
+    setVoicePhase("listening"); rec.start();
   }
+
   function cancelVoice() {
-    clearTimeout(timerRef.current);
-    setVoicePhase("idle");
+    recognitionRef.current?.abort();
+    setVoicePhase("idle"); setTranscript(""); setParsedMeal(null); setTextInput("");
   }
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  async function parseWithAI(text) {
+    const prompt = `The user said they ate: "${text}"
+Parse into a meal entry. Return ONLY valid JSON, no markdown:
+{"name":"<clean meal name>","cal":<number>,"protein":<number>,"carbs":<number>,"fat":<number>}
+Use realistic average nutrition. All numbers must be plain integers.`;
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: prompt, context: "meal_parser" }),
+      });
+      const data = await res.json();
+      const raw = (data.reply || "").replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(raw);
+      setParsedMeal(parsed); setVoicePhase("heard");
+    } catch {
+      setParsedMeal({ name: text, cal: 500, protein: 25, carbs: 50, fat: 20 });
+      setVoicePhase("heard");
+    }
+  }
+
+  function submitText() {
+    if (!textInput.trim()) return;
+    setTranscript(textInput); setVoicePhase("processing"); parseWithAI(textInput);
+  }
+
+  useEffect(() => () => recognitionRef.current?.abort(), []);
 
   // Dinner has an AI-adjusted original; other meals show the suggested as both sides
   const hasAdjustment = !!meal.originalSuggested;
@@ -1786,16 +1830,49 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
               <button onClick={cancelVoice} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             </>
           )}
-          {voicePhase === "heard" && (
+          {voicePhase === "processing" && (
             <>
-              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>Heard you — does this look right?</div>
-              <div style={{ background: "#111827", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#9BB3C8", fontStyle: "italic", marginBottom: 10 }}>
-                "I had a burger and fries instead"
+              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8, fontStyle: "italic" }}>"{transcript}"</div>
+              <div style={{ width: 24, height: 24, border: `3px solid #1A2332`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite", margin: "0 auto 8px" }} />
+              <div style={{ fontSize: 11, color: a }}>Looking up nutrition info…</div>
+            </>
+          )}
+          {voicePhase === "heard" && parsedMeal && (
+            <>
+              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>Does this look right?</div>
+              <div style={{ background: "#111827", borderRadius: 10, padding: "10px 12px", marginBottom: 10, textAlign: "left" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", marginBottom: 6 }}>{parsedMeal.name}</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <span style={{ fontSize: 11, color: a }}>{parsedMeal.cal} cal</span>
+                  <span style={{ fontSize: 11, color: theme.textDim }}>·</span>
+                  <span style={{ fontSize: 11, color: theme.textDim }}>{parsedMeal.protein}g protein</span>
+                  <span style={{ fontSize: 11, color: theme.textDim }}>·</span>
+                  <span style={{ fontSize: 11, color: theme.textDim }}>{parsedMeal.fat}g fat</span>
+                </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
-                <button onClick={onSwap} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Confirm ✓</button>
+                <button onClick={() => onSwap(parsedMeal)} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log this ✓</button>
               </div>
+            </>
+          )}
+          {voicePhase === "text_fallback" && (
+            <>
+              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>Type what you ate instead</div>
+              <input value={textInput} onChange={e => setTextInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && submitText()}
+                placeholder="e.g. burger and fries"
+                style={{ width: "100%", background: "#111827", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#E8EDF2", outline: "none", fontFamily: "inherit", marginBottom: 8 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                <button onClick={submitText} disabled={!textInput.trim()} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: textInput.trim() ? 1 : 0.4 }}>Look up →</button>
+              </div>
+            </>
+          )}
+          {voicePhase === "error" && (
+            <>
+              <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8 }}>Mic not available — type instead</div>
+              <button onClick={() => setVoicePhase("text_fallback")} style={{ background: a, border: "none", borderRadius: 9, padding: "7px 16px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Type it instead</button>
             </>
           )}
         </div>
@@ -1895,8 +1972,8 @@ function MealPlanScreen() {
       }).catch(() => {});
     }
   }
-  function logSwap(id) {
-    const swapped = { name: "Burger & fries", cal: 820, protein: 28, carbs: 72, fat: 38 };
+  function logSwap(id, parsedMeal) {
+    const swapped = parsedMeal || { name: "Something else", cal: 500, protein: 25, carbs: 50, fat: 20 };
     setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "swapped", logged: swapped } : m));
     setDetailMeal(null);
     if (supabaseUser?.id) {
@@ -1919,7 +1996,7 @@ function MealPlanScreen() {
         meal={detailMeal}
         onBack={() => setDetailMeal(null)}
         onConfirm={() => confirmSalad(detailMeal.id)}
-        onSwap={() => logSwap(detailMeal.id)}
+        onSwap={(parsedMeal) => logSwap(detailMeal.id, parsedMeal)}
       />
     );
   }
