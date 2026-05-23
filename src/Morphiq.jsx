@@ -9,13 +9,31 @@ const SUPABASE_ANON = "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll";
 // Uses Supabase's PostgREST + Auth REST APIs directly.
 const sb = {
   // ── AUTH ──────────────────────────────────────────────────────────────────
-  async sendMagicLink(email) {
+  // Sends a 6-digit OTP to email (works inside the PWA — no browser redirect)
+  async sendOTP(email) {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
       method: "POST",
       headers: { "apikey": SUPABASE_ANON, "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, options: { shouldCreateUser: true } }),
     });
     return res.ok;
+  },
+
+  // Verifies the 6-digit code typed by the user; returns { uid, email } or null
+  async verifyOTP(email, token) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ email, token, type: "email" }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const accessToken = data?.access_token;
+      if (!accessToken) return null;
+      const payload = JSON.parse(atob(accessToken.split(".")[1]));
+      return { uid: payload.sub, email: payload.email || email };
+    } catch { return null; }
   },
 
   // ── PROFILES ──────────────────────────────────────────────────────────────
@@ -133,6 +151,18 @@ const sb = {
       });
       return res.ok;
     } catch { return false; }
+  },
+
+  // ── GYM OWNER LOOKUP ─────────────────────────────────────────────────────
+  async getGymByOwnerEmail(email) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/gyms?owner_email=eq.${encodeURIComponent(email.toLowerCase())}&limit=1`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      return rows?.[0] || null;
+    } catch { return null; }
   },
 
   // ── GYM BRANDING ─────────────────────────────────────────────────────────
@@ -518,101 +548,182 @@ function AuthScreen() {
 
   const [mode, setMode] = useState("member");
   const [email, setEmail] = useState("");
-  const [authStep, setAuthStep] = useState("idle");
+  // steps: idle → sending → code → verifying → done
+  const [step, setStep] = useState("idle");
+  const [code, setCode] = useState(["","","","","",""]);
   const [errorMsg, setErrorMsg] = useState("");
-
-  async function handleMemberLogin() {
-    if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
-    setAuthStep("sending"); setErrorMsg("");
-    // In production, this sends a real Supabase magic link.
-    // sb.sendMagicLink(email) is called but we still show the "sent" state regardless of response
-    // (to avoid leaking whether the email exists in our system).
-    try { await sb.sendMagicLink(email); } catch { /* network issues — still show sent */ }
-    await new Promise(r => setTimeout(r, 400));
-    setAuthStep("sent");
-  }
-
-  async function handleOwnerLogin() {
-    if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
-    setAuthStep("sending"); setErrorMsg("");
-    try { await sb.sendMagicLink(email); } catch { /* still show sent */ }
-    await new Promise(r => setTimeout(r, 400));
-    setAuthStep("sent");
-  }
-
-  // Simulates clicking the magic link — in prod this is the Supabase redirect callback
-  function clickMagicLink(hasPlan) {
-    setAuthStep("loading");
-    setTimeout(() => signIn(email || "demo@morphiq.app", "member", hasPlan), 900);
-  }
+  const inputRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
 
   const inp = { width: "100%", background: ob.card, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: ob.white, outline: "none", fontFamily: ob.font, marginBottom: 10 };
   const btn = (dis) => ({ width: "100%", background: dis ? "#1A2332" : a, color: dis ? ob.muted : ob.tealDk, border: "none", borderRadius: 10, padding: "11px", fontSize: 13, fontWeight: 600, cursor: dis ? "default" : "pointer", fontFamily: ob.font, marginTop: 4 });
 
+  async function handleSend() {
+    if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
+    setStep("sending"); setErrorMsg("");
+    const ok = await sb.sendOTP(email);
+    if (ok) {
+      setStep("code");
+      setTimeout(() => inputRefs[0]?.current?.focus(), 100);
+    } else {
+      setStep("idle");
+      setErrorMsg("Couldn't send the code. Check your email and try again.");
+    }
+  }
+
+  function handleDigit(i, val) {
+    // Accept paste of full 6-digit code
+    if (val.length === 6 && /^\d{6}$/.test(val)) {
+      const digits = val.split("");
+      setCode(digits);
+      inputRefs[5]?.current?.focus();
+      setTimeout(() => verifyCode(digits.join("")), 100);
+      return;
+    }
+    const digit = val.replace(/\D/g,"").slice(-1);
+    const next = [...code];
+    next[i] = digit;
+    setCode(next);
+    if (digit && i < 5) inputRefs[i+1]?.current?.focus();
+    if (next.every(d => d !== "")) setTimeout(() => verifyCode(next.join("")), 80);
+  }
+
+  function handleDigitKey(i, e) {
+    if (e.key === "Backspace" && !code[i] && i > 0) {
+      inputRefs[i-1]?.current?.focus();
+    }
+  }
+
+  async function verifyCode(token) {
+    setStep("verifying"); setErrorMsg("");
+    const result = await sb.verifyOTP(email, token);
+    if (result?.uid) {
+      // Check if this email is a gym owner
+      const gymRow = await sb.getGymByOwnerEmail(email);
+      const role = gymRow ? "owner" : "member";
+      signIn(result.email, role, null, result.uid);
+    } else {
+      setStep("code");
+      setCode(["","","","","",""]);
+      setErrorMsg("Incorrect code — check your email and try again.");
+      setTimeout(() => inputRefs[0]?.current?.focus(), 100);
+    }
+  }
+
+  function resetToEmail() { setStep("idle"); setCode(["","","","","",""]); setErrorMsg(""); }
+
   return (
     <div style={{ background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white, overflow: "hidden" }}>
-      <div style={{ padding: "28px 20px 20px", textAlign: "center" }}>
-        <div style={{ width: 52, height: 52, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>M</div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
-        <div style={{ fontSize: 11, color: ob.muted }}>Powered by Morphiq</div>
+      {/* Logo */}
+      <div style={{ padding: "36px 20px 24px", textAlign: "center" }}>
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: 24, fontWeight: 700, color: a }}>M</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
+        <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Morphiq</div>
       </div>
-      <div style={{ display: "flex", margin: "0 20px 20px", background: ob.card, borderRadius: 10, padding: 3 }}>
-        {[["member","I'm a Member"],["owner","Gym Owner"]].map(([id, label]) => (
-          <button key={id} onClick={() => { setMode(id); setAuthStep("idle"); setErrorMsg(""); }}
-            style={{ flex: 1, padding: "8px", background: mode === id ? a : "transparent", color: mode === id ? ob.tealDk : ob.muted, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, transition: "all .2s" }}>
-            {label}
-          </button>
-        ))}
-      </div>
+
+      {/* Member / Owner toggle — only shown on idle step */}
+      {step === "idle" && (
+        <div style={{ display: "flex", margin: "0 20px 20px", background: ob.card, borderRadius: 10, padding: 3 }}>
+          {[["member","I'm a Member"],["owner","Gym Owner"]].map(([id, label]) => (
+            <button key={id} onClick={() => { setMode(id); setErrorMsg(""); }}
+              style={{ flex: 1, padding: "8px", background: mode === id ? a : "transparent", color: mode === id ? ob.tealDk : ob.muted, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, transition: "all .2s" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ flex: 1, padding: "0 20px 20px" }}>
-        {mode === "member" && (
+
+        {/* ── STEP: Email entry ── */}
+        {step === "idle" || step === "sending" ? (
           <div className="mq-fade">
-            {authStep === "idle" || authStep === "sending" ? (
-              <>
-                <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>Enter your email and we'll send you a one-tap sign-in link. No password needed.</div>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleMemberLogin()} placeholder="your@email.com" style={inp} />
-                {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
-                <button onClick={handleMemberLogin} style={btn(!email.includes("@") || authStep === "sending")}>{authStep === "sending" ? "Sending…" : "Send magic link →"}</button>
-              </>
-            ) : authStep === "sent" ? (
-              <div className="mq-fade" style={{ textAlign: "center", paddingTop: 20 }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>📬</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: ob.white, marginBottom: 8 }}>Check your inbox</div>
-                <div style={{ fontSize: 12, color: ob.body, marginBottom: 20, lineHeight: 1.6 }}>We sent a sign-in link to <span style={{ color: a }}>{email}</span>. Tap it to continue.</div>
-                <button onClick={() => setAuthStep("idle")} style={{ fontSize: 11, color: ob.muted, background: "none", border: "none", cursor: "pointer" }}>Use a different email</button>
+            <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>
+              {mode === "member"
+                ? "Enter your email and we'll text you a 6-digit code to sign in instantly."
+                : "Enter your gym owner email to receive a sign-in code."}
+            </div>
+            <input
+              type="email" value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSend()}
+              placeholder="your@email.com"
+              style={inp}
+              autoCapitalize="none" autoCorrect="off"
+            />
+            {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
+            <button onClick={handleSend} style={btn(!email.includes("@") || step === "sending")}>
+              {step === "sending" ? "Sending code…" : "Send code →"}
+            </button>
+          </div>
+        ) : null}
+
+        {/* ── STEP: Code entry ── */}
+        {(step === "code" || step === "verifying") ? (
+          <div className="mq-fade">
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>📱</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: ob.white, marginBottom: 6 }}>Enter your code</div>
+              <div style={{ fontSize: 12, color: ob.body, lineHeight: 1.6 }}>
+                We sent a 6-digit code to<br />
+                <span style={{ color: a, fontWeight: 500 }}>{email}</span>
               </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 40 }}>
-                <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
-                <div style={{ fontSize: 12, color: ob.body }}>Signing you in…</div>
+            </div>
+
+            {/* 6 digit boxes */}
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 16 }}>
+              {code.map((digit, i) => (
+                <input
+                  key={i}
+                  ref={inputRefs[i]}
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={digit}
+                  onChange={e => handleDigit(i, e.target.value)}
+                  onKeyDown={e => handleDigitKey(i, e)}
+                  style={{
+                    width: 42, height: 52, textAlign: "center", fontSize: 22, fontWeight: 700,
+                    background: digit ? ob.tealDk : ob.card,
+                    border: `1.5px solid ${digit ? a : "rgba(255,255,255,0.12)"}`,
+                    borderRadius: 10, color: digit ? a : ob.muted,
+                    outline: "none", fontFamily: ob.font,
+                    transition: "all .15s",
+                  }}
+                />
+              ))}
+            </div>
+
+            {errorMsg && (
+              <div style={{ fontSize: 12, color: theme.red, textAlign: "center", marginBottom: 12, background: "#1F1010", borderRadius: 8, padding: "8px 12px" }}>
+                {errorMsg}
               </div>
             )}
-          </div>
-        )}
-        {mode === "owner" && (
-          <div className="mq-fade">
-            {authStep === "idle" || authStep === "sending" ? (
-              <>
-                <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>Enter your gym owner email and we'll send you a one-tap sign-in link.</div>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleOwnerLogin()} placeholder="gym@ironhouse.com" style={inp} />
-                {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
-                <button onClick={handleOwnerLogin} style={btn(!email.includes("@") || authStep === "sending")}>{authStep === "sending" ? "Sending…" : "Send magic link →"}</button>
-              </>
-            ) : authStep === "sent" ? (
-              <div className="mq-fade" style={{ textAlign: "center", paddingTop: 20 }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>📬</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: ob.white, marginBottom: 8 }}>Check your inbox</div>
-                <div style={{ fontSize: 12, color: ob.body, marginBottom: 20, lineHeight: 1.6 }}>We sent a sign-in link to <span style={{ color: a }}>{email}</span>. Tap it to open your dashboard.</div>
-                <button onClick={() => setAuthStep("idle")} style={{ fontSize: 11, color: ob.muted, background: "none", border: "none", cursor: "pointer" }}>Use a different email</button>
+
+            {step === "verifying" ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "8px 0" }}>
+                <div style={{ width: 28, height: 28, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+                <div style={{ fontSize: 12, color: ob.body }}>Verifying…</div>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 40 }}>
-                <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
-                <div style={{ fontSize: 12, color: ob.body }}>Signing you in…</div>
-              </div>
+              <button
+                onClick={() => verifyCode(code.join(""))}
+                style={btn(code.some(d => !d))}
+              >
+                Verify code →
+              </button>
             )}
+
+            <div style={{ textAlign: "center", marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              <button onClick={handleSend} style={{ fontSize: 11, color: ob.muted, background: "none", border: "none", cursor: "pointer", fontFamily: ob.font }}>
+                Resend code
+              </button>
+              <button onClick={resetToEmail} style={{ fontSize: 11, color: ob.muted, background: "none", border: "none", cursor: "pointer", fontFamily: ob.font }}>
+                Use a different email
+              </button>
+            </div>
           </div>
-        )}
+        ) : null}
+
       </div>
       <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: ".5px", padding: "4px 0 10px" }}>POWERED BY MORPHIQ</div>
     </div>
