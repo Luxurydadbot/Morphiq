@@ -257,6 +257,7 @@ function AppProvider({ children }) {
   const [plan, setPlan] = useState(DEV_SKIP === "member_returning" ? MOCK_RETURNING_PLAN : null);
   const [supabaseUser, setSupabaseUser] = useState(DEV_SKIP ? { email: "dev@morphiq.app", id: "dev-001" } : null);
   const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
+  const [historicalData, setHistoricalData] = useState(null);
 
   // ── On mount: load gym branding from Supabase ────────────────────────────
   useEffect(() => {
@@ -276,6 +277,7 @@ function AppProvider({ children }) {
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
         setUser({ name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" });
         setPlan(profile.plan);
+        loadHistoricalData(savedSession.uid);
         setScreen("home");
       } else {
         localStorage.removeItem(SESSION_KEY);
@@ -312,6 +314,7 @@ function AppProvider({ children }) {
         setPlan(profile.plan);
         // Save session so next open skips login
         try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
+        loadHistoricalData(uid);
         setScreen("home");
       } else {
         setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding");
@@ -338,16 +341,59 @@ function AppProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load historical workout + weight data once we have a real user ID
+  async function loadHistoricalData(uid) {
+    if (!uid || uid.startsWith("sim-") || uid === "dev-001") return;
+    try {
+      const [wLogs, wtLogs] = await Promise.all([
+        sb.getWorkoutLogs(uid, 60),
+        sb.getWeightLogs(uid, 12),
+      ]);
+      const workoutLogs = Array.isArray(wLogs) ? wLogs : [];
+      const weightLogs  = Array.isArray(wtLogs) ? wtLogs : [];
+
+      // Unique workout dates sorted descending
+      const dates = [...new Set(workoutLogs.map(r => r.workout_date))].sort((a,b) => b.localeCompare(a));
+      const totalWorkouts = dates.length;
+
+      // Streak — count consecutive days ending today or yesterday
+      let streak = 0;
+      const today = new Date().toISOString().slice(0,10);
+      const dateSet = new Set(dates);
+      let cursor = new Date(today);
+      // allow today or yesterday as streak start
+      if (!dateSet.has(today)) cursor.setDate(cursor.getDate() - 1);
+      while (dateSet.has(cursor.toISOString().slice(0,10))) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      }
+
+      // Last session date
+      const lastSession = dates[0] || null;
+
+      // Weight change
+      let weightChange = null;
+      if (weightLogs.length >= 2) {
+        const first = parseFloat(weightLogs[0].weight_lbs);
+        const last  = parseFloat(weightLogs[weightLogs.length - 1].weight_lbs);
+        weightChange = (last - first).toFixed(1);
+      }
+
+      setHistoricalData({ workoutLogs, weightLogs, streak, totalWorkouts, lastSession, weightChange });
+    } catch(e) { console.warn("[Morphiq] historicalData load failed:", e); }
+  }
+
   function signOut() {
     try { localStorage.removeItem(SESSION_KEY); } catch {}
     setSupabaseUser(null);
     setUser(DEFAULT_USER);
     setPlan(null);
+    setHistoricalData(null);
     setScreen("auth");
   }
 
   return (
-    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData }}>
       {children}
     </AppContext.Provider>
   );
@@ -472,7 +518,6 @@ function AuthScreen() {
 
   const [mode, setMode] = useState("member");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [authStep, setAuthStep] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -488,15 +533,11 @@ function AuthScreen() {
   }
 
   async function handleOwnerLogin() {
-    if (!email.includes("@") || password.length < 6) { setErrorMsg("Check your email and password."); return; }
-    setAuthStep("loading"); setErrorMsg("");
-    await new Promise(r => setTimeout(r, 1400));
-    if (email.toLowerCase().includes("owner") || email.toLowerCase().includes("gym")) {
-      signIn(email, "owner");
-    } else {
-      setAuthStep("error");
-      setErrorMsg("Demo: use an email containing 'owner' or 'gym'.");
-    }
+    if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
+    setAuthStep("sending"); setErrorMsg("");
+    try { await sb.sendMagicLink(email); } catch { /* still show sent */ }
+    await new Promise(r => setTimeout(r, 400));
+    setAuthStep("sent");
   }
 
   // Simulates clicking the magic link — in prod this is the Supabase redirect callback
@@ -514,12 +555,6 @@ function AuthScreen() {
         <div style={{ width: 52, height: 52, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>M</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
         <div style={{ fontSize: 11, color: ob.muted }}>Powered by Morphiq</div>
-      </div>
-      {/* DEV SHORTCUTS — remove before launch */}
-      <div style={{ margin: "0 20px 10px", display: "flex", gap: 8 }}>
-        <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.2)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: "rgba(0,212,177,0.5)", cursor: "pointer", fontFamily: ob.font }}>New member</button>
-        <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: "#0A1628", border: "1px dashed rgba(0,212,177,0.2)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: "rgba(0,212,177,0.5)", cursor: "pointer", fontFamily: ob.font }}>Returning</button>
-        <button onClick={() => signIn("owner@gym.com", "owner")} style={{ flex: 1, background: "#0D0A1F", border: "1px dashed rgba(167,139,250,0.2)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: "rgba(167,139,250,0.5)", cursor: "pointer", fontFamily: ob.font }}>Owner</button>
       </div>
       <div style={{ display: "flex", margin: "0 20px 20px", background: ob.card, borderRadius: 10, padding: 3 }}>
         {[["member","I'm a Member"],["owner","Gym Owner"]].map(([id, label]) => (
@@ -544,13 +579,6 @@ function AuthScreen() {
                 <div style={{ fontSize: 32, marginBottom: 12 }}>📬</div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: ob.white, marginBottom: 8 }}>Check your inbox</div>
                 <div style={{ fontSize: 12, color: ob.body, marginBottom: 20, lineHeight: 1.6 }}>We sent a sign-in link to <span style={{ color: a }}>{email}</span>. Tap it to continue.</div>
-                <div style={{ background: ob.card, borderRadius: 10, padding: "10px 14px", marginBottom: 12, border: "1px dashed rgba(0,212,177,0.3)" }}>
-                  <div style={{ fontSize: 10, color: ob.muted, marginBottom: 8 }}>DEV — simulate clicking the email link:</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => clickMagicLink(false)} style={{ flex: 1, background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 9, padding: "8px 6px", fontSize: 11, color: ob.teal, cursor: "pointer", fontFamily: ob.font }}>New member</button>
-                    <button onClick={() => clickMagicLink(true)} style={{ flex: 1, background: a, border: "none", borderRadius: 9, padding: "8px 6px", fontSize: 11, color: ob.tealDk, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>Returning member</button>
-                  </div>
-                </div>
                 <button onClick={() => setAuthStep("idle")} style={{ fontSize: 11, color: ob.muted, background: "none", border: "none", cursor: "pointer" }}>Use a different email</button>
               </div>
             ) : (
@@ -563,19 +591,24 @@ function AuthScreen() {
         )}
         {mode === "owner" && (
           <div className="mq-fade">
-            {authStep !== "loading" ? (
+            {authStep === "idle" || authStep === "sending" ? (
               <>
-                <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>Sign in to your gym dashboard with your admin credentials.</div>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="gym@ironhouse.com" style={inp} />
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleOwnerLogin()} placeholder="Password" style={{ ...inp, marginBottom: 4 }} />
+                <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>Enter your gym owner email and we'll send you a one-tap sign-in link.</div>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleOwnerLogin()} placeholder="gym@ironhouse.com" style={inp} />
                 {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
-                <button onClick={handleOwnerLogin} style={btn(!email.includes("@") || password.length < 6)}>{authStep === "sending" ? "Signing in…" : "Sign in →"}</button>
-                <div style={{ fontSize: 11, color: ob.muted, marginTop: 12, textAlign: "center", lineHeight: 1.6 }}>Demo: use any email containing "owner" or "gym" with any 6+ char password.</div>
+                <button onClick={handleOwnerLogin} style={btn(!email.includes("@") || authStep === "sending")}>{authStep === "sending" ? "Sending…" : "Send magic link →"}</button>
               </>
+            ) : authStep === "sent" ? (
+              <div className="mq-fade" style={{ textAlign: "center", paddingTop: 20 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📬</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: ob.white, marginBottom: 8 }}>Check your inbox</div>
+                <div style={{ fontSize: 12, color: ob.body, marginBottom: 20, lineHeight: 1.6 }}>We sent a sign-in link to <span style={{ color: a }}>{email}</span>. Tap it to open your dashboard.</div>
+                <button onClick={() => setAuthStep("idle")} style={{ fontSize: 11, color: ob.muted, background: "none", border: "none", cursor: "pointer" }}>Use a different email</button>
+              </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 40 }}>
                 <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
-                <div style={{ fontSize: 12, color: ob.body }}>Verifying credentials…</div>
+                <div style={{ fontSize: 12, color: ob.body }}>Signing you in…</div>
               </div>
             )}
           </div>
@@ -1225,7 +1258,7 @@ function PlanOverviewScreen() {
 
 // ─── HOME DASHBOARD ────────────────────────────────────────────────────────────
 function HomeDashboardScreen() {
-  const { navigate, user, gymBranding } = useApp();
+  const { navigate, user, gymBranding, historicalData } = useApp();
   const a = gymBranding.accent;
   const [done, setDone] = useState(0);
   const [cals, setCals] = useState(1100);
@@ -1235,13 +1268,27 @@ function HomeDashboardScreen() {
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   const sL = { fontSize: 11, color: theme.textDim, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" };
 
+  // Real historical values — fall back to placeholders until data loads
+  const streak = historicalData?.streak ?? "—";
+  const totalWorkouts = historicalData?.totalWorkouts ?? "—";
+  const weightChange = historicalData?.weightChange;
+  const lastSession = historicalData?.lastSession;
+  const weightChangeLabel = weightChange !== null && weightChange !== undefined
+    ? (parseFloat(weightChange) <= 0 ? `${weightChange} lbs` : `+${weightChange} lbs`)
+    : "—";
+
+  // AI coach message — personalised when we have history
+  const coachMsg = lastSession
+    ? `${greeting}, ${user.name || "there"}. Last workout: ${new Date(lastSession + "T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}. ${streak > 1 ? `You're on a ${streak}-day streak — keep it up!` : "Ready to train today?"}`
+    : `${greeting}, ${user.name || "there"}. Your plan is ready — let's get your first session in today.`;
+
   return (
     <Layout activeNav="home">
       <div style={{ margin: "1.5rem 1.25rem 0", background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem 1.25rem", display: "flex", gap: 12, alignItems: "flex-start" }}>
         <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A2E2B", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🤖</div>
         <div>
           <div style={{ fontSize: 12, color: a, fontWeight: 500, marginBottom: 4 }}>Your coach</div>
-          <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{greeting}, {user.name || "there"}. Full body day — you nailed chest on Monday. Keep that momentum going.</div>
+          <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{coachMsg}</div>
         </div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
@@ -1268,7 +1315,11 @@ function HomeDashboardScreen() {
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Your progress</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
-          {[["🔥 6", "Day streak", "#E8874A"], ["3", "Workouts this week", null], ["-4.5 lbs", "Since you started", null]].map(([v, l, c]) => (
+          {[
+            [`${streak > 0 ? "🔥 " : ""}${streak}`, "Day streak", streak > 0 ? "#E8874A" : null],
+            [`${totalWorkouts}`, "Total workouts", null],
+            [weightChangeLabel, "Since you started", parseFloat(weightChange) <= 0 ? a : "#F87171"],
+          ].map(([v, l, c]) => (
             <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: ".85rem .75rem" }}>
               <div style={{ fontSize: 18, fontWeight: 500, color: c || "#F0F0F0" }}>{v}</div>
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>{l}</div>
@@ -2022,14 +2073,30 @@ function WeightChart({ data, accent }) {
   );
 }
 
-function StreakCalendar({ accent }) {
+function StreakCalendar({ accent, workoutDates }) {
   const days = ["M","T","W","T","F","S","S"];
-  const grid = [
-    [1,0,1,0,1,0,0],
-    [1,0,1,0,1,0,0],
-    [1,0,0,0,1,0,0],
-    [1,0,1,0,null,null,null],
-  ];
+  // Build a 4-week grid ending today
+  const today = new Date();
+  // Find the most recent Monday
+  const dow = today.getDay(); // 0=Sun
+  const mondayOffset = dow === 0 ? 6 : dow - 1;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - mondayOffset - 21); // go back 3 more weeks
+  const dateSet = new Set(workoutDates || []);
+  const grid = [];
+  for (let week = 0; week < 4; week++) {
+    const row = [];
+    for (let d = 0; d < 7; d++) {
+      const cell = new Date(monday);
+      cell.setDate(monday.getDate() + week * 7 + d);
+      if (cell > today) { row.push(null); }
+      else {
+        const iso = cell.toISOString().slice(0,10);
+        row.push(dateSet.has(iso) ? 1 : 0);
+      }
+    }
+    grid.push(row);
+  }
   return (
     <div>
       <div style={{ display:"flex", gap:4, marginBottom:5 }}>
@@ -2051,20 +2118,13 @@ function StreakCalendar({ accent }) {
 }
 
 function ProgressScreen() {
-  const { gymBranding, supabaseUser, user } = useApp();
+  const { gymBranding, supabaseUser, user, historicalData, loadHistoricalData } = useApp();
   const a = gymBranding.accent;
   const [tab, setTab] = useState("body");
   const sL = { fontSize:10, color:"#6B7A8D", textTransform:"uppercase", letterSpacing:"1.2px", marginBottom:10, fontWeight:500 };
 
-  // ── Real workout logs from Supabase ───────────────────────────────────────
-  const [realLogs, setRealLogs] = useState(null);
-  useEffect(() => {
-    if (!supabaseUser?.id || supabaseUser.id.startsWith("sim-") || supabaseUser.id === "dev-001") {
-      setRealLogs([]); return;
-    }
-    sb.getWorkoutLogs(supabaseUser.id, 30).then(rows => setRealLogs(Array.isArray(rows) ? rows : []));
-  }, [supabaseUser?.id]);
-
+  // Pull workout logs from historicalData (loaded at sign-in) — no extra fetch needed
+  const realLogs = historicalData?.workoutLogs || null;
   const useRealWorkoutData = realLogs !== null && realLogs.length > 0;
 
   const realSessions = useRealWorkoutData ? (() => {
@@ -2095,9 +2155,9 @@ function ProgressScreen() {
     return Object.values(best).slice(0, 6);
   })() : PERSONAL_BESTS;
 
-  // ── Real weight logs from Supabase ────────────────────────────────────────
-  const [weightLogs, setWeightLogs] = useState(null); // null = loading
-  const [weightLoading, setWeightLoading] = useState(false);
+  // ── Weight logs from historicalData ──────────────────────────────────────
+  const [weightLoading] = useState(false);
+  const [weightLogs, setWeightLogs] = useState(null);
   const [showLogWeight, setShowLogWeight] = useState(false);
   const [newWeightInput, setNewWeightInput] = useState("");
   const [savingWeight, setSavingWeight] = useState(false);
@@ -2105,14 +2165,10 @@ function ProgressScreen() {
 
   const isRealUser = supabaseUser?.id && !supabaseUser.id.startsWith("sim-") && supabaseUser.id !== "dev-001";
 
+  // Sync weightLogs from historicalData whenever it updates
   useEffect(() => {
-    if (!isRealUser) { setWeightLogs([]); return; }
-    setWeightLoading(true);
-    sb.getWeightLogs(supabaseUser.id, 12).then(rows => {
-      setWeightLogs(Array.isArray(rows) ? rows : []);
-      setWeightLoading(false);
-    });
-  }, [supabaseUser?.id]);
+    if (historicalData?.weightLogs) setWeightLogs(historicalData.weightLogs);
+  }, [historicalData?.weightLogs]);
 
   // Build chart data: real entries or mock fallback
   const useRealWeightData = weightLogs !== null && weightLogs.length >= 1;
@@ -2138,8 +2194,8 @@ function ProgressScreen() {
     // Also persist to Supabase if real user
     if (isRealUser) {
       await sb.insertWeightLog(supabaseUser.id, val);
-      const rows = await sb.getWeightLogs(supabaseUser.id, 12);
-      if (Array.isArray(rows) && rows.length > 0) setWeightLogs(rows);
+      // Refresh historicalData so weight chart and home screen update
+      await loadHistoricalData(supabaseUser.id);
     }
     setSavingWeight(false);
     setWeightSaved(true);
@@ -2161,8 +2217,8 @@ function ProgressScreen() {
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
           {[
             { val: lost > 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, lbl:"Weight change", color: lost >= 0 ? a : "#F87171" },
-            { val:"🔥 6", lbl:"Day streak", color:"#F59E0B" },
-            { val:"8",    lbl:"PBs this month", color:"#A78BFA" },
+            { val: historicalData?.streak > 0 ? `🔥 ${historicalData.streak}` : (historicalData?.streak ?? "—"), lbl:"Day streak", color:"#F59E0B" },
+            { val: String(realPBs.length || 0), lbl:"PBs logged", color:"#A78BFA" },
           ].map(({ val, lbl, color }) => (
             <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
               <div style={{ fontSize:18, fontWeight:700, color }}>{val}</div>
@@ -2262,7 +2318,11 @@ function ProgressScreen() {
 
             <div style={sL}>Workout streak</div>
             <div style={{ background:"#1A2332", borderRadius:14, padding:"14px" }}>
-              <StreakCalendar accent={a} />
+              <StreakCalendar accent={a} workoutDates={
+                useRealWorkoutData
+                  ? [...new Set(realLogs.map(r => r.workout_date))]
+                  : []
+              } />
               <div style={{ display:"flex", gap:14, marginTop:10 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:5 }}>
                   <div style={{ width:10, height:10, borderRadius:3, background:a }} />
