@@ -225,6 +225,87 @@ const sb = {
       return await res.json();
     } catch { return []; }
   },
+
+  // ── GYM OWNER DATA ────────────────────────────────────────────────────────
+  // Fetch all profiles for a gym
+  async getGymMembers(gymId = "demo-gym") {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?gym_id=eq.${encodeURIComponent(gymId)}&select=id,name,goal,weight,updated_at&order=updated_at.desc`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows : [];
+    } catch { return []; }
+  },
+
+  // For each profile ID, count workout sessions this calendar month
+  async getWorkoutCountsThisMonth(profileIds) {
+    if (!profileIds.length) return {};
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    const startStr = monthStart.toISOString().slice(0, 10);
+    try {
+      const ids = profileIds.map(id => `"${id}"`).join(",");
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=in.(${ids})&workout_date=gte.${startStr}&select=user_id,workout_date`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      if (!Array.isArray(rows)) return {};
+      // Count unique workout dates per user
+      const counts = {};
+      const dates = {};
+      rows.forEach(r => {
+        if (!dates[r.user_id]) dates[r.user_id] = new Set();
+        dates[r.user_id].add(r.workout_date);
+      });
+      Object.keys(dates).forEach(uid => { counts[uid] = dates[uid].size; });
+      return counts;
+    } catch { return {}; }
+  },
+
+  // For each profile ID, get last workout date
+  async getLastWorkoutDates(profileIds) {
+    if (!profileIds.length) return {};
+    try {
+      const ids = profileIds.map(id => `"${id}"`).join(",");
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=in.(${ids})&select=user_id,workout_date&order=workout_date.desc`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      if (!Array.isArray(rows)) return {};
+      const lastDates = {};
+      rows.forEach(r => { if (!lastDates[r.user_id]) lastDates[r.user_id] = r.workout_date; });
+      return lastDates;
+    } catch { return {}; }
+  },
+
+  // First and last weight log per profile for delta calculation
+  async getWeightDeltas(profileIds) {
+    if (!profileIds.length) return {};
+    try {
+      const ids = profileIds.map(id => `"${id}"`).join(",");
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/weight_logs?user_id=in.(${ids})&select=user_id,weight_lbs,logged_date&order=logged_date.asc`,
+        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      if (!Array.isArray(rows)) return {};
+      // first and last per user
+      const first = {}, last = {};
+      rows.forEach(r => {
+        if (!first[r.user_id]) first[r.user_id] = parseFloat(r.weight_lbs);
+        last[r.user_id] = parseFloat(r.weight_lbs);
+      });
+      const deltas = {};
+      Object.keys(first).forEach(uid => {
+        deltas[uid] = (last[uid] - first[uid]).toFixed(1);
+      });
+      return deltas;
+    } catch { return {}; }
+  },
 };
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -2650,13 +2731,73 @@ function ProfileScreen() {
 }
 
 // ─── GYM OWNER DASHBOARD ──────────────────────────────────────────────────────
-const MEMBERS_DATA = [
-  { initials: "AJ", name: "Alex Johnson",   bg: "#003D35", color: "#00D4B1", sessions: 12, status: "on track",     delta: "-8.2lb", dColor: "#00D4B1", msgColor: "#00D4B1" },
-  { initials: "SM", name: "Sara Mitchell",  bg: "#2D1A00", color: "#F59E0B", sessions:  8, status: "needs nudge",   delta: "-3.1lb", dColor: "#F59E0B", msgColor: "#00D4B1" },
-  { initials: "LP", name: "Lisa Park",      bg: "#1F1010", color: "#F87171", sessions:  0, status: "No activity — 9 days", delta: "—", dColor: "#F87171", msgColor: "#F87171" },
-  { initials: "MT", name: "Mike Torres",    bg: "#1A1040", color: "#A78BFA", sessions: 15, status: "ahead of plan", delta: "-5.6lb", dColor: "#A78BFA", msgColor: "#00D4B1" },
-  { initials: "KW", name: "Kim Wang",       bg: "#003D35", color: "#00D4B1", sessions:  9, status: "on track",     delta: "-2.8lb", dColor: "#00D4B1", msgColor: "#00D4B1" },
-];
+
+// Derive display properties from a raw profile + stats
+function buildMemberRow(profile, sessions, lastDate, weightDelta) {
+  const initials = (profile.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const avatarColors = ["#003D35/#00D4B1","#2D1A00/#F59E0B","#1A1040/#A78BFA","#1F1010/#F87171","#0A1628/#60A5FA"];
+  const [bg, color] = (avatarColors[initials.charCodeAt(0) % avatarColors.length]).split("/");
+
+  const today = new Date();
+  const daysSince = lastDate
+    ? Math.floor((today - new Date(lastDate)) / 86400000)
+    : null;
+
+  let status, statusColor;
+  if (daysSince === null || daysSince > 7) {
+    status = daysSince !== null ? `No activity — ${daysSince} days` : "Never logged in";
+    statusColor = "#F87171";
+  } else if (sessions >= 10) {
+    status = `${sessions} sessions · ahead of plan`;
+    statusColor = "#00D4B1";
+  } else if (sessions >= 5) {
+    status = `${sessions} sessions · on track`;
+    statusColor = "#6B7A8D";
+  } else {
+    status = `${sessions} sessions · needs nudge`;
+    statusColor = "#F59E0B";
+  }
+
+  const delta = weightDelta !== undefined
+    ? (parseFloat(weightDelta) > 0 ? `+${weightDelta}lb` : `${weightDelta}lb`)
+    : "—";
+  const deltaColor = weightDelta !== undefined
+    ? (parseFloat(weightDelta) < 0 ? "#00D4B1" : "#F87171")
+    : "#6B7A8D";
+
+  return { id: profile.id, name: profile.name || "Member", initials, bg, color, sessions: sessions || 0, status, statusColor, delta, deltaColor, atRisk: daysSince === null || daysSince > 7 };
+}
+
+// Shared hook — loads all owner data once, shared between Overview + Members tabs
+function useOwnerData() {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const profiles = await sb.getGymMembers("demo-gym");
+      if (cancelled || !profiles.length) { setLoading(false); return; }
+
+      const profileIds = profiles.map(p => p.id);
+      const [counts, lastDates, deltas] = await Promise.all([
+        sb.getWorkoutCountsThisMonth(profileIds),
+        sb.getLastWorkoutDates(profileIds),
+        sb.getWeightDeltas(profileIds),
+      ]);
+
+      if (cancelled) return;
+      const rows = profiles.map(p => buildMemberRow(p, counts[p.id] || 0, lastDates[p.id] || null, deltas[p.id]));
+      setMembers(rows);
+      setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { members, loading };
+}
 
 function OwnerStatCard({ value, label, sub, color }) {
   return (
@@ -2668,64 +2809,115 @@ function OwnerStatCard({ value, label, sub, color }) {
   );
 }
 
+function OwnerSpinner() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 0" }}>
+      <div style={{ width: 28, height: 28, border: "3px solid #1A2332", borderTopColor: "#00D4B1", borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+      <div style={{ fontSize: 12, color: "#6B7A8D" }}>Loading member data…</div>
+    </div>
+  );
+}
+
 function OwnerOverviewTab() {
+  const { members, loading } = useOwnerData();
+
+  if (loading) return <OwnerSpinner />;
+
+  const total = members.length;
+  const activeCount = members.filter(m => m.sessions > 0).length;
+  const activePct = total > 0 ? Math.round((activeCount / total) * 100) : 0;
+  const totalSessions = members.reduce((s, m) => s + m.sessions, 0);
+  const weightLosers = members.filter(m => m.delta !== "—" && parseFloat(m.delta) < 0);
+  const avgLoss = weightLosers.length > 0
+    ? (weightLosers.reduce((s, m) => s + parseFloat(m.delta), 0) / weightLosers.length).toFixed(1)
+    : null;
+  const atRisk = members.filter(m => m.atRisk);
+
   return (
     <div className="mq-fade">
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
-        <OwnerStatCard value="284" label="Total members" sub="↑ 12 joined this week" />
-        <OwnerStatCard value="71%" label="Active this week" color="#00D4B1" sub="↑ up from 64%" />
-        <OwnerStatCard value="1,840" label="Workouts this month" color="#F59E0B" />
-        <OwnerStatCard value="-6.2lb" label="Avg member loss" color="#818cf8" />
+        <OwnerStatCard value={total || "0"} label="Total members" />
+        <OwnerStatCard value={`${activePct}%`} label="Active this month" color="#00D4B1" />
+        <OwnerStatCard value={totalSessions.toLocaleString()} label="Sessions this month" color="#F59E0B" />
+        <OwnerStatCard value={avgLoss ? `${avgLoss}lb` : "—"} label="Avg weight change" color="#818cf8" />
       </div>
-      <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Engagement</div>
+
+      <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Activity breakdown</div>
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        {[["71%", "Workout active", "#00D4B1"], ["62%", "Meal logging", "#F59E0B"], ["45%", "AI chat used", "#A78BFA"]].map(([v, l, c]) => (
+        {[
+          [`${activePct}%`, "Active members", "#00D4B1"],
+          [`${members.filter(m => m.sessions >= 8).length}`, "On track", "#F59E0B"],
+          [`${atRisk.length}`, "At risk", "#F87171"],
+        ].map(([v, l, c]) => (
           <div key={l} style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 8px", textAlign: "center" }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: c }}>{v}</div>
             <div style={{ fontSize: 10, color: "#6B7A8D", marginTop: 3, lineHeight: 1.3 }}>{l}</div>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Members needing attention</div>
-      <div style={{ background: "#1F1010", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 12, padding: "12px 14px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#1F1010", border: "1px solid #F87171", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#F87171", fontWeight: 600, flexShrink: 0 }}>LP</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Lisa Park</div>
-            <div style={{ fontSize: 11, color: "#F87171" }}>No activity — 9 days</div>
-          </div>
-          <Pill variant="red">At risk</Pill>
+
+      {atRisk.length > 0 && (
+        <>
+          <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Needs attention</div>
+          {atRisk.slice(0, 3).map(m => (
+            <div key={m.id} style={{ background: "#1F1010", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#1F1010", border: "1px solid #F87171", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#F87171", fontWeight: 600, flexShrink: 0 }}>{m.initials}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{m.name}</div>
+                  <div style={{ fontSize: 11, color: "#F87171" }}>{m.status}</div>
+                </div>
+                <Pill variant="red">At risk</Pill>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+
+      {total === 0 && (
+        <div style={{ background: "#1A2332", borderRadius: 12, padding: "20px 16px", textAlign: "center" }}>
+          <div style={{ fontSize: 13, color: "#6B7A8D", lineHeight: 1.6 }}>No members yet. Share your gym's sign-up link to get started.</div>
         </div>
-        <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5 }}>Send a check-in message to re-engage.</div>
-      </div>
+      )}
     </div>
   );
 }
 
 function OwnerMembersTab() {
+  const { members, loading } = useOwnerData();
   const [composeTo, setComposeTo] = useState(null);
   const [msgText, setMsgText] = useState("");
   const [sent, setSent] = useState(false);
 
   function sendMsg() { setSent(true); setTimeout(() => { setSent(false); setComposeTo(null); setMsgText(""); }, 1400); }
 
+  if (loading) return <OwnerSpinner />;
+
+  if (!members.length) {
+    return (
+      <div className="mq-fade" style={{ background: "#1A2332", borderRadius: 14, padding: "24px 16px", textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: "#6B7A8D", lineHeight: 1.6 }}>No members have signed up yet.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="mq-fade">
       <div style={{ background: "#1A2332", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
-        {MEMBERS_DATA.map((m, i) => (
-          <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < MEMBERS_DATA.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+        {members.map((m, i) => (
+          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < members.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: m.color, flexShrink: 0 }}>{m.initials}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{m.name}</div>
-              <div style={{ fontSize: 11, color: m.sessions === 0 ? "#F87171" : "#6B7A8D" }}>{m.sessions === 0 ? m.status : `${m.sessions} sessions · ${m.status}`}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
+              <div style={{ fontSize: 11, color: m.statusColor }}>{m.status}</div>
             </div>
-            <div style={{ textAlign: "right", marginRight: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: m.dColor }}>{m.delta}</div>
-              <div style={{ fontSize: 10, color: "#6B7A8D" }}>30 days</div>
+            <div style={{ textAlign: "right", marginRight: 8, flexShrink: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: m.deltaColor }}>{m.delta}</div>
+              <div style={{ fontSize: 10, color: "#6B7A8D" }}>weight</div>
             </div>
             <button onClick={() => { setComposeTo(m); setSent(false); setMsgText(""); }}
-              style={{ width: 28, height: 28, borderRadius: 8, background: "#0D1623", border: `1px solid rgba(255,255,255,0.08)`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.4-.6 2.6-1.5 3.5L10.5 12H6.5c-2.76 0-5-2.24-5-5z" stroke={m.msgColor} strokeWidth="1" /></svg>
+              style={{ width: 28, height: 28, borderRadius: 8, background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.4-.6 2.6-1.5 3.5L10.5 12H6.5c-2.76 0-5-2.24-5-5z" stroke="#00D4B1" strokeWidth="1" /></svg>
             </button>
           </div>
         ))}
