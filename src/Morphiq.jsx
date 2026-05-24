@@ -329,7 +329,7 @@ const theme = {
 };
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-// Set DEV_SKIP to "member_new", "member_returning", "owner", or null for real auth.
+// Set DEV_SKIP to "member_new", "member_new", "owner", or null for real auth.
 const DEV_SKIP = null; // null = shows real auth screen
 
 // ─── CONTEXT ──────────────────────────────────────────────────────────────────
