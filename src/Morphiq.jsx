@@ -811,6 +811,28 @@ function AuthScreen() {
         ) : null}
 
       </div>
+      {/* ── DEV BYPASS ── always visible so you can test without hitting OTP rate limits */}
+      <div style={{ margin: "0 20px 12px", border: "2px dashed #b45309", borderRadius: 12, padding: "12px 14px", background: "#1c1200" }}>
+        <div style={{ fontSize: 10, color: "#f59e0b", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10, textAlign: "center" }}>🛠 Dev Bypass — Skip OTP</div>
+        <div style={{ display: "flex", gap: 7 }}>
+          <button
+            onClick={() => signIn("dev@morphiq.app", "member", false)}
+            style={{ flex: 1, background: "#1c1200", border: "1px solid #b45309", borderRadius: 8, padding: "8px 4px", fontSize: 11, color: "#fbbf24", cursor: "pointer", fontFamily: ob.font, fontWeight: 600 }}>
+            🆕 New<br/>member
+          </button>
+          <button
+            onClick={() => signIn("dev@morphiq.app", "member", true)}
+            style={{ flex: 1, background: "#1c1200", border: "1px solid #b45309", borderRadius: 8, padding: "8px 4px", fontSize: 11, color: "#fbbf24", cursor: "pointer", fontFamily: ob.font, fontWeight: 600 }}>
+            🏠 Returning<br/>member
+          </button>
+          <button
+            onClick={() => signIn("dev@morphiq.app", "owner", null)}
+            style={{ flex: 1, background: "#1c1200", border: "1px solid #b45309", borderRadius: 8, padding: "8px 4px", fontSize: 11, color: "#fbbf24", cursor: "pointer", fontFamily: ob.font, fontWeight: 600 }}>
+            🏋️ Gym<br/>owner
+          </button>
+        </div>
+      </div>
+
       <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: ".5px", padding: "4px 0 10px" }}>POWERED BY MORPHIQ</div>
     </div>
   );
