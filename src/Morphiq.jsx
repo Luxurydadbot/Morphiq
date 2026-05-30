@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useEffect, useRef } from "react";
 const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
 const SUPABASE_ANON = "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll";
 const SB_HEADERS = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`, "Content-Type": "application/json" };
-const SB_GET = SB_GET;
+const SB_GET = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` };
 
 const sb = {
   // ── AUTH ──────────────────────────────────────────────────────────────────
