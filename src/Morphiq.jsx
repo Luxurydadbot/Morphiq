@@ -1,12 +1,10 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 
-// ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
-// Replace these with your actual Supabase project URL and anon key.
 const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
 const SUPABASE_ANON = "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll";
+const SB_HEADERS = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`, "Content-Type": "application/json" };
+const SB_GET = SB_GET;
 
-// Thin REST wrapper — avoids requiring the npm package inside a JSX artifact.
-// Uses Supabase's PostgREST + Auth REST APIs directly.
 const sb = {
   // ── AUTH ──────────────────────────────────────────────────────────────────
   // Sends a 6-digit OTP to email (works inside the PWA — no browser redirect)
@@ -46,7 +44,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&limit=1`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       const rows = await res.json();
       return rows?.[0] || null;
@@ -71,11 +69,7 @@ const sb = {
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
         method: "POST",
-        headers: {
-          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type": "application/json",
-          "Prefer": "resolution=merge-duplicates",   // upsert on supabase_user_id unique key
-        },
+        headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" },
         body: JSON.stringify(body),
       });
       return res.ok;
@@ -88,7 +82,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&select=id&limit=1`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       const rows = await res.json();
       return rows?.[0]?.id || null;
@@ -103,12 +97,9 @@ const sb = {
       if (!profileId) return false;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
         method: "POST",
-        headers: {
-          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type": "application/json",
-        },
+        headers: SB_HEADERS,
         body: JSON.stringify({
-          user_id: profileId,           // ← profiles.id, not auth.users.id
+          user_id: profileId,
           exercise_name: exerciseName,
           set_number: setNumber,
           reps,
@@ -127,7 +118,7 @@ const sb = {
       if (!profileId) return [];
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&order=logged_at.desc&limit=${limit}`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       return await res.json();
     } catch { return []; }
@@ -140,12 +131,9 @@ const sb = {
       if (!profileId) return false;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/meal_logs`, {
         method: "POST",
-        headers: {
-          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type": "application/json",
-        },
+        headers: SB_HEADERS,
         body: JSON.stringify({
-          user_id: profileId,           // ← profiles.id, not auth.users.id
+          user_id: profileId,
           meal_id: mealId,
           date: new Date().toISOString().slice(0, 10),
           status,
@@ -163,7 +151,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/gyms?owner_email=eq.${encodeURIComponent(email.toLowerCase())}&limit=1`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       const rows = await res.json();
       return rows?.[0] || null;
@@ -175,7 +163,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       const rows = await res.json();
       return rows?.[0] || null;
@@ -186,11 +174,7 @@ const sb = {
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms`, {
         method: "POST",
-        headers: {
-          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type": "application/json",
-          "Prefer": "resolution=merge-duplicates",
-        },
+        headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" },
         body: JSON.stringify({ gym_id: gymId, name, accent, welcome, updated_at: new Date().toISOString() }),
       });
       return res.ok;
@@ -204,10 +188,7 @@ const sb = {
       if (!profileId) return false;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/weight_logs`, {
         method: "POST",
-        headers: {
-          "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Content-Type": "application/json",
-        },
+        headers: SB_HEADERS,
         body: JSON.stringify({
           user_id: profileId,
           weight_lbs: weightLbs,
@@ -225,7 +206,7 @@ const sb = {
       if (!profileId) return [];
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/weight_logs?user_id=eq.${profileId}&order=logged_date.asc&limit=${limit}`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       return await res.json();
     } catch { return []; }
@@ -237,7 +218,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?gym_id=eq.${encodeURIComponent(gymId)}&select=id,name,goal,weight,updated_at&order=updated_at.desc`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       const rows = await res.json();
       return Array.isArray(rows) ? rows : [];
@@ -254,7 +235,7 @@ const sb = {
       const ids = profileIds.map(id => `"${id}"`).join(",");
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/workout_logs?user_id=in.(${ids})&workout_date=gte.${startStr}&select=user_id,workout_date`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       const rows = await res.json();
       if (!Array.isArray(rows)) return {};
@@ -277,7 +258,7 @@ const sb = {
       const ids = profileIds.map(id => `"${id}"`).join(",");
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/workout_logs?user_id=in.(${ids})&select=user_id,workout_date&order=workout_date.desc`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       const rows = await res.json();
       if (!Array.isArray(rows)) return {};
@@ -294,7 +275,7 @@ const sb = {
       const ids = profileIds.map(id => `"${id}"`).join(",");
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/weight_logs?user_id=in.(${ids})&select=user_id,weight_lbs,logged_date&order=logged_date.asc`,
-        { headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` } }
+        { headers: SB_GET }
       );
       const rows = await res.json();
       if (!Array.isArray(rows)) return {};
@@ -313,7 +294,6 @@ const sb = {
   },
 };
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
 const theme = {
   accent: "#00D4B1", accentDim: "rgba(0,212,177,0.10)", accentBorder: "rgba(0,212,177,0.25)",
   bg: "#0F0F0F", surface: "#161616", border: "#242424", borderSubtle: "#1E1E1E",
@@ -326,13 +306,12 @@ const theme = {
     white: "#E8EDF2", body: "#9BB3C8", muted: "#6B7A8D",
     font: "'DM Sans', system-ui, sans-serif",
   },
+  sL: { fontSize: 11, color: "#888", letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" },
 };
 
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
 // Set DEV_SKIP to "member_new", "member_new", "owner", or null for real auth.
 const DEV_SKIP = null; // null = shows real auth screen
 
-// ─── CONTEXT ──────────────────────────────────────────────────────────────────
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 
@@ -387,7 +366,6 @@ function AppProvider({ children }) {
         setGymBranding({ name: row.name, accent: row.accent || "#00D4B1", welcome: row.welcome || "", units: "imperial" });
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── On mount: if we have a saved session, restore it from Supabase ────────
@@ -405,7 +383,6 @@ function AppProvider({ children }) {
         setScreen("auth");
       }
     }).catch(() => { localStorage.removeItem(SESSION_KEY); setScreen("auth"); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Called after successful auth. role = "member" | "owner".
@@ -459,7 +436,6 @@ function AppProvider({ children }) {
       const uid = payload.sub || "";
       if (uid) signIn(email, "member", null, uid);
     } catch(e) { console.error("Magic link error:", e); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load historical workout + weight data once we have a real user ID
@@ -520,7 +496,6 @@ function AppProvider({ children }) {
   );
 }
 
-// ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -560,7 +535,6 @@ const css = `
   }
 `;
 
-// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
 function MicIcon({ size = 22, color = "#003D35" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -597,6 +571,9 @@ function Pill({ children, variant = "teal" }) {
     </span>
   );
 }
+function Spinner({ size = 28, color = "#00D4B1", trackColor = "#1A2332" }) {
+  return <div style={{ width: size, height: size, border: `3px solid ${trackColor}`, borderTopColor: color, borderRadius: "50%", animation: "spin .9s linear infinite", flexShrink: 0 }} />;
+}
 
 function NavIcon({ id }) {
   if (id === "home") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9L9 2l7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M4 7v8h4v-4h2v4h4V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>;
@@ -631,7 +608,6 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   );
 }
 
-// ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
 function AuthScreen() {
   const { signIn, gymBranding } = useApp();
   const a = gymBranding.accent;
@@ -792,7 +768,7 @@ function AuthScreen() {
 
             {step === "verifying" ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "8px 0" }}>
-                <div style={{ width: 28, height: 28, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+                <Spinner size={28} color={a} trackColor={ob.card} />
                 <div style={{ fontSize: 12, color: ob.body }}>Verifying…</div>
               </div>
             ) : (
@@ -843,7 +819,6 @@ function AuthScreen() {
   );
 }
 
-// ─── ONBOARDING ───────────────────────────────────────────────────────────────
 const GOAL_OPTIONS = [
   { id: "lose_fat", icon: "🔥", label: "Lose fat", sub: "Burn calories, drop weight" },
   { id: "build_muscle", icon: "💪", label: "Build muscle", sub: "Get stronger, gain size" },
@@ -896,7 +871,21 @@ function OnboardingScreen() {
       } catch (_) {
         if (!cancelled) {
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, unit };
-          const fallbackPlan = { calories: goal === "lose_fat" ? 1800 : goal === "build_muscle" ? 2800 : 2200, protein: 140, carbs: 160, fat: 55, workoutDays: ["Monday","Wednesday","Friday","Saturday","Tuesday","Thursday"].slice(0, daysPerWeek || 3), workoutType: "Full Body", workoutDuration: 40, weeklyFocus: "Build your movement foundation with compound lifts.", exercises: [{ name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" }, { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" }, { name: "Incline Press", sets: 3, reps: 10, weight: 35, muscle: "Chest / Shoulders" }, { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 65, muscle: "Hamstrings" }, { name: "Shoulder Press", sets: 3, reps: 10, weight: 25, muscle: "Shoulders" }], tip: "Consistency over perfection — show up, even on hard days." };
+          const fallbackPlan = {
+            calories: goal === "lose_fat" ? 1800 : goal === "build_muscle" ? 2800 : 2200,
+            protein: 140, carbs: 160, fat: 55,
+            workoutDays: ["Monday","Wednesday","Friday","Saturday","Tuesday","Thursday"].slice(0, daysPerWeek || 3),
+            workoutType: "Full Body", workoutDuration: 40,
+            weeklyFocus: "Build your movement foundation with compound lifts.",
+            exercises: [
+              { name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" },
+              { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" },
+              { name: "Incline Press", sets: 3, reps: 10, weight: 35, muscle: "Chest / Shoulders" },
+              { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 65, muscle: "Hamstrings" },
+              { name: "Shoulder Press", sets: 3, reps: 10, weight: 25, muscle: "Shoulders" },
+            ],
+            tip: "Consistency over perfection — show up, even on hard days.",
+          };
           setUser(userData);
           setPlan(fallbackPlan);
           if (supabaseUser?.id) {
@@ -910,7 +899,6 @@ function OnboardingScreen() {
     Promise.all([generatePlan(), new Promise(r => setTimeout(r, 2600))]);
     return () => { cancelled = true; };
   }, [step]);
-
 
   const bodyValid = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && weight && parseFloat(weight) > 0;
   const ageValid = age && parseInt(age) >= 13 && parseInt(age) <= 100;
@@ -1077,7 +1065,7 @@ function OnboardingScreen() {
         </div>}
 
         {step === 9 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <div style={{ width: 40, height: 40, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
+          <Spinner size={40} color={a} trackColor={ob.card} />
           <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>Building your plan</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", marginTop: 4 }}>
             {["Analyzing your goal", "Selecting best exercises", "Building your meal guide", "Personalizing week one..."].map((item, i) => (
@@ -1121,7 +1109,6 @@ function OnboardingScreen() {
   );
 }
 
-// ─── WORKOUT SCREEN ───────────────────────────────────────────────────────────
 const WORKOUT_EXERCISES = [
   { name: "Goblet Squat", muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 25 },
   { name: "Dumbbell Row", muscle: "Back / Biceps", sets: 3, targetReps: 10, weight: 30 },
@@ -1591,28 +1578,16 @@ function WorkoutScreen() {
   );
 }
 
-// ─── PLAN OVERVIEW ─────────────────────────────────────────────────────────────
-const EXERCISES_DISPLAY = [
-  { name: "Goblet squat", weight: "35 lbs", reps: "10 reps", sets: "3 sets" },
-  { name: "Dumbbell bench press", weight: "30 lbs", reps: "10 reps", sets: "3 sets" },
-  { name: "Seated cable row", weight: "85 lbs", reps: "12 reps", sets: "3 sets" },
-  { name: "Dumbbell shoulder press", weight: "25 lbs", reps: "10 reps", sets: "3 sets" },
-  { name: "Romanian deadlift", weight: "65 lbs", reps: "10 reps", sets: "3 sets" },
-];
+const EXERCISES_DISPLAY = [{name:"Goblet squat",weight:"35 lbs",reps:"10 reps",sets:"3 sets"},{name:"Dumbbell bench press",weight:"30 lbs",reps:"10 reps",sets:"3 sets"},{name:"Seated cable row",weight:"85 lbs",reps:"12 reps",sets:"3 sets"},{name:"Dumbbell shoulder press",weight:"25 lbs",reps:"10 reps",sets:"3 sets"},{name:"Romanian deadlift",weight:"65 lbs",reps:"10 reps",sets:"3 sets"}];
 
-const WEEK = [
-  { name: "Mon", type: "Full body", isWorkout: true }, { name: "Tue", type: "Rest", isWorkout: false },
-  { name: "Wed", type: "Full body", isWorkout: true }, { name: "Thu", type: "Rest", isWorkout: false },
-  { name: "Fri", type: "Full body", isWorkout: true }, { name: "Sat", type: "Rest", isWorkout: false },
-  { name: "Sun", type: "Rest", isWorkout: false },
-];
+const WEEK = [{name:"Mon",type:"Full body",isWorkout:true},{name:"Tue",type:"Rest",isWorkout:false},{name:"Wed",type:"Full body",isWorkout:true},{name:"Thu",type:"Rest",isWorkout:false},{name:"Fri",type:"Full body",isWorkout:true},{name:"Sat",type:"Rest",isWorkout:false},{name:"Sun",type:"Rest",isWorkout:false}];
 
 function PlanOverviewScreen() {
   const { navigate, user, gymBranding } = useApp();
   const a = gymBranding.accent;
   const [activeDay, setActiveDay] = useState(0);
   const day = WEEK[activeDay];
-  const sL = { fontSize: 11, color: theme.textDim, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".75rem" };
+  const sL = theme.sL;
   const goalLabel = GOAL_OPTIONS.find(g => g.id === user.goal)?.label?.toLowerCase() || "fitness";
 
   return (
@@ -1679,7 +1654,6 @@ function PlanOverviewScreen() {
   );
 }
 
-// ─── HOME DASHBOARD ────────────────────────────────────────────────────────────
 function HomeDashboardScreen() {
   const { navigate, user, gymBranding, historicalData } = useApp();
   const a = gymBranding.accent;
@@ -1689,7 +1663,7 @@ function HomeDashboardScreen() {
   const calGoal = 1840;
   const h = new Date().getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-  const sL = { fontSize: 11, color: theme.textDim, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" };
+  const sL = theme.sL;
 
   // Real historical values — fall back to placeholders until data loads
   const streak = historicalData?.streak ?? "—";
@@ -1791,7 +1765,6 @@ function HomeDashboardScreen() {
   );
 }
 
-// ─── MEAL PLAN DATA ────────────────────────────────────────────────────────────
 const MEAL_DATA = [
   {
     id: "breakfast", label: "Breakfast", time: "7–9 AM",
@@ -1837,7 +1810,6 @@ const GROCERY_DATA = [
   ]},
 ];
 
-// ─── MACRO BAR ────────────────────────────────────────────────────────────────
 function MacroBar({ label, current, goal, color }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));
   return (
@@ -1851,7 +1823,6 @@ function MacroBar({ label, current, goal, color }) {
   );
 }
 
-// ─── MEAL SLOT (list view) ────────────────────────────────────────────────────
 function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
@@ -1925,7 +1896,6 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
   );
 }
 
-// ─── MEAL DETAIL SCREEN ──────────────────────────────────────────────────────
 function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
   const { gymBranding, user } = useApp();
   const a = gymBranding.accent;
@@ -2071,7 +2041,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
           {voicePhase === "processing" && (
             <>
               <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8, fontStyle: "italic" }}>"{transcript}"</div>
-              <div style={{ width: 24, height: 24, border: `3px solid #1A2332`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite", margin: "0 auto 8px" }} />
+              <Spinner size={24} color={a} />
               <div style={{ fontSize: 11, color: a }}>Looking up nutrition info…</div>
             </>
           )}
@@ -2130,7 +2100,6 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
   );
 }
 
-// ─── GROCERY LIST ─────────────────────────────────────────────────────────────
 function GroceryList({ groceries, onToggle }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
@@ -2163,7 +2132,6 @@ function GroceryList({ groceries, onToggle }) {
   );
 }
 
-// ─── MEAL PLAN SCREEN ─────────────────────────────────────────────────────────
 function MealPlanScreen() {
   const { gymBranding, supabaseUser } = useApp();
   const a = gymBranding.accent;
@@ -2295,14 +2263,12 @@ function MealPlanScreen() {
   );
 }
 
-// ─── AI TRAINER CHAT ──────────────────────────────────────────────────────────
 const CHAT_SUGGESTIONS = {
   idle:    ["What should I eat today?", "How was my last workout?", "I'm feeling tired"],
   workout: ["My knee hurts on squats", "Can I swap an exercise?", "How many sets left?"],
   meals:   ["What can I eat for dinner?", "I already had lunch", "I'm still hungry"],
 };
 
-// ─── FALLBACK responses used in dev/demo when API is unavailable ──────────────
 const FALLBACK_REPLIES = {
   "my knee hurts on squats": "Stop squats for now — not worth the risk. I'm swapping in seated leg press instead, much easier on the knee. If it keeps bothering you, let me know and I'll adjust your whole program.",
   "can i swap an exercise": "Of course. Which exercise are you on? Tell me the name and I'll find a solid alternative that hits the same muscle group.",
@@ -2320,7 +2286,6 @@ function getFallbackReply(text) {
   return FALLBACK_REPLIES[key] || "Good question. Based on your plan and history, you're on track — keep it up and check in if anything feels off.";
 }
 
-// ─── API call to /api/chat proxy ──────────────────────────────────────────────
 async function fetchAIReply(messages, user, context) {
   const res = await fetch("/api/chat", {
     method:  "POST",
@@ -2523,26 +2488,9 @@ function ChatScreen({ fromScreen = "home" }) {
   );
 }
 
-
-// ─── PROGRESS SCREEN ──────────────────────────────────────────────────────────
-const WEIGHT_DATA_MOCK = [
-  { week: "W1", weight: 187.0 }, { week: "W2", weight: 185.5 },
-  { week: "W3", weight: 184.2 }, { week: "W4", weight: 183.0 },
-  { week: "W5", weight: 182.1 }, { week: "W6", weight: 181.4 },
-];
-const WORKOUT_LOG = [
-  { date: "Mon May 5",  name: "Full body A", sets: 15, vol: "4,820 lbs", pbs: 2 },
-  { date: "Wed May 7",  name: "Full body B", sets: 14, vol: "4,540 lbs", pbs: 1 },
-  { date: "Fri May 9",  name: "Full body A", sets: 15, vol: "5,010 lbs", pbs: 2 },
-  { date: "Mon May 12", name: "Full body B", sets: 14, vol: "4,760 lbs", pbs: 0 },
-  { date: "Wed May 14", name: "Full body A", sets: 15, vol: "5,200 lbs", pbs: 3 },
-];
-const PERSONAL_BESTS = [
-  { exercise: "Goblet Squat",         weight: "35 lbs", reps: 13, date: "May 14" },
-  { exercise: "Dumbbell Bench Press", weight: "35 lbs", reps: 11, date: "May 12" },
-  { exercise: "Seated Cable Row",     weight: "95 lbs", reps: 12, date: "May 14" },
-  { exercise: "Romanian Deadlift",    weight: "75 lbs", reps: 10, date: "May 9"  },
-];
+const WEIGHT_DATA_MOCK = [{week:"W1",weight:187.0},{week:"W2",weight:185.5},{week:"W3",weight:184.2},{week:"W4",weight:183.0},{week:"W5",weight:182.1},{week:"W6",weight:181.4}];
+const WORKOUT_LOG = [{date:"Mon May 5",name:"Full body A",sets:15,vol:"4,820 lbs",pbs:2},{date:"Wed May 7",name:"Full body B",sets:14,vol:"4,540 lbs",pbs:1},{date:"Fri May 9",name:"Full body A",sets:15,vol:"5,010 lbs",pbs:2},{date:"Mon May 12",name:"Full body B",sets:14,vol:"4,760 lbs",pbs:0},{date:"Wed May 14",name:"Full body A",sets:15,vol:"5,200 lbs",pbs:1}];
+const PERSONAL_BESTS = [{exercise:"Goblet Squat",weight:"35 lbs",reps:13,date:"May 14"},{exercise:"Dumbbell Bench Press",weight:"35 lbs",reps:11,date:"May 12"},{exercise:"Seated Cable Row",weight:"95 lbs",reps:12,date:"May 14"},{exercise:"Romanian Deadlift",weight:"75 lbs",reps:10,date:"May 9"}];
 
 function WeightChart({ data, accent }) {
   const W = 260, H = 84, PAD = 10;
@@ -2628,7 +2576,7 @@ function ProgressScreen() {
   const { gymBranding, supabaseUser, user, historicalData, loadHistoricalData } = useApp();
   const a = gymBranding.accent;
   const [tab, setTab] = useState("body");
-  const sL = { fontSize:10, color:"#6B7A8D", textTransform:"uppercase", letterSpacing:"1.2px", marginBottom:10, fontWeight:500 };
+  const sL = { ...theme.sL, fontSize: 10, letterSpacing: "1.2px", marginBottom: 10, fontWeight: 500 };
 
   // Pull workout logs from historicalData (loaded at sign-in) — no extra fetch needed
   const realLogs = historicalData?.workoutLogs || null;
@@ -2794,7 +2742,7 @@ function ProgressScreen() {
 
               {weightLoading ? (
                 <div style={{ display:"flex", justifyContent:"center", padding:"20px 0" }}>
-                  <div style={{ width:24, height:24, border:`2px solid #1A2332`, borderTopColor:a, borderRadius:"50%", animation:"spin .9s linear infinite" }} />
+                  <Spinner size={24} color={a} />
                 </div>
               ) : (
                 <WeightChart data={weightChartData} accent={a} />
@@ -2931,8 +2879,6 @@ function ProgressScreen() {
   );
 }
 
-
-// ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
 function ProfileScreen() {
   const { navigate, user, gymBranding, signOut } = useApp();
   const a = gymBranding.accent;
@@ -2940,7 +2886,7 @@ function ProfileScreen() {
   const [selectedGoal, setSelectedGoal] = useState(user.goal || "lose_fat");
 
   const goalLabel = GOAL_OPTIONS.find(g => g.id === selectedGoal)?.label || "Lose fat";
-  const sL = { fontSize: 11, color: theme.textDim, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 10 };
+  const sL = theme.sL;
 
   const StatRow = ({ label, value, sub }) => (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
@@ -3045,8 +2991,6 @@ function ProfileScreen() {
   );
 }
 
-// ─── GYM OWNER DASHBOARD ──────────────────────────────────────────────────────
-
 // Derive display properties from a raw profile + stats
 function buildMemberRow(profile, sessions, lastDate, weightDelta) {
   const initials = (profile.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -3127,7 +3071,7 @@ function OwnerStatCard({ value, label, sub, color }) {
 function OwnerSpinner() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 0" }}>
-      <div style={{ width: 28, height: 28, border: "3px solid #1A2332", borderTopColor: "#00D4B1", borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+      <Spinner />
       <div style={{ fontSize: 12, color: "#6B7A8D" }}>Loading member data…</div>
     </div>
   );
@@ -3401,7 +3345,6 @@ function OwnerInviteTab() {
   );
 }
 
-// ─── PRICING SCREEN ───────────────────────────────────────────────────────────
 function PricingScreen() {
   const { navigate } = useApp();
   const plans = [
@@ -3523,7 +3466,7 @@ function PricingScreen() {
   );
 }
 
-
+function GymOwnerDashboard() {
   const { navigate } = useApp();
   const [tab, setTab] = useState("overview");
   const tabs = [["overview","Overview"],["members","Members"],["invite","Invite"],["branding","Branding"]];
@@ -3567,7 +3510,6 @@ function PricingScreen() {
   );
 }
 
-// ─── LOADING SCREEN ───────────────────────────────────────────────────────────
 function LoadingScreen() {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
@@ -3575,14 +3517,13 @@ function LoadingScreen() {
   return (
     <div style={{ background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: ob.font }}>
       <div style={{ width: 48, height: 48, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: a }}>M</div>
-      <div style={{ width: 36, height: 36, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+      <Spinner size={36} color={a} trackColor={ob.card} />
       <div style={{ fontSize: 13, color: ob.body }}>Loading your account…</div>
       <div style={{ fontSize: 9, color: "#333", letterSpacing: ".5px", marginTop: 20 }}>POWERED BY MORPHIQ</div>
     </div>
   );
 }
 
-// ─── ROUTER ───────────────────────────────────────────────────────────────────
 function AppRouter() {
   const { screen } = useApp();
   if (screen === "auth") return <AuthScreen />;
