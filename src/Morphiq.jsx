@@ -1488,7 +1488,7 @@ function WorkoutScreen() {
             </div>
             {!wasSkipped && (
               <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : savedToCloud ? a : theme.textFaint, marginTop: 4 }}>
-                {savingToCloud ? "☁ Saving to account..." : savedToCloud ? "☁ Saved to account ✓" : supabaseUser?.id && !supabaseUser.id.startsWith("sim-") && supabaseUser.id !== "dev-001" ? "☁ Saving..." : "☁ Dev mode — not saved to DB"}
+                {savingToCloud ? "☁ Saving to account..." : savedToCloud ? "☁ Saved to account ✓" : supabaseUser?.id ? "☁ Saving..." : ""}
               </div>
             )}
           </div>
