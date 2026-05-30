@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   try { body = typeof req.body === "string" ? JSON.parse(req.body) : req.body; }
   catch { res.status(400).json({ error: "Invalid JSON" }); return; }
 
-  const { messages = [], user = {}, context = "home" } = body;
+  const { messages = [], user = {}, context = "home", workoutContext = null } = body;
 
   const anthropicMessages = messages
     .filter(m => m.role === "ai" || m.role === "user")
@@ -27,11 +27,18 @@ export default async function handler(req, res) {
     ? `Workout days: ${(user.plan.workoutDays||[]).join(", ")}, Calories: ${user.plan.calories}, Protein: ${user.plan.protein}g, Exercises: ${(user.plan.exercises||[]).map(e=>e.name).join(", ")}`
     : "No plan yet";
 
+  // Build live workout detail line when the member is mid-exercise
+  let workoutDetail = "";
+  if (workoutContext && workoutContext.exercise) {
+    const { exercise, setNumber, setsTotal, targetReps, weight } = workoutContext;
+    workoutDetail = `\nLIVE WORKOUT: Member is on Set ${setNumber || "??"} of ${setsTotal || "??"} — ${exercise}, targeting ${targetReps || "??"} reps at ${weight ? weight + " lbs" : "bodyweight"}. Give specific advice about THIS exercise and set, not generic workout tips.`;
+  }
+
   const system = `You are the Morphiq AI personal trainer inside ${user.gymName||"the gym"} app.
 Member: ${user.name||"Member"}, Goal: ${user.goal||"get fit"}, Weight: ${user.weight||"—"}, Age: ${user.age||"—"}.
 Plan: ${planSummary}.
-Context: Member is viewing ${ctxLabel}.
-Rules: Keep replies to 1-3 sentences. Use their first name. No guilt language. Be warm and direct.
+Context: Member is viewing ${ctxLabel}.${workoutDetail}
+Rules: Keep replies to 1-3 sentences. Use their first name. No guilt language. Be warm and direct. If live workout context is present, reference the specific exercise and set number in your reply.
 After every reply add: <!--CHIPS:["short question 1","short question 2","short question 3"]-->`;
 
   try {
