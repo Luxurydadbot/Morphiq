@@ -89,6 +89,31 @@ const sb = {
     } catch { return null; }
   },
 
+  // Creates a real profile row in Supabase for dev bypass testing so cloud save works
+  async ensureDevProfile() {
+    try {
+      const body = {
+        supabase_user_id: "dev-bypass-001",
+        gym_id: "demo-gym",
+        name: "Alex (Dev)",
+        goal: "lose_fat",
+        sex: "Male",
+        height: "5\'11\"",
+        weight: "183 lbs",
+        age: "28",
+        days_per_week: 3,
+        injuries: "",
+        plan: null,
+        updated_at: new Date().toISOString(),
+      };
+      await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+        method: "POST",
+        headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify(body),
+      });
+    } catch { /* silent — dev only */ }
+  },
+
   // ── WORKOUT LOGS ──────────────────────────────────────────────────────────
   async insertWorkoutLog(supabaseUserId, { exerciseName, setNumber, reps, weight }) {
     try {
@@ -391,17 +416,22 @@ function AppProvider({ children }) {
   // Called after successful auth. role = "member" | "owner".
   // hasPlan=true|false = dev shortcut (bypasses DB). hasPlan=null = production path (reads DB).
   async function signIn(email, role, hasPlan = null, realAuthUserId = null) {
-    const uid = realAuthUserId || ("sim-" + Date.now());
+    // Dev bypass always uses a fixed ID so getProfileId finds a real Supabase row
+    const uid = realAuthUserId || (hasPlan !== null ? "dev-bypass-001" : ("sim-" + Date.now()));
     setSupabaseUser({ email, id: uid });
     if (role === "owner") { setScreen("owner"); return; }
 
     if (hasPlan === true) {
+      // Ensure dev profile row exists in Supabase so cloud save works during testing
+      sb.ensureDevProfile().catch(() => {});
       setUser({ name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" });
       setPlan(MOCK_RETURNING_PLAN);
       setScreen("home");
       return;
     }
     if (hasPlan === false) {
+      // Ensure dev profile row exists in Supabase so cloud save works during testing
+      sb.ensureDevProfile().catch(() => {});
       setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding"); return;
     }
 
