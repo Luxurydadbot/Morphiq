@@ -1392,8 +1392,18 @@ function WorkoutScreen() {
             {listening ? "Listening..." : "Finish your set, then tap to log reps"}
           </div>
           {voiceTranscript ? (
-            <div className="mq-fade" style={{ background: "#0A1628", border: `1px solid rgba(0,212,177,0.15)`, borderRadius: 10, padding: "8px 12px", fontSize: 10, color: "#9BB3C8", fontStyle: "italic", marginBottom: 8 }}>
-              {voiceTranscript}
+            <div className="mq-fade" style={{ marginBottom: 8 }}>
+              <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 10, padding: "8px 12px", fontSize: 10, color: "#9BB3C8", fontStyle: "italic", marginBottom: 4 }}>
+                {voiceTranscript}
+              </div>
+              <button onClick={() => {
+                const typed = window.prompt("How many reps did you actually do?");
+                const n = parseInt(typed);
+                if (n > 0 && n < 100) { setVoiceTranscript('"' + n + ' reps"'); logSet(n); }
+                else setVoiceTranscript("");
+              }} style={{ background: "transparent", border: "none", fontSize: 9, color: "#00D4B1", cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+                Wrong number? Tap to correct it
+              </button>
             </div>
           ) : listening ? (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 8 }} className="mq-wave">
