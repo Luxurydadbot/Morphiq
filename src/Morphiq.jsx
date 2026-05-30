@@ -1347,44 +1347,47 @@ function WorkoutScreen() {
   }
 
   if (state === "confirm") {
+    const wasSkipped = lastLoggedReps === 0;
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 20 }}>
           {/* Big animated checkmark */}
-          <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#003D35", border: `3px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, boxShadow: `0 0 40px rgba(0,212,177,0.25)` }}>✓</div>
+          <div style={{ width: 100, height: 100, borderRadius: "50%", background: wasSkipped ? "#1A1A0A" : "#003D35", border: `3px solid ${wasSkipped ? theme.amber : a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, boxShadow: `0 0 40px ${wasSkipped ? "rgba(245,158,11,0.2)" : "rgba(0,212,177,0.25)"}` }}>{wasSkipped ? "→" : "✓"}</div>
 
-          {/* Rep count — very large */}
+          {/* Message */}
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: theme.textDim, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 8 }}>Set logged</div>
-            <div style={{ fontSize: 52, fontWeight: 700, color: a, lineHeight: 1, marginBottom: 4 }}>{lastLoggedReps}</div>
-            <div style={{ fontSize: 18, color: theme.text, fontWeight: 500 }}>reps at {currentWeight} lbs</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: theme.text, marginBottom: 4 }}>{wasSkipped ? "Set skipped" : "Set logged!"}</div>
+            {wasSkipped
+              ? <div style={{ fontSize: 14, color: theme.textDim }}>Moving to next set</div>
+              : <div style={{ fontSize: 15, color: a, fontWeight: 600 }}>{lastLoggedReps} reps at {currentWeight} lbs</div>}
           </div>
 
-          {/* Correction button — bigger and more visible */}
-          <button onClick={() => {
-            clearTimeout(confirmTimerRef.current);
-            const typed = window.prompt("How many reps did you actually do?");
-            const n = parseInt(typed);
-            if (n > 0 && n < 100) {
-              const updated = [...loggedSets];
-              updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
-              setLoggedSets(updated);
-              loggedSetsRef.current = updated;
-              setLastLoggedReps(n);
-            }
-            goToRestOrNudge();
-          }} style={{ background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "12px 24px", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-            ✏️ Wrong number? Fix it
-          </button>
+          {/* Correction button — only shown when not skipped */}
+          {!wasSkipped && (
+            <button onClick={() => {
+              clearTimeout(confirmTimerRef.current);
+              const typed = window.prompt("How many reps did you actually do?");
+              const n = parseInt(typed);
+              if (n > 0 && n < 100) {
+                const updated = [...loggedSets];
+                updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
+                setLoggedSets(updated);
+                loggedSetsRef.current = updated;
+                setLastLoggedReps(n);
+              }
+              goToRestOrNudge();
+            }} style={{ background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "12px 24px", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+              ✏️ Wrong number? Fix it
+            </button>
+          )}
 
           {/* Countdown bar */}
           <div style={{ width: "100%", marginTop: 8 }}>
-            <div style={{ fontSize: 11, color: theme.textDim, textAlign: "center", marginBottom: 8 }}>Rest timer starts in 3 seconds...</div>
+            <div style={{ fontSize: 11, color: theme.textDim, textAlign: "center", marginBottom: 8 }}>
+              {wasSkipped ? "Continuing in 3 seconds..." : "Rest timer starts in 3 seconds..."}
+            </div>
             <div style={{ height: 4, background: "#1A2332", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{
-                height: "100%", background: a, borderRadius: 4,
-                animation: "confirmCountdown 3s linear forwards",
-              }} />
+              <div style={{ height: "100%", background: wasSkipped ? theme.amber : a, borderRadius: 4, animation: "confirmCountdown 3s linear forwards" }} />
             </div>
           </div>
         </div>
@@ -1443,14 +1446,14 @@ function WorkoutScreen() {
     <Layout activeNav="workout" chatTarget="chat_workout">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
 
-        {/* Header — exercise name + set info */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <div>
-            <div style={{ fontSize: 9, color: theme.textDim, letterSpacing: "1.5px", textTransform: "uppercase" }}>Set {setIdx + 1} of {ex.sets}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: theme.text }}>{ex.name}</div>
-            <div style={{ fontSize: 11, color: theme.textDim }}>{ex.muscle}</div>
+        {/* Header — exercise name front and center */}
+        <div style={{ textAlign: "center", marginBottom: 10 }}>
+          <div style={{ fontSize: 10, color: theme.textDim, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>Set {setIdx + 1} of {ex.sets}</div>
+          <div style={{ fontSize: 42, fontWeight: 700, color: theme.text, lineHeight: 1.1, marginBottom: 6 }}>{ex.name}</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <div style={{ fontSize: 13, color: theme.textDim }}>{ex.muscle}</div>
+            <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${ex.targetReps} reps`}</Pill>
           </div>
-          <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${ex.targetReps}`}</Pill>
         </div>
 
         <SetDots total={ex.sets} current={setIdx} />
@@ -1466,10 +1469,10 @@ function WorkoutScreen() {
         )}
 
         {/* Weight display */}
-        <div style={{ background: "#1A2332", borderRadius: 12, padding: "8px 12px", marginBottom: 10, textAlign: "center" }}>
-          <div style={{ fontSize: 9, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
-          <div style={{ fontSize: 38, fontWeight: 700, color: a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
-          <div style={{ fontSize: 9, color: theme.textDim, marginTop: 2 }}>+5lb from last session</div>
+        <div style={{ background: "#1A2332", borderRadius: 12, padding: "10px 12px", marginBottom: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
+          <div style={{ fontSize: 52, fontWeight: 700, color: a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 18, color: theme.textDim }}>lbs</span></div>
+          <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>+5lb from last session</div>
         </div>
 
         {/* ── REP COUNTER — the focal point ── */}
@@ -1513,7 +1516,7 @@ function WorkoutScreen() {
 
         {/* Bottom actions */}
         <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
-          <button onClick={() => { logSet(ex.targetReps - 2); }}
+          <button onClick={() => { logSet(0); }}
             style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
           <button onClick={() => { if (exIdx < WORKOUT_EXERCISES.length - 1) { setExIdx(i => i + 1); setSetIdx(0); setNudgedWeight(null); setRepCount(null); setState("active"); } }}
             style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Swap exercise</button>
