@@ -1120,16 +1120,16 @@ function SetDots({ total, current }) {
   );
 }
 
-function RestRing({ secondsLeft, totalSeconds, accent }) {
-  const r = 38;
+function RestRing({ secondsLeft, totalSeconds, accent, size = 100 }) {
+  const r = size * 0.38;
   const circ = 2 * Math.PI * r;
   const offset = circ * (1 - secondsLeft / totalSeconds);
   const isLow = secondsLeft <= 15;
   const color = isLow ? "#F59E0B" : accent;
   return (
-    <svg width="100" height="100" viewBox="0 0 100 100" style={{ transform: "rotate(-90deg)" }}>
-      <circle cx="50" cy="50" r={r} fill="none" stroke="#1A2332" strokeWidth="7" />
-      <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1A2332" strokeWidth="8" />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
         strokeDasharray={circ} strokeDashoffset={offset} className="mq-ring-fill" style={{ transition: "stroke-dashoffset 1s linear, stroke .3s" }} />
     </svg>
   );
@@ -1410,43 +1410,54 @@ function WorkoutScreen() {
   }
 
   if (state === "rest") {
+    const RING_SIZE = 220;
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
-        <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column" }}>
-          <div style={{ textAlign: "center", fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 6 }}>Rest</div>
-          <div style={{ background: "#003D35", borderRadius: 8, padding: "5px 10px", fontSize: 10, color: a, textAlign: "center", marginBottom: 10 }}>
-            Logged — {loggedSets[loggedSets.length - 1]?.reps} reps at {loggedSets[loggedSets.length - 1]?.weight} lbs ✓
+        <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
+
+          {/* Status label */}
+          <div style={{ textAlign: "center", fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Rest</div>
+
+          {/* Logged confirmation strip */}
+          <div style={{ background: "#003D35", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: a, textAlign: "center", marginBottom: 16 }}>
+            ✓ Logged — {loggedSets[loggedSets.length - 1]?.reps} reps at {loggedSets[loggedSets.length - 1]?.weight} lbs
           </div>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 10, position: "relative" }}>
-            <RestRing secondsLeft={restSecs} totalSeconds={REST_SECS} accent={a} />
+
+          {/* Big ring + countdown number */}
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16, position: "relative" }}>
+            <RestRing secondsLeft={restSecs} totalSeconds={REST_SECS} accent={a} size={RING_SIZE} />
             <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center" }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: theme.text, lineHeight: 1 }}>{restSecs}</div>
-              <div style={{ fontSize: 9, color: theme.textDim }}>seconds</div>
+              <div style={{ fontSize: 80, fontWeight: 700, color: restSecs <= 15 ? theme.amber : theme.text, lineHeight: 1, transition: "color 0.3s" }}>{restSecs}</div>
+              <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>seconds</div>
             </div>
           </div>
-          <div style={{ textAlign: "center", marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: theme.textDim }}>Rest up — next set coming</div>
-            <div style={{ fontSize: 10, color: a, marginTop: 2 }}>Or tap below to start now</div>
-          </div>
-          <div style={{ background: "#0F1922", border: `1px solid rgba(0,212,177,0.12)`, borderRadius: 10, padding: "8px 10px", display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 12, color: a }}>→</div>
+
+          {/* Up next — large and prominent */}
+          <div style={{ background: "#0A1A14", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20, color: a }}>→</div>
             <div>
-              <div style={{ fontSize: 9, color: theme.textDim }}>Up next</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: theme.text }}>{ex.name} — Set {setIdx + 2}</div>
-              <div style={{ fontSize: 9, color: theme.textDim }}>{currentWeight} lbs · {ex.targetReps} reps target</div>
+              <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Up next</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, lineHeight: 1.1 }}>{ex.name}</div>
+              <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>Set {setIdx + 2} · {currentWeight} lbs · {ex.targetReps} reps</div>
             </div>
           </div>
+
+          {/* After that — smaller, secondary */}
           {nextEx && (
-            <div style={{ background: "#0F1922", border: `1px solid rgba(255,255,255,0.04)`, borderRadius: 10, padding: "8px 10px", display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <div style={{ width: 30, height: 30, borderRadius: 8, background: "#1A2332", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, color: theme.textDim }}>⏱</div>
+            <div style={{ background: "#0F1922", border: `1px solid rgba(255,255,255,0.05)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#1A2332", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, color: theme.textDim }}>⏱</div>
               <div>
-                <div style={{ fontSize: 9, color: theme.textDim }}>After that</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: theme.text }}>{nextEx.name}</div>
-                <div style={{ fontSize: 9, color: theme.textDim }}>{nextEx.sets} sets · {nextEx.targetReps} reps target</div>
+                <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 1 }}>After that</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: theme.textDim }}>{nextEx.name}</div>
+                <div style={{ fontSize: 11, color: theme.textFaint }}>{nextEx.sets} sets · {nextEx.targetReps} reps</div>
               </div>
             </div>
           )}
-          <button onClick={skipRest} style={{ width: "100%", background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 10, padding: "9px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit", marginTop: "auto" }}>Skip rest — I'm ready</button>
+
+          <button onClick={skipRest} style={{ width: "100%", background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "13px", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit", marginTop: "auto", marginBottom: 4 }}>
+            Skip rest — I'm ready
+          </button>
+
         </div>
       </Layout>
     );
