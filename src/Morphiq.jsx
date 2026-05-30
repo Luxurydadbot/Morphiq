@@ -1177,8 +1177,10 @@ function WorkoutScreen() {
   const REST_SECS = 60;
   const [restSecs, setRestSecs] = useState(REST_SECS);
   const timerRef = useRef(null);
+  const confirmTimerRef = useRef(null);
 
   const [nudgedWeight, setNudgedWeight] = useState(null);
+  const [lastLoggedReps, setLastLoggedReps] = useState(null);
 
   const ex = exercises[exIdx];
   const currentWeight = nudgedWeight ?? ex.weight;
@@ -1197,10 +1199,38 @@ function WorkoutScreen() {
     return () => clearInterval(timerRef.current);
   }, [state]);
 
+  // 3-second confirmation window before rest timer starts
+  useEffect(() => {
+    if (state === "confirm") {
+      confirmTimerRef.current = setTimeout(() => {
+        goToRestOrNudge();
+      }, 3000);
+    }
+    return () => clearTimeout(confirmTimerRef.current);
+  }, [state]);
+
+  function goToRestOrNudge() {
+    const newLogs = loggedSetsRef.current;
+    const prevSets = newLogs.filter(l => l.exIdx === exIdx);
+    const exceeded = prevSets.filter(l => l.reps > ex.targetReps).length;
+    const isLastSet = setIdx === ex.sets - 1;
+    if (exceeded >= 2 && !isLastSet) {
+      setNudgedWeight(currentWeight + 5);
+      setState("nudge");
+    } else {
+      setState("rest");
+    }
+  }
+
+  const loggedSetsRef = useRef(loggedSets);
+  useEffect(() => { loggedSetsRef.current = loggedSets; }, [loggedSets]);
+
   function logSet(reps = ex.targetReps + 1) {
     const entry = { exIdx, setIdx, reps, weight: currentWeight };
     const newLogs = [...loggedSets, entry];
     setLoggedSets(newLogs);
+    loggedSetsRef.current = newLogs;
+    setLastLoggedReps(reps);
     setVoiceTranscript("");
     setListening(false);
 
@@ -1214,16 +1244,8 @@ function WorkoutScreen() {
       }).catch(() => {});
     }
 
-    const prevSets = newLogs.filter(l => l.exIdx === exIdx);
-    const exceeded = prevSets.filter(l => l.reps > ex.targetReps).length;
-    const isLastSet = setIdx === ex.sets - 1;
-
-    if (exceeded >= 2 && !isLastSet) {
-      setNudgedWeight(currentWeight + 5);
-      setState("nudge");
-    } else {
-      setState("rest");
-    }
+    // Show 3-second confirmation window before starting rest timer
+    setState("confirm");
   }
 
   function advanceSet() {
@@ -1306,6 +1328,36 @@ function WorkoutScreen() {
             ))}
           </div>
           <button onClick={() => navigate("home")} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Back to dashboard →</button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (state === "confirm") {
+    return (
+      <Layout activeNav="workout" chatTarget="chat_workout">
+        <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 16 }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#003D35", border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>✓</div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: theme.text, marginBottom: 4 }}>Set logged!</div>
+            <div style={{ fontSize: 15, color: a, fontWeight: 600 }}>{lastLoggedReps} reps at {currentWeight} lbs</div>
+          </div>
+          <button onClick={() => {
+            clearTimeout(confirmTimerRef.current);
+            const typed = window.prompt("How many reps did you actually do?");
+            const n = parseInt(typed);
+            if (n > 0 && n < 100) {
+              const updated = [...loggedSets];
+              updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
+              setLoggedSets(updated);
+              loggedSetsRef.current = updated;
+              setLastLoggedReps(n);
+            }
+            goToRestOrNudge();
+          }} style={{ background: "transparent", border: "none", fontSize: 13, color: a, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+            Wrong number? Tap to correct it
+          </button>
+          <div style={{ fontSize: 11, color: theme.textDim }}>Rest timer starting in 3 seconds...</div>
         </div>
       </Layout>
     );
