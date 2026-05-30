@@ -353,6 +353,9 @@ function AppProvider({ children }) {
   const [supabaseUser, setSupabaseUser] = useState(DEV_SKIP ? { email: "dev@morphiq.app", id: "dev-001" } : null);
   const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
   const [historicalData, setHistoricalData] = useState(null);
+  // Tracks the current exercise + set while WorkoutScreen is active
+  // so ChatScreen can pass exact context to Claude (e.g. "Set 2 of 3 · Goblet Squat")
+  const [workoutContext, setWorkoutContext] = useState(null);
 
   // ── On mount: load gym branding from Supabase ────────────────────────────
   useEffect(() => {
@@ -490,7 +493,7 @@ function AppProvider({ children }) {
   }
 
   return (
-    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext }}>
       {children}
     </AppContext.Provider>
   );
@@ -1166,7 +1169,7 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
 }
 
 function WorkoutScreen() {
-  const { navigate, user, gymBranding, plan, supabaseUser } = useApp();
+  const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext } = useApp();
   const a = gymBranding.accent;
 
   // Use AI-generated exercises if available, else fall back to defaults
@@ -1197,6 +1200,20 @@ function WorkoutScreen() {
   const ex = exercises[exIdx];
   const currentWeight = nudgedWeight ?? ex.weight;
   const nextEx = exercises[exIdx + 1];
+
+  // Keep shared context updated so ChatScreen always knows exactly where we are
+  useEffect(() => {
+    setWorkoutContext({
+      exercise: ex?.name || "Unknown exercise",
+      setNumber: setIdx + 1,
+      totalSets: ex?.sets || 3,
+      targetReps: ex?.targetReps || 10,
+      weight: currentWeight,
+    });
+    // Clear context when workout screen unmounts
+    return () => setWorkoutContext(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exIdx, setIdx, currentWeight]);
 
   const restStartRef = useRef(null);
 
@@ -2286,18 +2303,18 @@ function getFallbackReply(text) {
   return FALLBACK_REPLIES[key] || "Good question. Based on your plan and history, you're on track — keep it up and check in if anything feels off.";
 }
 
-async function fetchAIReply(messages, user, context) {
+async function fetchAIReply(messages, user, context, workoutContext = null) {
   const res = await fetch("/api/chat", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, user, context }),
+    body: JSON.stringify({ messages, user, context, workoutContext }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json(); // { text, action, chips }
 }
 
 function ChatScreen({ fromScreen = "home" }) {
-  const { navigate, user, gymBranding } = useApp();
+  const { navigate, user, gymBranding, workoutContext } = useApp();
   const a = gymBranding.accent;
   const [messages, setMessages] = useState([
     { id: 1, role: "ai", text: `Hey ${user.name || "there"}! I can see your full plan and history. What's up?` },
@@ -2338,7 +2355,8 @@ function ChatScreen({ fromScreen = "home" }) {
       const { text: reply, action, chips } = await fetchAIReply(
         userMessages,
         { ...user, gymName: gymBranding.name },
-        fromScreen
+        fromScreen,
+        workoutContext   // null when not in workout, object when mid-workout
       );
       setThinking(false);
       setMessages(prev => [...prev, { id: Date.now() + 1, role: "ai", text: reply }]);
@@ -2371,7 +2389,11 @@ function ChatScreen({ fromScreen = "home" }) {
   function confirmVoice() { sendMessage(voiceText); }
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  const ctx = { home: "Dashboard", workout: "Mid-workout", meals: "Meal plan", chat: "Dashboard" }[fromScreen] || "Dashboard";
+  // Build a detailed context string — if we have live workout context, use it
+  const ctxBase = { home: "Dashboard", workout: "Mid-workout", meals: "Meal plan", chat: "Dashboard" }[fromScreen] || "Dashboard";
+  const ctx = (fromScreen === "workout" && workoutContext)
+    ? `${workoutContext.exercise} · Set ${workoutContext.setNumber} of ${workoutContext.totalSets}`
+    : ctxBase;
 
   return (
     <div style={{ background: theme.bg, borderRadius: 20, color: theme.text, minHeight: "100dvh", fontFamily: "system-ui,sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
