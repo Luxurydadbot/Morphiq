@@ -1246,11 +1246,44 @@ function WorkoutScreen() {
   }
 
   function simulateListen() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      const typed = window.prompt("Voice not supported. How many reps did you do?");
+      const n = parseInt(typed);
+      if (n > 0 && n < 100) { setVoiceTranscript('"' + n + ' reps"'); setTimeout(() => logSet(n), 600); }
+      return;
+    }
     setListening(true);
-    setTimeout(() => {
-      setVoiceTranscript(`"Did ${ex.targetReps + 1} reps"`);
-      setTimeout(() => logSet(ex.targetReps + 1), 800);
-    }, 1500);
+    setVoiceTranscript("");
+    const rec = new SpeechRecognition();
+    rec.lang = "en-US";
+    rec.interimResults = false;
+    rec.maxAlternatives = 3;
+    rec.onresult = (e) => {
+      let reps = null;
+      for (let i = 0; i < e.results[0].length; i++) {
+        const text = e.results[0][i].transcript.toLowerCase().trim();
+        const words = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20};
+        const numMatch = text.match(/\d+/);
+        if (numMatch) { reps = parseInt(numMatch[0]); break; }
+        for (const [word, val] of Object.entries(words)) {
+          if (text.includes(word)) { reps = val; break; }
+        }
+        if (reps) break;
+      }
+      if (reps && reps > 0 && reps < 100) {
+        setVoiceTranscript('"' + reps + ' reps"');
+        setListening(false);
+        setTimeout(() => logSet(reps), 600);
+      } else {
+        const heard = e.results[0][0].transcript;
+        setVoiceTranscript('Heard: "' + heard + '" — tap Log ✓ for ' + ex.targetReps + ' reps');
+        setListening(false);
+      }
+    };
+    rec.onerror = () => { setListening(false); setVoiceTranscript("Didn't catch that — tap Log ✓ to log your reps"); };
+    rec.onend = () => setListening(false);
+    rec.start();
   }
 
   const card = { background: "#1A2332", borderRadius: 12, padding: "10px 12px", marginBottom: 8 };
