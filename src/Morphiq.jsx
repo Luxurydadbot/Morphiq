@@ -118,7 +118,12 @@ const sb = {
   async insertWorkoutLog(supabaseUserId, { exerciseName, setNumber, reps, weight }) {
     try {
       // Resolve to profiles.id so the FK constraint is satisfied
-      const profileId = await this.getProfileId(supabaseUserId);
+      let profileId = await this.getProfileId(supabaseUserId);
+      // If dev bypass profile doesn't exist yet, create it now and retry
+      if (!profileId && supabaseUserId === "dev-bypass-001") {
+        await this.ensureDevProfile();
+        profileId = await this.getProfileId(supabaseUserId);
+      }
       if (!profileId) return false;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
         method: "POST",
