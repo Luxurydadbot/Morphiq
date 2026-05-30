@@ -1139,18 +1139,18 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
   return (
-    <div className="mq-fade" style={{ background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-        <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, color: a }}>✓</div>
-        <div style={{ fontSize: 10, color: a, fontWeight: 600 }}>Morphiq noticed something</div>
+    <div className="mq-fade" style={{ background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, color: a }}>✓</div>
+        <div style={{ fontSize: 15, color: a, fontWeight: 700 }}>Morphiq noticed something</div>
       </div>
-      <div style={{ fontSize: 10, color: "#9BB3C8", lineHeight: 1.5, marginBottom: 8 }}>
+      <div style={{ fontSize: 14, color: "#9BB3C8", lineHeight: 1.6, marginBottom: 12 }}>
         You exceeded target reps both sets. Nudging weight to{" "}
-        <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{newWeight} lbs</span> for this set.
+        <span style={{ color: "#E8EDF2", fontWeight: 700 }}>{newWeight} lbs</span> for this set.
       </div>
-      <div style={{ display: "flex", gap: 6 }}>
-        <button onClick={onKeep} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.12)`, borderRadius: 8, padding: "6px 4px", fontSize: 10, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Keep {oldWeight} lbs</button>
-        <button onClick={onAccept} style={{ flex: 2, background: a, border: "none", borderRadius: 8, padding: "6px 4px", fontSize: 10, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Use {newWeight} lbs ✦</button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={onKeep} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.12)`, borderRadius: 10, padding: "10px 4px", fontSize: 13, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Keep {oldWeight} lbs</button>
+        <button onClick={onAccept} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "10px 4px", fontSize: 14, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Use {newWeight} lbs ✦</button>
       </div>
     </div>
   );
@@ -1350,46 +1350,59 @@ function WorkoutScreen() {
     const wasSkipped = lastLoggedReps === 0;
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
-        <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 20 }}>
-          {/* Big animated checkmark */}
-          <div style={{ width: 100, height: 100, borderRadius: "50%", background: wasSkipped ? "#1A1A0A" : "#003D35", border: `3px solid ${wasSkipped ? theme.amber : a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, boxShadow: `0 0 40px ${wasSkipped ? "rgba(245,158,11,0.2)" : "rgba(0,212,177,0.25)"}` }}>{wasSkipped ? "→" : "✓"}</div>
+        <div className="mq-fade" style={{ padding: "1.5rem 1.25rem", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", flex: 1 }}>
 
-          {/* Message */}
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: theme.text, marginBottom: 4 }}>{wasSkipped ? "Set skipped" : "Set logged!"}</div>
-            {wasSkipped
-              ? <div style={{ fontSize: 14, color: theme.textDim }}>Moving to next set</div>
-              : <div style={{ fontSize: 15, color: a, fontWeight: 600 }}>{lastLoggedReps} reps at {currentWeight} lbs</div>}
+          {/* Top — status label */}
+          <div style={{ textAlign: "center", paddingTop: "1rem" }}>
+            <div style={{ fontSize: 13, color: wasSkipped ? theme.amber : a, textTransform: "uppercase", letterSpacing: "3px", fontWeight: 600 }}>
+              {wasSkipped ? "Set Skipped" : "Set Logged"}
+            </div>
           </div>
 
-          {/* Correction button — only shown when not skipped */}
-          {!wasSkipped && (
-            <button onClick={() => {
-              clearTimeout(confirmTimerRef.current);
-              const typed = window.prompt("How many reps did you actually do?");
-              const n = parseInt(typed);
-              if (n > 0 && n < 100) {
-                const updated = [...loggedSets];
-                updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
-                setLoggedSets(updated);
-                loggedSetsRef.current = updated;
-                setLastLoggedReps(n);
-              }
-              goToRestOrNudge();
-            }} style={{ background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "12px 24px", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-              ✏️ Wrong number? Fix it
-            </button>
-          )}
+          {/* Middle — the big info */}
+          <div style={{ textAlign: "center", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            {/* Icon */}
+            <div style={{ width: 110, height: 110, borderRadius: "50%", background: wasSkipped ? "#1A1A0A" : "#003D35", border: `3px solid ${wasSkipped ? theme.amber : a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 58, boxShadow: `0 0 50px ${wasSkipped ? "rgba(245,158,11,0.2)" : "rgba(0,212,177,0.3)"}` }}>
+              {wasSkipped ? "→" : "✓"}
+            </div>
 
-          {/* Countdown bar */}
-          <div style={{ width: "100%", marginTop: 8 }}>
-            <div style={{ fontSize: 11, color: theme.textDim, textAlign: "center", marginBottom: 8 }}>
+            {wasSkipped ? (
+              <div style={{ fontSize: 28, fontWeight: 600, color: theme.textDim }}>Moving to next set</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 96, fontWeight: 700, color: a, lineHeight: 1 }}>{lastLoggedReps}</div>
+                <div style={{ fontSize: 28, fontWeight: 500, color: theme.text }}>reps at {currentWeight} lbs</div>
+              </>
+            )}
+          </div>
+
+          {/* Bottom — correction button + countdown bar */}
+          <div style={{ width: "100%", paddingBottom: "1rem" }}>
+            {!wasSkipped && (
+              <button onClick={() => {
+                clearTimeout(confirmTimerRef.current);
+                const typed = window.prompt("How many reps did you actually do?");
+                const n = parseInt(typed);
+                if (n > 0 && n < 100) {
+                  const updated = [...loggedSets];
+                  updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
+                  setLoggedSets(updated);
+                  loggedSetsRef.current = updated;
+                  setLastLoggedReps(n);
+                }
+                goToRestOrNudge();
+              }} style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 14, padding: "16px", fontSize: 18, color: a, cursor: "pointer", fontFamily: "inherit", marginBottom: 16 }}>
+                ✏️ Wrong number? Fix it
+              </button>
+            )}
+            <div style={{ fontSize: 13, color: theme.textDim, textAlign: "center", marginBottom: 10 }}>
               {wasSkipped ? "Continuing in 3 seconds..." : "Rest timer starts in 3 seconds..."}
             </div>
-            <div style={{ height: 4, background: "#1A2332", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ height: 6, background: "#1A2332", borderRadius: 4, overflow: "hidden" }}>
               <div style={{ height: "100%", background: wasSkipped ? theme.amber : a, borderRadius: 4, animation: "confirmCountdown 3s linear forwards" }} />
             </div>
           </div>
+
         </div>
         <style>{`@keyframes confirmCountdown { from { width: 100%; } to { width: 0%; } }`}</style>
       </Layout>
