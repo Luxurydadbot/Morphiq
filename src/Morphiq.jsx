@@ -1168,15 +1168,55 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
   );
 }
 
+// ─── SWAP ALTERNATIVES ────────────────────────────────────────────────────────
+// Keyed by muscle group string — must match the muscle field in WORKOUT_EXERCISES.
+// Each entry is 3 alternatives. Weight is a sensible starting default.
+const SWAP_ALTERNATIVES = {
+  "Quads / Glutes": [
+    { name: "Leg Press",        muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 90 },
+    { name: "Step-Ups",         muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 20 },
+    { name: "Split Squat",      muscle: "Quads / Glutes", sets: 3, targetReps: 10, weight: 20 },
+  ],
+  "Back / Biceps": [
+    { name: "Lat Pulldown",     muscle: "Back / Biceps",  sets: 3, targetReps: 10, weight: 60 },
+    { name: "Cable Row",        muscle: "Back / Biceps",  sets: 3, targetReps: 10, weight: 55 },
+    { name: "Hammer Curl",      muscle: "Back / Biceps",  sets: 3, targetReps: 12, weight: 20 },
+  ],
+  "Chest / Shoulders": [
+    { name: "Dumbbell Fly",     muscle: "Chest / Shoulders", sets: 3, targetReps: 12, weight: 20 },
+    { name: "Push-Up",          muscle: "Chest / Shoulders", sets: 3, targetReps: 15, weight: 0  },
+    { name: "Cable Chest Press",muscle: "Chest / Shoulders", sets: 3, targetReps: 10, weight: 30 },
+  ],
+  "Hamstrings": [
+    { name: "Lying Leg Curl",   muscle: "Hamstrings",     sets: 3, targetReps: 12, weight: 50 },
+    { name: "Good Morning",     muscle: "Hamstrings",     sets: 3, targetReps: 10, weight: 45 },
+    { name: "Nordic Curl",      muscle: "Hamstrings",     sets: 3, targetReps: 8,  weight: 0  },
+  ],
+  "Shoulders": [
+    { name: "Lateral Raise",    muscle: "Shoulders",      sets: 3, targetReps: 15, weight: 10 },
+    { name: "Front Raise",      muscle: "Shoulders",      sets: 3, targetReps: 12, weight: 10 },
+    { name: "Arnold Press",     muscle: "Shoulders",      sets: 3, targetReps: 10, weight: 20 },
+  ],
+};
+// Fallback alternatives when muscle group isn't in the table
+const SWAP_FALLBACK = [
+  { name: "Plank",              muscle: "Core",           sets: 3, targetReps: 30, weight: 0 },
+  { name: "Mountain Climber",   muscle: "Core",           sets: 3, targetReps: 20, weight: 0 },
+  { name: "Dead Bug",           muscle: "Core",           sets: 3, targetReps: 12, weight: 0 },
+];
+
 function WorkoutScreen() {
   const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext } = useApp();
   const a = gymBranding.accent;
 
-  // Use AI-generated exercises if available, else fall back to defaults
-  const exercises = (plan?.exercises || WORKOUT_EXERCISES).map(e => ({
-    name: e.name, muscle: e.muscle, sets: e.sets,
-    targetReps: e.reps || e.targetReps, weight: e.weight,
-  }));
+  // Use AI-generated exercises if available, else fall back to defaults.
+  // Stored in state (not const) so swapping an exercise updates it live.
+  const [exercises, setExercises] = useState(() =>
+    (plan?.exercises || WORKOUT_EXERCISES).map(e => ({
+      name: e.name, muscle: e.muscle, sets: e.sets,
+      targetReps: e.reps || e.targetReps, weight: e.weight,
+    }))
+  );
 
   const [exIdx, setExIdx] = useState(0);
   const [setIdx, setSetIdx] = useState(0);
@@ -1193,6 +1233,8 @@ function WorkoutScreen() {
   const confirmTimerRef = useRef(null);
 
   const [nudgedWeight, setNudgedWeight] = useState(null);
+  const [showSwapSheet, setShowSwapSheet] = useState(false);  // controls the swap picker sheet
+  const [swapConfirmName, setSwapConfirmName] = useState(null); // shows "Swapped in X ✓" briefly
   const [lastLoggedReps, setLastLoggedReps] = useState(null);
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [savedToCloud, setSavedToCloud] = useState(false);
@@ -1311,6 +1353,24 @@ function WorkoutScreen() {
   function skipRest() {
     clearInterval(timerRef.current);
     advanceSet();
+  }
+
+  // Called when member picks an alternative from the swap sheet.
+  // Replaces the current exercise in the exercises array and resets the set counter.
+  function doSwap(alt) {
+    setExercises(prev => {
+      const next = [...prev];
+      next[exIdx] = { ...alt };  // replace only this exercise; rest of workout unchanged
+      return next;
+    });
+    setSetIdx(0);
+    setNudgedWeight(null);
+    setRepCount(null);
+    setState("active");
+    setShowSwapSheet(false);
+    // Show a brief "Swapped in X ✓" confirmation banner for 2.5 seconds
+    setSwapConfirmName(alt.name);
+    setTimeout(() => setSwapConfirmName(null), 2500);
   }
 
   function simulateListen() {
@@ -1581,7 +1641,7 @@ function WorkoutScreen() {
         <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
           <button onClick={() => { logSet(0); }}
             style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
-          <button onClick={() => { if (exIdx < WORKOUT_EXERCISES.length - 1) { setExIdx(i => i + 1); setSetIdx(0); setNudgedWeight(null); setRepCount(null); setState("active"); } }}
+          <button onClick={() => setShowSwapSheet(true)}
             style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Swap exercise</button>
           <button onClick={() => logSet(displayReps)}
             style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px 6px", fontSize: 12, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Log {displayReps} reps ✓</button>
@@ -1591,6 +1651,57 @@ function WorkoutScreen() {
           Exercise {exIdx + 1} of {exercises.length} · {totalCompleted} sets logged
         </div>
       </div>
+
+      {/* ── Swap confirmation banner ── */}
+      {swapConfirmName && (
+        <div className="mq-fade" style={{ position: "absolute", top: 60, left: 16, right: 16, background: "#0A1628", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, zIndex: 20 }}>
+          <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>✓</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: a }}>Swapped in {swapConfirmName}</div>
+            <div style={{ fontSize: 11, color: "#9BB3C8" }}>Sets reset to 1 — same muscle group</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Swap picker sheet — slides up from bottom ── */}
+      {showSwapSheet && (
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end", borderRadius: 20 }}>
+          <div className="mq-fade" style={{ background: "#111827", borderRadius: "20px 20px 20px 20px", padding: "20px 16px 24px" }}>
+            {/* Sheet header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF2" }}>Swap exercise</div>
+                <div style={{ fontSize: 12, color: "#9BB3C8", marginTop: 2 }}>
+                  Replacing <span style={{ color: a }}>{ex.name}</span> — same muscle group
+                </div>
+              </div>
+              <button onClick={() => setShowSwapSheet(false)}
+                style={{ background: "#1A2332", border: "none", borderRadius: 8, width: 30, height: 30, fontSize: 16, color: "#6B7A8D", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            </div>
+            {/* Muscle group label */}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#0A1628", border: `1px solid rgba(0,212,177,0.15)`, borderRadius: 20, padding: "3px 10px", marginBottom: 14 }}>
+              <span style={{ fontSize: 10, color: a }}>💪</span>
+              <span style={{ fontSize: 11, color: "#9BB3C8" }}>{ex.muscle}</span>
+            </div>
+            {/* Alternatives list */}
+            {(SWAP_ALTERNATIVES[ex.muscle] || SWAP_FALLBACK).map((alt) => (
+              <button key={alt.name} onClick={() => doSwap(alt)}
+                style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(255,255,255,0.06)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2" }}>{alt.name}</div>
+                  <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>{alt.muscle} · {alt.targetReps} reps · {alt.sets} sets</div>
+                </div>
+                <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Swap →</div>
+              </button>
+            ))}
+            <button onClick={() => setShowSwapSheet(false)}
+              style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px", fontSize: 13, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit", marginTop: 2 }}>
+              Cancel — keep {ex.name}
+            </button>
+          </div>
+        </div>
+      )}
+
     </Layout>
   );
 }
