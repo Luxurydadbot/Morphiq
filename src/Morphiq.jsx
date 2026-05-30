@@ -1173,6 +1173,7 @@ function WorkoutScreen() {
 
   const [listening, setListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [repCount, setRepCount] = useState(null); // null = not set yet, number = user typed/adjusted
 
   const REST_SECS = 60;
   const [restSecs, setRestSecs] = useState(REST_SECS);
@@ -1186,15 +1187,25 @@ function WorkoutScreen() {
   const currentWeight = nudgedWeight ?? ex.weight;
   const nextEx = exercises[exIdx + 1];
 
+  const restStartRef = useRef(null);
+
   useEffect(() => {
     if (state === "rest") {
+      // Record the exact wall-clock time rest started
+      restStartRef.current = Date.now();
       setRestSecs(REST_SECS);
+      // Poll every 500ms — uses real elapsed time so screen sleep doesn't break it
       timerRef.current = setInterval(() => {
-        setRestSecs(s => {
-          if (s <= 1) { clearInterval(timerRef.current); advanceSet(); return 0; }
-          return s - 1;
-        });
-      }, 1000);
+        const elapsed = Math.floor((Date.now() - restStartRef.current) / 1000);
+        const remaining = REST_SECS - elapsed;
+        if (remaining <= 0) {
+          clearInterval(timerRef.current);
+          setRestSecs(0);
+          advanceSet();
+        } else {
+          setRestSecs(remaining);
+        }
+      }, 500);
     }
     return () => clearInterval(timerRef.current);
   }, [state]);
@@ -1250,6 +1261,7 @@ function WorkoutScreen() {
 
   function advanceSet() {
     setNudgedWeight(null);
+    setRepCount(null);
     if (setIdx < ex.sets - 1) {
       setSetIdx(s => s + 1);
       setState("active");
@@ -1295,6 +1307,7 @@ function WorkoutScreen() {
       }
       if (reps && reps > 0 && reps < 100) {
         setVoiceTranscript('"' + reps + ' reps"');
+        setRepCount(reps);
         setListening(false);
         setTimeout(() => logSet(reps), 600);
       } else {
@@ -1336,12 +1349,18 @@ function WorkoutScreen() {
   if (state === "confirm") {
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
-        <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 16 }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#003D35", border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>✓</div>
+        <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 20 }}>
+          {/* Big animated checkmark */}
+          <div style={{ width: 100, height: 100, borderRadius: "50%", background: "#003D35", border: `3px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, boxShadow: `0 0 40px rgba(0,212,177,0.25)` }}>✓</div>
+
+          {/* Rep count — very large */}
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: theme.text, marginBottom: 4 }}>Set logged!</div>
-            <div style={{ fontSize: 15, color: a, fontWeight: 600 }}>{lastLoggedReps} reps at {currentWeight} lbs</div>
+            <div style={{ fontSize: 13, color: theme.textDim, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 8 }}>Set logged</div>
+            <div style={{ fontSize: 52, fontWeight: 700, color: a, lineHeight: 1, marginBottom: 4 }}>{lastLoggedReps}</div>
+            <div style={{ fontSize: 18, color: theme.text, fontWeight: 500 }}>reps at {currentWeight} lbs</div>
           </div>
+
+          {/* Correction button — bigger and more visible */}
           <button onClick={() => {
             clearTimeout(confirmTimerRef.current);
             const typed = window.prompt("How many reps did you actually do?");
@@ -1354,11 +1373,22 @@ function WorkoutScreen() {
               setLastLoggedReps(n);
             }
             goToRestOrNudge();
-          }} style={{ background: "transparent", border: "none", fontSize: 13, color: a, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
-            Wrong number? Tap to correct it
+          }} style={{ background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "12px 24px", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+            ✏️ Wrong number? Fix it
           </button>
-          <div style={{ fontSize: 11, color: theme.textDim }}>Rest timer starting in 3 seconds...</div>
+
+          {/* Countdown bar */}
+          <div style={{ width: "100%", marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: theme.textDim, textAlign: "center", marginBottom: 8 }}>Rest timer starts in 3 seconds...</div>
+            <div style={{ height: 4, background: "#1A2332", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{
+                height: "100%", background: a, borderRadius: 4,
+                animation: "confirmCountdown 3s linear forwards",
+              }} />
+            </div>
+          </div>
         </div>
+        <style>{`@keyframes confirmCountdown { from { width: 100%; } to { width: 0%; } }`}</style>
       </Layout>
     );
   }
@@ -1407,16 +1437,20 @@ function WorkoutScreen() {
   }
 
   const isLastSet = setIdx === ex.sets - 1;
+  const displayReps = repCount !== null ? repCount : ex.targetReps;
+
   return (
     <Layout activeNav="workout" chatTarget="chat_workout">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+
+        {/* Header — exercise name + set info */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <div>
             <div style={{ fontSize: 9, color: theme.textDim, letterSpacing: "1.5px", textTransform: "uppercase" }}>Set {setIdx + 1} of {ex.sets}</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: theme.text }}>{ex.name}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: theme.text }}>{ex.name}</div>
             <div style={{ fontSize: 11, color: theme.textDim }}>{ex.muscle}</div>
           </div>
-          <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${ex.targetReps} reps`}</Pill>
+          <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${ex.targetReps}`}</Pill>
         </div>
 
         <SetDots total={ex.sets} current={setIdx} />
@@ -1431,51 +1465,64 @@ function WorkoutScreen() {
           />
         )}
 
-        <div style={{ ...card, textAlign: "center" }}>
-          <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
-          <div style={{ fontSize: 34, fontWeight: 700, color: a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 14, color: theme.textDim }}>lbs</span></div>
-          {state === "nudge"
-            ? <div style={{ fontSize: 9, color: theme.amber, marginTop: 3 }}>Progressive overload applied</div>
-            : <div style={{ fontSize: 9, color: theme.textDim, marginTop: 3 }}>+5lb from last session</div>}
+        {/* Weight display */}
+        <div style={{ background: "#1A2332", borderRadius: 12, padding: "8px 12px", marginBottom: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 9, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
+          <div style={{ fontSize: 38, fontWeight: 700, color: a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
+          <div style={{ fontSize: 9, color: theme.textDim, marginTop: 2 }}>+5lb from last session</div>
         </div>
 
-        <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 10 }}>
-            {listening ? "Listening..." : "Finish your set, then tap to log reps"}
-          </div>
-          {voiceTranscript ? (
-            <div className="mq-fade" style={{ marginBottom: 8 }}>
-              <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 10, padding: "8px 12px", fontSize: 10, color: "#9BB3C8", fontStyle: "italic", marginBottom: 4 }}>
-                {voiceTranscript}
-              </div>
-              <button onClick={() => {
-                const typed = window.prompt("How many reps did you actually do?");
-                const n = parseInt(typed);
-                if (n > 0 && n < 100) { setVoiceTranscript('"' + n + ' reps"'); logSet(n); }
-                else setVoiceTranscript("");
-              }} style={{ background: "transparent", border: "none", fontSize: 9, color: "#00D4B1", cursor: "pointer", textDecoration: "underline", padding: 0 }}>
-                Wrong number? Tap to correct it
-              </button>
+        {/* ── REP COUNTER — the focal point ── */}
+        <div style={{ textAlign: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 10 }}>Reps</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
+            {/* Minus button */}
+            <button onClick={() => setRepCount(Math.max(1, displayReps - 1))}
+              style={{ width: 52, height: 52, borderRadius: "50%", background: "#1A2332", border: `1px solid rgba(255,255,255,0.1)`, fontSize: 26, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}>−</button>
+
+            {/* Big rep number */}
+            <div style={{ fontSize: 80, fontWeight: 700, color: repCount !== null ? a : theme.textDim, lineHeight: 1, minWidth: 100, textAlign: "center", transition: "color 0.2s" }}>
+              {displayReps}
             </div>
-          ) : listening ? (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 8 }} className="mq-wave">
+
+            {/* Plus button */}
+            <button onClick={() => setRepCount(displayReps + 1)}
+              style={{ width: 52, height: 52, borderRadius: "50%", background: "#1A2332", border: `1px solid rgba(255,255,255,0.1)`, fontSize: 26, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}>+</button>
+          </div>
+          <div style={{ fontSize: 11, color: theme.textDim, marginTop: 4 }}>
+            {repCount !== null ? "Tap mic or Log ✓ to save" : "Tap − / + to adjust, or speak your reps"}
+          </div>
+        </div>
+
+        {/* ── MICROPHONE — large and central ── */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          {listening ? (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28 }} className="mq-wave">
               {[1,2,3,4,5,6].map(i => <span key={i} />)}
             </div>
+          ) : voiceTranscript ? (
+            <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 10, padding: "6px 12px", fontSize: 11, color: "#9BB3C8", fontStyle: "italic" }}>
+              {voiceTranscript}
+            </div>
           ) : null}
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <VoiceBtn listening={listening && !voiceTranscript} onPress={simulateListen} size={60} />
+          <VoiceBtn listening={listening && !voiceTranscript} onPress={simulateListen} size={90} />
+          <div style={{ fontSize: 11, color: listening ? a : theme.textDim }}>
+            {listening ? "Listening..." : "Tap to speak your reps"}
           </div>
-          {listening && !voiceTranscript && <div style={{ fontSize: 9, color: a, marginTop: 6 }}>Listening...</div>}
         </div>
 
+        {/* Bottom actions */}
         <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
-          <button onClick={() => { logSet(ex.targetReps - 2); }} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "7px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
-          <button onClick={() => { if (exIdx < WORKOUT_EXERCISES.length - 1) { setExIdx(i => i + 1); setSetIdx(0); setNudgedWeight(null); setState("active"); } }} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "7px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Swap exercise</button>
-          <button onClick={logSet} style={{ flex: 1, background: a, border: "none", borderRadius: 10, padding: "7px 6px", fontSize: 10, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log ✓</button>
+          <button onClick={() => { logSet(ex.targetReps - 2); }}
+            style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
+          <button onClick={() => { if (exIdx < WORKOUT_EXERCISES.length - 1) { setExIdx(i => i + 1); setSetIdx(0); setNudgedWeight(null); setRepCount(null); setState("active"); } }}
+            style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Swap exercise</button>
+          <button onClick={() => logSet(displayReps)}
+            style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px 6px", fontSize: 12, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Log {displayReps} reps ✓</button>
         </div>
 
-        <div style={{ marginTop: 10, fontSize: 9, color: theme.textFaint, textAlign: "center" }}>
-          Exercise {exIdx + 1} of {WORKOUT_EXERCISES.length} · {totalCompleted} sets logged
+        <div style={{ marginTop: 8, fontSize: 9, color: theme.textFaint, textAlign: "center" }}>
+          Exercise {exIdx + 1} of {exercises.length} · {totalCompleted} sets logged
         </div>
       </div>
     </Layout>
