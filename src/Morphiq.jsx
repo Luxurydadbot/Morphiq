@@ -377,7 +377,12 @@ function AppProvider({ children }) {
 
   // ── On mount: load gym branding from Supabase ────────────────────────────
   useEffect(() => {
-    sb.getGymBranding("demo-gym").then(row => {
+    // Check if a gym ID was passed in the URL (from invite link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const gymIdFromUrl = urlParams.get("gym");
+    const gymToLoad = gymIdFromUrl || "demo-gym";
+
+    sb.getGymBranding(gymToLoad).then(row => {
       if (row?.name) {
         setGymBranding({ name: row.name, accent: row.accent || "#00D4B1", welcome: row.welcome || "", units: "imperial" });
       }
@@ -864,7 +869,7 @@ function OnboardingScreen() {
   const [checklist, setChecklist] = useState([false, false, false, false]);
 
   useEffect(() => {
-    if (step !== 8) return;
+    if (step !== 9) return;
     let cancelled = false;
     [0,1,2,3].forEach(i => setTimeout(() => { if(!cancelled) setChecklist(c => c.map((v,idx) => idx<=i ? true : v)); }, i*550+300));
 
@@ -886,7 +891,7 @@ function OnboardingScreen() {
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, parsed).catch(() => {});
           }
-          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
+          setTimeout(() => { if (!cancelled) setStep(10); }, 400);
         }
       } catch (_) {
         if (!cancelled) {
@@ -897,7 +902,7 @@ function OnboardingScreen() {
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, fallbackPlan).catch(() => {});
           }
-          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
+          setTimeout(() => { if (!cancelled) setStep(10); }, 400);
         }
       }
     }
@@ -909,7 +914,7 @@ function OnboardingScreen() {
 
   const bodyValid = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && weight && parseFloat(weight) > 0;
   const ageValid = age && parseInt(age) >= 13 && parseInt(age) <= 100;
-  const progressPct = [15, 25, 35, 50, 60, 72, 83, 92, 100, 100][step] || 15;
+  const progressPct = [15, 25, 35, 50, 60, 72, 82, 88, 95, 100, 100][step] || 15;
   const goalLabel = GOAL_OPTIONS.find(g => g.id === goal)?.label || "";
 
   const s = {
@@ -943,7 +948,7 @@ function OnboardingScreen() {
         </div>
         <span style={{ fontSize: 9, color: ob.muted }}>Powered by Morphiq</span>
       </div>
-      {step < 9 && (
+      {step < 10 && (
         <div style={{ padding: "8px 14px 0", flexShrink: 0 }}>
           <div style={{ height: 3, background: ob.card, borderRadius: 2 }}>
             <div style={{ height: 3, background: a, borderRadius: 2, width: `${progressPct}%`, transition: "width .5s ease" }} />
@@ -1041,6 +1046,23 @@ function OnboardingScreen() {
         </div>}
 
         {step === 7 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Before I build your plan, please review the health disclaimer below. Your safety comes first.</div></div>
+          <div style={{ background: ob.card, borderRadius: 12, padding: "12px 14px", marginBottom: 10, flex: 1, overflowY: "auto" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ob.white, marginBottom: 6 }}>⚠️ Health & Fitness Disclaimer</div>
+            <div style={{ fontSize: 11, color: ob.body, lineHeight: 1.65 }}>
+              The fitness and nutrition plans provided by Morphiq are for <span style={{ color: ob.white, fontWeight: 600 }}>informational and educational purposes only</span> and do not constitute medical advice.<br /><br />
+              Before starting any new exercise or nutrition program, consult a qualified healthcare provider — especially if you have a medical condition, injury, or concern.<br /><br />
+              You agree to exercise within your own limits and accept responsibility for your health and safety during all workouts. Morphiq and its licensees are not liable for any injury, illness, or adverse outcome.<br /><br />
+              By tapping "I agree", you confirm you are at least 13 years old and accept these terms.
+            </div>
+          </div>
+          <button onClick={() => setStep(8)} style={{ ...s.tealBtn(false), marginTop: 6 }}>I agree — build my plan ✦</button>
+          <div style={{ textAlign: "center", marginTop: 8 }}>
+            <button onClick={() => navigate("auth")} style={{ fontSize: 10, color: ob.muted, background: "none", border: "none", cursor: "pointer", fontFamily: ob.font }}>Decline — go back</button>
+          </div>
+        </div>}
+
+        {step === 8 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>Perfect. {goalLabel}, {daysPerWeek} days a week{injuries.trim() ? `, noting: ${injuries.trim()}` : ", no injuries"}. I have everything I need.</div></div>
           <div style={{ background: ob.card, borderRadius: 10, padding: "6px 10px", marginBottom: 8 }}>
             {confirmRows.map(([k, v]) => (
@@ -1050,11 +1072,11 @@ function OnboardingScreen() {
               </div>
             ))}
           </div>
-          <button onClick={() => { setChecklist([false, false, false, false]); setStep(8); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
+          <button onClick={() => { setChecklist([false, false, false, false]); setStep(9); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
           <button onClick={() => setStep(0)} style={{ ...s.outlineBtn, width: "100%", marginTop: 6 }}>Start over</button>
         </div>}
 
-        {step === 8 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+        {step === 9 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
           <div style={{ width: 40, height: 40, border: `3px solid ${ob.card}`, borderTopColor: a, borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
           <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>Building your plan</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", marginTop: 4 }}>
@@ -1066,7 +1088,7 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 9 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 10 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ textAlign: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>Your plan is ready</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}&apos;s {goalLabel} Plan</div>
@@ -1182,6 +1204,8 @@ function WorkoutScreen() {
 
   const [nudgedWeight, setNudgedWeight] = useState(null);
   const [lastLoggedReps, setLastLoggedReps] = useState(null);
+  const [savingToCloud, setSavingToCloud] = useState(false);
+  const [savedToCloud, setSavedToCloud] = useState(false);
 
   const ex = exercises[exIdx];
   const currentWeight = nudgedWeight ?? ex.weight;
@@ -1247,12 +1271,18 @@ function WorkoutScreen() {
 
     // Persist to Supabase workout_logs (fire-and-forget)
     if (supabaseUser?.id) {
+      setSavingToCloud(true);
+      setSavedToCloud(false);
       sb.insertWorkoutLog(supabaseUser.id, {
         exerciseName: ex.name,
         setNumber: setIdx + 1,
         reps,
         weight: currentWeight,
-      }).catch(() => {});
+      }).then(ok => {
+        setSavingToCloud(false);
+        setSavedToCloud(ok);
+        if (ok) setTimeout(() => setSavedToCloud(false), 3000);
+      }).catch(() => { setSavingToCloud(false); });
     }
 
     // Show 3-second confirmation window before starting rest timer
@@ -1357,6 +1387,11 @@ function WorkoutScreen() {
             <div style={{ fontSize: 13, color: wasSkipped ? theme.amber : a, textTransform: "uppercase", letterSpacing: "3px", fontWeight: 600 }}>
               {wasSkipped ? "Set Skipped" : "Set Logged"}
             </div>
+            {!wasSkipped && (
+              <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : savedToCloud ? a : theme.textFaint, marginTop: 4 }}>
+                {savingToCloud ? "☁ Saving to account..." : savedToCloud ? "☁ Saved to account ✓" : supabaseUser?.id && !supabaseUser.id.startsWith("sim-") && supabaseUser.id !== "dev-001" ? "☁ Saving..." : "☁ Dev mode — not saved to DB"}
+              </div>
+            )}
           </div>
 
           {/* Middle — the big info */}
@@ -1920,22 +1955,34 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
   }
 
   async function parseWithAI(text) {
-    const prompt = `The user said they ate: "${text}"
-Parse into a meal entry. Return ONLY valid JSON, no markdown:
-{"name":"<clean meal name>","cal":<number>,"protein":<number>,"carbs":<number>,"fat":<number>}
-Use realistic average nutrition. All numbers must be plain integers.`;
+    const prompt = `The user said they ate: "${text}". Parse into a meal entry. Return ONLY valid JSON, no markdown, no extra text: {"name":"<clean meal name>","cal":<number>,"protein":<number>,"carbs":<number>,"fat":<number>}. Use realistic average nutrition values. All numbers must be plain integers.`;
     try {
       const res = await fetch("/api/chat", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt, context: "meal_parser" }),
+        body: JSON.stringify({
+          messages: [{ id: 1, role: "user", text: prompt }],
+          user: { name: user?.name || "member" },
+          context: "meal_parser",
+        }),
       });
       const data = await res.json();
-      const raw = (data.reply || "").replace(/```json|```/g, "").trim();
+      // API returns { text } for chat responses
+      const raw = (data.text || data.reply || "").replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(raw);
-      setParsedMeal(parsed); setVoicePhase("heard");
+      if (parsed.name && parsed.cal) {
+        setParsedMeal(parsed); setVoicePhase("heard");
+      } else {
+        throw new Error("Bad parse");
+      }
     } catch {
-      setParsedMeal({ name: text, cal: 500, protein: 25, carbs: 50, fat: 20 });
-      setVoicePhase("heard");
+      // Fallback: estimate based on common foods
+      const lower = text.toLowerCase();
+      const fallback = lower.includes("burger") ? { name: "Burger", cal: 550, protein: 28, carbs: 45, fat: 28 }
+        : lower.includes("salad") ? { name: "Salad", cal: 280, protein: 18, carbs: 22, fat: 14 }
+        : lower.includes("pizza") ? { name: "Pizza", cal: 620, protein: 24, carbs: 72, fat: 26 }
+        : lower.includes("chicken") ? { name: "Chicken", cal: 350, protein: 42, carbs: 8, fat: 12 }
+        : { name: text.charAt(0).toUpperCase() + text.slice(1), cal: 450, protein: 22, carbs: 48, fat: 18 };
+      setParsedMeal(fallback); setVoicePhase("heard");
     }
   }
 
@@ -3289,10 +3336,197 @@ function OwnerBrandingTab() {
   );
 }
 
-function GymOwnerDashboard() {
+function OwnerInviteTab() {
+  const gymId = "demo-gym";
+  const inviteUrl = `${window.location.origin}?gym=${gymId}`;
+  const [copied, setCopied] = useState(false);
+
+  function copyLink() {
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }).catch(() => {
+      // Fallback for browsers without clipboard API
+      const el = document.createElement("textarea");
+      el.value = inviteUrl;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  }
+
+  return (
+    <div className="mq-fade">
+      <div style={{ background: "#1A2332", borderRadius: 14, padding: "16px 14px", marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#E8EDF2", marginBottom: 6 }}>Member invite link</div>
+        <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.6, marginBottom: 14 }}>
+          Share this link with new members. When they open it, they'll land directly on your branded gym sign-up — no searching for Morphiq separately.
+        </div>
+        <div style={{ background: "#0D1623", border: "1px solid #1E2D42", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: 1, fontSize: 11, color: "#9BB3C8", fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.5 }}>{inviteUrl}</div>
+          <button onClick={copyLink} style={{ flexShrink: 0, background: copied ? "#003D35" : "#00D4B1", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: copied ? "#00D4B1" : "#003D35", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
+            {copied ? "Copied ✓" : "Copy"}
+          </button>
+        </div>
+        <div style={{ fontSize: 10, color: "#6B7A8D", lineHeight: 1.6 }}>
+          Members who sign up via this link are automatically assigned to your gym. Their plan will show your branding.
+        </div>
+      </div>
+
+      <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px", marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>How it works</div>
+        {[
+          ["1", "Copy the link above and share it via text, email, or your gym's social media."],
+          ["2", "Member opens the link → sees your gym name and branding on the sign-in screen."],
+          ["3", "They sign up with their email → get a 6-digit code → complete the quiz."],
+          ["4", "Their plan is built by Morphiq AI and appears in the Members tab of your dashboard."],
+        ].map(([num, text]) => (
+          <div key={num} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: "1px solid rgba(0,212,177,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#00D4B1", flexShrink: 0 }}>{num}</div>
+            <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.6 }}>{text}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px" }}>
+        <div style={{ fontSize: 11, color: "#00D4B1", fontWeight: 600, marginBottom: 4 }}>Tip: QR code</div>
+        <div style={{ fontSize: 11, color: "#6B7A8D", lineHeight: 1.6 }}>
+          Go to qr-code-generator.com, paste your link, and print the QR code to display at your front desk or on your website.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PRICING SCREEN ───────────────────────────────────────────────────────────
+function PricingScreen() {
+  const { navigate } = useApp();
+  const plans = [
+    {
+      name: "Starter",
+      price: "$99",
+      perMember: "$2",
+      color: "#00D4B1",
+      bg: "#003D35",
+      border: "rgba(0,212,177,0.3)",
+      badge: null,
+      features: [
+        "Up to 100 active members",
+        "AI workout plans",
+        "AI meal plans",
+        "Voice rep logging",
+        "Member progress tracking",
+        "Basic gym branding",
+        "Email support",
+      ],
+    },
+    {
+      name: "Growth",
+      price: "$199",
+      perMember: "$1.75",
+      color: "#A78BFA",
+      bg: "#1E1040",
+      border: "rgba(167,139,250,0.4)",
+      badge: "Most popular",
+      features: [
+        "Up to 500 active members",
+        "Everything in Starter",
+        "Broadcast messaging to all members",
+        "Advanced analytics dashboard",
+        "Custom welcome message",
+        "Priority email support",
+        "Weekly engagement report",
+      ],
+    },
+    {
+      name: "Scale",
+      price: "$399",
+      perMember: "$1.50",
+      color: "#F59E0B",
+      bg: "#2D1A00",
+      border: "rgba(245,158,11,0.3)",
+      badge: "Best value",
+      features: [
+        "Unlimited active members",
+        "Everything in Growth",
+        "Dedicated account manager",
+        "Custom AI personality name",
+        "White-label mobile app icon",
+        "API access",
+        "Phone & chat support",
+      ],
+    },
+  ];
+
+  return (
+    <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
+      <div style={{ background: "#0D1623", borderBottom: "1px solid #1E2D42", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+        <button onClick={() => navigate("owner")} style={{ background: "none", border: "none", color: "#6B7A8D", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF2" }}>Pricing Plans</div>
+      </div>
+
+      <div style={{ padding: "16px 16px 80px", overflowY: "auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: "#9BB3C8", lineHeight: 1.6 }}>
+            All plans include a <span style={{ color: "#00D4B1", fontWeight: 600 }}>14-day free trial</span>. No credit card required to start.
+          </div>
+          <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 4 }}>
+            Billing is monthly. "Active member" = logged at least one workout that month.
+          </div>
+        </div>
+
+        {plans.map(plan => (
+          <div key={plan.name} style={{ background: plan.bg, border: `1px solid ${plan.border}`, borderRadius: 16, padding: "16px 14px", marginBottom: 12, position: "relative" }}>
+            {plan.badge && (
+              <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", background: plan.color, color: plan.name === "Growth" ? "#1E1040" : "#2D1A00", borderRadius: 20, padding: "2px 12px", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+                {plan.badge}
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: plan.color }}>{plan.name}</div>
+                <div style={{ fontSize: 11, color: "#9BB3C8", marginTop: 2 }}>Base monthly fee</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: "#E8EDF2", lineHeight: 1 }}>{plan.price}<span style={{ fontSize: 12, color: "#9BB3C8", fontWeight: 400 }}>/mo</span></div>
+                <div style={{ fontSize: 11, color: plan.color, marginTop: 2 }}>+ {plan.perMember} per active member</div>
+              </div>
+            </div>
+            <div style={{ borderTop: `1px solid rgba(255,255,255,0.06)`, paddingTop: 10 }}>
+              {plan.features.map(f => (
+                <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
+                  <div style={{ width: 14, height: 14, borderRadius: "50%", background: plan.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "#080E1A", fontWeight: 700, flexShrink: 0 }}>✓</div>
+                  <span style={{ fontSize: 12, color: "#C0C0C0" }}>{f}</span>
+                </div>
+              ))}
+            </div>
+            <button style={{ width: "100%", background: plan.color, color: "#080E1A", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 14 }}>
+              Start {plan.name} trial →
+            </button>
+          </div>
+        ))}
+
+        <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px", textAlign: "center" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", marginBottom: 6 }}>Need something custom?</div>
+          <div style={{ fontSize: 12, color: "#9BB3C8", marginBottom: 10, lineHeight: 1.6 }}>
+            Enterprise plans available for gym chains, franchises, and large studios. Let's talk.
+          </div>
+          <div style={{ fontSize: 12, color: "#00D4B1" }}>hello@morphiq.app</div>
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "8px 0 12px" }}>POWERED BY MORPHIQ</div>
+    </div>
+  );
+}
+
+
   const { navigate } = useApp();
   const [tab, setTab] = useState("overview");
-  const tabs = [["overview","Overview"],["members","Members"],["branding","Branding"]];
+  const tabs = [["overview","Overview"],["members","Members"],["invite","Invite"],["branding","Branding"]];
 
   return (
     <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
@@ -3319,14 +3553,16 @@ function GymOwnerDashboard() {
       <div style={{ padding: "16px 16px 0", overflowY: "auto" }}>
         {tab === "overview" && <OwnerOverviewTab />}
         {tab === "members"  && <OwnerMembersTab />}
+        {tab === "invite"   && <OwnerInviteTab />}
         {tab === "branding" && <OwnerBrandingTab />}
       </div>
 
       {/* Footer back link */}
       <div style={{ padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <button onClick={() => navigate("home")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>← Member view</button>
-        <div style={{ fontSize: 10, color: "#333", letterSpacing: ".5px" }}>POWERED BY MORPHIQ</div>
+        <button onClick={() => navigate("pricing")} style={{ background: "none", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit" }}>Plans & pricing →</button>
       </div>
+      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "0 0 12px" }}>POWERED BY MORPHIQ</div>
     </div>
   );
 }
@@ -3361,6 +3597,7 @@ function AppRouter() {
   if (screen === "chat") return <ChatScreen fromScreen="home" />;
   if (screen === "chat_workout") return <ChatScreen fromScreen="workout" />;
   if (screen === "chat_meals") return <ChatScreen fromScreen="meals" />;
+  if (screen === "pricing") return <PricingScreen />;
   return <HomeDashboardScreen />;
 }
 
