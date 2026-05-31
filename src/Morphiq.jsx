@@ -883,6 +883,7 @@ function OnboardingScreen() {
   const ob = theme.ob;
   const a = gymBranding.accent || ob.teal;
   const [step, setStep] = useState(0);
+  const [planError, setPlanError] = useState("");
   const [name, setName] = useState("");
   const [goal, setGoal] = useState(null);
   const [sex, setSex] = useState(null);
@@ -927,7 +928,13 @@ function OnboardingScreen() {
           }
           setTimeout(() => { if (!cancelled) setStep(13); }, 400);
         }
-      } catch (_) {
+      } catch (planErr) {
+        console.error("[Morphiq] /api/plan failed:", planErr.message);
+        if (!cancelled) {
+          setPlanError("API error: " + planErr.message);
+          setStep(12); // stay on generating screen, show error
+          return;
+        }
         if (!cancelled) {
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           const fallbackPlan = {
