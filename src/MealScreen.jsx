@@ -124,7 +124,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         body: JSON.stringify({ text }),
       });
       const parsed = await res.json();
-      if (parsed.name && parsed.cal) {
+      if (parsed.name && !parsed.error) {
         setParsedMeal(parsed); setVoicePhase("heard");
       } else {
         throw new Error("Bad parse");
