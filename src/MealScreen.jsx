@@ -94,6 +94,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
   const [voicePhase, setVoicePhase] = useState("idle");
   const [transcript, setTranscript] = useState("");
   const [parsedMeal, setParsedMeal] = useState(null);
+  const [lookupError, setLookupError] = useState("");
   const [textInput, setTextInput] = useState("");
   const recognitionRef = useRef(null);
 
@@ -113,7 +114,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
 
   function cancelVoice() {
     recognitionRef.current?.abort();
-    setVoicePhase("idle"); setTranscript(""); setParsedMeal(null); setTextInput("");
+    setVoicePhase("idle"); setTranscript(""); setParsedMeal(null); setTextInput(""); setLookupError("");
   }
 
   async function parseWithAI(text) {
@@ -122,21 +123,20 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        console.error("parse-meal HTTP error:", res.status, errData);
+      const parsed = await res.json().catch(() => null);
+      if (!res.ok || !parsed) {
+        setLookupError(parsed?.error || "HTTP " + res.status + ": " + parsed?.detail || "Unknown error");
         setVoicePhase("error_lookup");
         return;
       }
-      const parsed = await res.json();
       if (parsed.name) {
         setParsedMeal(parsed); setVoicePhase("heard");
       } else {
-        console.error("parse-meal bad response:", parsed);
+        setLookupError("No food name returned. Raw: " + JSON.stringify(parsed));
         setVoicePhase("error_lookup");
       }
     } catch (e) {
-      console.error("parse-meal fetch failed:", e.message);
+      setLookupError("Network error: " + e.message);
       setVoicePhase("error_lookup");
     }
   }
@@ -278,10 +278,14 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
           {voicePhase === "error_lookup" && (
             <>
               <div style={{ fontSize: 11, color: "#F87171", marginBottom: 4 }}>Nutrition lookup failed</div>
-              <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 10 }}>Check your connection and try again</div>
+              {lookupError ? (
+                <div style={{ fontSize: 10, color: "#F87171", background: "#1F0A0A", borderRadius: 8, padding: "6px 10px", marginBottom: 8, fontFamily: "monospace", wordBreak: "break-all" }}>{lookupError}</div>
+              ) : (
+                <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 8 }}>Check your connection and try again</div>
+              )}
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                <button onClick={() => { setVoicePhase("idle"); setTranscript(""); }} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
+                <button onClick={() => { setVoicePhase("idle"); setTranscript(""); setLookupError(""); }} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
               </div>
             </>
           )}
