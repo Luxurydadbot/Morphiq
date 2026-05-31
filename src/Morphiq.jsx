@@ -2100,15 +2100,10 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
       } else {
         throw new Error("Bad parse");
       }
-    } catch {
-      // Fallback: estimate based on common foods
-      const lower = text.toLowerCase();
-      const fallback = lower.includes("burger") ? { name: "Burger", cal: 550, protein: 28, carbs: 45, fat: 28 }
-        : lower.includes("salad") ? { name: "Salad", cal: 280, protein: 18, carbs: 22, fat: 14 }
-        : lower.includes("pizza") ? { name: "Pizza", cal: 620, protein: 24, carbs: 72, fat: 26 }
-        : lower.includes("chicken") ? { name: "Chicken", cal: 350, protein: 42, carbs: 8, fat: 12 }
-        : { name: text.charAt(0).toUpperCase() + text.slice(1), cal: 450, protein: 22, carbs: 48, fat: 18 };
-      setParsedMeal(fallback); setVoicePhase("heard");
+    } catch (err) {
+      // Show the actual error so we can debug — remove this once working
+      setParsedMeal({ name: "ERROR: " + (err?.message || "unknown"), cal: 0, protein: 0, carbs: 0, fat: 0 });
+      setVoicePhase("heard");
     }
   }
 
