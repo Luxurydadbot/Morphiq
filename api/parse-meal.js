@@ -24,7 +24,7 @@ export default async function handler(req, res) {
         "content-type": "application/json"
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: "claude-haiku-4-5",
         max_tokens: 150,
         messages: [{
           role: "user",
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     const reply = data.content?.[0]?.text || "";
 
     const get = (label) => {
-      const match = reply.match(new RegExp(label + "[:\s]+([\d.]+)", "i"));
+      const match = reply.match(new RegExp(label + "[:\\s]+([\\d.]+)", "i"));
       return match ? Math.round(parseFloat(match[1])) : 0;
     };
     const nameMatch = reply.match(/NAME[:\s]+(.+)/i);
@@ -53,7 +53,8 @@ export default async function handler(req, res) {
     const carbs = get("CARBS");
     const fat = get("FAT");
 
-    if (!name || cal === 0) {
+    // Only fail if we couldn't parse a name at all — cal can legitimately be low
+    if (!name) {
       res.status(500).json({ error: "Could not parse", raw: reply });
       return;
     }
