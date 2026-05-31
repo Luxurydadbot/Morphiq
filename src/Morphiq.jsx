@@ -882,7 +882,7 @@ function OnboardingScreen() {
   const [checklist, setChecklist] = useState([false, false, false, false]);
 
   useEffect(() => {
-    if (step !== 9) return;
+    if (step !== 8) return;
     let cancelled = false;
     [0,1,2,3].forEach(i => setTimeout(() => { if(!cancelled) setChecklist(c => c.map((v,idx) => idx<=i ? true : v)); }, i*550+300));
 
@@ -904,7 +904,7 @@ function OnboardingScreen() {
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, parsed).catch(() => {});
           }
-          setTimeout(() => { if (!cancelled) setStep(10); }, 400);
+          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
         }
       } catch (_) {
         if (!cancelled) {
@@ -929,7 +929,7 @@ function OnboardingScreen() {
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, fallbackPlan).catch(() => {});
           }
-          setTimeout(() => { if (!cancelled) setStep(10); }, 400);
+          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
         }
       }
     }
@@ -940,7 +940,7 @@ function OnboardingScreen() {
 
   const bodyValid = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && weight && parseFloat(weight) > 0;
   const ageValid = age && parseInt(age) >= 13 && parseInt(age) <= 100;
-  const progressPct = [15, 25, 35, 50, 60, 72, 82, 88, 95, 100, 100][step] || 15;
+  const progressPct = [15, 25, 35, 50, 60, 75, 88, 95, 100, 100][step] || 15;
   const goalLabel = GOAL_OPTIONS.find(g => g.id === goal)?.label || "";
 
   const s = {
@@ -1059,19 +1059,9 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 6 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Almost there. Where do you usually work out?</div></div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-            {[["🏋️", "Gym", "Full equipment available"], ["🏠", "Home", "Dumbbells or bodyweight"], ["🌳", "Both", "Flexible setup"]].map(([icon, label, sub]) => (
-              <button key={label} style={{ background: ob.card, border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 10, padding: "9px 10px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setStep(7)}>
-                <span style={{ fontSize: 16 }}>{icon}</span>
-                <div><div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>{label}</div><div style={{ fontSize: 9, color: ob.muted }}>{sub}</div></div>
-              </button>
-            ))}
-          </div>
-        </div>}
 
-        {step === 7 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+
+        {step === 6 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Before I build your plan, please review the health disclaimer below. Your safety comes first.</div></div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "12px 14px", marginBottom: 10, flex: 1, overflowY: "auto" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: ob.white, marginBottom: 6 }}>⚠️ Health & Fitness Disclaimer</div>
@@ -1082,13 +1072,13 @@ function OnboardingScreen() {
               By tapping "I agree", you confirm you are at least 13 years old and accept these terms.
             </div>
           </div>
-          <button onClick={() => setStep(8)} style={{ ...s.tealBtn(false), marginTop: 6 }}>I agree — build my plan ✦</button>
+          <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 6 }}>I agree — build my plan ✦</button>
           <div style={{ textAlign: "center", marginTop: 8 }}>
             <button onClick={() => navigate("auth")} style={{ fontSize: 10, color: ob.muted, background: "none", border: "none", cursor: "pointer", fontFamily: ob.font }}>Decline — go back</button>
           </div>
         </div>}
 
-        {step === 8 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 7 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>Perfect. {goalLabel}, {daysPerWeek} days a week{injuries.trim() ? `, noting: ${injuries.trim()}` : ", no injuries"}. I have everything I need.</div></div>
           <div style={{ background: ob.card, borderRadius: 10, padding: "6px 10px", marginBottom: 8 }}>
             {confirmRows.map(([k, v]) => (
@@ -1098,11 +1088,11 @@ function OnboardingScreen() {
               </div>
             ))}
           </div>
-          <button onClick={() => { setChecklist([false, false, false, false]); setStep(9); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
+          <button onClick={() => { setChecklist([false, false, false, false]); setStep(8); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
           <button onClick={() => setStep(0)} style={{ ...s.outlineBtn, width: "100%", marginTop: 6 }}>Start over</button>
         </div>}
 
-        {step === 9 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+        {step === 8 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
           <Spinner size={40} color={a} trackColor={ob.card} />
           <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>Building your plan</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", marginTop: 4 }}>
@@ -1114,7 +1104,7 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 10 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 9 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ textAlign: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>Your plan is ready</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}&apos;s {goalLabel} Plan</div>
