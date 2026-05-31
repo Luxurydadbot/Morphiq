@@ -3047,10 +3047,29 @@ function ProgressScreen() {
 }
 
 function ProfileScreen() {
-  const { navigate, user, gymBranding, signOut } = useApp();
+  const { navigate, user, setUser, plan, setPlan, gymBranding, signOut, supabaseUser } = useApp();
   const a = gymBranding.accent;
   const [editGoal, setEditGoal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(user.goal || "lose_fat");
+  const [editDays, setEditDays] = useState(false);
+  const [selectedDays, setSelectedDays] = useState(plan?.workoutDays || ["Monday","Wednesday","Friday"]);
+  const [daySaveMsg, setDaySaveMsg] = useState("");
+
+  async function saveDays() {
+    if (selectedDays.length === 0) return;
+    // Update plan with new workout days (keep everything else the same)
+    const updatedPlan = { ...(plan || {}), workoutDays: selectedDays };
+    const updatedUser = { ...(user || {}), daysPerWeek: selectedDays.length };
+    setPlan(updatedPlan);
+    setUser(updatedUser);
+    setEditDays(false);
+    setDaySaveMsg("Schedule updated ✓");
+    setTimeout(() => setDaySaveMsg(""), 3000);
+    // Save to Supabase (fire-and-forget)
+    if (supabaseUser?.id) {
+      sb.upsertProfile(supabaseUser.id, updatedUser, updatedPlan).catch(() => {});
+    }
+  }
 
   const goalLabel = GOAL_OPTIONS.find(g => g.id === selectedGoal)?.label || "Lose fat";
   const sL = theme.sL;
@@ -3139,10 +3158,43 @@ function ProfileScreen() {
 
         {/* Plan settings */}
         <div style={sL}>Plan Settings</div>
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "0 14px", marginBottom: 16 }}>
-          <StatRow label="Workout days" value="Mon, Wed, Fri" />
-          <StatRow label="Session length" value="~40 min" />
-          <StatRow label="Program level" value="Beginner" />
+        <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+          {/* Workout day switcher */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 13, color: theme.text }}>Workout days</div>
+              {editDays ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setEditDays(false)} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "3px 10px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  <button onClick={saveDays} style={{ background: a, border: "none", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit" }}>Save</button>
+                </div>
+              ) : (
+                <button onClick={() => setEditDays(true)} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "4px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
+              )}
+            </div>
+            {editDays ? (
+              <div style={{ display: "flex", gap: 5, flexWrap: "nowrap" }}>
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((short, idx) => {
+                  const full = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][idx];
+                  const on = selectedDays.includes(full);
+                  return (
+                    <button key={full} onClick={() => setSelectedDays(prev => on ? prev.filter(d => d !== full) : [...prev, full])}
+                      style={{ flex: 1, background: on ? "#003D35" : "transparent", border: `1.5px solid ${on ? a : "rgba(255,255,255,0.1)"}`, borderRadius: 8, padding: "7px 2px", fontSize: 10, fontWeight: on ? 600 : 400, color: on ? a : theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+                      {short}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, fontWeight: 600, color: a }}>
+                {(plan?.workoutDays || []).map(d => d.slice(0,3)).join(", ") || "Not set"}
+              </div>
+            )}
+            {editDays && daySaveMsg && <div style={{ fontSize: 10, color: a, marginTop: 6 }}>{daySaveMsg}</div>}
+          </div>
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 10 }}>
+            <StatRow label="Session length" value={`~${plan?.workoutDuration || 40} min`} />
+          </div>
           <StatRow label="Injuries/notes" value={user.injuries || "None"} />
         </div>
 
@@ -3514,6 +3566,26 @@ function OwnerInviteTab() {
 
 function PricingScreen() {
   const { navigate } = useApp();
+  const [leadPlan, setLeadPlan] = useState(null);   // which plan button was tapped
+  const [leadEmail, setLeadEmail] = useState("");
+  const [leadSent, setLeadSent] = useState(false);
+  const [leadSaving, setLeadSaving] = useState(false);
+
+  async function submitLead() {
+    if (!leadEmail.includes("@") || !leadPlan) return;
+    setLeadSaving(true);
+    try {
+      // Save to Supabase leads table (create table SQL: id uuid default gen_random_uuid(), email text, plan text, created_at timestamptz default now())
+      await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+        method: "POST",
+        headers: { ...SB_HEADERS, "Prefer": "return=minimal" },
+        body: JSON.stringify({ email: leadEmail, plan: leadPlan, created_at: new Date().toISOString() }),
+      });
+    } catch (_) {}  // fire-and-forget — never block the UI
+    setLeadSent(true);
+    setLeadSaving(false);
+  }
+
   const plans = [
     {
       name: "Starter",
@@ -3613,9 +3685,32 @@ function PricingScreen() {
                 </div>
               ))}
             </div>
-            <button style={{ width: "100%", background: plan.color, color: "#080E1A", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 14 }}>
-              Start {plan.name} trial →
-            </button>
+            {leadPlan === plan.name && !leadSent ? (
+              <div style={{ marginTop: 14 }}>
+                <input
+                  type="email"
+                  value={leadEmail}
+                  onChange={e => setLeadEmail(e.target.value)}
+                  placeholder="Your email address"
+                  style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: `1px solid ${plan.color}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#E8EDF2", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                />
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button onClick={() => setLeadPlan(null)} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px", fontSize: 12, color: "#9BB3C8", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  <button onClick={submitLead} disabled={!leadEmail.includes("@") || leadSaving} style={{ flex: 2, background: plan.color, color: "#080E1A", border: "none", borderRadius: 10, padding: "9px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: leadSaving ? 0.6 : 1 }}>
+                    {leadSaving ? "Saving..." : "Start free trial →"}
+                  </button>
+                </div>
+              </div>
+            ) : leadPlan === plan.name && leadSent ? (
+              <div style={{ marginTop: 14, background: "rgba(0,0,0,0.3)", border: `1px solid ${plan.color}`, borderRadius: 10, padding: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: 14, color: plan.color, fontWeight: 700, marginBottom: 4 }}>✓ You're on the list!</div>
+                <div style={{ fontSize: 11, color: "#9BB3C8" }}>We'll reach out to {leadEmail} within 24 hours to get you set up.</div>
+              </div>
+            ) : (
+              <button onClick={() => { setLeadPlan(plan.name); setLeadEmail(""); setLeadSent(false); }} style={{ width: "100%", background: plan.color, color: "#080E1A", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 14 }}>
+                Start {plan.name} trial →
+              </button>
+            )}
           </div>
         ))}
 
