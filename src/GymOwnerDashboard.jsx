@@ -532,7 +532,7 @@ function OwnerUsageTab() {
       try {
         const res = await fetch(
           `https://uvnyjegmhsztdednjclb.supabase.co/rest/v1/ai_usage?month=eq.${month}&order=created_at.desc&limit=200`,
-          { headers: { "apikey": "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll", "Authorization": "Bearer sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll" } }
+          { headers: { "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04" } }
         );
         const data = await res.json();
         if (Array.isArray(data)) setRows(data);
