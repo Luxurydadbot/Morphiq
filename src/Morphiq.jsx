@@ -1563,6 +1563,7 @@ const GROCERY_DATA = [
   ]},
 ];
 
+function getFallbackReply(text) {
   const key = text.toLowerCase().trim().replace(/[!?.]/g, "");
   return FALLBACK_REPLIES[key] || "Good question. Based on your plan and history, you're on track — keep it up and check in if anything feels off.";
 }
