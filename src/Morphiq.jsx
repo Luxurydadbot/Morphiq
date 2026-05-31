@@ -932,32 +932,7 @@ function OnboardingScreen() {
         console.error("[Morphiq] /api/plan failed:", planErr.message);
         if (!cancelled) {
           setPlanError("API error: " + planErr.message);
-          setStep(12); // stay on generating screen, show error
-          return;
-        }
-        if (!cancelled) {
-          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
-          const fallbackPlan = {
-            calories: goal === "lose_fat" ? 1800 : goal === "build_muscle" ? 2800 : 2200,
-            protein: 140, carbs: 160, fat: 55,
-            workoutDays: ["Monday","Wednesday","Friday","Saturday","Tuesday","Thursday"].slice(0, daysPerWeek || 3),
-            workoutType: "Full Body", workoutDuration: 40, restSeconds: restPref,
-            weeklyFocus: "Build your movement foundation with compound lifts.",
-            exercises: [
-              { name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" },
-              { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" },
-              { name: "Incline Press", sets: 3, reps: 10, weight: 35, muscle: "Chest / Shoulders" },
-              { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 65, muscle: "Hamstrings" },
-              { name: "Shoulder Press", sets: 3, reps: 10, weight: 25, muscle: "Shoulders" },
-            ],
-            tip: "Consistency over perfection — show up, even on hard days.",
-          };
-          setUser(userData);
-          setPlan(fallbackPlan);
-          if (supabaseUser?.id) {
-            sb.upsertProfile(supabaseUser.id, userData, fallbackPlan).catch(() => {});
-          }
-          setTimeout(() => { if (!cancelled) setStep(13); }, 400);
+          setStep(12);
         }
       }
     }
