@@ -894,15 +894,21 @@ function OnboardingScreen() {
   const [daysPerWeek, setDaysPerWeek] = useState(3);
   const [injuries, setInjuries] = useState("");
   const [equipment, setEquipment] = useState(null);
+  const [trainingHistory, setTrainingHistory] = useState(null);
+  const [recentActivity, setRecentActivity] = useState(null);
+  const [restPref, setRestPref] = useState(120);
   const [checklist, setChecklist] = useState([false, false, false, false]);
 
   useEffect(() => {
-    if (step !== 9) return;
+    if (step !== 12) return;
     let cancelled = false;
     [0,1,2,3].forEach(i => setTimeout(() => { if(!cancelled) setChecklist(c => c.map((v,idx) => idx<=i ? true : v)); }, i*550+300));
 
     async function generatePlan() {
-      const prompt = `You are a certified personal trainer. Return ONLY valid JSON (no markdown, no preamble) for this member: name=${name}, goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}.\nJSON shape exactly: {"calories":<number>,"protein":<number>,"carbs":<number>,"fat":<number>,"workoutDays":[<${daysPerWeek} day names>],"workoutType":"<string>","workoutDuration":<minutes>,"weeklyFocus":"<1 sentence>","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<starting lbs>,"muscle":"<string>"}],"tip":"<1 sentence>"}\nInclude 5-6 exercises appropriate for ${goal === "lose_fat" ? "fat loss (cardio-friendly, compound movements)" : goal === "build_muscle" ? "muscle building (progressive overload, hypertrophy)" : "general fitness"}. Starting weights should match a ${sex} beginner at ${weight}lbs. All numeric fields must be plain numbers.`;
+      const historyMap = { new: "beginner with no training history", some: "intermediate, 6 months to 2 years experience", years: "experienced lifter, several years of training" };
+      const activityMap = { returning: "returning after a long break (treat as rebuilding, use 60-70% of experienced weights)", consistent: "moderately active, some consistency recently", active: "currently training regularly" };
+      const fitnessProfile = `${historyMap[trainingHistory] || "beginner"}, ${activityMap[recentActivity] || "just starting out"}`;
+      const prompt = `You are a certified personal trainer. Return ONLY valid JSON (no markdown, no preamble). Member: name=${name}, goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile="${fitnessProfile}", restPreference=${restPref}s.\nReturn this exact JSON shape: {"calories":<number>,"protein":<number>,"carbs":<number>,"fat":<number>,"workoutDays":[<${daysPerWeek} day names>],"workoutType":"<string>","workoutDuration":<minutes>,"restSeconds":${restPref},"weeklyFocus":"<1 sentence>","tip":"<1 sentence>","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<lbs>,"muscle":"<string>"}],"weeks":[{"week":1,"focus":"Foundation","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<lbs>,"muscle":"<string>"}]},{"week":2,"focus":"Progressive","exercises":[...]},{"week":3,"focus":"Intensity","exercises":[...]},{"week":4,"focus":"Peak","exercises":[...]}]}\nTop-level exercises = week 1 exercises. Each week has 5-6 exercises. Week 1: learn movements, moderate weights. Week 2: add 1 set or 2 reps. Week 3: increase weight 5-10%. Week 4: peak intensity, hardest variation. Goal: ${goal === "lose_fat" ? "fat loss - compound movements, keep rest short" : goal === "build_muscle" ? "muscle building - progressive overload, hypertrophy" : "general fitness - balanced full body"}. Fitness profile: ${fitnessProfile}. Do NOT use beginner weights for experienced members. All numeric fields must be plain numbers.`;
       try {
         const res = await fetch("/api/plan", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -912,23 +918,23 @@ function OnboardingScreen() {
         const raw = (data.text || "").replace(/```json|```/g, "").trim();
         const parsed = JSON.parse(raw);
         if (!cancelled) {
-          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit };
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           setUser(userData);
           setPlan(parsed);
           // Persist to Supabase profiles table (fire-and-forget — UI doesn't block on this)
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, parsed).catch(() => {});
           }
-          setTimeout(() => { if (!cancelled) setStep(10); }, 400);
+          setTimeout(() => { if (!cancelled) setStep(13); }, 400);
         }
       } catch (_) {
         if (!cancelled) {
-          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit };
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           const fallbackPlan = {
             calories: goal === "lose_fat" ? 1800 : goal === "build_muscle" ? 2800 : 2200,
             protein: 140, carbs: 160, fat: 55,
             workoutDays: ["Monday","Wednesday","Friday","Saturday","Tuesday","Thursday"].slice(0, daysPerWeek || 3),
-            workoutType: "Full Body", workoutDuration: 40,
+            workoutType: "Full Body", workoutDuration: 40, restSeconds: restPref,
             weeklyFocus: "Build your movement foundation with compound lifts.",
             exercises: [
               { name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" },
@@ -944,7 +950,7 @@ function OnboardingScreen() {
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, fallbackPlan).catch(() => {});
           }
-          setTimeout(() => { if (!cancelled) setStep(10); }, 400);
+          setTimeout(() => { if (!cancelled) setStep(13); }, 400);
         }
       }
     }
@@ -955,7 +961,7 @@ function OnboardingScreen() {
 
   const bodyValid = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && weight && parseFloat(weight) > 0;
   const ageValid = age && parseInt(age) >= 13 && parseInt(age) <= 100;
-  const progressPct = [15, 22, 33, 45, 56, 66, 76, 86, 93, 100, 100][step] || 15;
+  const progressPct = [10, 18, 26, 34, 44, 54, 62, 70, 78, 86, 93, 100, 100][step] || 10;
   const goalLabel = GOAL_OPTIONS.find(g => g.id === goal)?.label || "";
 
   const s = {
@@ -974,10 +980,16 @@ function OnboardingScreen() {
   );
 
   const EQUIP_LABELS = { barbell: "Barbells & racks", dumbbell: "Dumbbells & cables", kettlebell: "Kettlebells & bodyweight", machine: "Machines mostly" };
+  const HISTORY_LABELS = { new: "New to working out", some: "Some experience (6m–2yr)", years: "Several years training" };
+  const ACTIVITY_LABELS = { returning: "Getting back into it", consistent: "Pretty consistent", active: "Training regularly" };
+  const REST_LABELS = { 60: "1 min", 120: "2 min", 180: "3 min" };
   const confirmRows = [
     ["Name", name], ["Goal", goalLabel], ["Sex", sex || "—"],
     ["Height", `${heightFt}′ ${heightIn || "0"}″`], ["Weight", `${weight} lbs`],
-    ["Age", age ? `${age} yrs` : "—"], ["Days/week", daysPerWeek ? `${daysPerWeek}×` : "—"],
+    ["Age", age ? `${age} yrs` : "—"], ["Experience", HISTORY_LABELS[trainingHistory] || "—"],
+    ["Recent activity", ACTIVITY_LABELS[recentActivity] || "—"],
+    ["Days/week", daysPerWeek ? `${daysPerWeek}×` : "—"],
+    ["Rest between sets", REST_LABELS[restPref] || "2 min"],
     ["Equipment", EQUIP_LABELS[equipment] || "—"],
     ["Injuries", injuries.trim() || "None"],
   ];
@@ -1039,7 +1051,58 @@ function OnboardingScreen() {
           </div>
         </div>}
 
+        
         {step === 2 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Your background</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>How long have you been training?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Helps us set the right starting point</div>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              { id: "new", label: "New to working out", sub: "Just getting started", icon: "🌱" },
+              { id: "some", label: "Some experience", sub: "6 months to 2 years, on and off", icon: "📈" },
+              { id: "years", label: "Several years of training", sub: "I know my way around a gym", icon: "🏋️" },
+            ].map(opt => (
+              <button key={opt.id} onClick={() => { setTrainingHistory(opt.id); setTimeout(() => setStep(3), 180); }}
+                style={{ background: trainingHistory === opt.id ? ob.tealDk : ob.card, border: `1.5px solid ${trainingHistory === opt.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: trainingHistory === opt.id ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20 }}>{opt.icon}</div>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: trainingHistory === opt.id ? a : ob.white }}>{opt.label}</div>
+                  <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{opt.sub}</div>
+                </div>
+                {trainingHistory === opt.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+              </button>
+            ))}
+          </div>
+        </div>}
+
+        {step === 3 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Right now</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>How active have you been lately?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>No judgment — this calibrates your starting weights</div>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              { id: "returning", label: "Just getting back into it", sub: "Been a while — starting fresh", icon: "🔄" },
+              { id: "consistent", label: "Pretty consistent", sub: "Training here and there recently", icon: "⚡" },
+              { id: "active", label: "Training regularly right now", sub: "Already in a routine", icon: "🔥" },
+            ].map(opt => (
+              <button key={opt.id} onClick={() => { setRecentActivity(opt.id); setTimeout(() => setStep(4), 180); }}
+                style={{ background: recentActivity === opt.id ? ob.tealDk : ob.card, border: `1.5px solid ${recentActivity === opt.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: recentActivity === opt.id ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20 }}>{opt.icon}</div>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: recentActivity === opt.id ? a : ob.white }}>{opt.label}</div>
+                  <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{opt.sub}</div>
+                </div>
+                {recentActivity === opt.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+              </button>
+            ))}
+          </div>
+        </div>}
+
+        {step === 4 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>About you</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>Biological sex</div>
@@ -1047,7 +1110,7 @@ function OnboardingScreen() {
           </div>
           <div style={{ display: "flex", gap: 10, flex: 1, alignItems: "flex-start" }}>
             {[["Male", (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="14" r="5"/><path d="M19 5l-5.5 5.5M19 5h-4M19 5v4"/></svg>)], ["Female", (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="9" r="5"/><path d="M12 14v6M9 17h6"/></svg>)]].map(([label, icon]) => (
-              <button key={label} onClick={() => { setSex(label); setTimeout(() => setStep(3), 180); }}
+              <button key={label} onClick={() => { setSex(label); setTimeout(() => setStep(5), 180); }}
                 style={{ flex: 1, background: sex === label ? ob.tealDk : ob.card, border: `1.5px solid ${sex === label ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: "24px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", transition: "all .15s" }}>
                 <div style={{ color: sex === label ? a : ob.muted }}>{icon}</div>
                 <span style={{ fontSize: 14, fontWeight: 600, color: sex === label ? a : ob.white }}>{label}</span>
@@ -1057,7 +1120,7 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 3 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 5 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Your stats</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>Quick measurements</div>
@@ -1081,7 +1144,7 @@ function OnboardingScreen() {
           <button onClick={() => setStep(4)} disabled={!bodyValid || !ageValid} style={{ ...s.tealBtn(!bodyValid || !ageValid), marginTop: "auto" }}>Continue →</button>
         </div>}
 
-        {step === 4 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 6 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Training frequency</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>How often can you train?</div>
@@ -1116,10 +1179,33 @@ function OnboardingScreen() {
               ))}
             </div>
           </div>
-          <button onClick={() => setStep(5)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13 }}>Continue →</button>
+          <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13 }}>Continue →</button>
         </div>}
 
-        {step === 5 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        
+        {step === 7 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Rest preference</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>How long to rest between sets?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>You can always change this mid-workout</div>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
+            {[[60, "1 minute", "High intensity, keep the burn going", "🔥"], [120, "2 minutes", "Balanced — works for most people", "⚡"], [180, "3 minutes", "Full recovery, lift heavier", "💪"]].map(([secs, label, sub, icon]) => (
+              <button key={secs} onClick={() => { setRestPref(secs); setTimeout(() => setStep(8), 180); }}
+                style={{ background: restPref === secs ? ob.tealDk : ob.card, border: `2px solid ${restPref === secs ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "all .15s" }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: restPref === secs ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 24 }}>{icon}</div>
+                <div style={{ textAlign: "left", flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: restPref === secs ? a : ob.white }}>{label}</div>
+                  <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>{sub}</div>
+                </div>
+                {restPref === secs && <div style={{ width: 20, height: 20, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: ob.muted, textAlign: "center", marginTop: 12 }}>This is your default — tap during rest to adjust on the fly</div>
+        </div>}
+
+        {step === 8 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Injuries & limits</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>Anything to avoid?</div>
@@ -1138,15 +1224,15 @@ function OnboardingScreen() {
           </div>
           <textarea value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="Or type anything else (e.g. no overhead pressing)..." style={{ ...s.numInput, minHeight: 64, resize: "none", lineHeight: 1.5, fontSize: 12 }} maxLength={200} />
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button onClick={() => { setInjuries(""); setStep(6); }} style={{ ...s.outlineBtn, flex: 1 }}>None →</button>
-            <button onClick={() => setStep(6)} style={{ ...s.tealBtn(false), flex: 2, marginTop: 0, padding: 10 }}>Continue →</button>
+            <button onClick={() => { setInjuries(""); setStep(9); }} style={{ ...s.outlineBtn, flex: 1 }}>None →</button>
+            <button onClick={() => setStep(9)} style={{ ...s.tealBtn(false), flex: 2, marginTop: 0, padding: 10 }}>Continue →</button>
           </div>
         </div>}
 
 
 
 
-        {step === 6 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 9 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Equipment</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>What will you be training with?</div>
@@ -1159,7 +1245,7 @@ function OnboardingScreen() {
               { id: "kettlebell", label: "Kettlebells & bodyweight", sub: "Functional, explosive training", icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 3a3 3 0 0 1 3 3c0 1.5-1 2.5-2 3l2 9H9l2-9c-1-.5-2-1.5-2-3a3 3 0 0 1 3-3z"/><path d="M9 18h6"/></svg>) },
               { id: "machine", label: "Machines mostly", sub: "Guided equipment, great for beginners", icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="6" width="4" height="12" rx="1"/><rect x="17" y="6" width="4" height="12" rx="1"/><path d="M7 12h10"/></svg>) },
             ].map(eq => (
-              <button key={eq.id} onClick={() => { setEquipment(eq.id); setTimeout(() => setStep(7), 180); }}
+              <button key={eq.id} onClick={() => { setEquipment(eq.id); setTimeout(() => setStep(10), 180); }}
                 style={{ background: equipment === eq.id ? ob.tealDk : ob.card, border: `1.5px solid ${equipment === eq.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: equipment === eq.id ? `rgba(0,212,177,0.15)` : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: equipment === eq.id ? a : ob.muted }}>
                   {eq.icon}
@@ -1174,7 +1260,7 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 7 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 10 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Before I build your plan, please review the health disclaimer below. Your safety comes first.</div></div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "12px 14px", marginBottom: 10, flex: 1, overflowY: "auto" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: ob.white, marginBottom: 6 }}>⚠️ Health & Fitness Disclaimer</div>
@@ -1185,14 +1271,14 @@ function OnboardingScreen() {
               By tapping "I agree", you confirm you are at least 13 years old and accept these terms.
             </div>
           </div>
-          <button onClick={() => setStep(8)} style={{ ...s.tealBtn(false), marginTop: 6 }}>I agree — build my plan ✦</button>
+          <button onClick={() => setStep(11)} style={{ ...s.tealBtn(false), marginTop: 6 }}>I agree — build my plan ✦</button>
           <div style={{ textAlign: "center", marginTop: 8 }}>
             <button onClick={() => navigate("auth")} style={{ fontSize: 10, color: ob.muted, background: "none", border: "none", cursor: "pointer", fontFamily: ob.font }}>Decline — go back</button>
           </div>
         </div>}
 
-        {step === 8 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>Perfect. {goalLabel}, {daysPerWeek} days a week{injuries.trim() ? `, noting: ${injuries.trim()}` : ", no injuries"}. I have everything I need.</div></div>
+        {step === 11 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>Perfect, {name}. {goalLabel}, {daysPerWeek} days a week, {restPref === 60 ? "1-min" : restPref === 180 ? "3-min" : "2-min"} rest{injuries.trim() ? `, noting: ${injuries.trim()}` : ""}. Building your 4-week plan now.</div></div>
           <div style={{ background: ob.card, borderRadius: 10, padding: "6px 10px", marginBottom: 8 }}>
             {confirmRows.map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
@@ -1201,11 +1287,11 @@ function OnboardingScreen() {
               </div>
             ))}
           </div>
-          <button onClick={() => { setChecklist([false, false, false, false]); setStep(9); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
+          <button onClick={() => { setChecklist([false, false, false, false]); setStep(12); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
           <button onClick={() => setStep(0)} style={{ ...s.outlineBtn, width: "100%", marginTop: 6 }}>Start over</button>
         </div>}
 
-        {step === 9 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+        {step === 12 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
           <Spinner size={40} color={a} trackColor={ob.card} />
           <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>Building your plan</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", marginTop: 4 }}>
@@ -1217,7 +1303,7 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 10 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 13 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ textAlign: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>Your plan is ready</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}&apos;s {goalLabel} Plan</div>
