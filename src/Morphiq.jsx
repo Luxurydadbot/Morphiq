@@ -1172,12 +1172,21 @@ function OnboardingScreen() {
               <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
               <button onClick={() => setDaysPerWeek(d => Math.min(7, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
             </div>
-            {/* Day dots */}
+            {/* Day dots — tappable to toggle specific days */}
             <div style={{ display: "flex", gap: 6 }}>
-              {["M","T","W","T","F","S","S"].map((d, i) => (
-                <div key={i} style={{ width: 26, height: 26, borderRadius: "50%", background: i < daysPerWeek ? ob.tealDk : ob.card, border: `1px solid ${i < daysPerWeek ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: i < daysPerWeek ? a : ob.muted, transition: "all .2s" }}>{d}</div>
-              ))}
+              {["M","T","W","T","F","S","S"].map((d, i) => {
+                const on = i < daysPerWeek;
+                return (
+                  <button key={i}
+                    onClick={() => {
+                      if (on && daysPerWeek > 2) setDaysPerWeek(daysPerWeek - 1);
+                      else if (!on && daysPerWeek < 7) setDaysPerWeek(daysPerWeek + 1);
+                    }}
+                    style={{ width: 32, height: 32, borderRadius: "50%", background: on ? ob.tealDk : ob.card, border: `1.5px solid ${on ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: on ? 700 : 400, color: on ? a : ob.muted, cursor: "pointer", fontFamily: ob.font, transition: "all .2s", flexShrink: 0 }}>{d}</button>
+                );
+              })}
             </div>
+            <div style={{ fontSize: 10, color: ob.muted, marginTop: 4 }}>Tap dots or use +/− to adjust</div>
           </div>
           <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13 }}>Continue →</button>
         </div>}
@@ -2196,6 +2205,10 @@ function ProfileScreen() {
   const [editDays, setEditDays] = useState(false);
   const [selectedDays, setSelectedDays] = useState(plan?.workoutDays || ["Monday","Wednesday","Friday"]);
   const [daySaveMsg, setDaySaveMsg] = useState("");
+  // Sync selectedDays if plan loads after component mounts (e.g. from Supabase)
+  useEffect(() => {
+    if (plan?.workoutDays?.length) setSelectedDays(plan.workoutDays);
+  }, [plan?.workoutDays?.join(",")]);
 
   async function saveDays() {
     if (selectedDays.length === 0) return;
@@ -2328,8 +2341,16 @@ function ProfileScreen() {
                 })}
               </div>
             ) : (
-              <div style={{ fontSize: 13, fontWeight: 600, color: a }}>
-                {(plan?.workoutDays || []).map(d => d.slice(0,3)).join(", ") || "Not set"}
+              <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((short, idx) => {
+                  const full = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][idx];
+                  const on = (plan?.workoutDays || selectedDays).includes(full);
+                  return (
+                    <div key={short} style={{ width: 32, height: 32, borderRadius: "50%", background: on ? "#003D35" : "#1A2332", border: `1.5px solid ${on ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: on ? 700 : 400, color: on ? a : theme.textDim }}>
+                      {short.slice(0,1)}
+                    </div>
+                  );
+                })}
               </div>
             )}
             {editDays && daySaveMsg && <div style={{ fontSize: 10, color: a, marginTop: 6 }}>{daySaveMsg}</div>}
