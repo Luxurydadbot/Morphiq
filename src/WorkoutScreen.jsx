@@ -109,8 +109,9 @@ function WorkoutScreen() {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [repCount, setRepCount] = useState(null); // null = not set yet, number = user typed/adjusted
 
-  const REST_SECS = 60;
+  const REST_SECS = plan?.restSeconds || 120;
   const [restSecs, setRestSecs] = useState(REST_SECS);
+  const [activeRestSecs, setActiveRestSecs] = useState(REST_SECS);
   const timerRef = useRef(null);
   const confirmTimerRef = useRef(null);
 
@@ -140,16 +141,20 @@ function WorkoutScreen() {
   }, [exIdx, setIdx, currentWeight]);
 
   const restStartRef = useRef(null);
+  const activeRestSecsRef = useRef(activeRestSecs);
 
   useEffect(() => {
     if (state === "rest") {
       // Record the exact wall-clock time rest started
       restStartRef.current = Date.now();
-      setRestSecs(REST_SECS);
+      const newRestSecs = plan?.restSeconds || 120;
+      setActiveRestSecs(newRestSecs);
+      activeRestSecsRef.current = newRestSecs;
+      setRestSecs(newRestSecs);
       // Poll every 500ms — uses real elapsed time so screen sleep doesn't break it
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - restStartRef.current) / 1000);
-        const remaining = REST_SECS - elapsed;
+        const remaining = activeRestSecsRef.current - elapsed;
         if (remaining <= 0) {
           clearInterval(timerRef.current);
           setRestSecs(0);
@@ -406,7 +411,7 @@ function WorkoutScreen() {
 
           {/* Big ring + countdown number */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 16, position: "relative" }}>
-            <RestRing secondsLeft={restSecs} totalSeconds={REST_SECS} accent={a} size={RING_SIZE} />
+            <RestRing secondsLeft={restSecs} totalSeconds={activeRestSecs} accent={a} size={RING_SIZE} />
             <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center" }}>
               <div style={{ fontSize: 80, fontWeight: 700, color: restSecs <= 15 ? theme.amber : theme.text, lineHeight: 1, transition: "color 0.3s" }}>{restSecs}</div>
               <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>seconds</div>
@@ -435,7 +440,20 @@ function WorkoutScreen() {
             </div>
           )}
 
-          <button onClick={skipRest} style={{ width: "100%", background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "13px", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit", marginTop: "auto", marginBottom: 4 }}>
+          {/* Quick-tap rest duration buttons */}
+          <div style={{ marginTop: "auto", marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: theme.textDim, textAlign: "center", marginBottom: 6 }}>Change rest length</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[[60, "1 min"], [120, "2 min"], [180, "3 min"]].map(([secs, label]) => (
+                <button key={secs} onClick={() => { setActiveRestSecs(secs); setRestSecs(secs); activeRestSecsRef.current = secs; }}
+                  style={{ flex: 1, background: activeRestSecs === secs ? "#003D35" : "#1A2332", border: `1.5px solid ${activeRestSecs === secs ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "8px 4px", fontSize: 12, fontWeight: activeRestSecs === secs ? 700 : 400, color: activeRestSecs === secs ? a : theme.textDim, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={skipRest} style={{ width: "100%", background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "13px", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit", marginBottom: 4 }}>
             Skip rest — I'm ready
           </button>
 
