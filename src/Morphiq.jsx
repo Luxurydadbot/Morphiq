@@ -2153,7 +2153,7 @@ function ProfileScreen() {
             <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{gymBranding.name} · Member</div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 20, padding: "2px 8px", marginTop: 4 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: a }} />
-              <span style={{ fontSize: 10, color: a }}>Week 3 · Fat loss plan</span>
+              <span style={{ fontSize: 10, color: a }}>Active plan · {goalLabel}</span>
             </div>
           </div>
         </div>
@@ -2165,7 +2165,7 @@ function ProfileScreen() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>{goalLabel}</div>
-                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>3 workouts/week · Beginner</div>
+                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{(plan?.workoutDays?.length || user.daysPerWeek || 3)} workouts/week · {user.fitnessLevel || "Beginner"}</div>
               </div>
               <button onClick={() => setEditGoal(true)} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "5px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
             </div>
@@ -2204,7 +2204,7 @@ function ProfileScreen() {
         {/* Daily targets */}
         <div style={sL}>Daily Targets</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-          {[["1,840", "Calories", a], ["140g", "Protein", "#F59E0B"], ["160g", "Carbs", "#818cf8"], ["55g", "Fat", "#f472b6"]].map(([v, l, c]) => (
+          {[[(plan?.calories?.toLocaleString() || "1,800"), "Calories", a], [(plan?.protein ? plan.protein + "g" : "140g"), "Protein", "#F59E0B"], [(plan?.carbs ? plan.carbs + "g" : "160g"), "Carbs", "#818cf8"], [(plan?.fat ? plan.fat + "g" : "55g"), "Fat", "#f472b6"]].map(([v, l, c]) => (
             <div key={l} style={{ background: "#1A2332", borderRadius: 12, padding: "10px 12px" }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: c }}>{v}</div>
               <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{l}</div>
