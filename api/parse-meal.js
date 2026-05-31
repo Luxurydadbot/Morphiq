@@ -24,7 +24,7 @@ export default async function handler(req, res) {
         "content-type": "application/json"
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 150,
         messages: [{
           role: "user",
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     const carbs = get("CARBS");
     const fat = get("FAT");
 
-    // Only fail if we couldn't parse a name at all — cal can legitimately be low
+    // Only fail if we couldn't parse a name — cal can legitimately be 0 for some foods
     if (!name) {
       res.status(500).json({ error: "Could not parse", raw: reply });
       return;
