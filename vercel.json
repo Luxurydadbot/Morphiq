@@ -1,36 +1,5 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
-    },
-    {
-      "src": "api/ping.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/chat.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/plan.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/parse-meal.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    { "src": "/api/ping", "dest": "/api/ping.js" },
-    { "src": "/api/chat", "dest": "/api/chat.js" },
-    { "src": "/api/plan", "dest": "/api/plan.js" },
-    { "src": "/api/parse-meal", "dest": "/api/parse-meal.js" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
