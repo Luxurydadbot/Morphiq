@@ -2177,11 +2177,18 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 14, padding: "14px 14px 12px", marginBottom: 14, textAlign: "center" }}>
           {voicePhase === "idle" && (
             <>
-              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 12 }}>Did you eat something different? Tap the mic and tell me.</div>
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+              <div style={{ fontSize: 13, color: theme.textDim, marginBottom: 12 }}>Did you eat something different?</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
                 <VoiceBtn onPress={startVoice} size={54} />
               </div>
-              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 8 }}>Tap mic to log something else</div>
+              <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 10 }}>— or type it below —</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={textInput} onChange={e => setTextInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && submitText()}
+                  placeholder="e.g. chips and salsa"
+                  style={{ flex: 1, background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }} />
+                <button onClick={submitText} disabled={!textInput.trim()} style={{ background: a, border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: textInput.trim() ? 1 : 0.4 }}>→</button>
+              </div>
             </>
           )}
           {voicePhase === "listening" && (
@@ -2204,14 +2211,14 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
           {voicePhase === "heard" && parsedMeal && (
             <>
               <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>Does this look right?</div>
-              <div style={{ background: "#111827", borderRadius: 10, padding: "10px 12px", marginBottom: 10, textAlign: "left" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", marginBottom: 6 }}>{parsedMeal.name}</div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <span style={{ fontSize: 11, color: a }}>{parsedMeal.cal} cal</span>
-                  <span style={{ fontSize: 11, color: theme.textDim }}>·</span>
-                  <span style={{ fontSize: 11, color: theme.textDim }}>{parsedMeal.protein}g protein</span>
-                  <span style={{ fontSize: 11, color: theme.textDim }}>·</span>
-                  <span style={{ fontSize: 11, color: theme.textDim }}>{parsedMeal.fat}g fat</span>
+              <div style={{ background: "#111827", borderRadius: 10, padding: "12px 14px", marginBottom: 10, textAlign: "left" }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: "#E8EDF2", marginBottom: 8 }}>{parsedMeal.name}</div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <span style={{ fontSize: 13, color: a }}>{parsedMeal.cal} cal</span>
+                  <span style={{ fontSize: 13, color: theme.textDim }}>·</span>
+                  <span style={{ fontSize: 13, color: theme.textDim }}>{parsedMeal.protein}g protein</span>
+                  <span style={{ fontSize: 13, color: theme.textDim }}>·</span>
+                  <span style={{ fontSize: 13, color: theme.textDim }}>{parsedMeal.fat}g fat</span>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
