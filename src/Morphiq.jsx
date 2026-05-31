@@ -652,7 +652,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 
 // ── Shared exports for child screen files ───────────────────────────────────
 export { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
-         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET };
+         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme };
 
 function AuthScreen() {
   const { signIn, gymBranding } = useApp();
