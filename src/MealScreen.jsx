@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
-         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET } from "./Morphiq.jsx";
+         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./Morphiq.jsx";
 
 function MacroBar({ label, current, goal, color }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));
@@ -118,21 +118,26 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
 
   async function parseWithAI(text) {
     try {
-      // Use dedicated parse-meal endpoint — returns clean JSON, not a chat response
       const res = await fetch("/api/parse-meal", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.error("parse-meal HTTP error:", res.status, errData);
+        setVoicePhase("error_lookup");
+        return;
+      }
       const parsed = await res.json();
-      if (parsed.name && !parsed.error) {
+      if (parsed.name) {
         setParsedMeal(parsed); setVoicePhase("heard");
       } else {
-        throw new Error("Bad parse");
+        console.error("parse-meal bad response:", parsed);
+        setVoicePhase("error_lookup");
       }
-    } catch {
-      // API unavailable — show gentle message instead of dummy numbers
-      setParsedMeal({ name: "Couldn't look that up — try again", cal: 0, protein: 0, carbs: 0, fat: 0 });
-      setVoicePhase("heard");
+    } catch (e) {
+      console.error("parse-meal fetch failed:", e.message);
+      setVoicePhase("error_lookup");
     }
   }
 
@@ -268,6 +273,16 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
             <>
               <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8 }}>Mic not available — type instead</div>
               <button onClick={() => setVoicePhase("text_fallback")} style={{ background: a, border: "none", borderRadius: 9, padding: "7px 16px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Type it instead</button>
+            </>
+          )}
+          {voicePhase === "error_lookup" && (
+            <>
+              <div style={{ fontSize: 11, color: "#F87171", marginBottom: 4 }}>Nutrition lookup failed</div>
+              <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 10 }}>Check your connection and try again</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                <button onClick={() => { setVoicePhase("idle"); setTranscript(""); }} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
+              </div>
             </>
           )}
         </div>
