@@ -2098,7 +2098,8 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
       if (parsed.name && parsed.cal) {
         setParsedMeal(parsed); setVoicePhase("heard");
       } else {
-        throw new Error("Bad parse");
+        // Show exactly what came back so we can debug
+        throw new Error("Got: " + JSON.stringify(parsed).slice(0, 120));
       }
     } catch (err) {
       // Show the actual error so we can debug — remove this once working
