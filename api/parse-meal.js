@@ -21,25 +21,45 @@ export default async function handler(req, res) {
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 200,
-        system: 'Return ONLY a raw JSON object, no markdown, no explanation. Example: {"name":"2 eggs","cal":140,"protein":12,"carbs":1,"fat":10}. Use realistic nutrition values. All numbers must be plain integers.',
-        messages: [{ role: "user", content: "Nutrition values for: " + text }],
+        max_tokens: 150,
+        messages: [{
+          role: "user",
+          content: `Give me the nutrition for "${text}". Reply with ONLY these 5 lines, nothing else:
+NAME: <meal name>
+CAL: <calories as integer>
+PROTEIN: <grams as integer>
+CARBS: <grams as integer>
+FAT: <grams as integer>`
+        }],
       }),
     });
 
-    if (!claudeRes.ok) { res.status(502).json({ error: "Claude error" }); return; }
+    if (!claudeRes.ok) {
+      const err = await claudeRes.text();
+      res.status(502).json({ error: "Claude error", detail: err }); return;
+    }
 
     const data = await claudeRes.json();
-    let raw = (data.content?.[0]?.text || "").trim();
-    // Strip any markdown fences if present
-    raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
-    // Extract just the JSON object in case there's surrounding text
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("No JSON found");
-    const parsed = JSON.parse(match[0]);
-    if (!parsed.name || parsed.cal === undefined) throw new Error("Missing fields");
-    res.status(200).json(parsed);
+    const text2 = data.content?.[0]?.text || "";
+
+    // Parse the 5-line format
+    const get = (label) => {
+      const match = text2.match(new RegExp(label + ":\s*(.+)", "i"));
+      return match ? match[1].trim() : null;
+    };
+
+    const name = get("NAME");
+    const cal = parseInt(get("CAL"));
+    const protein = parseInt(get("PROTEIN"));
+    const carbs = parseInt(get("CARBS"));
+    const fat = parseInt(get("FAT"));
+
+    if (!name || isNaN(cal)) {
+      res.status(500).json({ error: "Could not parse response", raw: text2 }); return;
+    }
+
+    res.status(200).json({ name, cal, protein: protein||0, carbs: carbs||0, fat: fat||0 });
   } catch (e) {
-    res.status(500).json({ error: "Parse failed", detail: e.message });
+    res.status(500).json({ error: e.message });
   }
 }
