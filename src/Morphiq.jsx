@@ -857,11 +857,17 @@ function AuthScreen() {
   );
 }
 
+const GOAL_ICONS = {
+  lose_fat: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>),
+  build_muscle: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M6 8.5v7M18 8.5v7"/></svg>),
+  get_fit: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>),
+  strength: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4v16M18 4v16M3 8h3M15 8h6M3 16h3M15 16h6"/></svg>),
+};
 const GOAL_OPTIONS = [
-  { id: "lose_fat", icon: "🔥", label: "Lose fat", sub: "Burn calories, drop weight" },
-  { id: "build_muscle", icon: "💪", label: "Build muscle", sub: "Get stronger, gain size" },
-  { id: "get_fit", icon: "⚡", label: "Get fit & healthy", sub: "More energy, feel better" },
-  { id: "strength", icon: "🏋️", label: "Get stronger", sub: "Build power, hit PRs" },
+  { id: "lose_fat", label: "Lose fat", sub: "Burn calories, drop weight" },
+  { id: "build_muscle", label: "Build muscle", sub: "Get stronger, gain size" },
+  { id: "get_fit", label: "Get fit & healthy", sub: "More energy, feel better" },
+  { id: "strength", label: "Get stronger", sub: "Build power, hit PRs" },
 ];
 
 function OnboardingScreen() {
@@ -877,17 +883,18 @@ function OnboardingScreen() {
   const [heightIn, setHeightIn] = useState("");
   const [weight, setWeight] = useState("");
   const [age, setAge] = useState("");
-  const [daysPerWeek, setDaysPerWeek] = useState(null);
+  const [daysPerWeek, setDaysPerWeek] = useState(3);
   const [injuries, setInjuries] = useState("");
+  const [equipment, setEquipment] = useState(null);
   const [checklist, setChecklist] = useState([false, false, false, false]);
 
   useEffect(() => {
-    if (step !== 8) return;
+    if (step !== 9) return;
     let cancelled = false;
     [0,1,2,3].forEach(i => setTimeout(() => { if(!cancelled) setChecklist(c => c.map((v,idx) => idx<=i ? true : v)); }, i*550+300));
 
     async function generatePlan() {
-      const prompt = `You are a certified personal trainer. Return ONLY valid JSON (no markdown, no preamble) for this member: name=${name}, goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, injuries=${injuries||"none"}.\nJSON shape exactly: {"calories":<number>,"protein":<number>,"carbs":<number>,"fat":<number>,"workoutDays":[<${daysPerWeek} day names>],"workoutType":"<string>","workoutDuration":<minutes>,"weeklyFocus":"<1 sentence>","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<starting lbs>,"muscle":"<string>"}],"tip":"<1 sentence>"}\nInclude 5-6 exercises appropriate for ${goal === "lose_fat" ? "fat loss (cardio-friendly, compound movements)" : goal === "build_muscle" ? "muscle building (progressive overload, hypertrophy)" : "general fitness"}. Starting weights should match a ${sex} beginner at ${weight}lbs. All numeric fields must be plain numbers.`;
+      const prompt = `You are a certified personal trainer. Return ONLY valid JSON (no markdown, no preamble) for this member: name=${name}, goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}.\nJSON shape exactly: {"calories":<number>,"protein":<number>,"carbs":<number>,"fat":<number>,"workoutDays":[<${daysPerWeek} day names>],"workoutType":"<string>","workoutDuration":<minutes>,"weeklyFocus":"<1 sentence>","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<starting lbs>,"muscle":"<string>"}],"tip":"<1 sentence>"}\nInclude 5-6 exercises appropriate for ${goal === "lose_fat" ? "fat loss (cardio-friendly, compound movements)" : goal === "build_muscle" ? "muscle building (progressive overload, hypertrophy)" : "general fitness"}. Starting weights should match a ${sex} beginner at ${weight}lbs. All numeric fields must be plain numbers.`;
       try {
         const res = await fetch("/api/plan", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -897,18 +904,18 @@ function OnboardingScreen() {
         const raw = (data.text || "").replace(/```json|```/g, "").trim();
         const parsed = JSON.parse(raw);
         if (!cancelled) {
-          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, unit };
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit };
           setUser(userData);
           setPlan(parsed);
           // Persist to Supabase profiles table (fire-and-forget — UI doesn't block on this)
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, parsed).catch(() => {});
           }
-          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
+          setTimeout(() => { if (!cancelled) setStep(10); }, 400);
         }
       } catch (_) {
         if (!cancelled) {
-          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, unit };
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit };
           const fallbackPlan = {
             calories: goal === "lose_fat" ? 1800 : goal === "build_muscle" ? 2800 : 2200,
             protein: 140, carbs: 160, fat: 55,
@@ -929,7 +936,7 @@ function OnboardingScreen() {
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, fallbackPlan).catch(() => {});
           }
-          setTimeout(() => { if (!cancelled) setStep(9); }, 400);
+          setTimeout(() => { if (!cancelled) setStep(10); }, 400);
         }
       }
     }
@@ -940,7 +947,7 @@ function OnboardingScreen() {
 
   const bodyValid = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && weight && parseFloat(weight) > 0;
   const ageValid = age && parseInt(age) >= 13 && parseInt(age) <= 100;
-  const progressPct = [15, 25, 35, 50, 60, 75, 88, 95, 100, 100][step] || 15;
+  const progressPct = [15, 22, 33, 45, 56, 66, 76, 86, 93, 100, 100][step] || 15;
   const goalLabel = GOAL_OPTIONS.find(g => g.id === goal)?.label || "";
 
   const s = {
@@ -958,10 +965,12 @@ function OnboardingScreen() {
     <div style={{ width: 28, height: 28, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, color: a, fontWeight: 700 }}>AI</div>
   );
 
+  const EQUIP_LABELS = { barbell: "Barbells & racks", dumbbell: "Dumbbells & cables", kettlebell: "Kettlebells & bodyweight", machine: "Machines mostly" };
   const confirmRows = [
     ["Name", name], ["Goal", goalLabel], ["Sex", sex || "—"],
     ["Height", `${heightFt}′ ${heightIn || "0"}″`], ["Weight", `${weight} lbs`],
     ["Age", age ? `${age} yrs` : "—"], ["Days/week", daysPerWeek ? `${daysPerWeek}×` : "—"],
+    ["Equipment", EQUIP_LABELS[equipment] || "—"],
     ["Injuries", injuries.trim() || "None"],
   ];
 
@@ -983,42 +992,69 @@ function OnboardingScreen() {
       )}
       <div style={s.inner}>
         {step === 0 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>Hey! I'm your Morphiq trainer. I'll build a plan completely personal to you — takes about 2 minutes. Ready?</div></div>
-          <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>First — what's your name?</div></div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: "auto" }}>
-            <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && name.trim().length >= 2 && setStep(1)} placeholder="Type your name..." style={{ flex: 1, background: ob.card, border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 16, padding: "8px 10px", fontSize: 12, color: ob.white, outline: "none", fontFamily: ob.font }} maxLength={30} />
-            <button onClick={() => name.trim().length >= 2 && setStep(1)} style={{ width: 30, height: 30, borderRadius: "50%", background: a, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, color: ob.tealDk, fontWeight: 700, opacity: name.trim().length < 2 ? 0.4 : 1 }}>→</button>
+          <div style={{ textAlign: "center", margin: "16px 0 20px" }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 22, fontWeight: 700, color: a }}>
+              {gymBranding.name?.[0]?.toUpperCase() || "M"}
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
+            <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>Powered by Morphiq</div>
           </div>
+          <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "12px 14px", fontSize: 13, lineHeight: 1.6, color: ob.body, marginBottom: 20 }}>
+            I'll build a training plan personal to you in about 2 minutes. Let's start with your name.
+          </div>
+          <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && name.trim().length >= 2 && setStep(1)} placeholder="Your first name..." style={{ background: ob.card, border: `1.5px solid ${name.trim().length >= 2 ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 12, padding: "12px 14px", fontSize: 16, color: ob.white, outline: "none", fontFamily: ob.font, width: "100%", transition: "border-color .2s" }} maxLength={30} />
+          <button onClick={() => name.trim().length >= 2 && setStep(1)} disabled={name.trim().length < 2} style={{ ...s.tealBtn(name.trim().length < 2), marginTop: 12, padding: 12, fontSize: 13 }}>
+            Let's go, {name.trim() || "..."} →
+          </button>
         </div>}
 
         {step === 1 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Nice to meet you, <span style={{ color: a, fontWeight: 600 }}>{name}</span>! No judgment — what's the main thing you want to achieve?</div></div>
-          <div style={{ flex: 1 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Your goal</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>What do you want to achieve?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>No judgment — pick the one that fits best</div>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
             {GOAL_OPTIONS.map(g => (
-              <button key={g.id} onClick={() => setGoal(g.id)} style={s.goalCard(goal === g.id)}>
-                <span style={{ fontSize: 16 }}>{g.icon}</span>
-                <div><div style={{ fontSize: 12, fontWeight: 600, color: goal === g.id ? a : ob.white }}>{g.label}</div><div style={{ fontSize: 9, color: ob.muted }}>{g.sub}</div></div>
+              <button key={g.id} onClick={() => { setGoal(g.id); setTimeout(() => setStep(2), 180); }}
+                style={{ background: goal === g.id ? ob.tealDk : ob.card, border: `1.5px solid ${goal === g.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: goal === g.id ? `rgba(0,212,177,0.15)` : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: goal === g.id ? a : ob.muted }}>
+                  {GOAL_ICONS[g.id]}
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: goal === g.id ? a : ob.white }}>{g.label}</div>
+                  <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{g.sub}</div>
+                </div>
+                {goal === g.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
               </button>
             ))}
           </div>
-          <button onClick={() => setStep(2)} disabled={!goal} style={s.tealBtn(!goal)}>Continue →</button>
         </div>}
 
         {step === 2 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Got it! Are you male or female? (helps me calculate your calorie targets accurately)</div></div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            {[["Male", "♂"], ["Female", "♀"]].map(([label, icon]) => (
-              <button key={label} onClick={() => setSex(label)} style={{ flex: 1, background: sex === label ? ob.tealDk : ob.card, border: `1.5px solid ${sex === label ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "12px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, cursor: "pointer" }}>
-                <span style={{ fontSize: 20 }}>{icon}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: sex === label ? a : ob.white }}>{label}</span>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>About you</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>Biological sex</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Used to calculate accurate calorie targets</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, flex: 1, alignItems: "flex-start" }}>
+            {[["Male", (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="14" r="5"/><path d="M19 5l-5.5 5.5M19 5h-4M19 5v4"/></svg>)], ["Female", (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="9" r="5"/><path d="M12 14v6M9 17h6"/></svg>)]].map(([label, icon]) => (
+              <button key={label} onClick={() => { setSex(label); setTimeout(() => setStep(3), 180); }}
+                style={{ flex: 1, background: sex === label ? ob.tealDk : ob.card, border: `1.5px solid ${sex === label ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: "24px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", transition: "all .15s" }}>
+                <div style={{ color: sex === label ? a : ob.muted }}>{icon}</div>
+                <span style={{ fontSize: 14, fontWeight: 600, color: sex === label ? a : ob.white }}>{label}</span>
+                {sex === label && <div style={{ width: 16, height: 16, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: ob.tealDk, fontWeight: 700 }}>✓</div>}
               </button>
             ))}
           </div>
-          <button onClick={() => setStep(3)} disabled={!sex} style={s.tealBtn(!sex)}>Continue →</button>
         </div>}
 
         {step === 3 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Quick stats — I use these to set the right calorie and weight targets for you.</div></div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Your stats</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>Quick measurements</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Used to set accurate calorie and weight targets</div>
+          </div>
           <div style={{ marginBottom: 10 }}>
             <div style={s.label}>Height</div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -1038,30 +1074,99 @@ function OnboardingScreen() {
         </div>}
 
         {step === 4 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>How many days per week can you commit to working out?</div></div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-            {[2, 3, 4, 5, 6, 7].map(d => (
-              <button key={d} onClick={() => setDaysPerWeek(d)} style={{ background: daysPerWeek === d ? ob.tealDk : ob.card, border: `1.5px solid ${daysPerWeek === d ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer" }}>
-                <span style={{ fontSize: 18, fontWeight: 700, color: daysPerWeek === d ? a : ob.white }}>{d}</span>
-                <span style={{ fontSize: 9, color: ob.muted }}>days</span>
-              </button>
-            ))}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Training frequency</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>How often can you train?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>3–4 days is ideal for most beginners</div>
           </div>
-          <button onClick={() => setStep(5)} disabled={!daysPerWeek} style={{ ...s.tealBtn(!daysPerWeek), marginTop: "auto" }}>Continue →</button>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            {/* Circular dial ring */}
+            <div style={{ position: "relative", width: 140, height: 140 }}>
+              <svg width="140" height="140" viewBox="0 0 140 140" style={{ transform: "rotate(-90deg)" }}>
+                <circle cx="70" cy="70" r="58" fill="none" stroke={ob.card} strokeWidth="12"/>
+                <circle cx="70" cy="70" r="58" fill="none" stroke={a} strokeWidth="12" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 58}
+                  strokeDashoffset={2 * Math.PI * 58 * (1 - (daysPerWeek - 2) / 5)}
+                  style={{ transition: "stroke-dashoffset .35s cubic-bezier(.4,0,.2,1)" }}
+                />
+              </svg>
+              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center" }}>
+                <div style={{ fontSize: 38, fontWeight: 700, color: ob.white, lineHeight: 1 }}>{daysPerWeek}</div>
+                <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>days/week</div>
+              </div>
+            </div>
+            {/* +/− buttons */}
+            <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+              <button onClick={() => setDaysPerWeek(d => Math.max(2, d - 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.card, border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: ob.muted, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>−</button>
+              <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
+              <button onClick={() => setDaysPerWeek(d => Math.min(7, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
+            </div>
+            {/* Day dots */}
+            <div style={{ display: "flex", gap: 6 }}>
+              {["M","T","W","T","F","S","S"].map((d, i) => (
+                <div key={i} style={{ width: 26, height: 26, borderRadius: "50%", background: i < daysPerWeek ? ob.tealDk : ob.card, border: `1px solid ${i < daysPerWeek ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: i < daysPerWeek ? a : ob.muted, transition: "all .2s" }}>{d}</div>
+              ))}
+            </div>
+          </div>
+          <button onClick={() => setStep(5)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13 }}>Continue →</button>
         </div>}
 
         {step === 5 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>Any injuries or areas to avoid? (optional — tap "None" to skip)</div></div>
-          <textarea value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="e.g. bad left knee, no overhead pressing..." style={{ ...s.numInput, minHeight: 80, resize: "none", lineHeight: 1.5 }} maxLength={200} />
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Injuries & limits</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>Anything to avoid?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Tap all that apply — your plan will work around these</div>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+            {["Lower back","Knees","Shoulders","Wrists","Neck","Hips","Ankles","Elbows"].map(area => {
+              const sel = injuries.includes(area);
+              return (
+                <button key={area} onClick={() => setInjuries(prev => sel ? prev.replace(area, "").replace(/,\s*,/g,",").replace(/^,|,$/g,"").trim() : prev ? `${prev}, ${area}` : area)}
+                  style={{ background: sel ? ob.tealDk : ob.card, border: `1.5px solid ${sel ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 20, padding: "7px 14px", fontSize: 12, color: sel ? a : ob.body, cursor: "pointer", fontFamily: ob.font, transition: "all .15s" }}>
+                  {area}
+                </button>
+              );
+            })}
+          </div>
+          <textarea value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="Or type anything else (e.g. no overhead pressing)..." style={{ ...s.numInput, minHeight: 64, resize: "none", lineHeight: 1.5, fontSize: 12 }} maxLength={200} />
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <button onClick={() => { setInjuries(""); setStep(6); }} style={{ ...s.outlineBtn, flex: 1 }}>None →</button>
-            <button onClick={() => setStep(6)} style={{ ...s.tealBtn(false), flex: 2, marginTop: 0 }}>Continue →</button>
+            <button onClick={() => setStep(6)} style={{ ...s.tealBtn(false), flex: 2, marginTop: 0, padding: 10 }}>Continue →</button>
           </div>
         </div>}
+
 
 
 
         {step === 6 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Equipment</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>What will you be training with?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Your plan is built around your available equipment</div>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              { id: "barbell", label: "Barbells & racks", sub: "Powerlifting-style, free weights", icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 4v16M18 4v16M3 8h3M15 8h6M3 16h3M15 16h6M6 12h12"/></svg>) },
+              { id: "dumbbell", label: "Dumbbells & cables", sub: "Most commercial gyms", icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 8v8M18 8v8M3 10h3M18 10h3M3 14h3M18 14h3M9 12h6"/></svg>) },
+              { id: "kettlebell", label: "Kettlebells & bodyweight", sub: "Functional, explosive training", icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 3a3 3 0 0 1 3 3c0 1.5-1 2.5-2 3l2 9H9l2-9c-1-.5-2-1.5-2-3a3 3 0 0 1 3-3z"/><path d="M9 18h6"/></svg>) },
+              { id: "machine", label: "Machines mostly", sub: "Guided equipment, great for beginners", icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="6" width="4" height="12" rx="1"/><rect x="17" y="6" width="4" height="12" rx="1"/><path d="M7 12h10"/></svg>) },
+            ].map(eq => (
+              <button key={eq.id} onClick={() => { setEquipment(eq.id); setTimeout(() => setStep(7), 180); }}
+                style={{ background: equipment === eq.id ? ob.tealDk : ob.card, border: `1.5px solid ${equipment === eq.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: equipment === eq.id ? `rgba(0,212,177,0.15)` : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: equipment === eq.id ? a : ob.muted }}>
+                  {eq.icon}
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: equipment === eq.id ? a : ob.white }}>{eq.label}</div>
+                  <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{eq.sub}</div>
+                </div>
+                {equipment === eq.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+              </button>
+            ))}
+          </div>
+        </div>}
+
+        {step === 7 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Before I build your plan, please review the health disclaimer below. Your safety comes first.</div></div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "12px 14px", marginBottom: 10, flex: 1, overflowY: "auto" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: ob.white, marginBottom: 6 }}>⚠️ Health & Fitness Disclaimer</div>
@@ -1072,13 +1177,13 @@ function OnboardingScreen() {
               By tapping "I agree", you confirm you are at least 13 years old and accept these terms.
             </div>
           </div>
-          <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 6 }}>I agree — build my plan ✦</button>
+          <button onClick={() => setStep(8)} style={{ ...s.tealBtn(false), marginTop: 6 }}>I agree — build my plan ✦</button>
           <div style={{ textAlign: "center", marginTop: 8 }}>
             <button onClick={() => navigate("auth")} style={{ fontSize: 10, color: ob.muted, background: "none", border: "none", cursor: "pointer", fontFamily: ob.font }}>Decline — go back</button>
           </div>
         </div>}
 
-        {step === 7 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 8 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>Perfect. {goalLabel}, {daysPerWeek} days a week{injuries.trim() ? `, noting: ${injuries.trim()}` : ", no injuries"}. I have everything I need.</div></div>
           <div style={{ background: ob.card, borderRadius: 10, padding: "6px 10px", marginBottom: 8 }}>
             {confirmRows.map(([k, v]) => (
@@ -1088,11 +1193,11 @@ function OnboardingScreen() {
               </div>
             ))}
           </div>
-          <button onClick={() => { setChecklist([false, false, false, false]); setStep(8); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
+          <button onClick={() => { setChecklist([false, false, false, false]); setStep(9); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
           <button onClick={() => setStep(0)} style={{ ...s.outlineBtn, width: "100%", marginTop: 6 }}>Start over</button>
         </div>}
 
-        {step === 8 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+        {step === 9 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
           <Spinner size={40} color={a} trackColor={ob.card} />
           <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>Building your plan</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", marginTop: 4 }}>
@@ -1104,7 +1209,7 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 9 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 10 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ textAlign: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>Your plan is ready</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}&apos;s {goalLabel} Plan</div>
