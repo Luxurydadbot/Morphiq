@@ -22,16 +22,24 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 200,
-        system: "You are a nutrition parser. Return ONLY valid JSON with no markdown, no explanation, no extra text. Format: {"name":"meal name","cal":number,"protein":number,"carbs":number,"fat":number}. Use realistic average nutrition values for the food described. All numbers must be plain integers.",
-        messages: [{ role: "user", content: `What are the nutrition values for: ${text}` }],
+        system: 'Return ONLY a raw JSON object, no markdown, no explanation. Example: {"name":"2 eggs","cal":140,"protein":12,"carbs":1,"fat":10}. Use realistic nutrition values. All numbers must be plain integers.',
+        messages: [{ role: "user", content: "Nutrition values for: " + text }],
       }),
     });
 
     if (!claudeRes.ok) { res.status(502).json({ error: "Claude error" }); return; }
 
     const data = await claudeRes.json();
-    const raw = (data.content?.[0]?.text || "").replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(raw);
+    let raw = (data.content?.[0]?.text || "").trim();
+    // Strip any markdown fences if present
+    raw = raw.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
+    // Extract just the JSON object in case there's surrounding text
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("No JSON found");
+    const parsed = JSON.parse(match[0]);
+    if (!parsed.name || parsed.cal === undefined) throw new Error("Missing fields");
     res.status(200).json(parsed);
-  } catch { res.status(500).json({ error: "Parse failed" }); }
+  } catch (e) {
+    res.status(500).json({ error: "Parse failed", detail: e.message });
+  }
 }
