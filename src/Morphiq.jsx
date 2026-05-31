@@ -2088,20 +2088,13 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
   }
 
   async function parseWithAI(text) {
-    const prompt = `The user said they ate: "${text}". Parse into a meal entry. Return ONLY valid JSON, no markdown, no extra text: {"name":"<clean meal name>","cal":<number>,"protein":<number>,"carbs":<number>,"fat":<number>}. Use realistic average nutrition values. All numbers must be plain integers.`;
     try {
-      const res = await fetch("/api/chat", {
+      // Use dedicated parse-meal endpoint — returns clean JSON, not a chat response
+      const res = await fetch("/api/parse-meal", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ id: 1, role: "user", text: prompt }],
-          user: { name: user?.name || "member" },
-          context: "meal_parser",
-        }),
+        body: JSON.stringify({ text }),
       });
-      const data = await res.json();
-      // API returns { text } for chat responses
-      const raw = (data.text || data.reply || "").replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(raw);
+      const parsed = await res.json();
       if (parsed.name && parsed.cal) {
         setParsedMeal(parsed); setVoicePhase("heard");
       } else {
