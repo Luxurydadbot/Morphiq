@@ -18,47 +18,47 @@ export default async function handler(req, res) {
   try {
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+      },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 150,
         messages: [{
           role: "user",
-          content: `Give me the nutrition for "${text}". Reply with ONLY these 5 lines, nothing else:
-NAME: <meal name>
-CAL: <calories as integer>
-PROTEIN: <grams as integer>
-CARBS: <grams as integer>
-FAT: <grams as integer>`
-        }],
+          content: "Give me the nutrition for: " + text + ". Reply with ONLY these 5 lines:\nNAME: meal name\nCAL: calories\nPROTEIN: grams\nCARBS: grams\nFAT: grams"
+        }]
       }),
     });
 
-    if (!claudeRes.ok) {
-      const err = await claudeRes.text();
-      res.status(502).json({ error: "Claude error", detail: err }); return;
-    }
-
     const data = await claudeRes.json();
-    const text2 = data.content?.[0]?.text || "";
 
-    // Parse the 5-line format
-    const get = (label) => {
-      const match = text2.match(new RegExp(label + ":\s*(.+)", "i"));
-      return match ? match[1].trim() : null;
-    };
-
-    const name = get("NAME");
-    const cal = parseInt(get("CAL"));
-    const protein = parseInt(get("PROTEIN"));
-    const carbs = parseInt(get("CARBS"));
-    const fat = parseInt(get("FAT"));
-
-    if (!name || isNaN(cal)) {
-      res.status(500).json({ error: "Could not parse response", raw: text2 }); return;
+    if (!claudeRes.ok) {
+      res.status(502).json({ error: "Claude error", detail: data?.error?.message || JSON.stringify(data) });
+      return;
     }
 
-    res.status(200).json({ name, cal, protein: protein||0, carbs: carbs||0, fat: fat||0 });
+    const reply = data.content?.[0]?.text || "";
+
+    const get = (label) => {
+      const match = reply.match(new RegExp(label + "[:\s]+([\d.]+)", "i"));
+      return match ? Math.round(parseFloat(match[1])) : 0;
+    };
+    const nameMatch = reply.match(/NAME[:\s]+(.+)/i);
+    const name = nameMatch ? nameMatch[1].trim() : text;
+    const cal = get("CAL");
+    const protein = get("PROTEIN");
+    const carbs = get("CARBS");
+    const fat = get("FAT");
+
+    if (!name || cal === 0) {
+      res.status(500).json({ error: "Could not parse", raw: reply });
+      return;
+    }
+
+    res.status(200).json({ name, cal, protein, carbs, fat });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
