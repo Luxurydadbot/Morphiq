@@ -2098,12 +2098,11 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
       if (parsed.name && parsed.cal) {
         setParsedMeal(parsed); setVoicePhase("heard");
       } else {
-        // Show exactly what came back so we can debug
-        throw new Error("Got: " + JSON.stringify(parsed).slice(0, 120));
+        throw new Error("Bad parse");
       }
-    } catch (err) {
-      // Show the actual error so we can debug — remove this once working
-      setParsedMeal({ name: "ERROR: " + (err?.message || "unknown"), cal: 0, protein: 0, carbs: 0, fat: 0 });
+    } catch {
+      // API unavailable — show gentle message instead of dummy numbers
+      setParsedMeal({ name: "Couldn't look that up — try again", cal: 0, protein: 0, carbs: 0, fat: 0 });
       setVoicePhase("heard");
     }
   }
@@ -2456,7 +2455,8 @@ async function fetchAIReply(messages, user, context, workoutContext = null) {
 }
 
 function ChatScreen({ fromScreen = "home" }) {
-  const { navigate, user, gymBranding, workoutContext } = useApp();
+  const { navigate, user, gymBranding, workoutContext, supabaseUser } = useApp();
+  const [msgUsage, setMsgUsage] = useState(null);
   const a = gymBranding.accent;
   const [messages, setMessages] = useState([
     { id: 1, role: "ai", text: `Hey ${user.name || "there"}! I can see your full plan and history. What's up?` },
@@ -2494,12 +2494,14 @@ function ChatScreen({ fromScreen = "home" }) {
     try {
       // Send full conversation history so Claude has context
       const userMessages = newMessages.filter(m => m.role === "user" || m.role === "ai");
-      const { text: reply, action, chips } = await fetchAIReply(
+      const profileId = await sb.getProfileId(supabaseUser?.id).catch(() => null);
+      const { text: reply, action, chips, usageCount, usageLimit } = await fetchAIReply(
         userMessages,
-        { ...user, gymName: gymBranding.name },
+        { ...user, gymName: gymBranding.name, profileId, gymId: gymBranding.gymId || "unknown" },
         fromScreen,
         workoutContext   // null when not in workout, object when mid-workout
       );
+      if (usageCount !== undefined) setMsgUsage({ count: usageCount, limit: usageLimit });
       setThinking(false);
       setMessages(prev => [...prev, { id: Date.now() + 1, role: "ai", text: reply }]);
       if (chips?.length) setDynamicChips(chips);
@@ -2626,6 +2628,17 @@ function ChatScreen({ fromScreen = "home" }) {
               <button onClick={confirmVoice} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Send ✓</button>
             </div>
           </>}
+        </div>
+      )}
+
+      {/* Usage counter */}
+      {msgUsage && (
+        <div style={{ padding: "4px 14px 0", background: "#0D1117", display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: msgUsage.count >= msgUsage.limit ? "#F87171" : "#6B7A8D" }}>
+            {msgUsage.count >= msgUsage.limit
+              ? "Monthly limit reached — resets on the 1st"
+              : `${msgUsage.count} / ${msgUsage.limit} AI messages this month`}
+          </div>
         </div>
       )}
 
@@ -3630,10 +3643,78 @@ function PricingScreen() {
   );
 }
 
+
+function OwnerUsageTab() {
+  const { gymBranding } = useApp();
+  const a = "#00D4B1";
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const month = new Date().toISOString().slice(0, 7);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(
+          `https://uvnyjegmhsztdednjclb.supabase.co/rest/v1/ai_usage?month=eq.${month}&order=created_at.desc&limit=200`,
+          { headers: { "apikey": "sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll", "Authorization": "Bearer sb_publishable_uMj3nFhXSfk4s9Upa4mkuw_nwFvBCll" } }
+        );
+        const data = await res.json();
+        if (Array.isArray(data)) setRows(data);
+      } catch {}
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const totalCalls = rows.length;
+  const totalTokens = rows.reduce((sum, r) => sum + (r.tokens_used || 0), 0);
+  const estCost = ((totalTokens / 1000) * 0.003).toFixed(2);
+  const chatCalls = rows.filter(r => r.feature === "chat").length;
+  const mealCalls = rows.filter(r => r.feature === "meal_parse").length;
+
+  const card = { background: "#1A2332", borderRadius: 12, padding: "12px 14px", marginBottom: 10 };
+  const dim = { fontSize: 11, color: "#6B7A8D" };
+  const big = { fontSize: 22, fontWeight: 700, color: a };
+
+  return (
+    <div style={{ paddingBottom: 80 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", marginBottom: 14 }}>AI Usage — {month}</div>
+      {loading ? <div style={{ ...dim, textAlign: "center", padding: 20 }}>Loading...</div> : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+            <div style={card}><div style={big}>{totalCalls}</div><div style={dim}>Total AI calls</div></div>
+            <div style={{ ...card, background: "#0A1A14", border: "1px solid rgba(0,212,177,0.2)" }}><div style={big}>${estCost}</div><div style={dim}>Est. cost this month</div></div>
+            <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#A78BFA" }}>{totalTokens.toLocaleString()}</div><div style={dim}>Tokens used</div></div>
+            <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#F59E0B" }}>{chatCalls}</div><div style={dim}>Chat messages</div></div>
+          </div>
+          <div style={card}>
+            <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Usage by feature</div>
+            {[["AI Chat", chatCalls, a], ["Meal parsing", mealCalls, "#F59E0B"], ["Plan generation", totalCalls - chatCalls - mealCalls, "#A78BFA"]].map(([label, count, color]) => (
+              <div key={label} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9BB3C8", marginBottom: 4 }}>
+                  <span>{label}</span><span style={{ color }}>{count} calls</span>
+                </div>
+                <div style={{ height: 4, background: "#0D1623", borderRadius: 2 }}>
+                  <div style={{ height: 4, borderRadius: 2, background: color, width: totalCalls ? `${Math.round((count/totalCalls)*100)}%` : "0%", transition: "width .5s" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...card, background: "#0D1623" }}>
+            <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 4 }}>Member limit</div>
+            <div style={{ fontSize: 13, color: "#E8EDF2" }}>50 AI chat messages per member per month</div>
+            <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 4 }}>Resets on the 1st of each month</div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function GymOwnerDashboard() {
   const { navigate } = useApp();
   const [tab, setTab] = useState("overview");
-  const tabs = [["overview","Overview"],["members","Members"],["invite","Invite"],["branding","Branding"]];
+  const tabs = [["overview","Overview"],["members","Members"],["invite","Invite"],["branding","Branding"],["usage","AI Usage"]];
 
   return (
     <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
@@ -3662,6 +3743,7 @@ function GymOwnerDashboard() {
         {tab === "members"  && <OwnerMembersTab />}
         {tab === "invite"   && <OwnerInviteTab />}
         {tab === "branding" && <OwnerBrandingTab />}
+        {tab === "usage"    && <OwnerUsageTab />}
       </div>
 
       {/* Footer back link */}
