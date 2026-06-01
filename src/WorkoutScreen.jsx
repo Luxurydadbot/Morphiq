@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         WORKOUT_EXERCISES, EXERCISES_DISPLAY, FALLBACK_REPLIES, CHAT_SUGGESTIONS } from "./Morphiq.jsx";
+         WORKOUT_EXERCISES } from "./Morphiq.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
