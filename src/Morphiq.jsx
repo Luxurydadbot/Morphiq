@@ -932,8 +932,8 @@ function OnboardingScreen() {
       } catch (planErr) {
         console.error("[Morphiq] /api/plan failed:", planErr.message);
         if (!cancelled) {
-          setPlanError("API error: " + planErr.message);
-          setStep(12);
+          setPlanError("Plan generation failed — " + (planErr.message || "unknown error") + ". Tap to try again.");
+          setIsGenerating(false);
         }
       }
     }
