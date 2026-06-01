@@ -971,7 +971,6 @@ Include exactly 5 exercises. All values must be plain numbers not strings.`;
         console.error("[Morphiq] /api/plan failed:", planErr.message);
         if (!cancelled) {
           setPlanError("Plan generation failed — " + (planErr.message || "unknown error") + ". Tap to try again.");
-          setIsGenerating(false);
         }
       }
     }
