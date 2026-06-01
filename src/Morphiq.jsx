@@ -950,12 +950,12 @@ function OnboardingScreen() {
         : recentActivity === "returning"
         ? "Returning lifter — use intermediate weights, NOT advanced: goblet squat 35-55lbs, dumbbell row 35-50lbs, bench press 115-155lbs, squat 135-175lbs. They need to rebuild."
         : "Experienced active lifter: goblet squat 55-75lbs, dumbbell row 55-75lbs, dumbbell press 45-65lbs, barbell squat 155-205lbs, bench press 155-205lbs, RDL 135-185lbs. Do NOT exceed these unless the member is clearly a competitive athlete.";
-      const prompt = `You are a certified personal trainer. Return ONLY valid JSON, no markdown, no explanation.
-Member: goal=${{goal}}, sex=${{sex}}, height=${{heightFt}}ft${{heightIn||0}}in, weight=${{weight}}lbs, age=${{age}}, daysPerWeek=${{daysPerWeek}}, equipment=${{equipment||"dumbbells"}}, injuries=${{injuries||"none"}}, fitnessProfile=${{fitnessProfile}}, restPreference=${{restPref}}s.
-Goal: ${{goalGuide}}.
-IMPORTANT weight guidance — follow these ranges closely: ${{weightGuide}}
+Member: goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile=${fitnessProfile}, restPreference=${restPref}s.
+Goal: ${goalGuide}.
+IMPORTANT weight guidance — follow these ranges closely: ${weightGuide}
 Return exactly this JSON with no extra fields:
-{{"calories":number,"protein":number,"carbs":number,"fat":number,"workoutDays":[array of ${{daysPerWeek}} day name strings],"workoutType":"string","workoutDuration":number,"restSeconds":${{restPref}},"weekNumber":1,"weekStartDate":"2026-06-01","weeklyFocus":"1 sentence","tip":"1 sentence","exercises":[{{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string"}}]}}
+{"calories":number,"protein":number,"carbs":number,"fat":number,"workoutDays":[array of ${daysPerWeek} day name strings],"workoutType":"string","workoutDuration":number,"restSeconds":${restPref},"weekNumber":1,"weekStartDate":"2026-06-01","weeklyFocus":"1 sentence","tip":"1 sentence","exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string"}]}
+Include exactly 5 exercises appropriate for the equipment. All values must be plain numbers not strings.`;
 Include exactly 5 exercises appropriate for the equipment. All values must be plain numbers not strings.`;
 
       try {
