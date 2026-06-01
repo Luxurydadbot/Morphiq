@@ -1284,15 +1284,25 @@ function OnboardingScreen() {
         </div>}
 
         {step === 12 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <Spinner size={40} color={a} trackColor={ob.card} />
-          <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>Building your plan</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", marginTop: 4 }}>
-            {["Analyzing your goal", "Selecting best exercises", "Building your meal guide", "Personalizing week one..."].map((item, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: checklist[i] ? a : ob.muted, padding: "3px 0" }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: checklist[i] ? a : ob.card, flexShrink: 0, transition: "background .3s" }} />{item}
+          {planError ? (
+            <>
+              <div style={{ fontSize: 13, color: "#F87171", textAlign: "center", fontWeight: 600 }}>Something went wrong</div>
+              <div style={{ fontSize: 11, color: ob.muted, textAlign: "center", padding: "0 20px" }}>{planError}</div>
+              <button onClick={() => { setPlanError(""); setStep(11); }} style={{ background: a, border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 12, color: ob.tealDk, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, marginTop: 8 }}>Try again</button>
+            </>
+          ) : (
+            <>
+              <Spinner size={40} color={a} trackColor={ob.card} />
+              <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>Building your plan</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", marginTop: 4 }}>
+                {["Analyzing your goal", "Selecting best exercises", "Building your meal guide", "Personalizing week one..."].map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: checklist[i] ? a : ob.muted, padding: "3px 0" }}>
+                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: checklist[i] ? a : ob.card, flexShrink: 0, transition: "background .3s" }} />{item}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>}
 
         {step === 13 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
