@@ -942,21 +942,8 @@ function OnboardingScreen() {
       const activityMap = { returning: "returning after a long break (treat as rebuilding, use 60-70% of experienced weights)", consistent: "moderately active, some consistency recently", active: "currently training regularly" };
       const fitnessProfile = `${historyMap[trainingHistory] || "beginner"}, ${activityMap[recentActivity] || "just starting out"}`;
       const goalGuide = goal === "lose_fat" ? "fat loss: compound moves, 12-15 reps, shorter rest" : goal === "build_muscle" ? "muscle building: 6-10 reps, heavier progressive weight" : "general fitness: balanced full body, 10-12 reps";
-      // Realistic starting weight ranges by experience — prevents AI from going too heavy
-      const weightGuide = trainingHistory === "new"
-        ? "Beginner weights: goblet squat 15-25lbs, dumbbell row 15-25lbs, dumbbell press 10-20lbs, RDL 20-30lbs. Start conservative — form over weight."
-        : trainingHistory === "some"
-        ? "Intermediate weights: goblet squat 35-55lbs, dumbbell row 35-50lbs, dumbbell press 25-40lbs, RDL 50-70lbs, barbell squat 95-155lbs, bench press 95-155lbs. Moderate challenge."
-        : recentActivity === "returning"
-        ? "Returning lifter — use intermediate weights, NOT advanced: goblet squat 35-55lbs, dumbbell row 35-50lbs, bench press 115-155lbs, squat 135-175lbs. They need to rebuild."
-        : "Experienced active lifter: goblet squat 55-75lbs, dumbbell row 55-75lbs, dumbbell press 45-65lbs, barbell squat 155-205lbs, bench press 155-205lbs, RDL 135-185lbs. Do NOT exceed these unless the member is clearly a competitive athlete.";
-Member: goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile=${fitnessProfile}, restPreference=${restPref}s.
-Goal: ${goalGuide}.
-IMPORTANT weight guidance — follow these ranges closely: ${weightGuide}
-Return exactly this JSON with no extra fields:
-{"calories":number,"protein":number,"carbs":number,"fat":number,"workoutDays":[array of ${daysPerWeek} day name strings],"workoutType":"string","workoutDuration":number,"restSeconds":${restPref},"weekNumber":1,"weekStartDate":"2026-06-01","weeklyFocus":"1 sentence","tip":"1 sentence","exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string"}]}
-Include exactly 5 exercises appropriate for the equipment. All values must be plain numbers not strings.`;
-Include exactly 5 exercises appropriate for the equipment. All values must be plain numbers not strings.`;
+      const weightGuide = trainingHistory === "new" ? "Beginner: goblet squat 15-25lbs, dumbbell row 15-25lbs, dumbbell press 10-20lbs, RDL 20-30lbs. Start conservative." : trainingHistory === "some" ? "Intermediate: goblet squat 35-55lbs, dumbbell row 35-50lbs, dumbbell press 25-40lbs, RDL 50-70lbs, barbell bench 95-155lbs. Moderate challenge." : recentActivity === "returning" ? "Returning lifter (NOT advanced): goblet squat 35-55lbs, dumbbell row 35-50lbs, barbell bench 115-155lbs, barbell squat 135-175lbs. Rebuild carefully." : "Experienced active: goblet squat 55-75lbs, dumbbell row 55-75lbs, barbell squat 155-205lbs, bench press 155-205lbs, RDL 135-185lbs. Do NOT exceed these.";
+      const prompt = `You are a certified personal trainer. Return ONLY valid JSON, no markdown.\nMember: goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile=${fitnessProfile}, restPreference=${restPref}s.\nGoal: ${goalGuide}.\nWEIGHT GUIDANCE - follow closely: ${weightGuide}\nReturn exactly: {"calories":number,"protein":number,"carbs":number,"fat":number,"workoutDays":[${daysPerWeek} day names],"workoutType":"string","workoutDuration":number,"restSeconds":${restPref},"weekNumber":1,"weekStartDate":"2026-06-01","weeklyFocus":"1 sentence","tip":"1 sentence","exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string"}]}\nInclude exactly 5 exercises. All values must be plain numbers.`;
 
       try {
         const res = await fetch("/api/plan", {
