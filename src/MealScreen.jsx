@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
-         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./Morphiq.jsx";
+         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
+         MEAL_DATA, GROCERY_DATA } from "./Morphiq.jsx";
 
 function MacroBar({ label, current, goal, color }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));

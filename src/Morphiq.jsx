@@ -652,7 +652,9 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 
 // ── Shared exports for child screen files ───────────────────────────────────
 export { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
-         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme };
+         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
+         MEAL_DATA, GROCERY_DATA, WORKOUT_EXERCISES, EXERCISES_DISPLAY,
+         FALLBACK_REPLIES, CHAT_SUGGESTIONS };
 
 function AuthScreen() {
   const { signIn, gymBranding } = useApp();
@@ -2357,6 +2359,17 @@ function ProfileScreen() {
 }
 
 // Derive display properties from a raw profile + stats
+function LoadingScreen() {
+  return (
+    <Layout>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
+        <Spinner />
+        <div style={{ fontSize: 13, color: theme.textDim }}>Loading...</div>
+      </div>
+    </Layout>
+  );
+}
+
 function AppRouter() {
   const { screen } = useApp();
   if (screen === "auth") return <AuthScreen />;
