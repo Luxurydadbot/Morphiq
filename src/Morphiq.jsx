@@ -67,7 +67,11 @@ const sb = {
         age: userData.age,
         days_per_week: userData.daysPerWeek,
         injuries: userData.injuries || "",
-        plan: planData,                         // full plan JSON stored in jsonb column
+        plan: planData,
+        week_number: planData?.weekNumber || 1,
+        week_start_date: planData?.weekStartDate || new Date().toISOString().split('T')[0],
+        equipment: userData.equipment || "",
+        training_history: userData.trainingHistory || "",
         updated_at: new Date().toISOString(),
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
@@ -413,6 +417,7 @@ function AppProvider({ children }) {
         setUser({ name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" });
         setPlan(profile.plan);
         loadHistoricalData(savedSession.uid);
+        checkAndGenerateNextWeek(savedSession.uid, profile.plan, profile).catch(() => {});
         setScreen("home");
       } else {
         localStorage.removeItem(SESSION_KEY);
@@ -480,6 +485,32 @@ function AppProvider({ children }) {
   }, []);
 
   // Load historical workout + weight data once we have a real user ID
+
+  // Checks if 7+ days have passed since weekStartDate — if so, silently generates next week
+  async function checkAndGenerateNextWeek(uid, currentPlan, currentUser) {
+    try {
+      if (!currentPlan?.weekStartDate) return;
+      const daysSince = Math.floor((Date.now() - new Date(currentPlan.weekStartDate)) / 86400000);
+      if (daysSince < 7) return;
+      const nextWeekNum = (currentPlan.weekNumber || 1) + 1;
+      const prevEx = (currentPlan.exercises || []).map(e => `${e.name} ${e.sets}x${e.reps} @ ${e.weight}lbs`).join(", ");
+      const deload = nextWeekNum % 4 === 0;
+      const weekGuide = nextWeekNum <= 2 ? "add 1 rep or 2.5-5lbs to last week" : deload ? "deload: reduce weight 10%, same reps, focus on form" : "increase weight 5-10% or add a set vs last week";
+      const prompt = `You are a certified personal trainer. Generate Week ${nextWeekNum} based on Week ${currentPlan.weekNumber||1} performance. Return ONLY valid JSON, no markdown.
+Member: goal=${currentUser.goal}, equipment=${currentUser.equipment||"dumbbells"}, injuries=${currentUser.injuries||"none"}, restPreference=${currentPlan.restSeconds||90}s.
+Last week exercises: ${prevEx}.
+Week ${nextWeekNum} instruction: ${weekGuide}.
+Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"workoutDays":${JSON.stringify(currentPlan.workoutDays||[])},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","weeklyFocus":"1 sentence","tip":"1 sentence","exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string"}]}
+Include exactly 5 exercises. All values must be plain numbers.`;
+      const res = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+      const data = await res.json();
+      const nextPlan = JSON.parse((data.text || "").replace(/```json|```/g, "").trim());
+      setPlan(nextPlan);
+      if (uid) sb.upsertProfile(uid, currentUser, nextPlan).catch(() => {});
+      console.log("[Morphiq] Auto-generated Week", nextWeekNum);
+    } catch (e) { console.log("[Morphiq] Next week skipped:", e.message); }
+  }
+
   async function loadHistoricalData(uid) {
     if (!uid || uid.startsWith("sim-") || uid === "dev-001") return;
     try {
@@ -910,7 +941,14 @@ function OnboardingScreen() {
       const historyMap = { new: "beginner with no training history", some: "intermediate, 6 months to 2 years experience", years: "experienced lifter, several years of training" };
       const activityMap = { returning: "returning after a long break (treat as rebuilding, use 60-70% of experienced weights)", consistent: "moderately active, some consistency recently", active: "currently training regularly" };
       const fitnessProfile = `${historyMap[trainingHistory] || "beginner"}, ${activityMap[recentActivity] || "just starting out"}`;
-      const prompt = `You are a certified personal trainer. Return ONLY valid JSON (no markdown, no preamble). Member: name=${name}, goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile="${fitnessProfile}", restPreference=${restPref}s.\nReturn this exact JSON shape: {"calories":<number>,"protein":<number>,"carbs":<number>,"fat":<number>,"workoutDays":[<${daysPerWeek} day names>],"workoutType":"<string>","workoutDuration":<minutes>,"restSeconds":${restPref},"weeklyFocus":"<1 sentence>","tip":"<1 sentence>","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<lbs>,"muscle":"<string>"}],"weeks":[{"week":1,"focus":"Foundation","exercises":[{"name":"<string>","sets":<n>,"reps":<n>,"weight":<lbs>,"muscle":"<string>"}]},{"week":2,"focus":"Progressive","exercises":[...]},{"week":3,"focus":"Intensity","exercises":[...]},{"week":4,"focus":"Peak","exercises":[...]}]}\nTop-level exercises = week 1 exercises. Each week has 5-6 exercises. Week 1: learn movements, moderate weights. Week 2: add 1 set or 2 reps. Week 3: increase weight 5-10%. Week 4: peak intensity, hardest variation. Goal: ${goal === "lose_fat" ? "fat loss - compound movements, keep rest short" : goal === "build_muscle" ? "muscle building - progressive overload, hypertrophy" : "general fitness - balanced full body"}. Fitness profile: ${fitnessProfile}. Do NOT use beginner weights for experienced members. All numeric fields must be plain numbers.`;
+      const goalGuide = goal === "lose_fat" ? "fat loss: compound moves, 12-15 reps, shorter rest" : goal === "build_muscle" ? "muscle building: 6-10 reps, heavier progressive weight" : "general fitness: balanced full body, 10-12 reps";
+      const prompt = `You are a certified personal trainer. Return ONLY valid JSON, no markdown, no explanation.
+Member: goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile=${fitnessProfile}, restPreference=${restPref}s.
+Goal: ${goalGuide}. Do not use beginner weights for experienced members.
+Return exactly this JSON with no extra fields:
+{"calories":number,"protein":number,"carbs":number,"fat":number,"workoutDays":[array of ${daysPerWeek} day name strings],"workoutType":"string","workoutDuration":number,"restSeconds":${restPref},"weekNumber":1,"weekStartDate":"2026-06-01","weeklyFocus":"1 sentence","tip":"1 sentence","exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string"}]}
+Include exactly 5 exercises. All values must be plain numbers not strings.`;
+
       try {
         const res = await fetch("/api/plan", {
           method: "POST", headers: { "Content-Type": "application/json" },
