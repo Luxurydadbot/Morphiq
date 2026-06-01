@@ -1377,6 +1377,7 @@ Include exactly 5 exercises appropriate for the equipment. All values must be pl
           </div>
           {plan.tip && <div style={{ background: "#0A1628", borderLeft: `2px solid ${a}`, borderRadius: "0 8px 8px 0", padding: "7px 10px", marginBottom: 8, fontSize: 11, color: ob.body, lineHeight: 1.5 }}>{plan.tip}</div>}
           <button onClick={() => navigate("plan")} style={{ ...s.tealBtn(false), marginTop: "auto", padding: 10, fontSize: 12 }}>Start Day 1 →</button>
+          <button onClick={() => { const adj = { ...plan, exercises: (plan.exercises||[]).map(e => ({ ...e, weight: Math.max(5, Math.round(e.weight * 0.75)) })) }; setPlan(adj); if (supabaseUser?.id) sb.upsertProfile(supabaseUser.id, user, adj).catch(() => {}); }} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: 8, fontSize: 11, color: ob.muted, cursor: "pointer", marginTop: 6, fontFamily: ob.font }}>Weights feel too heavy? Reduce all by 25%</button>
         </div>}
       </div>
       <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: "0.5px", padding: "4px 0 6px", flexShrink: 0 }}>POWERED BY MORPHIQ</div>
