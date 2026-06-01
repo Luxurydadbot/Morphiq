@@ -938,7 +938,7 @@ function OnboardingScreen() {
       }
     }
 
-    Promise.all([generatePlan(), new Promise(r => setTimeout(r, 2600))]);
+    if (step === 12) generatePlan();
     return () => { cancelled = true; };
   }, [step]);
 
