@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
-         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET } from "./Morphiq.jsx";
+         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./Morphiq.jsx";
 
 function buildMemberRow(profile, sessions, lastDate, weightDelta) {
   const initials = (profile.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();

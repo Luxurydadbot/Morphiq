@@ -1408,6 +1408,37 @@ function PlanOverviewScreen() {
   );
 }
 
+const WEEK = [
+  {name:"Mon",type:"Full body",isWorkout:true},
+  {name:"Tue",type:"Rest",isWorkout:false},
+  {name:"Wed",type:"Full body",isWorkout:true},
+  {name:"Thu",type:"Rest",isWorkout:false},
+  {name:"Fri",type:"Full body",isWorkout:true},
+  {name:"Sat",type:"Rest",isWorkout:false},
+  {name:"Sun",type:"Rest",isWorkout:false},
+];
+
+const EXERCISES_DISPLAY = [
+  {name:"Goblet squat",weight:"35 lbs",reps:"10 reps",sets:"3 sets"},
+  {name:"Dumbbell row",weight:"30 lbs",reps:"10 reps",sets:"3 sets"},
+  {name:"Incline press",weight:"25 lbs",reps:"10 reps",sets:"3 sets"},
+  {name:"Romanian deadlift",weight:"60 lbs",reps:"10 reps",sets:"3 sets"},
+];
+
+const FALLBACK_REPLIES = {
+  "how many calories should i eat": "Based on your goal and weight, your target is already set in your plan. Check the Meals tab for your daily targets.",
+  "what should i eat today": "Check your Meals tab — your full day is planned out with breakfast, lunch, and dinner suggestions.",
+  "am i on track": "You're doing great. Keep logging your workouts and meals and I'll flag anything that needs attention.",
+  "how do i lose weight": "You're already on a fat loss plan. Stick to your calorie target, hit your protein goal, and keep showing up to workouts.",
+};
+
+const CHAT_SUGGESTIONS = {
+  idle: ["What should I eat today?","Am I on track?","How many calories?"],
+  workout: ["How many sets left?","Is my form right?","Can I swap this exercise?"],
+  meals: ["What can I snack on?","Did I hit protein today?","Adjust for tomorrow"],
+  home: ["What's my plan today?","How am I doing this week?","Motivate me"],
+};
+
 function HomeDashboardScreen() {
   const { navigate, user, gymBranding, historicalData } = useApp();
   const a = gymBranding.accent;
