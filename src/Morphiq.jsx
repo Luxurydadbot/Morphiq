@@ -355,8 +355,9 @@ const useApp = () => useContext(AppContext);
 const DEFAULT_USER = { name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" };
 const MOCK_RETURNING_PLAN = {
   calories: 1800, protein: 140, carbs: 160, fat: 55,
-  workoutDays: ["Monday","Wednesday","Friday"], workoutType: "Full Body",
-  workoutDuration: 40, weeklyFocus: "Build your movement foundation.",
+  workoutType: "Full Body", workoutDuration: 40,
+  weekNumber: 2, daysPerWeek: 3,
+  weeklyFocus: "Build your movement foundation.",
   exercises: [
     { name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" },
     { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" },
@@ -383,7 +384,7 @@ function AppProvider({ children }) {
   );
   const [user, setUser] = useState(
     DEV_SKIP === "member_returning"
-      ? { name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" }
+      ? { name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial", fitnessLevel: "Beginner" }
       : DEFAULT_USER
   );
   const [plan, setPlan] = useState(DEV_SKIP === "member_returning" ? MOCK_RETURNING_PLAN : null);
