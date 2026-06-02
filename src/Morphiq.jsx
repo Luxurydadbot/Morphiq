@@ -1474,11 +1474,9 @@ const CHAT_SUGGESTIONS = {
 };
 
 function HomeDashboardScreen() {
-  const { navigate, user, gymBranding, historicalData } = useApp();
+  const { navigate, user, plan, gymBranding, historicalData } = useApp();
   const a = gymBranding.accent;
-  const [done, setDone] = useState(0);
   const [cals, setCals] = useState(1100);
-  const [logged, setLogged] = useState(false);
   const calGoal = 1840;
   const h = new Date().getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
