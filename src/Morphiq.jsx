@@ -3,12 +3,12 @@ import { WorkoutScreen } from "./WorkoutScreen.jsx";
 import { MealPlanScreen } from "./MealScreen.jsx";
 import { GymOwnerDashboard, PricingScreen } from "./GymOwnerDashboard.jsx";
 
-const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04";
-const SB_HEADERS = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`, "Content-Type": "application/json" };
-const SB_GET = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` };
+export const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
+export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04";
+export const SB_HEADERS = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`, "Content-Type": "application/json" };
+export const SB_GET = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` };
 
-const sb = {
+export const sb = {
   // ── AUTH ──────────────────────────────────────────────────────────────────
   // Sends a 6-digit OTP to email (works inside the PWA — no browser redirect)
   async sendOTP(email) {
@@ -331,7 +331,7 @@ const sb = {
   },
 };
 
-const theme = {
+export const theme = {
   accent: "#00D4B1", accentDim: "rgba(0,212,177,0.10)", accentBorder: "rgba(0,212,177,0.25)",
   bg: "#0F0F0F", surface: "#161616", border: "#242424", borderSubtle: "#1E1E1E",
   text: "#E8E8E8", textMuted: "#888", textDim: "#555", textFaint: "#333",
@@ -350,7 +350,7 @@ const theme = {
 const DEV_SKIP = null; // null = shows real auth screen
 
 const AppContext = createContext(null);
-const useApp = () => useContext(AppContext);
+export const useApp = () => useContext(AppContext);
 
 const DEFAULT_USER = { name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" };
 const MOCK_RETURNING_PLAN = {
@@ -608,7 +608,7 @@ const css = `
   }
 `;
 
-function MicIcon({ size = 22, color = "#003D35" }) {
+export function MicIcon({ size = 22, color = "#003D35" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <rect x="8" y="2" width="8" height="12" rx="4" fill={color} />
@@ -619,7 +619,7 @@ function MicIcon({ size = 22, color = "#003D35" }) {
   );
 }
 
-function VoiceBtn({ listening = false, onPress, size = 56 }) {
+export function VoiceBtn({ listening = false, onPress, size = 56 }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
   return (
@@ -630,7 +630,7 @@ function VoiceBtn({ listening = false, onPress, size = 56 }) {
   );
 }
 
-function Pill({ children, variant = "teal" }) {
+export function Pill({ children, variant = "teal" }) {
   const colors = {
     teal: { bg: "#003D35", color: "#00D4B1" },
     amber: { bg: "#2D1A00", color: "#F59E0B" },
@@ -644,18 +644,18 @@ function Pill({ children, variant = "teal" }) {
     </span>
   );
 }
-function Spinner({ size = 28, color = "#00D4B1", trackColor = "#1A2332" }) {
+export function Spinner({ size = 28, color = "#00D4B1", trackColor = "#1A2332" }) {
   return <div style={{ width: size, height: size, border: `3px solid ${trackColor}`, borderTopColor: color, borderRadius: "50%", animation: "spin .9s linear infinite", flexShrink: 0 }} />;
 }
 
-function NavIcon({ id }) {
+export function NavIcon({ id }) {
   if (id === "home") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9L9 2l7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M4 7v8h4v-4h2v4h4V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (id === "workout") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="10" y="3" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="3" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="10" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /></svg>;
   if (id === "meals") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2v4M9 12v4M2 9h4M12 9h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.4" /></svg>;
   return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2a5 5 0 100 10A5 5 0 009 2zM3.5 15.5c0-2 2.5-3.5 5.5-3.5s5.5 1.5 5.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>;
 }
 
-function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
+export function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   const { navigate, gymBranding, user } = useApp();
   const a = gymBranding.accent;
   return (
@@ -1362,7 +1362,7 @@ function OnboardingScreen() {
   );
 }
 
-const WORKOUT_EXERCISES = [
+export const WORKOUT_EXERCISES = [
   { name: "Goblet Squat", muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 25 },
   { name: "Dumbbell Row", muscle: "Back / Biceps", sets: 3, targetReps: 10, weight: 30 },
   { name: "Incline Press", muscle: "Chest / Shoulders", sets: 3, targetReps: 10, weight: 35 },
@@ -1635,7 +1635,7 @@ function HomeDashboardScreen() {
   );
 }
 
-const MEAL_DATA = [
+export const MEAL_DATA = [
   {
     id: "breakfast", label: "Breakfast", time: "7–9 AM",
     suggested: { name: "Greek yogurt & berries", cal: 320, protein: 28, carbs: 36, fat: 6 },
@@ -1660,7 +1660,7 @@ const MEAL_DATA = [
   },
 ];
 
-const GROCERY_DATA = [
+export const GROCERY_DATA = [
   { category: "Protein", emoji: "🥩", items: [
     { name: "Chicken breast", qty: "2 lbs", done: true },
     { name: "Greek yogurt", qty: "32 oz", done: false },
