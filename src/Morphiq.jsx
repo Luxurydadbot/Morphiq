@@ -1655,7 +1655,7 @@ async function fetchAIReply(messages, user, context, workoutContext = null) {
 }
 
 function ChatScreen({ fromScreen = "home" }) {
-  const { navigate, user, gymBranding, workoutContext, supabaseUser } = useApp();
+  const { navigate, user, plan, gymBranding, workoutContext, supabaseUser } = useApp();
   const [msgUsage, setMsgUsage] = useState(null);
   const a = gymBranding.accent;
   const [messages, setMessages] = useState([
@@ -1697,7 +1697,7 @@ function ChatScreen({ fromScreen = "home" }) {
       const profileId = await sb.getProfileId(supabaseUser?.id).catch(() => null);
       const { text: reply, action, chips, usageCount, usageLimit } = await fetchAIReply(
         userMessages,
-        { ...user, gymName: gymBranding.name, profileId, gymId: gymBranding.gymId || "unknown" },
+        { ...user, plan, gymName: gymBranding.name, profileId, gymId: gymBranding.gymId || "unknown" },
         fromScreen,
         workoutContext   // null when not in workout, object when mid-workout
       );
