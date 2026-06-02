@@ -1493,6 +1493,22 @@ function HomeDashboardScreen() {
     ? (parseFloat(weightChange) <= 0 ? `${weightChange} lbs` : `+${weightChange} lbs`)
     : "—";
 
+  // Queue-based weekly workout logic — no fixed days, just count per week
+  const weekKey = (() => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    const mon = new Date(now); mon.setDate(now.getDate() + diff);
+    return "wk_" + mon.toISOString().slice(0, 10);
+  })();
+  const weeklyTarget = plan?.daysPerWeek || user?.daysPerWeek || 3;
+  const weeklyDone = parseInt(localStorage.getItem(weekKey) || "0", 10);
+  const allDone = weeklyDone >= weeklyTarget;
+  const exerciseCount = plan?.exercises?.length || 5;
+  const workoutDuration = plan?.workoutDuration || 40;
+  const workoutType = plan?.workoutType || "Full Body";
+  const weekNum = plan?.weekNumber || 1;
+
   // AI coach message — personalised when we have history
   const coachMsg = lastSession
     ? `${greeting}, ${user.name || "there"}. Last workout: ${new Date(lastSession + "T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}. ${streak > 1 ? `You're on a ${streak}-day streak — keep it up!` : "Ready to train today?"}`
@@ -1508,76 +1524,51 @@ function HomeDashboardScreen() {
         </div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
-        {(() => {
-          // Queue-based weekly workout counter
-          // Uses localStorage to track completions — resets each Monday
-          const weekKey = (() => {
-            const now = new Date();
-            const day = now.getDay(); // 0=Sun
-            const diff = (day === 0 ? -6 : 1 - day);
-            const mon = new Date(now); mon.setDate(now.getDate() + diff);
-            return "wk_" + mon.toISOString().slice(0,10);
-          })();
-          const weeklyTarget = plan?.daysPerWeek || user?.daysPerWeek || 3;
-          const weeklyDone = parseInt(localStorage.getItem(weekKey) || "0", 10);
-          const allDone = weeklyDone >= weeklyTarget;
-          const exerciseCount = plan?.exercises?.length || 5;
-          const duration = plan?.workoutDuration || 40;
-          const workoutType = plan?.workoutType || "Full Body";
-          const weekNum = plan?.weekNumber || 1;
-          return (
-            <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={sL}>Your next workout</div>
-                <div style={{ fontSize: 12, color: allDone ? theme.success : a, fontWeight: 500 }}>
-                  {allDone ? "Week complete ✓" : `${weeklyDone} of ${weeklyTarget} done this week`}
-                </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={sL}>Your next workout</div>
+          <div style={{ fontSize: 12, color: allDone ? theme.success : a, fontWeight: 500 }}>
+            {allDone ? "Week complete ✓" : `${weeklyDone} of ${weeklyTarget} done this week`}
+          </div>
+        </div>
+        {allDone ? (
+          <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1.25rem", textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>🎉</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#F0F0F0", marginBottom: 4 }}>All {weeklyTarget} workouts done!</div>
+            <div style={{ fontSize: 13, color: theme.textDim }}>Enjoy your rest. New workouts unlock Monday.</div>
+          </div>
+        ) : (
+          <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ padding: "1rem 1.25rem .75rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, color: a, fontWeight: 500, marginBottom: 2 }}>Week {weekNum} · {workoutType}</div>
+                <div style={{ fontSize: 12, color: theme.textDim }}>{exerciseCount} exercises · ~{workoutDuration} min</div>
               </div>
-              {allDone ? (
-                <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1.25rem", textAlign: "center" }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>🎉</div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: "#F0F0F0", marginBottom: 4 }}>All {weeklyTarget} workouts done!</div>
-                  <div style={{ fontSize: 13, color: theme.textDim }}>Enjoy your rest. New workouts unlock Monday.</div>
-                </div>
-              ) : (
-                <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
-                  {/* Header row */}
-                  <div style={{ padding: "1rem 1.25rem .75rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 11, color: theme.textDim }}>{user?.fitnessLevel || "Beginner"}</div>
+            </div>
+            <div style={{ margin: "0 1.25rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+              {(plan?.exercises || []).map((ex, idx) => (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: idx < (plan.exercises.length - 1) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1A2E2B", border: "1px solid rgba(0,212,177,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: a, flexShrink: 0 }}>{idx + 1}</div>
                     <div>
-                      <div style={{ fontSize: 13, color: a, fontWeight: 500, marginBottom: 2 }}>Week {weekNum} · {workoutType}</div>
-                      <div style={{ fontSize: 12, color: theme.textDim }}>{exerciseCount} exercises · ~{duration} min</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "#F0F0F0" }}>{ex.name}</div>
+                      <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>{ex.muscle}</div>
                     </div>
-                    <div style={{ fontSize: 11, color: theme.textDim }}>{user?.fitnessLevel || "Beginner"}</div>
                   </div>
-                  {/* Exercise list */}
-                  <div style={{ margin: "0 1.25rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                    {(plan?.exercises || []).map((ex, idx) => (
-                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: idx < (plan.exercises.length - 1) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1A2E2B", border: `1px solid rgba(0,212,177,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: a, flexShrink: 0 }}>{idx + 1}</div>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 500, color: "#F0F0F0" }}>{ex.name}</div>
-                            <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>{ex.muscle}</div>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: a }}>{ex.sets} × {ex.reps}</div>
-                          <div style={{ fontSize: 11, color: theme.textDim }}>{ex.weight ? ex.weight + " lbs" : "bodyweight"}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Start button */}
-                  <div style={{ padding: "1rem 1.25rem" }}>
-                    <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                      {weeklyDone === 0 ? "Start workout" : "Next workout →"}
-                    </button>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: a }}>{ex.sets} × {ex.reps}</div>
+                    <div style={{ fontSize: 11, color: theme.textDim }}>{ex.weight ? ex.weight + " lbs" : "bodyweight"}</div>
                   </div>
                 </div>
-              )}
-            </>
-          );
-        })()}
+              ))}
+            </div>
+            <div style={{ padding: "1rem 1.25rem" }}>
+              <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                {weeklyDone === 0 ? "Start workout" : "Next workout →"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Your progress</div>
