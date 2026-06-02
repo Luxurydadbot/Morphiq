@@ -1667,6 +1667,7 @@ function ChatScreen({ fromScreen = "home" }) {
   const [thinking, setThinking] = useState(false);
   const [dynamicChips, setDynamicChips] = useState(null); // chips returned by Claude
   const [apiError, setApiError] = useState(false);
+  const [apiErrorMsg, setApiErrorMsg] = useState("");
   const scrollRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -1713,6 +1714,7 @@ function ChatScreen({ fromScreen = "home" }) {
     } catch (err) {
       console.warn("[Morphiq] API unavailable, using fallback:", err.message);
       setApiError(true);
+      setApiErrorMsg(err.message || "unknown error");
       setThinking(false);
       setMessages(prev => [...prev, { id: Date.now() + 1, role: "ai", text: getFallbackReply(text) }]);
     }
@@ -1793,7 +1795,7 @@ function ChatScreen({ fromScreen = "home" }) {
       {/* API error banner — shown when proxy is unreachable */}
       {apiError && (
         <div style={{ margin: "6px 14px 0", background: "#1A1010", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "7px 12px", fontSize: 11, color: "#F87171", flexShrink: 0 }}>
-          ⚠ Using offline responses — check that your /api/chat server is running.
+          ⚠ API error: {apiErrorMsg || "check console for details"}
         </div>
       )}
 
