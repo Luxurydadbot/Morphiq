@@ -18,6 +18,50 @@ export default async function handler(req, res) {
 
   const { messages = [], user = {}, context = "home", workoutContext = null } = body;
 
+  // ── OFF-TOPIC GUARDRAIL ────────────────────────────────────────────────────
+  // Check the latest user message before hitting Claude at all.
+  // If it's clearly off-topic, return a canned response immediately.
+  // This costs zero tokens and does NOT count against the usage limit.
+  const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+  const msgText = (lastUserMsg?.text || "").toLowerCase().trim();
+
+  const FITNESS_KEYWORDS = [
+    "workout","exercise","rep","set","squat","deadlift","bench","press","curl","row","lunge","plank",
+    "muscle","protein","calorie","macro","carb","fat","diet","meal","food","eat","nutrition","weight",
+    "cardio","run","walk","jog","swim","bike","stretch","warm","cool","rest","recovery","sleep","water",
+    "pain","sore","hurt","injury","shoulder","knee","back","hip","wrist","elbow","ankle",
+    "goal","progress","plan","program","routine","schedule","streak","session","gym","lift",
+    "motivation","tired","energy","supplement","creatine","whey","cut","bulk","maintain",
+    "bmi","body","fat","lean","strong","fit","health","lose","gain","tone","build"
+  ];
+
+  const OFFTOPIC_PATTERNS = [
+    /write (me )?(a |an )?(poem|story|essay|email|code|song|joke|letter)/i,
+    /translate/i,
+    /what (is|are|was|were) the (capital|population|president|prime minister|currency|history)/i,
+    /who (is|was|are|were) (the )?(president|prime minister|ceo|founder|inventor|author|actor|singer|artist)/i,
+    /how (do|does|did) .*(work|make|build|create|cook|bake|drive|play|install|download|hack)/i,
+    /math|equation|calculate \d|solve for/i,
+    /(weather|stock|crypto|bitcoin|news|sports score|movie|tv show|recipe for|book recommend)/i,
+    /tell me (a |an )?(joke|fact|story|fun fact)/i,
+    /what (time|day|date|year) is it/i,
+  ];
+
+  const hasFitnessWord = FITNESS_KEYWORDS.some(k => msgText.includes(k));
+  const isObviouslyOffTopic = !hasFitnessWord && OFFTOPIC_PATTERNS.some(p => p.test(msgText));
+
+  if (isObviouslyOffTopic) {
+    const name = user.name ? user.name.split(" ")[0] : null;
+    const greeting = name ? `${name}, ` : "";
+    res.status(200).json({
+      text: `${greeting}I'm your fitness coach — I can only help with your workouts, nutrition, and training plan. What can I help you with today?`,
+      chips: ["How is my plan going?", "What should I eat today?", "Help me with my workout"],
+      action: null,
+      blocked: true
+    });
+    return;
+  }
+
   // ── USAGE LIMIT CHECK ──────────────────────────────────────────────────────
   const MONTHLY_LIMIT = 50;
   const month = new Date().toISOString().slice(0, 7); // "2026-05"
