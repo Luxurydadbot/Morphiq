@@ -1188,21 +1188,10 @@ function OnboardingScreen() {
               <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
               <button onClick={() => setDaysPerWeek(d => Math.min(7, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
             </div>
-            {/* Day dots — tappable to toggle specific days */}
-            <div style={{ display: "flex", gap: 6 }}>
-              {["M","T","W","T","F","S","S"].map((d, i) => {
-                const on = i < daysPerWeek;
-                return (
-                  <button key={i}
-                    onClick={() => {
-                      if (on && daysPerWeek > 2) setDaysPerWeek(daysPerWeek - 1);
-                      else if (!on && daysPerWeek < 7) setDaysPerWeek(daysPerWeek + 1);
-                    }}
-                    style={{ width: 32, height: 32, borderRadius: "50%", background: on ? ob.tealDk : ob.card, border: `1.5px solid ${on ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: on ? 700 : 400, color: on ? a : ob.muted, cursor: "pointer", fontFamily: ob.font, transition: "all .2s", flexShrink: 0 }}>{d}</button>
-                );
-              })}
+            <div style={{ fontSize: 12, color: ob.muted, textAlign: "center", lineHeight: 1.6 }}>
+              Do them any day that works for you —
+              <br />the app always shows your next workout.
             </div>
-            <div style={{ fontSize: 10, color: ob.muted, marginTop: 4 }}>Tap dots or use +/− to adjust</div>
           </div>
           <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13 }}>Continue →</button>
         </div>}
@@ -1518,25 +1507,66 @@ function HomeDashboardScreen() {
         </div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
-        <div style={sL}>Today's workout</div>
-        <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "1.1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div><div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>Full body A</div><div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>5 exercises · ~40 min</div></div>
-            <div style={{ background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>Full body</div>
-          </div>
-          <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {["3 sets each", "Beginner", "Week 2"].map(t => <div key={t} style={{ background: "#1E1E1E", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: theme.textMuted, display: "flex", alignItems: "center", gap: 5 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: a }} />{t}</div>)}
-          </div>
-          <div style={{ margin: "0 1.25rem .5rem", height: 3, background: "#1A1A1A", borderRadius: 2 }}>
-            <div style={{ height: 3, borderRadius: 2, background: done === 5 ? theme.success : a, width: `${Math.round((done / 5) * 100)}%`, transition: "width .5s" }} />
-          </div>
-          <div style={{ padding: "0 1.25rem .5rem", fontSize: 12, color: done === 5 ? theme.success : theme.textDim }}>{done === 5 ? "Workout complete! ✓" : `${done} of 5 exercises done`}</div>
-          <div style={{ padding: "0 1.25rem 1.25rem" }}>
-            <button onClick={() => navigate("workout")} style={{ width: "100%", background: done === 5 ? theme.success : a, color: done === 5 ? "#E1F5EE" : "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-              {done === 0 ? "Start workout" : done === 5 ? "View summary →" : "Continue workout →"}
-            </button>
-          </div>
-        </div>
+        {(() => {
+          // Queue-based weekly workout counter
+          // Uses localStorage to track completions — resets each Monday
+          const weekKey = (() => {
+            const now = new Date();
+            const day = now.getDay(); // 0=Sun
+            const diff = (day === 0 ? -6 : 1 - day);
+            const mon = new Date(now); mon.setDate(now.getDate() + diff);
+            return "wk_" + mon.toISOString().slice(0,10);
+          })();
+          const weeklyTarget = plan?.daysPerWeek || user?.daysPerWeek || 3;
+          const weeklyDone = parseInt(localStorage.getItem(weekKey) || "0", 10);
+          const allDone = weeklyDone >= weeklyTarget;
+          const exerciseCount = plan?.exercises?.length || 5;
+          const duration = plan?.workoutDuration || 40;
+          const workoutType = plan?.workoutType || "Full Body";
+          const weekNum = plan?.weekNumber || 1;
+          return (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={sL}>Your next workout</div>
+                <div style={{ fontSize: 12, color: allDone ? theme.success : a, fontWeight: 500 }}>
+                  {allDone ? "Week complete ✓" : `${weeklyDone} of ${weeklyTarget} done this week`}
+                </div>
+              </div>
+              {allDone ? (
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1.25rem", textAlign: "center" }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>🎉</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: "#F0F0F0", marginBottom: 4 }}>All {weeklyTarget} workouts done!</div>
+                  <div style={{ fontSize: 13, color: theme.textDim }}>Enjoy your rest. New workouts unlock Monday.</div>
+                </div>
+              ) : (
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
+                  <div style={{ padding: "1.1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>{workoutType}</div>
+                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>{exerciseCount} exercises · ~{duration} min</div>
+                    </div>
+                    <div style={{ background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>Week {weekNum}</div>
+                  </div>
+                  <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {[`${exerciseCount} exercises`, user?.fitnessLevel || "Beginner", `Week ${weekNum}`].map(t => (
+                      <div key={t} style={{ background: "#1E1E1E", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: theme.textMuted, display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ width: 5, height: 5, borderRadius: "50%", background: a }} />{t}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ padding: "0 1.25rem .5rem", fontSize: 12, color: theme.textDim }}>
+                    {weeklyDone === 0 ? "Ready when you are" : `${weeklyDone} of ${weeklyTarget} workouts done this week`}
+                  </div>
+                  <div style={{ padding: "0 1.25rem 1.25rem" }}>
+                    <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                      {weeklyDone === 0 ? "Start workout" : "Next workout →"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Your progress</div>
@@ -2392,46 +2422,10 @@ function ProfileScreen() {
         {/* Plan settings */}
         <div style={sL}>Plan Settings</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
-          {/* Workout day switcher */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 13, color: theme.text }}>Workout days</div>
-              {editDays ? (
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setEditDays(false)} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "3px 10px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                  <button onClick={saveDays} style={{ background: a, border: "none", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit" }}>Save</button>
-                </div>
-              ) : (
-                <button onClick={() => setEditDays(true)} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "4px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
-              )}
-            </div>
-            {editDays ? (
-              <div style={{ display: "flex", gap: 5, flexWrap: "nowrap" }}>
-                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((short, idx) => {
-                  const full = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][idx];
-                  const on = selectedDays.includes(full);
-                  return (
-                    <button key={full} onClick={() => setSelectedDays(prev => on ? prev.filter(d => d !== full) : [...prev, full])}
-                      style={{ flex: 1, background: on ? "#003D35" : "transparent", border: `1.5px solid ${on ? a : "rgba(255,255,255,0.1)"}`, borderRadius: 8, padding: "7px 2px", fontSize: 10, fontWeight: on ? 600 : 400, color: on ? a : theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
-                      {short}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
-                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((short, idx) => {
-                  const full = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][idx];
-                  const on = (plan?.workoutDays || selectedDays).includes(full);
-                  return (
-                    <div key={short} style={{ width: 32, height: 32, borderRadius: "50%", background: on ? "#003D35" : "#1A2332", border: `1.5px solid ${on ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: on ? 700 : 400, color: on ? a : theme.textDim }}>
-                      {short.slice(0,1)}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {editDays && daySaveMsg && <div style={{ fontSize: 10, color: a, marginTop: 6 }}>{daySaveMsg}</div>}
+          {/* Workouts per week — simple display, no day picker needed */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 10, marginBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+            <div style={{ fontSize: 13, color: theme.text }}>Workouts per week</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: a }}>{plan?.daysPerWeek || user?.daysPerWeek || 3}×</div>
           </div>
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 10 }}>
             <StatRow label="Session length" value={`~${plan?.workoutDuration || 40} min`} />
