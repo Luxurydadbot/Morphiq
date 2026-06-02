@@ -85,12 +85,15 @@ Plan: ${planSummary}.
 Context: Member is viewing ${ctxLabel}.${workoutDetail}
 
 STRICT RULES:
-1. You ONLY discuss fitness, workouts, nutrition, recovery, sleep as it relates to their training, and their Morphiq plan. Nothing else.
-2. If asked about anything unrelated to fitness or their plan — politics, news, general knowledge, other topics — respond ONLY with: "I'm your fitness coach — I can only help with your training and nutrition. What can I help you with today?"
-3. Keep replies to 1-3 sentences. Use their first name. No guilt language. Be warm and direct.
-4. If live workout context is present, reference the specific exercise and set number.
+1. You ONLY discuss fitness, workouts, nutrition, recovery, and sleep as it relates to training. Nothing else. For off-topic questions respond ONLY with: "I am your fitness coach — I can only help with your training and nutrition. What can I help you with today?"
+2. ALWAYS lead with a direct, practical answer or recommendation first. Never open with a question. The member has a limited number of messages — do not waste them asking for clarification you do not strictly need.
+3. For pain or soreness: immediately suggest whether to skip, modify, or substitute the affected exercise, and give one recovery tip. Do not ask when it started.
+4. For nutrition questions: give a specific answer based on their goal and plan. Do not ask what they already ate unless the conversation history shows you genuinely cannot answer without it.
+5. Only ask a follow-up question if you truly cannot give useful advice without more information — and only ONE question at the very end of your reply.
+6. Keep replies to 2-3 sentences max. Use their first name. No guilt language. Be warm and direct.
+7. If live workout context is present, reference the specific exercise and set number.
 
-After every reply add: <!--CHIPS:["short question 1","short question 2","short question 3"]-->`;
+After every reply add: <!--CHIPS:["short followup 1","short followup 2","short followup 3"]-->`;
 
   try {
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -103,7 +106,7 @@ After every reply add: <!--CHIPS:["short question 1","short question 2","short q
       const errData = await claudeRes.json().catch(() => ({}));
       const errMsg = errData?.error?.message || "API error";
       // Expose real error for diagnostics
-      res.status(200).json({ text: "AI error: " + errMsg, chips: [], error: errMsg });
+      res.status(200).json({ text: "Sorry, I hit a snag — try again in a moment.", chips: [], error: errMsg });
       return;
     }
 
@@ -136,6 +139,6 @@ After every reply add: <!--CHIPS:["short question 1","short question 2","short q
 
     res.status(200).json({ text, chips, action: null, usageCount: usageCount + 1, usageLimit: MONTHLY_LIMIT });
   } catch (e) {
-    res.status(200).json({ text: "Caught error: " + (e.message || "unknown"), chips: [], error: e.message });
+    res.status(200).json({ text: "Sorry, I hit a snag — try again in a moment.", chips: [], error: e.message });
   }
 }
