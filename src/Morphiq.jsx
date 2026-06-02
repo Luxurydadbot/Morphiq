@@ -1671,6 +1671,23 @@ function ChatScreen({ fromScreen = "home" }) {
   const scrollRef = useRef(null);
   const timerRef = useRef(null);
 
+  // Load usage count on mount so counter is visible before first message
+  useEffect(() => {
+    async function loadUsage() {
+      try {
+        const profileId = await sb.getProfileId(supabaseUser?.id).catch(() => null);
+        if (!profileId) return;
+        const month = new Date().toISOString().slice(0, 7);
+        const url = `https://uvnyjegmhsztdednjclb.supabase.co/rest/v1/ai_usage?user_id=eq.${profileId}&month=eq.${month}&feature=eq.chat&select=id`;
+        const res = await fetch(url, { headers: { apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04", Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04" } });
+        const rows = await res.json();
+        const count = Array.isArray(rows) ? rows.length : 0;
+        setMsgUsage({ count, limit: 50 });
+      } catch { /* non-blocking */ }
+    }
+    loadUsage();
+  }, [supabaseUser]);
+
   // Default suggestion chips per context — shown before first exchange
   const defaultChips = CHAT_SUGGESTIONS[fromScreen] || CHAT_SUGGESTIONS.idle;
   // After first exchange: show Claude's chips if available, else nothing
@@ -1752,9 +1769,18 @@ function ChatScreen({ fromScreen = "home" }) {
             <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Morphiq Trainer</div>
             <div style={{ fontSize: 11, color: a }}>Knows your full plan</div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: a }} />
-            <span style={{ fontSize: 11, color: theme.textDim }}>Online</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ width: 7, height: 7, borderRadius: "50%", background: a }} />
+              <span style={{ fontSize: 11, color: theme.textDim }}>Online</span>
+            </div>
+            {msgUsage && (
+              <div style={{ background: msgUsage.count >= 45 ? "#1F1010" : "#0D1623", border: "1px solid " + (msgUsage.count >= 45 ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.08)"), borderRadius: 10, padding: "2px 7px" }}>
+                <span style={{ fontSize: 10, color: msgUsage.count >= msgUsage.limit ? "#F87171" : msgUsage.count >= 45 ? "#F59E0B" : "#6B7A8D", fontWeight: 500 }}>
+                  {msgUsage.count >= msgUsage.limit ? "Limit reached" : (msgUsage.limit - msgUsage.count) + " left this month"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         {/* Context chip */}
@@ -1833,16 +1859,7 @@ function ChatScreen({ fromScreen = "home" }) {
         </div>
       )}
 
-      {/* Usage counter */}
-      {msgUsage && (
-        <div style={{ padding: "4px 14px 0", background: "#0D1117", display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
-          <div style={{ fontSize: 10, color: msgUsage.count >= msgUsage.limit ? "#F87171" : "#6B7A8D" }}>
-            {msgUsage.count >= msgUsage.limit
-              ? "Monthly limit reached — resets on the 1st"
-              : `${msgUsage.count} / ${msgUsage.limit} AI messages this month`}
-          </div>
-        </div>
-      )}
+      {/* Usage counter moved to header */}
 
       {/* Input bar */}
       <div style={{ padding: "10px 14px 14px", background: "#0D1117", borderTop: `1px solid ${theme.borderSubtle}`, display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
