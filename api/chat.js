@@ -102,8 +102,8 @@ After every reply add: <!--CHIPS:["short question 1","short question 2","short q
     if (!claudeRes.ok) {
       const errData = await claudeRes.json().catch(() => ({}));
       const errMsg = errData?.error?.message || "API error";
-      // Return graceful message instead of breaking the UI
-      res.status(200).json({ text: "AI coaching is temporarily unavailable. Your plan is still fully accessible.", chips: [], error: errMsg });
+      // Expose real error for diagnostics
+      res.status(200).json({ text: "AI error: " + errMsg, chips: [], error: errMsg });
       return;
     }
 
@@ -136,6 +136,6 @@ After every reply add: <!--CHIPS:["short question 1","short question 2","short q
 
     res.status(200).json({ text, chips, action: null, usageCount: usageCount + 1, usageLimit: MONTHLY_LIMIT });
   } catch (e) {
-    res.status(200).json({ text: "AI coaching is temporarily unavailable. Your plan is still fully accessible.", chips: [], error: e.message });
+    res.status(200).json({ text: "Caught error: " + (e.message || "unknown"), chips: [], error: e.message });
   }
 }
