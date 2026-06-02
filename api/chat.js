@@ -43,11 +43,28 @@ export default async function handler(req, res) {
     }
   }
 
+  // Build message array for Claude — must start with user, alternate user/assistant
   const anthropicMessages = messages
     .filter(m => m.role === "ai" || m.role === "user")
-    .map(m => ({ role: m.role === "ai" ? "assistant" : "user", content: m.text }));
+    .map(m => ({ role: m.role === "ai" ? "assistant" : "user", content: m.text || "" }));
 
-  if (!anthropicMessages.length || anthropicMessages[0].role !== "user") {
+  // Drop leading assistant messages (the opening AI greeting) — Claude requires user first
+  while (anthropicMessages.length && anthropicMessages[0].role === "assistant") {
+    anthropicMessages.shift();
+  }
+
+  // Also ensure no two consecutive same-role messages (merge or drop duplicates)
+  const dedupedMessages = [];
+  for (const msg of anthropicMessages) {
+    const last = dedupedMessages[dedupedMessages.length - 1];
+    if (last && last.role === msg.role) {
+      last.content += " " + msg.content;
+    } else {
+      dedupedMessages.push(msg);
+    }
+  }
+
+  if (!dedupedMessages.length || dedupedMessages[0].role !== "user") {
     res.status(400).json({ error: "Must start with user message" }); return;
   }
 
@@ -79,7 +96,7 @@ After every reply add: <!--CHIPS:["short question 1","short question 2","short q
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, system, messages: anthropicMessages }),
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, system, messages: dedupedMessages }),
     });
 
     if (!claudeRes.ok) {
