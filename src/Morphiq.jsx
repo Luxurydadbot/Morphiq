@@ -3,12 +3,12 @@ import { WorkoutScreen } from "./WorkoutScreen.jsx";
 import { MealPlanScreen } from "./MealScreen.jsx";
 import { GymOwnerDashboard, PricingScreen } from "./GymOwnerDashboard.jsx";
 
-export const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
-export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04";
-export const SB_HEADERS = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`, "Content-Type": "application/json" };
-export const SB_GET = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` };
+const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04";
+const SB_HEADERS = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`, "Content-Type": "application/json" };
+const SB_GET = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` };
 
-export const sb = {
+const sb = {
   // ── AUTH ──────────────────────────────────────────────────────────────────
   // Sends a 6-digit OTP to email (works inside the PWA — no browser redirect)
   async sendOTP(email) {
@@ -331,7 +331,7 @@ export const sb = {
   },
 };
 
-export const theme = {
+const theme = {
   accent: "#00D4B1", accentDim: "rgba(0,212,177,0.10)", accentBorder: "rgba(0,212,177,0.25)",
   bg: "#0F0F0F", surface: "#161616", border: "#242424", borderSubtle: "#1E1E1E",
   text: "#E8E8E8", textMuted: "#888", textDim: "#555", textFaint: "#333",
@@ -350,14 +350,13 @@ export const theme = {
 const DEV_SKIP = null; // null = shows real auth screen
 
 const AppContext = createContext(null);
-export const useApp = () => useContext(AppContext);
+const useApp = () => useContext(AppContext);
 
 const DEFAULT_USER = { name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" };
 const MOCK_RETURNING_PLAN = {
   calories: 1800, protein: 140, carbs: 160, fat: 55,
-  workoutType: "Full Body", workoutDuration: 40,
-  weekNumber: 2, daysPerWeek: 3,
-  weeklyFocus: "Build your movement foundation.",
+  workoutDays: ["Monday","Wednesday","Friday"], workoutType: "Full Body",
+  workoutDuration: 40, weeklyFocus: "Build your movement foundation.",
   exercises: [
     { name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" },
     { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" },
@@ -384,7 +383,7 @@ function AppProvider({ children }) {
   );
   const [user, setUser] = useState(
     DEV_SKIP === "member_returning"
-      ? { name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial", fitnessLevel: "Beginner" }
+      ? { name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" }
       : DEFAULT_USER
   );
   const [plan, setPlan] = useState(DEV_SKIP === "member_returning" ? MOCK_RETURNING_PLAN : null);
@@ -608,7 +607,7 @@ const css = `
   }
 `;
 
-export function MicIcon({ size = 22, color = "#003D35" }) {
+function MicIcon({ size = 22, color = "#003D35" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <rect x="8" y="2" width="8" height="12" rx="4" fill={color} />
@@ -619,7 +618,7 @@ export function MicIcon({ size = 22, color = "#003D35" }) {
   );
 }
 
-export function VoiceBtn({ listening = false, onPress, size = 56 }) {
+function VoiceBtn({ listening = false, onPress, size = 56 }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
   return (
@@ -630,7 +629,7 @@ export function VoiceBtn({ listening = false, onPress, size = 56 }) {
   );
 }
 
-export function Pill({ children, variant = "teal" }) {
+function Pill({ children, variant = "teal" }) {
   const colors = {
     teal: { bg: "#003D35", color: "#00D4B1" },
     amber: { bg: "#2D1A00", color: "#F59E0B" },
@@ -644,18 +643,18 @@ export function Pill({ children, variant = "teal" }) {
     </span>
   );
 }
-export function Spinner({ size = 28, color = "#00D4B1", trackColor = "#1A2332" }) {
+function Spinner({ size = 28, color = "#00D4B1", trackColor = "#1A2332" }) {
   return <div style={{ width: size, height: size, border: `3px solid ${trackColor}`, borderTopColor: color, borderRadius: "50%", animation: "spin .9s linear infinite", flexShrink: 0 }} />;
 }
 
-export function NavIcon({ id }) {
+function NavIcon({ id }) {
   if (id === "home") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9L9 2l7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M4 7v8h4v-4h2v4h4V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (id === "workout") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="10" y="3" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="3" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="10" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /></svg>;
   if (id === "meals") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2v4M9 12v4M2 9h4M12 9h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.4" /></svg>;
   return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2a5 5 0 100 10A5 5 0 009 2zM3.5 15.5c0-2 2.5-3.5 5.5-3.5s5.5 1.5 5.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>;
 }
 
-export function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
+function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
   const { navigate, gymBranding, user } = useApp();
   const a = gymBranding.accent;
   return (
@@ -682,6 +681,10 @@ export function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 }
 
 
+// ── Shared exports for child screen files ───────────────────────────────────
+export { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
+         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
+         MEAL_DATA, GROCERY_DATA, WORKOUT_EXERCISES };
 
 function AuthScreen() {
   const { signIn, gymBranding } = useApp();
@@ -1185,10 +1188,21 @@ function OnboardingScreen() {
               <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
               <button onClick={() => setDaysPerWeek(d => Math.min(7, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
             </div>
-            <div style={{ fontSize: 12, color: ob.muted, textAlign: "center", lineHeight: 1.6 }}>
-              Do them any day that works for you —
-              <br />the app always shows your next workout.
+            {/* Day dots — tappable to toggle specific days */}
+            <div style={{ display: "flex", gap: 6 }}>
+              {["M","T","W","T","F","S","S"].map((d, i) => {
+                const on = i < daysPerWeek;
+                return (
+                  <button key={i}
+                    onClick={() => {
+                      if (on && daysPerWeek > 2) setDaysPerWeek(daysPerWeek - 1);
+                      else if (!on && daysPerWeek < 7) setDaysPerWeek(daysPerWeek + 1);
+                    }}
+                    style={{ width: 32, height: 32, borderRadius: "50%", background: on ? ob.tealDk : ob.card, border: `1.5px solid ${on ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: on ? 700 : 400, color: on ? a : ob.muted, cursor: "pointer", fontFamily: ob.font, transition: "all .2s", flexShrink: 0 }}>{d}</button>
+                );
+              })}
             </div>
+            <div style={{ fontSize: 10, color: ob.muted, marginTop: 4 }}>Tap dots or use +/− to adjust</div>
           </div>
           <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13 }}>Continue →</button>
         </div>}
@@ -1358,7 +1372,7 @@ function OnboardingScreen() {
   );
 }
 
-export const WORKOUT_EXERCISES = [
+const WORKOUT_EXERCISES = [
   { name: "Goblet Squat", muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 25 },
   { name: "Dumbbell Row", muscle: "Back / Biceps", sets: 3, targetReps: 10, weight: 30 },
   { name: "Incline Press", muscle: "Chest / Shoulders", sets: 3, targetReps: 10, weight: 35 },
@@ -1470,9 +1484,11 @@ const CHAT_SUGGESTIONS = {
 };
 
 function HomeDashboardScreen() {
-  const { navigate, user, plan, gymBranding, historicalData } = useApp();
+  const { navigate, user, gymBranding, historicalData } = useApp();
   const a = gymBranding.accent;
+  const [done, setDone] = useState(0);
   const [cals, setCals] = useState(1100);
+  const [logged, setLogged] = useState(false);
   const calGoal = 1840;
   const h = new Date().getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
@@ -1486,22 +1502,6 @@ function HomeDashboardScreen() {
   const weightChangeLabel = weightChange !== null && weightChange !== undefined
     ? (parseFloat(weightChange) <= 0 ? `${weightChange} lbs` : `+${weightChange} lbs`)
     : "—";
-
-  // Queue-based weekly workout logic — no fixed days, just count per week
-  const weekKey = (() => {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = (day === 0 ? -6 : 1 - day);
-    const mon = new Date(now); mon.setDate(now.getDate() + diff);
-    return "wk_" + mon.toISOString().slice(0, 10);
-  })();
-  const weeklyTarget = plan?.daysPerWeek || user?.daysPerWeek || 3;
-  const weeklyDone = parseInt(localStorage.getItem(weekKey) || "0", 10);
-  const allDone = weeklyDone >= weeklyTarget;
-  const exerciseCount = plan?.exercises?.length || 5;
-  const workoutDuration = plan?.workoutDuration || 40;
-  const workoutType = plan?.workoutType || "Full Body";
-  const weekNum = plan?.weekNumber || 1;
 
   // AI coach message — personalised when we have history
   const coachMsg = lastSession
@@ -1518,51 +1518,25 @@ function HomeDashboardScreen() {
         </div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={sL}>Your next workout</div>
-          <div style={{ fontSize: 12, color: allDone ? theme.success : a, fontWeight: 500 }}>
-            {allDone ? "Week complete ✓" : `${weeklyDone} of ${weeklyTarget} done this week`}
+        <div style={sL}>Today's workout</div>
+        <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "1.1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div><div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>Full body A</div><div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>5 exercises · ~40 min</div></div>
+            <div style={{ background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>Full body</div>
+          </div>
+          <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {["3 sets each", "Beginner", "Week 2"].map(t => <div key={t} style={{ background: "#1E1E1E", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: theme.textMuted, display: "flex", alignItems: "center", gap: 5 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: a }} />{t}</div>)}
+          </div>
+          <div style={{ margin: "0 1.25rem .5rem", height: 3, background: "#1A1A1A", borderRadius: 2 }}>
+            <div style={{ height: 3, borderRadius: 2, background: done === 5 ? theme.success : a, width: `${Math.round((done / 5) * 100)}%`, transition: "width .5s" }} />
+          </div>
+          <div style={{ padding: "0 1.25rem .5rem", fontSize: 12, color: done === 5 ? theme.success : theme.textDim }}>{done === 5 ? "Workout complete! ✓" : `${done} of 5 exercises done`}</div>
+          <div style={{ padding: "0 1.25rem 1.25rem" }}>
+            <button onClick={() => navigate("workout")} style={{ width: "100%", background: done === 5 ? theme.success : a, color: done === 5 ? "#E1F5EE" : "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+              {done === 0 ? "Start workout" : done === 5 ? "View summary →" : "Continue workout →"}
+            </button>
           </div>
         </div>
-        {allDone ? (
-          <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1.25rem", textAlign: "center" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>🎉</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#F0F0F0", marginBottom: 4 }}>All {weeklyTarget} workouts done!</div>
-            <div style={{ fontSize: 13, color: theme.textDim }}>Enjoy your rest. New workouts unlock Monday.</div>
-          </div>
-        ) : (
-          <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
-            <div style={{ padding: "1rem 1.25rem .75rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 13, color: a, fontWeight: 500, marginBottom: 2 }}>Week {weekNum} · {workoutType}</div>
-                <div style={{ fontSize: 12, color: theme.textDim }}>{exerciseCount} exercises · ~{workoutDuration} min</div>
-              </div>
-              <div style={{ fontSize: 11, color: theme.textDim }}>{user?.fitnessLevel || "Beginner"}</div>
-            </div>
-            <div style={{ margin: "0 1.25rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-              {(plan?.exercises || []).map((ex, idx) => (
-                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: idx < (plan.exercises.length - 1) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1A2E2B", border: "1px solid rgba(0,212,177,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: a, flexShrink: 0 }}>{idx + 1}</div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: "#F0F0F0" }}>{ex.name}</div>
-                      <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>{ex.muscle}</div>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: a }}>{ex.sets} × {ex.reps}</div>
-                    <div style={{ fontSize: 11, color: theme.textDim }}>{ex.weight ? ex.weight + " lbs" : "bodyweight"}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ padding: "1rem 1.25rem" }}>
-              <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                {weeklyDone === 0 ? "Start workout" : "Next workout →"}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Your progress</div>
@@ -1620,7 +1594,7 @@ function HomeDashboardScreen() {
   );
 }
 
-export const MEAL_DATA = [
+const MEAL_DATA = [
   {
     id: "breakfast", label: "Breakfast", time: "7–9 AM",
     suggested: { name: "Greek yogurt & berries", cal: 320, protein: 28, carbs: 36, fat: 6 },
@@ -1645,7 +1619,7 @@ export const MEAL_DATA = [
   },
 ];
 
-export const GROCERY_DATA = [
+const GROCERY_DATA = [
   { category: "Protein", emoji: "🥩", items: [
     { name: "Chicken breast", qty: "2 lbs", done: true },
     { name: "Greek yogurt", qty: "32 oz", done: false },
@@ -2418,10 +2392,46 @@ function ProfileScreen() {
         {/* Plan settings */}
         <div style={sL}>Plan Settings</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
-          {/* Workouts per week — simple display, no day picker needed */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 10, marginBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-            <div style={{ fontSize: 13, color: theme.text }}>Workouts per week</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: a }}>{plan?.daysPerWeek || user?.daysPerWeek || 3}×</div>
+          {/* Workout day switcher */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 13, color: theme.text }}>Workout days</div>
+              {editDays ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setEditDays(false)} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "3px 10px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  <button onClick={saveDays} style={{ background: a, border: "none", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit" }}>Save</button>
+                </div>
+              ) : (
+                <button onClick={() => setEditDays(true)} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "4px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
+              )}
+            </div>
+            {editDays ? (
+              <div style={{ display: "flex", gap: 5, flexWrap: "nowrap" }}>
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((short, idx) => {
+                  const full = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][idx];
+                  const on = selectedDays.includes(full);
+                  return (
+                    <button key={full} onClick={() => setSelectedDays(prev => on ? prev.filter(d => d !== full) : [...prev, full])}
+                      style={{ flex: 1, background: on ? "#003D35" : "transparent", border: `1.5px solid ${on ? a : "rgba(255,255,255,0.1)"}`, borderRadius: 8, padding: "7px 2px", fontSize: 10, fontWeight: on ? 600 : 400, color: on ? a : theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+                      {short}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((short, idx) => {
+                  const full = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][idx];
+                  const on = (plan?.workoutDays || selectedDays).includes(full);
+                  return (
+                    <div key={short} style={{ width: 32, height: 32, borderRadius: "50%", background: on ? "#003D35" : "#1A2332", border: `1.5px solid ${on ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: on ? 700 : 400, color: on ? a : theme.textDim }}>
+                      {short.slice(0,1)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {editDays && daySaveMsg && <div style={{ fontSize: 10, color: a, marginTop: 6 }}>{daySaveMsg}</div>}
           </div>
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 10 }}>
             <StatRow label="Session length" value={`~${plan?.workoutDuration || 40} min`} />
