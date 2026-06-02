@@ -1540,24 +1540,34 @@ function HomeDashboardScreen() {
                 </div>
               ) : (
                 <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
-                  <div style={{ padding: "1.1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  {/* Header row */}
+                  <div style={{ padding: "1rem 1.25rem .75rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>{workoutType}</div>
-                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>{exerciseCount} exercises · ~{duration} min</div>
+                      <div style={{ fontSize: 13, color: a, fontWeight: 500, marginBottom: 2 }}>Week {weekNum} · {workoutType}</div>
+                      <div style={{ fontSize: 12, color: theme.textDim }}>{exerciseCount} exercises · ~{duration} min</div>
                     </div>
-                    <div style={{ background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>Week {weekNum}</div>
+                    <div style={{ fontSize: 11, color: theme.textDim }}>{user?.fitnessLevel || "Beginner"}</div>
                   </div>
-                  <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {[`${exerciseCount} exercises`, user?.fitnessLevel || "Beginner", `Week ${weekNum}`].map(t => (
-                      <div key={t} style={{ background: "#1E1E1E", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: theme.textMuted, display: "flex", alignItems: "center", gap: 5 }}>
-                        <div style={{ width: 5, height: 5, borderRadius: "50%", background: a }} />{t}
+                  {/* Exercise list */}
+                  <div style={{ margin: "0 1.25rem", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    {(plan?.exercises || []).map((ex, idx) => (
+                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: idx < (plan.exercises.length - 1) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1A2E2B", border: `1px solid rgba(0,212,177,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: a, flexShrink: 0 }}>{idx + 1}</div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: "#F0F0F0" }}>{ex.name}</div>
+                            <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>{ex.muscle}</div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: a }}>{ex.sets} × {ex.reps}</div>
+                          <div style={{ fontSize: 11, color: theme.textDim }}>{ex.weight ? ex.weight + " lbs" : "bodyweight"}</div>
+                        </div>
                       </div>
                     ))}
                   </div>
-                  <div style={{ padding: "0 1.25rem .5rem", fontSize: 12, color: theme.textDim }}>
-                    {weeklyDone === 0 ? "Ready when you are" : `${weeklyDone} of ${weeklyTarget} workouts done this week`}
-                  </div>
-                  <div style={{ padding: "0 1.25rem 1.25rem" }}>
+                  {/* Start button */}
+                  <div style={{ padding: "1rem 1.25rem" }}>
                     <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
                       {weeklyDone === 0 ? "Start workout" : "Next workout →"}
                     </button>
