@@ -496,12 +496,12 @@ function AppProvider({ children }) {
       const prevEx = (currentPlan.exercises || []).map(e => `${e.name} ${e.sets}x${e.reps} @ ${e.weight}lbs`).join(", ");
       const deload = nextWeekNum % 4 === 0;
       const weekGuide = nextWeekNum <= 2 ? "add 1 rep or 2.5-5lbs to last week" : deload ? "deload: reduce weight 10%, same reps, focus on form" : "increase weight 5-10% or add a set vs last week";
-      const prompt = `You are a certified personal trainer. Generate Week ${nextWeekNum} based on Week ${currentPlan.weekNumber||1} performance. Return ONLY valid JSON, no markdown.
-Member: goal=${currentUser.goal}, equipment=${currentUser.equipment||"dumbbells"}, injuries=${currentUser.injuries||"none"}, restPreference=${currentPlan.restSeconds||90}s.
+      const prompt = `Generate Week ${nextWeekNum} fitness plan based on Week ${currentPlan.weekNumber||1}. Return ONLY valid JSON, no markdown.
+Member: goal=${currentUser.goal}, equipment=${currentUser.equipment||"dumbbells"}, injuries=${currentUser.injuries||"none"}.
 Last week exercises: ${prevEx}.
 Week ${nextWeekNum} instruction: ${weekGuide}.
-Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"workoutDays":${JSON.stringify(currentPlan.workoutDays||[])},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","weeklyFocus":"1 sentence","tip":"1 sentence","exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string"}]}
-Include exactly 5 exercises. All values must be plain numbers.`;
+Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${currentPlan.daysPerWeek||3},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"string","warmup":[{"name":"string","duration":"string"}],"cooldown":[{"name":"string","duration":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
+Include exactly ${(currentPlan.exercises||[]).length || 5} exercises. All numeric values must be plain numbers.`;
       const res = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
       const data = await res.json();
       const nextPlan = JSON.parse((data.text || "").replace(/```json|```/g, "").trim());
@@ -941,9 +941,86 @@ function OnboardingScreen() {
       const historyMap = { new: "beginner with no training history", some: "intermediate, 6 months to 2 years experience", years: "experienced lifter, several years of training" };
       const activityMap = { returning: "returning after a long break (treat as rebuilding, use 60-70% of experienced weights)", consistent: "moderately active, some consistency recently", active: "currently training regularly" };
       const fitnessProfile = `${historyMap[trainingHistory] || "beginner"}, ${activityMap[recentActivity] || "just starting out"}`;
-      const goalGuide = goal === "lose_fat" ? "fat loss: compound moves, 12-15 reps, shorter rest" : goal === "build_muscle" ? "muscle building: 6-10 reps, heavier progressive weight" : "general fitness: balanced full body, 10-12 reps";
-      const weightGuide = trainingHistory === "new" ? "Beginner: goblet squat 15-25lbs, dumbbell row 15-25lbs, dumbbell press 10-20lbs, RDL 20-30lbs. Start conservative." : trainingHistory === "some" ? "Intermediate: goblet squat 35-55lbs, dumbbell row 35-50lbs, dumbbell press 25-40lbs, RDL 50-70lbs, barbell bench 95-155lbs. Moderate challenge." : recentActivity === "returning" ? "Returning lifter (NOT advanced): goblet squat 35-55lbs, dumbbell row 35-50lbs, barbell bench 115-155lbs, barbell squat 135-175lbs. Rebuild carefully." : "Experienced active: goblet squat 55-75lbs, dumbbell row 55-75lbs, barbell squat 155-205lbs, bench press 155-205lbs, RDL 135-185lbs. Do NOT exceed these.";
-      const prompt = `You are a certified personal trainer. Return ONLY valid JSON, no markdown.\nMember: goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile=${fitnessProfile}, restPreference=${restPref}s.\nGoal: ${goalGuide}.\nWEIGHT GUIDANCE - follow closely: ${weightGuide}\nReturn exactly: {"calories":number,"protein":number,"carbs":number,"fat":number,"workoutDays":[${daysPerWeek} day names],"workoutType":"string","workoutDuration":number,"restSeconds":${restPref},"weekNumber":1,"weekStartDate":"2026-06-01","weeklyFocus":"1 sentence","tip":"1 sentence","exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string"}]}\nInclude exactly 5 exercises. All values must be plain numbers.`;
+
+      // Mifflin-St Jeor BMR — convert imperial to metric first
+      const weightKg = parseFloat(weight) / 2.205;
+      const heightCm = ((parseInt(heightFt) * 12) + parseInt(heightIn || 0)) * 2.54;
+      const ageNum = parseInt(age);
+      const bmrCalc = sex === "male"
+        ? Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) + 5)
+        : Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) - 161);
+      const activityMult = daysPerWeek >= 4 ? 1.55 : 1.375;
+      const tdeeCalc = Math.round(bmrCalc * activityMult);
+      const goalAdj = goal === "build_muscle" ? 250 : goal === "lose_fat" ? -400 : 0;
+      const minCals = sex === "male" ? 1600 : 1400;
+      const targetCals = Math.max(minCals, tdeeCalc + goalAdj);
+
+      const proteinPer = goal === "general_fitness" ? 0.7 : 1.0;
+      const fatPer = goal === "build_muscle" ? 0.4 : 0.35;
+      const targetProtein = Math.round(parseFloat(weight) * proteinPer);
+      const targetFat = Math.round(parseFloat(weight) * fatPer);
+      const targetCarbs = Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4);
+
+      // Program structure by goal and days
+      const programGuide = goal === "build_muscle"
+        ? (daysPerWeek <= 2 ? "Full Body both days — same exercises, focus progressive overload. Compounds 3-4 sets 6-10 reps. Isolations 3 sets 10-15 reps. Rest 2-3 min compound, 60-90s isolation."
+          : daysPerWeek === 3 ? "Full Body alternating A and B. Day A: squat pattern, horizontal push, horizontal pull, bicep or tricep isolation, core. Day B: hinge pattern, vertical push, vertical pull, unilateral leg, shoulder isolation. Compounds 3-4 sets 6-10 reps. Isolations 3 sets 10-15 reps."
+          : "Upper/Lower split. Upper: horizontal push, horizontal pull, vertical push, vertical pull, bicep and tricep isolation. Lower: squat, hinge, unilateral leg, calf, core. 3-4 sets 6-10 reps compounds, 3 sets 10-15 reps isolation.")
+        : goal === "lose_fat"
+        ? (daysPerWeek <= 3 ? "Full Body 6 exercises. Pair upper and lower as supersets to keep heart rate up. At least one large lower body compound per session. Finish with one 3-minute metabolic finisher: kettlebell swings, jump rope, rowing machine, or bodyweight circuit. 3 sets 10-15 reps. Rest 60-90s max."
+          : "Upper/Lower split same structure but shorter rest and higher reps. 3 sets 10-15 reps. Rest 60-90s max.")
+        : "Full Body 5-6 exercises. Mix strength and conditioning. 3 sets 10-12 reps. Rest 90s. Finish each session with 5 min conditioning finisher.";
+
+      // Equipment constraints
+      const equipGuide = equipment === "dumbbells"
+        ? "DUMBBELLS ONLY. No barbell, no cable, no machine movements. Squat=goblet squat. Hinge=dumbbell Romanian deadlift. Row=single arm dumbbell row. Press=dumbbell floor press or dumbbell bench press."
+        : equipment === "dumbbells_barbell"
+        ? "Dumbbells and barbell available. Prefer barbell for primary compounds. Dumbbell for accessories and isolation."
+        : equipment === "full_gym"
+        ? "Full gym available (cables, machines, barbell, dumbbells). Prefer barbell for primary compounds. Cables preferred over dumbbells for isolation."
+        : "BODYWEIGHT ONLY. No equipment. Squat=bodyweight squat or split squat. Hinge=glute bridge or single leg RDL. Push=push-up variations. Pull=table row or door frame row.";
+
+      // Injury modifications
+      const injuryGuide = !injuries || injuries === "none" ? "" 
+        : injuries.toLowerCase().includes("knee") ? "KNEE INJURY: remove all squat variations and lunges. Replace with leg press, leg extension, step-up, or box squat limited range."
+        : injuries.toLowerCase().includes("back") ? "LOWER BACK INJURY: remove conventional deadlift and barbell bent over row. Use trap bar deadlift, light Romanian deadlift, cable row, or single arm dumbbell row with chest support."
+        : injuries.toLowerCase().includes("shoulder") ? "SHOULDER INJURY: remove all overhead pressing. Use landmine press, neutral grip dumbbell press at 30 degree incline, or cable chest fly. Remove upright row entirely."
+        : injuries.toLowerCase().includes("wrist") ? "WRIST INJURY: remove barbell front squat. Replace with safety bar squat or goblet squat."
+        : `INJURY NOTE: ${injuries} — avoid movements that aggravate this area.`;
+
+      // Weight guidance by experience
+      const weightGuide = trainingHistory === "new"
+        ? "Beginner weights: goblet squat 15-25lbs, dumbbell row 15-25lbs, dumbbell press 10-20lbs, RDL 20-30lbs. Start conservative."
+        : trainingHistory === "some"
+        ? "Intermediate weights: goblet squat 35-55lbs, dumbbell row 35-50lbs, dumbbell press 25-40lbs, RDL 50-70lbs, barbell bench 95-155lbs."
+        : recentActivity === "returning"
+        ? "Returning lifter — rebuild carefully: goblet squat 35-55lbs, dumbbell row 35-50lbs, barbell bench 115-155lbs, barbell squat 135-175lbs."
+        : "Experienced active: goblet squat 55-75lbs, dumbbell row 55-75lbs, barbell squat 155-205lbs, bench press 155-205lbs, RDL 135-185lbs.";
+
+      // RPE targets
+      const rpeGuide = "First set any new exercise: RPE 6. Compound working sets: RPE 7-8. Final set compounds: RPE 8-9. Isolation working sets: RPE 8-9.";
+
+      // Warm-up and cool-down instructions
+      const warmupGuide = daysPerWeek >= 4
+        ? "Include warmup array with: 90s light cardio, 10 reps arm circles, 10 reps band pull-apart, 10 reps scapular push-ups, 10 reps light dumbbell press."
+        : "Include warmup array with: 90s light cardio, 10 reps bodyweight squat, 10 reps hip hinge, 10 reps arm circles each direction, 10 reps band pull-apart.";
+      const cooldownGuide = "Include cooldown array with: 30s quad stretch each side, 30s hamstring stretch, 30s chest stretch, 30s shoulder stretch, 60s child's pose.";
+
+      const exerciseCount = goal === "lose_fat" && daysPerWeek <= 3 ? 6 : 5;
+
+      const prompt = `Generate a week 1 fitness plan. Return ONLY valid JSON, no markdown.
+Member: goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile=${fitnessProfile}.
+CALORIES ALREADY CALCULATED — use exactly these values: calories=${targetCals}, protein=${targetProtein}, carbs=${targetCarbs}, fat=${targetFat}, bmr=${bmrCalc}, tdee=${tdeeCalc}, goalAdjustment=${goalAdj}.
+PROGRAM: ${programGuide}
+EQUIPMENT: ${equipGuide}
+${injuryGuide ? "INJURIES: " + injuryGuide : ""}
+WEIGHTS: ${weightGuide}
+RPE: ${rpeGuide}
+${warmupGuide}
+${cooldownGuide}
+Return exactly this JSON structure:
+{"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"Weeks 1-3 add reps within range, week 4 deload 40%, week 5+ increase weight","warmup":[{"name":"string","duration":"string"}],"cooldown":[{"name":"string","duration":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
+Include exactly ${exerciseCount} exercises. All numeric values must be plain numbers, not strings.`;
 
       try {
         const res = await fetch("/api/plan", {
@@ -1362,6 +1439,25 @@ function OnboardingScreen() {
               </div>
             ))}
           </div>
+          {/* Calorie breakdown — shows how the number was calculated */}
+          {plan.bmr && plan.tdee && (
+            <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.12)", borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+              <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>How your calories were calculated</div>
+              <div style={{ fontSize: 11, color: ob.body, lineHeight: 1.7 }}>
+                Your body burns approximately <span style={{ color: ob.white, fontWeight: 600 }}>{plan.bmr?.toLocaleString()} cal</span> at rest each day.
+              </div>
+              <div style={{ fontSize: 11, color: ob.body, lineHeight: 1.7 }}>
+                With your activity level that becomes <span style={{ color: ob.white, fontWeight: 600 }}>{plan.tdee?.toLocaleString()} cal</span>.
+              </div>
+              <div style={{ fontSize: 11, color: a, lineHeight: 1.7, fontWeight: 500 }}>
+                {plan.goalAdjustment > 0
+                  ? `We added ${plan.goalAdjustment} calories to support muscle growth — your target is ${plan.calories?.toLocaleString()} cal/day.`
+                  : plan.goalAdjustment < 0
+                  ? `We reduced that by ${Math.abs(plan.goalAdjustment)} calories for steady fat loss — your target is ${plan.calories?.toLocaleString()} cal/day.`
+                  : `Your maintenance target is ${plan.calories?.toLocaleString()} calories per day.`}
+              </div>
+            </div>
+          )}
           {plan.tip && <div style={{ background: "#0A1628", borderLeft: `2px solid ${a}`, borderRadius: "0 8px 8px 0", padding: "7px 10px", marginBottom: 8, fontSize: 11, color: ob.body, lineHeight: 1.5 }}>{plan.tip}</div>}
           <button onClick={() => navigate("plan")} style={{ ...s.tealBtn(false), marginTop: "auto", padding: 10, fontSize: 12 }}>Start Day 1 →</button>
           <button onClick={() => { const adj = { ...plan, exercises: (plan.exercises||[]).map(e => ({ ...e, weight: Math.max(5, Math.round(e.weight * 0.75)) })) }; setPlan(adj); }} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: 8, fontSize: 11, color: ob.muted, cursor: "pointer", marginTop: 6, fontFamily: ob.font }}>Weights feel too heavy? Reduce all by 25%</button>
