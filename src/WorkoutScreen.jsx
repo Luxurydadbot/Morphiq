@@ -98,8 +98,17 @@ function WorkoutScreen() {
     (plan?.exercises || WORKOUT_EXERCISES).map(e => ({
       name: e.name, muscle: e.muscle, sets: e.sets,
       targetReps: e.reps || e.targetReps, weight: e.weight,
+      rpe: e.rpe || 8, alternative: e.alternative || null,
+      restSeconds: e.restSeconds || null,
     }))
   );
+
+  // Workout phase: "warmup" | "active" | "cooldown"
+  const warmupExercises = plan?.warmup || [];
+  const cooldownExercises = plan?.cooldown || [];
+  const [phase, setPhase] = useState(warmupExercises.length > 0 ? "warmup" : "active");
+  const [warmupStep, setWarmupStep] = useState(0);
+  const [cooldownStep, setCooldownStep] = useState(0);
 
   const [exIdx, setExIdx] = useState(0);
   const [setIdx, setSetIdx] = useState(0);
@@ -306,16 +315,98 @@ function WorkoutScreen() {
   const card = { background: "#1A2332", borderRadius: 12, padding: "10px 12px", marginBottom: 8 };
   const totalCompleted = loggedSets.filter(l => l.exIdx === exIdx).length;
 
+  // ── WARM-UP PHASE ──────────────────────────────────────────────────────────
+  if (phase === "warmup") {
+    const currentWarmup = warmupExercises[warmupStep];
+    const isLastWarmup = warmupStep >= warmupExercises.length - 1;
+    return (
+      <Layout activeNav="workout" chatTarget="chat_workout">
+        <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ textAlign: "center", marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: a, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Warm-up · {warmupStep + 1} of {warmupExercises.length}</div>
+            <div style={{ fontSize: 13, color: theme.textDim }}>5 minutes before your workout</div>
+          </div>
+          <div style={{ height: 4, background: "#1A2332", borderRadius: 2, marginBottom: 20 }}>
+            <div style={{ height: 4, borderRadius: 2, background: a, width: `${Math.round(((warmupStep + 1) / warmupExercises.length) * 100)}%`, transition: "width .4s" }} />
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 12 }}>
+            <div style={{ fontSize: 40 }}>🔥</div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, lineHeight: 1.2 }}>{currentWarmup?.name}</div>
+            <div style={{ fontSize: 18, color: a, fontWeight: 500 }}>{currentWarmup?.duration}</div>
+            <div style={{ fontSize: 13, color: theme.textDim, maxWidth: 240, lineHeight: 1.5 }}>Take your time — a proper warm-up reduces injury risk and improves performance.</div>
+          </div>
+          <div style={{ paddingBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
+            <button onClick={() => {
+              if (isLastWarmup) { setPhase("active"); }
+              else { setWarmupStep(s => s + 1); }
+            }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              {isLastWarmup ? "Start workout →" : "Done — next →"}
+            </button>
+            <button onClick={() => setPhase("active")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+              Skip warm-up
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── COOL-DOWN PHASE ─────────────────────────────────────────────────────────
+  if (phase === "cooldown") {
+    const currentCooldown = cooldownExercises[cooldownStep];
+    const isLastCooldown = cooldownStep >= cooldownExercises.length - 1;
+    const totalSets = loggedSets.length;
+    const totalVol = loggedSets.reduce((acc, l) => acc + l.reps * l.weight, 0);
+    return (
+      <Layout activeNav="workout" chatTarget="chat_workout">
+        <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ textAlign: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: a, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Cool-down · {cooldownStep + 1} of {cooldownExercises.length}</div>
+            <div style={{ fontSize: 13, color: theme.textDim }}>5 minutes to recover properly</div>
+          </div>
+          <div style={{ background: "#1A2332", borderRadius: 12, padding: "10px 14px", marginBottom: 14, display: "flex", justifyContent: "space-around" }}>
+            <div style={{ textAlign: "center" }}><div style={{ fontSize: 18, fontWeight: 700, color: a }}>{totalSets}</div><div style={{ fontSize: 11, color: theme.textDim }}>Sets done</div></div>
+            <div style={{ textAlign: "center" }}><div style={{ fontSize: 18, fontWeight: 700, color: a }}>{totalVol.toLocaleString()}</div><div style={{ fontSize: 11, color: theme.textDim }}>lbs volume</div></div>
+          </div>
+          <div style={{ height: 4, background: "#1A2332", borderRadius: 2, marginBottom: 16 }}>
+            <div style={{ height: 4, borderRadius: 2, background: a, width: `${Math.round(((cooldownStep + 1) / cooldownExercises.length) * 100)}%`, transition: "width .4s" }} />
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 12 }}>
+            <div style={{ fontSize: 40 }}>🧘</div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, lineHeight: 1.2 }}>{currentCooldown?.name}</div>
+            <div style={{ fontSize: 18, color: a, fontWeight: 500 }}>{currentCooldown?.duration}</div>
+          </div>
+          <div style={{ paddingBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
+            <button onClick={() => {
+              if (isLastCooldown) { setState("done"); setPhase("active"); }
+              else { setCooldownStep(s => s + 1); }
+            }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              {isLastCooldown ? "Finish workout ✓" : "Done — next →"}
+            </button>
+            <button onClick={() => { setState("done"); setPhase("active"); }} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+              Skip cool-down
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (state === "done") {
     const totalSets = loggedSets.length;
     const totalVol = loggedSets.reduce((acc, l) => acc + l.reps * l.weight, 0);
+    // If cool-down exercises exist and we haven't done them yet, go to cool-down phase
+    if (cooldownExercises.length > 0 && phase !== "cooldown") {
+      // Trigger cool-down on next render
+      setTimeout(() => setPhase("cooldown"), 0);
+    }
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "2rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
           <div style={{ fontSize: 22, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Workout complete!</div>
           <div style={{ fontSize: 14, color: theme.textDim, marginBottom: "1.5rem" }}>Great work, {user.name || "champ"}. Recovery starts now.</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%", marginBottom: "1.5rem" }}>
-            {[["Sets done", totalSets], ["Total volume", `${totalVol.toLocaleString()} lbs`], ["Exercises", WORKOUT_EXERCISES.length], ["Personal bests", "2 🔥"]].map(([l, v]) => (
+            {[["Sets done", totalSets], ["Total volume", `${totalVol.toLocaleString()} lbs`], ["Exercises", exercises.length], ["Personal bests", "2 🔥"]].map(([l, v]) => (
               <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
                 <div style={{ fontSize: 20, fontWeight: 600, color: a }}>{v}</div>
                 <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
@@ -474,9 +565,10 @@ function WorkoutScreen() {
         <div style={{ textAlign: "center", marginBottom: 10 }}>
           <div style={{ fontSize: 10, color: theme.textDim, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>Set {setIdx + 1} of {ex.sets}</div>
           <div style={{ fontSize: 42, fontWeight: 700, color: theme.text, lineHeight: 1.1, marginBottom: 6 }}>{ex.name}</div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ fontSize: 13, color: theme.textDim }}>{ex.muscle}</div>
             <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${ex.targetReps} reps`}</Pill>
+            {ex.rpe && <div style={{ background: "#1A2332", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 20, padding: "2px 8px", fontSize: 10, color: "#A78BFA" }}>RPE {ex.rpe}</div>}
           </div>
         </div>
 
@@ -584,7 +676,17 @@ function WorkoutScreen() {
               <span style={{ fontSize: 10, color: a }}>💪</span>
               <span style={{ fontSize: 11, color: "#9BB3C8" }}>{ex.muscle}</span>
             </div>
-            {/* Alternatives list */}
+            {/* Alternatives list — show plan's alternative first if available */}
+            {ex.alternative && (
+              <button key={ex.alternative} onClick={() => doSwap({ name: ex.alternative, muscle: ex.muscle, sets: ex.sets, targetReps: ex.targetReps, weight: Math.round(ex.weight * 0.85), rpe: ex.rpe, alternative: null })}
+                style={{ width: "100%", background: "#0A1A14", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2" }}>{ex.alternative}</div>
+                  <div style={{ fontSize: 11, color: a, marginTop: 2 }}>✦ Recommended — same muscle group</div>
+                </div>
+                <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Swap →</div>
+              </button>
+            )}
             {(SWAP_ALTERNATIVES[ex.muscle] || SWAP_FALLBACK).map((alt) => (
               <button key={alt.name} onClick={() => doSwap(alt)}
                 style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(255,255,255,0.06)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
