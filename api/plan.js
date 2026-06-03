@@ -10,7 +10,8 @@ export default async function handler(req, res) {
       headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 2000,
+        max_tokens: 3000,
+        system: "You are a certified personal trainer generating structured fitness plans. You must return ONLY valid JSON with no markdown, no code fences, no explanation. Every field in the requested structure must be present. Never omit warmup, cooldown, rpe, or alternative fields.",
         messages: [{ role: "user", content: prompt }]
       })
     });
