@@ -1100,6 +1100,12 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
           // Persist to Supabase profiles table (fire-and-forget — UI doesn't block on this)
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, parsed).catch(() => {});
+            // Also insert starting weight into weight_logs so Progress screen
+            // has a baseline data point from day one — weight is a plain number here (e.g. 175)
+            const startingWeight = parseFloat(weight);
+            if (startingWeight > 0) {
+              sb.insertWeightLog(supabaseUser.id, startingWeight).catch(() => {});
+            }
           }
           setTimeout(() => { if (!cancelled) setStep(13); }, 400);
         }
