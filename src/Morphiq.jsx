@@ -2164,6 +2164,29 @@ function StreakCalendar({ accent, workoutDates }) {
   );
 }
 
+// Returns the number of consecutive completed weeks (week streak).
+// A week is "complete" when the morphiq_week_YYYY-MM-DD key in localStorage
+// holds a value >= daysPerWeek. We look back up to 52 weeks.
+function getWeekStreak(daysPerWeek) {
+  daysPerWeek = daysPerWeek || 3;
+  try {
+    var streak = 0;
+    for (var w = 0; w < 52; w++) {
+      var d = new Date();
+      var day = d.getDay();
+      d.setDate(d.getDate() - (day === 0 ? 6 : day - 1) - w * 7);
+      var key = "morphiq_week_" + d.toISOString().slice(0, 10);
+      var done = parseInt(localStorage.getItem(key) || "0", 10);
+      if (done >= daysPerWeek) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  } catch(e) { return 0; }
+}
+
 function ProgressScreen() {
   const { gymBranding, supabaseUser, user, historicalData, loadHistoricalData } = useApp();
   const a = gymBranding.accent;
@@ -2264,7 +2287,7 @@ function ProgressScreen() {
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
           {[
             { val: lost > 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, lbl:"Weight change", color: lost >= 0 ? a : "#F87171" },
-            { val: historicalData?.streak > 0 ? `🔥 ${historicalData.streak}` : (historicalData?.streak ?? "—"), lbl:"Day streak", color:"#F59E0B" },
+            { val: (() => { var ws = getWeekStreak(plan && plan.daysPerWeek ? plan.daysPerWeek : 3); return ws > 0 ? "🔥 " + ws : "—"; })(), lbl:"Week streak", color:"#F59E0B" },
             { val: String(realPBs.length || 0), lbl:"PBs logged", color:"#A78BFA" },
           ].map(({ val, lbl, color }) => (
             <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
