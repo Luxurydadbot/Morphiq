@@ -354,17 +354,80 @@ const useApp = () => useContext(AppContext);
 
 const DEFAULT_USER = { name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" };
 const MOCK_RETURNING_PLAN = {
+  // ── Macros ───────────────────────────────────────────────────────────────
   calories: 1800, protein: 140, carbs: 160, fat: 55,
-  workoutDays: ["Monday","Wednesday","Friday"], workoutType: "Full Body",
-  workoutDuration: 40, weeklyFocus: "Build your movement foundation.",
-  exercises: [
-    { name: "Goblet Squat", sets: 3, reps: 12, weight: 25, muscle: "Quads / Glutes" },
-    { name: "Dumbbell Row", sets: 3, reps: 10, weight: 30, muscle: "Back / Biceps" },
-    { name: "Incline Press", sets: 3, reps: 10, weight: 35, muscle: "Chest / Shoulders" },
-    { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 65, muscle: "Hamstrings" },
-    { name: "Shoulder Press", sets: 3, reps: 10, weight: 25, muscle: "Shoulders" },
-  ],
+  bmr: 1820, tdee: 2503, goalAdjustment: -400,
+
+  // ── Schedule ─────────────────────────────────────────────────────────────
+  workoutDays: ["Monday","Wednesday","Friday"],
+  daysPerWeek: 3,
+  workoutType: "Full Body",
+  workoutDuration: 40,
+  weekNumber: 2,
+  weekStartDate: new Date((() => { const d = new Date(); const day = d.getDay(); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); return d; })()).toISOString().slice(0,10),
+
+  // ── Focus & tip ──────────────────────────────────────────────────────────
+  weeklyFocus: "Increase load or reps on at least one exercise versus last week.",
   tip: "Consistency over perfection — show up, even on hard days.",
+
+  // ── Progression rule ─────────────────────────────────────────────────────
+  // If member hits or exceeds target reps for 2+ sets, bump weight by 5 lbs next session
+  progressionRule: { triggerSets: 2, weightIncrementLbs: 5 },
+
+  // ── Rest between sets ────────────────────────────────────────────────────
+  restSeconds: 90,
+
+  // ── Warm-up (5 moves, ~5 min) ────────────────────────────────────────────
+  warmup: [
+    { name: "Jumping Jacks",      durationSec: 45, notes: "Full range of motion, keep breathing" },
+    { name: "Hip Circles",         durationSec: 30, notes: "10 each direction, hands on hips" },
+    { name: "Arm Crosses",         durationSec: 30, notes: "Cross at chest height, keep arms straight" },
+    { name: "Bodyweight Squat",    durationSec: 40, notes: "Slow and controlled, 8–10 reps" },
+    { name: "Shoulder Roll",       durationSec: 30, notes: "Forward 10×, backward 10×" },
+  ],
+
+  // ── Main exercises ───────────────────────────────────────────────────────
+  exercises: [
+    {
+      name: "Goblet Squat", sets: 3, reps: 12, weight: 30, muscle: "Quads / Glutes",
+      rpe: 7,
+      restSeconds: 90,
+      alternative: "Bodyweight Squat",
+    },
+    {
+      name: "Dumbbell Row", sets: 3, reps: 10, weight: 35, muscle: "Back / Biceps",
+      rpe: 7,
+      restSeconds: 90,
+      alternative: "Resistance Band Row",
+    },
+    {
+      name: "Incline Press", sets: 3, reps: 10, weight: 40, muscle: "Chest / Shoulders",
+      rpe: 8,
+      restSeconds: 90,
+      alternative: "Push-Up",
+    },
+    {
+      name: "Romanian Deadlift", sets: 3, reps: 10, weight: 70, muscle: "Hamstrings",
+      rpe: 8,
+      restSeconds: 90,
+      alternative: "Glute Bridge",
+    },
+    {
+      name: "Shoulder Press", sets: 3, reps: 10, weight: 30, muscle: "Shoulders",
+      rpe: 7,
+      restSeconds: 90,
+      alternative: "Lateral Raise",
+    },
+  ],
+
+  // ── Cool-down (5 moves, ~5 min) ──────────────────────────────────────────
+  cooldown: [
+    { name: "Standing Quad Stretch",   durationSec: 40, notes: "Hold each leg 20 s, use wall for balance" },
+    { name: "Doorway Chest Stretch",   durationSec: 40, notes: "Arm at 90°, lean gently into doorframe" },
+    { name: "Seated Hamstring Stretch",durationSec: 40, notes: "Reach toward toes, keep back straight" },
+    { name: "Child's Pose",            durationSec: 45, notes: "Arms extended, breathe into lower back" },
+    { name: "Neck Side Stretch",       durationSec: 30, notes: "Ear to shoulder, hold 15 s each side" },
+  ],
 };
 
 const SESSION_KEY = "morphiq_session";
