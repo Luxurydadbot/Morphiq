@@ -1656,6 +1656,26 @@ function HomeDashboardScreen() {
                 </div>
                 <div style={{ fontSize: 12, color: theme.textDim }}>{weeklyDone} of {weeklyTarget} workouts done this week</div>
               </div>
+              {plan?.exercises?.length > 0 && (
+                <div style={{ padding: "0 1.25rem .75rem", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {plan.exercises.slice(0, 5).map((ex, idx) => (
+                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(0,212,177,0.1)", border: `0.5px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0 }}>{idx + 1}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "#F0F0F0" }}>{ex.name}</div>
+                        <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>{ex.muscle}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 13, color: a, fontWeight: 500 }}>{ex.sets} × {ex.reps}</div>
+                        {ex.weight && <div style={{ fontSize: 11, color: theme.textMuted, marginTop: 1 }}>{ex.weight} lbs</div>}
+                      </div>
+                    </div>
+                  ))}
+                  {plan.exercises.length > 5 && (
+                    <div style={{ fontSize: 12, color: theme.textMuted, paddingLeft: 34 }}>+{plan.exercises.length - 5} more exercises</div>
+                  )}
+                </div>
+              )}
               <div style={{ padding: "0 1.25rem 1.25rem" }}>
                 <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
                   Start workout →
