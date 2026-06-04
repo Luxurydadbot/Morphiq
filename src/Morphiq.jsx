@@ -1265,21 +1265,7 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
               <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
               <button onClick={() => setDaysPerWeek(d => Math.min(7, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
             </div>
-            {/* Day dots — tappable to toggle specific days */}
-            <div style={{ display: "flex", gap: 6 }}>
-              {["M","T","W","T","F","S","S"].map((d, i) => {
-                const on = i < daysPerWeek;
-                return (
-                  <button key={i}
-                    onClick={() => {
-                      if (on && daysPerWeek > 2) setDaysPerWeek(daysPerWeek - 1);
-                      else if (!on && daysPerWeek < 7) setDaysPerWeek(daysPerWeek + 1);
-                    }}
-                    style={{ width: 32, height: 32, borderRadius: "50%", background: on ? ob.tealDk : ob.card, border: `1.5px solid ${on ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: on ? 700 : 400, color: on ? a : ob.muted, cursor: "pointer", fontFamily: ob.font, transition: "all .2s", flexShrink: 0 }}>{d}</button>
-                );
-              })}
-            </div>
-            <div style={{ fontSize: 10, color: ob.muted, marginTop: 4 }}>Tap dots or use +/− to adjust</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 4, textAlign: "center", lineHeight: 1.5 }}>Do them any day that works for you — the app always shows your next workout.</div>
           </div>
           <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13 }}>Continue →</button>
         </div>}
