@@ -2413,30 +2413,6 @@ function ProfileScreen() {
   const a = gymBranding.accent;
   const [editGoal, setEditGoal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(user.goal || "lose_fat");
-  const [editDays, setEditDays] = useState(false);
-  const [selectedDays, setSelectedDays] = useState(plan?.workoutDays || ["Monday","Wednesday","Friday"]);
-  const [daySaveMsg, setDaySaveMsg] = useState("");
-  // Sync selectedDays if plan loads after component mounts (e.g. from Supabase)
-  useEffect(() => {
-    if (plan?.workoutDays?.length) setSelectedDays(plan.workoutDays);
-  }, [plan?.workoutDays?.join(",")]);
-
-  async function saveDays() {
-    if (selectedDays.length === 0) return;
-    // Update plan with new workout days (keep everything else the same)
-    const updatedPlan = { ...(plan || {}), workoutDays: selectedDays };
-    const updatedUser = { ...(user || {}), daysPerWeek: selectedDays.length };
-    setPlan(updatedPlan);
-    setUser(updatedUser);
-    setEditDays(false);
-    setDaySaveMsg("Schedule updated ✓");
-    setTimeout(() => setDaySaveMsg(""), 3000);
-    // Save to Supabase (fire-and-forget)
-    if (supabaseUser?.id) {
-      sb.upsertProfile(supabaseUser.id, updatedUser, updatedPlan).catch(() => {});
-    }
-  }
-
   const goalLabel = GOAL_OPTIONS.find(g => g.id === selectedGoal)?.label || "Lose fat";
   const sL = theme.sL;
 
@@ -2525,47 +2501,7 @@ function ProfileScreen() {
         {/* Plan settings */}
         <div style={sL}>Plan Settings</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
-          {/* Workout day switcher */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 13, color: theme.text }}>Workout days</div>
-              {editDays ? (
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setEditDays(false)} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "3px 10px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                  <button onClick={saveDays} style={{ background: a, border: "none", borderRadius: 8, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit" }}>Save</button>
-                </div>
-              ) : (
-                <button onClick={() => setEditDays(true)} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "4px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
-              )}
-            </div>
-            {editDays ? (
-              <div style={{ display: "flex", gap: 5, flexWrap: "nowrap" }}>
-                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((short, idx) => {
-                  const full = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][idx];
-                  const on = selectedDays.includes(full);
-                  return (
-                    <button key={full} onClick={() => setSelectedDays(prev => on ? prev.filter(d => d !== full) : [...prev, full])}
-                      style={{ flex: 1, background: on ? "#003D35" : "transparent", border: `1.5px solid ${on ? a : "rgba(255,255,255,0.1)"}`, borderRadius: 8, padding: "7px 2px", fontSize: 10, fontWeight: on ? 600 : 400, color: on ? a : theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
-                      {short}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
-                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((short, idx) => {
-                  const full = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][idx];
-                  const on = (plan?.workoutDays || selectedDays).includes(full);
-                  return (
-                    <div key={short} style={{ width: 32, height: 32, borderRadius: "50%", background: on ? "#003D35" : "#1A2332", border: `1.5px solid ${on ? a : "rgba(255,255,255,0.06)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: on ? 700 : 400, color: on ? a : theme.textDim }}>
-                      {short.slice(0,1)}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {editDays && daySaveMsg && <div style={{ fontSize: 10, color: a, marginTop: 6 }}>{daySaveMsg}</div>}
-          </div>
+          <StatRow label="Workouts per week" value={`${plan?.daysPerWeek || user.daysPerWeek || 3}×`} />
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 10 }}>
             <StatRow label="Session length" value={`~${plan?.workoutDuration || 40} min`} />
           </div>
