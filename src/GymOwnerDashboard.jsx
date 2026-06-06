@@ -39,6 +39,7 @@ function buildMemberRow(profile, sessions, lastDate, weightDelta) {
 
 // Shared hook — loads all owner data once, shared between Overview + Members tabs
 function useOwnerData() {
+  const { gymBranding } = useApp();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,7 +47,9 @@ function useOwnerData() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const profiles = await sb.getGymMembers("demo-gym");
+      // Use the real gym ID from context — set when owner signs in
+      const gymId = gymBranding?.gymId || "demo-gym";
+      const profiles = await sb.getGymMembers(gymId);
       if (cancelled || !profiles.length) { setLoading(false); return; }
 
       const profileIds = profiles.map(p => p.id);
@@ -63,7 +66,7 @@ function useOwnerData() {
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [gymBranding?.gymId]); // re-fetch if gym changes
 
   return { members, loading };
 }
