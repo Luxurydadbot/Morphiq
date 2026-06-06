@@ -136,6 +136,7 @@ STRICT RULES:
 5. Only ask a follow-up question if you truly cannot give useful advice without more information — and only ONE question at the very end of your reply.
 6. Keep replies to 2-3 sentences max. Use their first name. No guilt language. Be warm and direct.
 7. If live workout context is present, reference the specific exercise and set number.
+8. EXERCISE SWAP RULE: If the member reports pain, injury, or asks to swap their current exercise, recommend a specific alternative by name. At the END of your reply (after the text, before CHIPS) include exactly this tag: <!--ACTION:swap_exercise:REPLACEMENT_EXERCISE_NAME--> — replacing REPLACEMENT_EXERCISE_NAME with the actual exercise (e.g. "Leg Press", "Seated Row", "Dumbbell Curl"). Only add this tag when recommending a swap.
 
 After every reply add: <!--CHIPS:["short followup 1","short followup 2","short followup 3"]-->`;
 
@@ -157,6 +158,17 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
     const data = await claudeRes.json();
     let text = data.content?.[0]?.text || "I'm here — what do you need?";
     let chips = [];
+    let action = null;
+
+    // ── PARSE SWAP ACTION ────────────────────────────────────────────────────
+    // Claude embeds <!--ACTION:swap_exercise:Exercise Name--> when recommending a swap.
+    // Extract it, build the action object, then strip the tag from the displayed text.
+    const actionMatch = text.match(/<!--ACTION:swap_exercise:([^-]+?)-->/);
+    if (actionMatch) {
+      const exerciseName = actionMatch[1].trim();
+      action = { type: "swap_exercise", to: exerciseName };
+      text = text.replace(/<!--ACTION:swap_exercise:[^-]+?-->/g, "").trim();
+    }
 
     const chipsMatch = text.match(/<!--CHIPS:(.*?)-->/s);
     if (chipsMatch) {
@@ -181,8 +193,9 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
       }).catch(() => {});
     }
 
-    res.status(200).json({ text, chips, action: null, usageCount: usageCount + 1, usageLimit: MONTHLY_LIMIT });
+    res.status(200).json({ text, chips, action, usageCount: usageCount + 1, usageLimit: MONTHLY_LIMIT });
   } catch (e) {
     res.status(200).json({ text: "Sorry, I hit a snag — try again in a moment.", chips: [], error: e.message });
   }
 }
+
