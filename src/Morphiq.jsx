@@ -495,7 +495,16 @@ function AppProvider({ children }) {
     // Dev bypass always uses a fixed ID so getProfileId finds a real Supabase row
     const uid = realAuthUserId || (hasPlan !== null ? "dev-bypass-001" : ("sim-" + Date.now()));
     setSupabaseUser({ email, id: uid });
-    if (role === "owner") { setScreen("owner"); return; }
+    if (role === "owner") {
+      // Look up the owner's gym and store the real gym_id in branding context
+      // so GymOwnerDashboard can query real member data
+      const gymRow = await sb.getGymByOwnerEmail(email);
+      if (gymRow?.gym_id) {
+        setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: gymRow.accent || prev.accent, welcome: gymRow.welcome || prev.welcome }));
+      }
+      setScreen("owner");
+      return;
+    }
 
     if (hasPlan === true) {
       // Ensure dev profile row exists in Supabase so cloud save works during testing
