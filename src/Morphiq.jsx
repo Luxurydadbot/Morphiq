@@ -334,6 +334,49 @@ const sb = {
       return deltas;
     } catch { return {}; }
   },
+
+  // ── GYM MESSAGES ─────────────────────────────────────────────────────────
+  async saveMessage(gymId, profileId, text) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/gym_messages`, {
+        method: "POST",
+        headers: SB_HEADERS,
+        body: JSON.stringify({
+          gym_id: gymId,
+          profile_id: profileId,
+          message: text,
+          read: false,
+          sent_at: new Date().toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "no body");
+        console.error("saveMessage failed:", res.status, errText);
+      }
+      return res.ok;
+    } catch (e) { console.error("saveMessage exception:", e); return false; }
+  },
+
+  async getMessages(profileId) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/gym_messages?profile_id=eq.${encodeURIComponent(profileId)}&order=sent_at.desc&limit=10`,
+        { headers: SB_GET }
+      );
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows : [];
+    } catch { return []; }
+  },
+
+  async markMessageRead(messageId) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/gym_messages?id=eq.${messageId}`, {
+        method: "PATCH",
+        headers: SB_HEADERS,
+        body: JSON.stringify({ read: true }),
+      });
+    } catch { /* fire and forget */ }
+  },
 };
 
 const theme = {
@@ -1704,6 +1747,19 @@ function HomeDashboardScreen() {
     ? `${greeting}, ${user.name || "there"}. Last workout: ${new Date(lastSession + "T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}. ${weeklyDone > 0 ? `${weeklyDone} of ${weeklyTarget} workouts done this week — keep it up!` : "Ready to train today?"}`
     : `${greeting}, ${user.name || "there"}. Your plan is ready — let's get your first session in today.`;
 
+  // Gym messages — load once on mount
+  const [gymMessages, setGymMessages] = React.useState([]);
+  const [msgExpanded, setMsgExpanded] = React.useState(false);
+  React.useEffect(() => {
+    if (!user?.profileId) return;
+    sb.getMessages(user.profileId).then(rows => setGymMessages(rows)).catch(() => {});
+  }, [user?.profileId]);
+  const unreadMessages = gymMessages.filter(m => !m.read);
+  function dismissMessage(msg) {
+    sb.markMessageRead(msg.id).catch(() => {});
+    setGymMessages(prev => prev.map(m => m.id === msg.id ? { ...m, read: true } : m));
+  }
+
   return (
     <Layout activeNav="home">
       <div style={{ margin: "1.5rem 1.25rem 0", background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem 1.25rem", display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -1713,6 +1769,36 @@ function HomeDashboardScreen() {
           <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{coachMsg}</div>
         </div>
       </div>
+      {/* Gym messages notification card — only shown when there are unread messages */}
+      {unreadMessages.length > 0 && (
+        <div style={{ margin: "0.75rem 1.25rem 0" }}>
+          <div style={{ background: theme.surface, border: `0.5px solid ${a}`, borderRadius: 16, overflow: "hidden" }}>
+            <div
+              onClick={() => setMsgExpanded(v => !v)}
+              style={{ padding: "0.85rem 1.25rem", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+            >
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(0,212,177,0.12)", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>💬</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: a, fontWeight: 500 }}>Message from your gym</div>
+                <div style={{ fontSize: 13, color: "#C0C0C0", marginTop: 2 }}>{unreadMessages.length} new message{unreadMessages.length > 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ fontSize: 18, color: "#6B7A8D", transform: msgExpanded ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
+            </div>
+            {msgExpanded && unreadMessages.map(msg => (
+              <div key={msg.id} style={{ borderTop: "0.5px solid rgba(255,255,255,0.06)", padding: "0.85rem 1.25rem" }}>
+                <div style={{ fontSize: 13, color: "#D0D0D0", lineHeight: 1.55, marginBottom: 10 }}>{msg.message}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 11, color: "#6B7A8D" }}>{new Date(msg.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                  <button
+                    onClick={() => dismissMessage(msg)}
+                    style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "4px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}
+                  >Got it ✓</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Your next workout</div>
         <div style={{ background: theme.surface, border: `0.5px solid ${allDone ? theme.border : theme.border}`, borderRadius: 16, overflow: "hidden" }}>
