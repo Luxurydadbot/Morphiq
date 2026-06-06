@@ -377,6 +377,24 @@ const sb = {
       });
     } catch { /* fire and forget */ }
   },
+
+  // Sends a message to every member of a gym in parallel.
+  // Returns { sent, failed } counts so the UI can show a summary.
+  async broadcastMessage(gymId, profileIds, text) {
+    const sentAt = new Date().toISOString();
+    const results = await Promise.allSettled(
+      profileIds.map(profileId =>
+        fetch(`${SUPABASE_URL}/rest/v1/gym_messages`, {
+          method: "POST",
+          headers: SB_HEADERS,
+          body: JSON.stringify({ gym_id: gymId, profile_id: profileId, message: text, read: false, sent_at: sentAt }),
+        }).then(r => r.ok ? "ok" : "fail")
+      )
+    );
+    const sent   = results.filter(r => r.status === "fulfilled" && r.value === "ok").length;
+    const failed = results.length - sent;
+    return { sent, failed };
+  },
 };
 
 const theme = {
