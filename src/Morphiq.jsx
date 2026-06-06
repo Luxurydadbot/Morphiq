@@ -2655,51 +2655,81 @@ function ProgressScreen() {
           </div>
         )}
 
-        {tab === "bests" && (
-          <div className="mq-fade">
-            <div style={{ background:"#0A1628", borderLeft:"2px solid #00D4B1", borderRadius:"0 10px 10px 0", padding:"8px 12px", marginBottom:14 }}>
-              <div style={{ fontSize:12, color:"#9BB3C8", lineHeight:1.5 }}>
-                You've set <span style={{ color:"#E8EDF2", fontWeight:600 }}>8 personal bests</span> this month. Progressive overload is working.
+        {tab === "bests" && (() => {
+          // Build real volume-per-exercise from workout logs for the current month
+          const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+          const volColors = [a, "#818cf8", "#F59E0B", "#f472b6", "#60A5FA", "#34D399"];
+          const realVolBars = useRealWorkoutData ? (() => {
+            const vol = {};
+            realLogs.forEach(row => {
+              if (!row.workout_date?.startsWith(thisMonth)) return;
+              const k = row.exercise_name;
+              if (!vol[k]) vol[k] = 0;
+              vol[k] += (row.weight || 0) * (row.reps || 0);
+            });
+            const entries = Object.entries(vol).sort((a, b) => b[1] - a[1]).slice(0, 4);
+            if (!entries.length) return null;
+            const maxVol = entries[0][1];
+            return entries.map(([label, v], i) => ({
+              label, pct: Math.round((v / maxVol) * 100), color: volColors[i % volColors.length],
+              total: v.toLocaleString() + " lbs",
+            }));
+          })() : null;
+
+          const pbCount = useRealWorkoutData ? realPBs.length : 8;
+          const pbMsg = useRealWorkoutData
+            ? (realPBs.length > 0
+                ? `You have ${pbCount} exercise best${pbCount !== 1 ? "s" : ""} on record. Keep adding weight to keep growing.`
+                : "No workouts logged yet. Complete your first session to start tracking personal bests.")
+            : "You've set 8 personal bests this month. Progressive overload is working.";
+
+          return (
+            <div className="mq-fade">
+              <div style={{ background:"#0A1628", borderLeft:"2px solid #00D4B1", borderRadius:"0 10px 10px 0", padding:"8px 12px", marginBottom:14 }}>
+                <div style={{ fontSize:12, color:"#9BB3C8", lineHeight:1.5 }}>{pbMsg}</div>
               </div>
-            </div>
-            <div style={sL}>Current bests</div>
-            <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
-              {realPBs.map((pb, i) => (
-                <div key={pb.exercise} style={{ padding:"11px 14px", borderBottom: i < realPBs.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <div>
-                      <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
-                      <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>Set {pb.date}</div>
+              {realPBs.length > 0 && (
+                <>
+                  <div style={sL}>Current bests</div>
+                  <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
+                    {realPBs.map((pb, i) => (
+                      <div key={pb.exercise} style={{ padding:"11px 14px", borderBottom: i < realPBs.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
+                            <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>
+                              {pb.date ? new Date(pb.date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "—"}
+                            </div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div>
+                            <div style={{ fontSize:11, color:"#6B7A8D" }}>{pb.reps} reps</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {realVolBars && (
+                <div style={{ background:"#1A2332", borderRadius:14, padding:"12px 14px" }}>
+                  <div style={{ fontSize:11, color:"#6B7A8D", textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Volume this month</div>
+                  {realVolBars.map(bar => (
+                    <div key={bar.label} style={{ marginBottom:8 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                        <span style={{ fontSize:11, color:theme.textMuted }}>{bar.label}</span>
+                        <span style={{ fontSize:11, color:bar.color, fontWeight:600 }}>{bar.total}</span>
+                      </div>
+                      <div style={{ height:4, background:"#0F1922", borderRadius:2 }}>
+                        <div style={{ height:4, borderRadius:2, background:bar.color, width:`${bar.pct}%`, transition:"width .8s ease" }} />
+                      </div>
                     </div>
-                    <div style={{ textAlign:"right" }}>
-                      <div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div>
-                      <div style={{ fontSize:11, color:"#6B7A8D" }}>{pb.reps} reps</div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-            <div style={{ background:"#1A2332", borderRadius:14, padding:"12px 14px" }}>
-              <div style={{ fontSize:11, color:"#6B7A8D", textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Volume progress this month</div>
-              {[
-                { label:"Goblet Squat",         pct:85, color:a },
-                { label:"Dumbbell Bench Press",  pct:72, color:"#818cf8" },
-                { label:"Seated Cable Row",      pct:91, color:"#F59E0B" },
-                { label:"Romanian Deadlift",     pct:68, color:"#f472b6" },
-              ].map(bar => (
-                <div key={bar.label} style={{ marginBottom:8 }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                    <span style={{ fontSize:11, color:theme.textMuted }}>{bar.label}</span>
-                    <span style={{ fontSize:11, color:bar.color, fontWeight:600 }}>{bar.pct}%</span>
-                  </div>
-                  <div style={{ height:4, background:"#0F1922", borderRadius:2 }}>
-                    <div style={{ height:4, borderRadius:2, background:bar.color, width:`${bar.pct}%`, transition:"width .8s ease" }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
       </div>
     </Layout>
@@ -2860,5 +2890,6 @@ export default function Morphiq() {
     </>
   );
 }
+
 
 
