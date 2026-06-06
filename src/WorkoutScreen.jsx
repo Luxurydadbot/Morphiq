@@ -188,12 +188,16 @@ function WorkoutScreen() {
   }, [state]);
 
   function goToRestOrNudge() {
-    const newLogs = loggedSetsRef.current;
-    const prevSets = newLogs.filter(l => l.exIdx === exIdx);
-    const exceeded = prevSets.filter(l => l.reps > ex.targetReps).length;
-    const isLastSet = setIdx === ex.sets - 1;
-    if (exceeded >= 2 && !isLastSet) {
-      setNudgedWeight(currentWeight + 5);
+    const allLogs = loggedSetsRef.current;
+    // All sets logged for this exercise so far (includes the one just logged)
+    const setsForThisEx = allLogs.filter(l => l.exIdx === exIdx);
+    // How many sets beat the target rep count
+    const exceededCount = setsForThisEx.filter(l => l.reps > (ex.targetReps || 10)).length;
+    const isLastSet = setIdx >= ex.sets - 1;
+    const increment = plan?.progressionRule?.weightIncrementLbs || 5;
+    // Trigger nudge: 2+ sets beat target, not on last set, and haven't nudged yet this exercise
+    if (exceededCount >= 2 && !isLastSet && !nudgeAcceptedRef.current) {
+      setNudgedWeight((nudgedWeight ?? ex.weight) + increment);
       setState("nudge");
     } else {
       setState("rest");
@@ -202,6 +206,8 @@ function WorkoutScreen() {
 
   const loggedSetsRef = useRef(loggedSets);
   useEffect(() => { loggedSetsRef.current = loggedSets; }, [loggedSets]);
+  // Tracks whether the overload nudge was accepted for this exercise — prevents double-nudging
+  const nudgeAcceptedRef = useRef(false);
 
   function logSet(reps = ex.targetReps + 1) {
     const entry = { exIdx, setIdx, reps, weight: currentWeight };
@@ -233,12 +239,15 @@ function WorkoutScreen() {
   }
 
   function advanceSet() {
-    setNudgedWeight(null);
     setRepCount(null);
     if (setIdx < ex.sets - 1) {
+      // Same exercise, next set — keep nudged weight so it persists
       setSetIdx(s => s + 1);
       setState("active");
     } else if (exIdx < exercises.length - 1) {
+      // New exercise — clear nudge state
+      setNudgedWeight(null);
+      nudgeAcceptedRef.current = false;
       setExIdx(i => i + 1);
       setSetIdx(0);
       setState("active");
@@ -577,10 +586,10 @@ function WorkoutScreen() {
         {state === "nudge" && nudgedWeight && (
           <AINudgeCard
             exercise={ex}
-            oldWeight={ex.weight + setIdx * 5}
+            oldWeight={ex.weight}
             newWeight={nudgedWeight}
-            onAccept={() => { setState("active"); }}
-            onKeep={() => { setNudgedWeight(ex.weight + setIdx * 5); setState("active"); }}
+            onAccept={() => { nudgeAcceptedRef.current = true; setState("rest"); }}
+            onKeep={() => { setNudgedWeight(ex.weight); nudgeAcceptedRef.current = true; setState("rest"); }}
           />
         )}
 
@@ -588,7 +597,11 @@ function WorkoutScreen() {
         <div style={{ background: "#1A2332", borderRadius: 12, padding: "10px 12px", marginBottom: 10, textAlign: "center" }}>
           <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
           <div style={{ fontSize: 52, fontWeight: 700, color: a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 18, color: theme.textDim }}>lbs</span></div>
-          <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>+5lb from last session</div>
+          {nudgeAcceptedRef.current ? (
+            <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>⚡ Progressive overload applied</div>
+          ) : (
+            <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === ex.weight ? "Today's target" : `+${currentWeight - ex.weight} lbs from plan`}</div>
+          )}
         </div>
 
         {/* ── REP COUNTER — the focal point ── */}
