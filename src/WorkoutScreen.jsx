@@ -261,6 +261,23 @@ function WorkoutScreen() {
     advanceSet();
   }
 
+  // Called once when the workout is fully complete (exercises done + cool-down done).
+  // Increments the morphiq_week_YYYY-MM-DD key so the home screen streak and
+  // weekly progress bar reflect the completed workout immediately.
+  function recordWorkoutComplete() {
+    try {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(now.setDate(diff));
+      const weekKey = `morphiq_week_${monday.toISOString().slice(0, 10)}`;
+      const current = parseInt(localStorage.getItem(weekKey) || "0", 10);
+      localStorage.setItem(weekKey, String(current + 1));
+    } catch {
+      // localStorage unavailable — not a fatal error, streak just won't update
+    }
+  }
+
   // Called when member picks an alternative from the swap sheet.
   // Replaces the current exercise in the exercises array and resets the set counter.
   function doSwap(alt) {
@@ -387,12 +404,12 @@ function WorkoutScreen() {
           </div>
           <div style={{ paddingBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
             <button onClick={() => {
-              if (isLastCooldown) { setState("done"); setPhase("active"); }
+              if (isLastCooldown) { setState("done"); }
               else { setCooldownStep(s => s + 1); }
             }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               {isLastCooldown ? "Finish workout ✓" : "Done — next →"}
             </button>
-            <button onClick={() => { setState("done"); setPhase("active"); }} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={() => setState("done")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
               Skip cool-down
             </button>
           </div>
@@ -402,19 +419,26 @@ function WorkoutScreen() {
   }
 
   if (state === "done") {
+    // If cool-down exercises exist and we have not done them yet, go there first.
+    // This replaces the old setTimeout hack — clean phase transition, no flicker.
+    if (cooldownExercises.length > 0 && phase === "active") {
+      setPhase("cooldown");
+      return null; // render nothing for one tick while phase updates
+    }
+
+    // Workout is truly complete (exercises done + cool-down done or skipped).
+    // Record to localStorage so home screen streak updates immediately.
     const totalSets = loggedSets.length;
     const totalVol = loggedSets.reduce((acc, l) => acc + l.reps * l.weight, 0);
-    // If cool-down exercises exist and we haven't done them yet, go to cool-down phase
-    if (cooldownExercises.length > 0 && phase !== "cooldown") {
-      // Trigger cool-down on next render
-      setTimeout(() => setPhase("cooldown"), 0);
-    }
+    const overloadApplied = nudgeAcceptedRef.current;
+
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "2rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <div style={{ fontSize: 22, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Workout complete!</div>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🏆</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: theme.text, marginBottom: 4 }}>Workout complete!</div>
           <div style={{ fontSize: 14, color: theme.textDim, marginBottom: "1.5rem" }}>Great work, {user.name || "champ"}. Recovery starts now.</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%", marginBottom: "1.5rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%", marginBottom: overloadApplied ? 10 : "1.5rem" }}>
             {[["Sets done", totalSets], ["Total volume", `${totalVol.toLocaleString()} lbs`], ["Exercises", exercises.length], ["Personal bests", "2 🔥"]].map(([l, v]) => (
               <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
                 <div style={{ fontSize: 20, fontWeight: 600, color: a }}>{v}</div>
@@ -422,7 +446,16 @@ function WorkoutScreen() {
               </div>
             ))}
           </div>
-          <button onClick={() => navigate("home")} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Back to dashboard →</button>
+          {overloadApplied && (
+            <div style={{ width: "100%", background: "#1A1200", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: "10px 14px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 20 }}>⚡</div>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#F59E0B" }}>Progressive overload applied</div>
+                <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>Morphiq nudged your weight up this session — you're getting stronger.</div>
+              </div>
+            </div>
+          )}
+          <button onClick={() => { recordWorkoutComplete(); navigate("home"); }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Back to dashboard →</button>
         </div>
       </Layout>
     );
