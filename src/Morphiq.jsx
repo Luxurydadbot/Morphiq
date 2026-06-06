@@ -1637,9 +1637,22 @@ const CHAT_SUGGESTIONS = {
 function HomeDashboardScreen() {
   const { navigate, user, plan, gymBranding, historicalData } = useApp();
   const a = gymBranding.accent;
-  const [cals, setCals] = useState(1100);
-  const [logged, setLogged] = useState(false);
-  const calGoal = 1840;
+  // Read today's logged calories from MealScreen's localStorage (same key, same format)
+  const calGoal = plan?.calories || 1800;
+  const todayNutritionKey = `morphiq_meals_${user?.id || "anon"}_${new Date().toISOString().slice(0,10)}`;
+  const todayNutritionCals = (() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(todayNutritionKey) || "[]");
+      return saved.reduce((sum, m) => {
+        if (m.status === "done" || m.status === "swapped") {
+          const cal = m.loggedCal ?? m.suggested?.cal ?? 0;
+          return sum + cal;
+        }
+        return sum;
+      }, 0);
+    } catch { return 0; }
+  })();
+  const cals = todayNutritionCals;
   const h = new Date().getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   const sL = theme.sL;
@@ -1776,8 +1789,8 @@ function HomeDashboardScreen() {
               <div style={{ fontSize: 14, color: "#D0D0D0", fontWeight: 500 }}>Grilled chicken + rice</div>
               <div style={{ fontSize: 12, color: theme.textDim }}>~480 cal · 42g protein</div>
             </div>
-            <button onClick={() => { if (!logged) { setCals(1580); setLogged(true); } }} style={{ background: "transparent", border: `0.5px solid ${logged ? a : "#2A2A2A"}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, color: logged ? a : theme.textMuted, cursor: "pointer", fontFamily: "inherit" }}>
-              {logged ? "Logged ✓" : "Log meal"}
+            <button onClick={() => navigate("meals")} style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+              Log meal →
             </button>
           </div>
         </div>
