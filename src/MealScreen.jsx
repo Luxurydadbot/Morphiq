@@ -339,16 +339,117 @@ function GroceryList({ groceries, onToggle }) {
   );
 }
 
+// Builds a day's meal slots from the plan's calorie and macro targets.
+// Distributes calories across 4 meals in a realistic split.
+// Returns the same shape as MEAL_DATA so everything downstream works unchanged.
+function buildMealsFromPlan(plan) {
+  const cal   = plan?.calories  || 1800;
+  const pro   = plan?.protein   || 140;
+  const carbs = plan?.carbs     || 160;
+  const fat   = plan?.fat       || 55;
+
+  // Split: breakfast 22%, lunch 30%, snack 14%, dinner 34%
+  const split = { breakfast: 0.22, lunch: 0.30, snack: 0.14, dinner: 0.34 };
+  const r = (n) => Math.round(n);
+
+  return [
+    {
+      id: "breakfast", label: "Breakfast", time: "7–9 AM",
+      suggested: {
+        name: "Greek yogurt, berries & granola",
+        cal:     r(cal   * split.breakfast),
+        protein: r(pro   * split.breakfast),
+        carbs:   r(carbs * split.breakfast),
+        fat:     r(fat   * split.breakfast),
+      },
+      status: "upcoming", logged: null,
+    },
+    {
+      id: "lunch", label: "Lunch", time: "12–1 PM",
+      suggested: {
+        name: "Grilled chicken wrap with salad",
+        cal:     r(cal   * split.lunch),
+        protein: r(pro   * split.lunch),
+        carbs:   r(carbs * split.lunch),
+        fat:     r(fat   * split.lunch),
+      },
+      status: "upcoming", logged: null,
+    },
+    {
+      id: "snack", label: "Snack", time: "3–4 PM",
+      suggested: {
+        name: "Protein shake + banana",
+        cal:     r(cal   * split.snack),
+        protein: r(pro   * split.snack),
+        carbs:   r(carbs * split.snack),
+        fat:     r(fat   * split.snack),
+      },
+      status: "upcoming", logged: null,
+    },
+    {
+      id: "dinner", label: "Dinner", time: "6–7 PM",
+      suggested: {
+        name: "Salmon fillet with roasted veg",
+        cal:     r(cal   * split.dinner),
+        protein: r(pro   * split.dinner),
+        carbs:   r(carbs * split.dinner),
+        fat:     r(fat   * split.dinner),
+      },
+      status: "upcoming", logged: null,
+    },
+  ];
+}
+
+// Returns a localStorage key scoped to today's date so logs reset each day.
+function todayMealKey(userId) {
+  const today = new Date().toISOString().slice(0, 10);
+  return `morphiq_meals_${userId || "anon"}_${today}`;
+}
+
 function MealPlanScreen() {
-  const { gymBranding, supabaseUser } = useApp();
+  const { gymBranding, supabaseUser, plan, user } = useApp();
   const a = gymBranding.accent;
 
-  const [tab, setTab] = useState("today");
-  const [meals, setMeals] = useState(MEAL_DATA);
-  const [groceries, setGroceries] = useState(GROCERY_DATA);
-  const [detailMeal, setDetailMeal] = useState(null); // null = list view, meal obj = detail view
+  // Macro goals from real plan — fall back to sensible defaults
+  const CAL_GOAL     = plan?.calories || 1800;
+  const PROTEIN_GOAL = plan?.protein  || 140;
+  const CARBS_GOAL   = plan?.carbs    || 160;
+  const FAT_GOAL     = plan?.fat      || 55;
 
-  const CAL_GOAL = 1840, PROTEIN_GOAL = 140, CARBS_GOAL = 160, FAT_GOAL = 55;
+  // Build today's initial meals from the plan, then restore any logged state
+  // from localStorage so a page refresh doesn't wipe the day's progress.
+  const [tab, setTab] = useState("today");
+  const [meals, setMeals] = useState(() => {
+    const base = buildMealsFromPlan(plan);
+    try {
+      const saved = localStorage.getItem(todayMealKey(supabaseUser?.id));
+      if (saved) {
+        const savedMeals = JSON.parse(saved);
+        // Merge saved status/logged back onto freshly-generated meals
+        return base.map(m => {
+          const s = savedMeals.find(sm => sm.id === m.id);
+          return s ? { ...m, status: s.status, logged: s.logged } : m;
+        });
+      }
+    } catch {}
+    return base;
+  });
+  const [groceries, setGroceries] = useState(GROCERY_DATA);
+  const [detailMeal, setDetailMeal] = useState(null);
+
+  // Persist meals to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const toSave = meals.map(m => ({ id: m.id, status: m.status, logged: m.logged }));
+      localStorage.setItem(todayMealKey(supabaseUser?.id), JSON.stringify(toSave));
+    } catch {}
+  }, [meals, supabaseUser?.id]);
+
+  // Day label from real date; goal label from user's plan goal
+  const dayName = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const goalLabel = user?.goal === "lose_fat" ? "Fat loss plan"
+    : user?.goal === "build_muscle" ? "Muscle building plan"
+    : "Fitness plan";
 
   const calcMacros = (mealList) => mealList.reduce((acc, m) => {
     const src = (m.status === "done" || m.status === "swapped") ? (m.logged || m.suggested) : null;
@@ -420,9 +521,9 @@ function MealPlanScreen() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 14 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 600, color: theme.text }}>Today's Meals</div>
-            <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>Monday · Fat loss plan</div>
+            <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{dayName} · {goalLabel}</div>
           </div>
-          <Pill variant={macros.cal > CAL_GOAL ? "amber" : "teal"}>{macros.cal} / {CAL_GOAL} cal</Pill>
+          <Pill variant={macros.cal > CAL_GOAL * 1.05 ? "amber" : "teal"}>{macros.cal} / {CAL_GOAL} cal</Pill>
         </div>
 
         <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
