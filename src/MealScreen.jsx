@@ -168,7 +168,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         {hasAdjustment && (
           <div style={{ background: "#080E1A", borderLeft: "2px solid #00D4B1", borderRadius: "0 10px 10px 0", padding: "8px 12px", marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: "#9BB3C8", lineHeight: 1.6 }}>
-              You had a bigger lunch today — no problem. I've lightened dinner to keep you close to your daily target. You're only <span style={{ color: "#E8EDF2", fontWeight: 600 }}>280 calories</span> over.
+              You had a bigger lunch today — no problem. I've lightened dinner to keep you close to your daily target.
             </div>
           </div>
         )}
@@ -467,6 +467,53 @@ function MealPlanScreen() {
       localStorage.setItem(todayMealKey(supabaseUser?.id), JSON.stringify(toSave));
     } catch {}
   }, [meals, supabaseUser?.id]);
+
+  // When lunch is swapped for something higher-calorie, recalculate dinner
+  // to fit the remaining daily budget. This is the core AI adjustment behavior.
+  useEffect(() => {
+    const lunch = meals.find(m => m.id === "lunch");
+    const dinner = meals.find(m => m.id === "dinner");
+    if (!lunch || !dinner) return;
+    if (lunch.status !== "swapped" || !lunch.logged) return;
+    if (dinner.status !== "upcoming") return; // don't touch dinner if already logged
+
+    const calGoal = plan?.calories || 1800;
+    const proGoal = plan?.protein || 140;
+
+    // Add up everything logged so far (breakfast + lunch)
+    const loggedSoFar = meals
+      .filter(m => m.id !== "dinner" && (m.status === "done" || m.status === "swapped"))
+      .reduce((acc, m) => {
+        const src = m.logged || m.suggested;
+        return { cal: acc.cal + (src.cal || 0), protein: acc.protein + (src.protein || 0) };
+      }, { cal: 0, protein: 0 });
+
+    // How much budget is left for dinner?
+    const remainingCal = Math.max(calGoal - loggedSoFar.cal, 200);
+    const remainingPro = Math.max(proGoal - loggedSoFar.protein, 10);
+
+    // Only adjust if lunch calories were meaningfully higher than planned
+    const lunchOriginal = dinner.originalSuggested ? null : lunch.suggested?.cal || 0;
+    const lunchActual = lunch.logged?.cal || 0;
+    if (lunchActual <= (lunchOriginal || 0) + 50) return; // no big overage, don't adjust
+
+    // Update dinner's suggested calories to the remaining budget
+    // and save the original suggestion so the before/after UI can show it
+    setMeals(prev => prev.map(m => {
+      if (m.id !== "dinner") return m;
+      if (m.originalSuggested) return m; // already adjusted, don't adjust twice
+      return {
+        ...m,
+        originalSuggested: { ...m.suggested }, // save original for before/after display
+        suggested: {
+          ...m.suggested,
+          cal:     Math.round(remainingCal),
+          protein: Math.round(remainingPro),
+          name:    m.suggested.name, // keep the same meal name
+        }
+      };
+    }));
+  }, [meals, plan]);
 
   // Day label from real date; goal label from user's plan goal
   const dayName = new Date().toLocaleDateString("en-US", { weekday: "long" });
