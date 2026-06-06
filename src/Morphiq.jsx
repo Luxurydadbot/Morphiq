@@ -2251,6 +2251,7 @@ function ProgressScreen() {
   const [newWeightInput, setNewWeightInput] = useState("");
   const [savingWeight, setSavingWeight] = useState(false);
   const [weightSaved, setWeightSaved] = useState(false);
+  const [weightError, setWeightError] = useState(false);
 
   const isRealUser = supabaseUser?.id && !supabaseUser.id.startsWith("sim-") && supabaseUser.id !== "dev-001";
 
@@ -2277,12 +2278,21 @@ function ProgressScreen() {
     const val = parseFloat(newWeightInput);
     if (!val || val < 50 || val > 600) return;
     setSavingWeight(true);
-    // Always update local state immediately so chart refreshes
+    setWeightError(false);
+    // Always update local state immediately so chart refreshes without waiting
     const newEntry = { weight_lbs: val, logged_date: new Date().toISOString().slice(0, 10) };
     setWeightLogs(prev => [...(prev || []), newEntry]);
-    // Also persist to Supabase if real user
+    // Persist to Supabase if real user — check result so we can surface failures
     if (isRealUser) {
-      await sb.insertWeightLog(supabaseUser.id, val);
+      const ok = await sb.insertWeightLog(supabaseUser.id, val);
+      if (!ok) {
+        // Save failed — remove the optimistic entry and show error
+        setWeightLogs(prev => (prev || []).filter(r => r.logged_date !== newEntry.logged_date || r.weight_lbs !== val));
+        setSavingWeight(false);
+        setWeightError(true);
+        setTimeout(() => setWeightError(false), 4000);
+        return;
+      }
       // Refresh historicalData so weight chart and home screen update
       await loadHistoricalData(supabaseUser.id);
     }
@@ -2343,8 +2353,8 @@ function ProgressScreen() {
                   </div>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                  <div style={{ background:"#003D35", borderRadius:8, padding:"4px 10px", fontSize:11, color:a, fontWeight:500 }}>
-                    {weightSaved ? "Saved ✓" : "On track ✓"}
+                  <div style={{ background: weightError ? "#1F1010" : "#003D35", borderRadius:8, padding:"4px 10px", fontSize:11, color: weightError ? "#F87171" : a, fontWeight:500 }}>
+                    {weightError ? "Save failed — try again" : weightSaved ? "Saved ✓" : "On track ✓"}
                   </div>
                   <button onClick={() => setShowLogWeight(!showLogWeight)}
                     style={{ background:"transparent", border:`1px solid rgba(0,212,177,0.3)`, borderRadius:8, padding:"4px 10px", fontSize:11, color:a, cursor:"pointer", fontFamily:"inherit" }}>
