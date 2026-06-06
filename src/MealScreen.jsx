@@ -350,6 +350,41 @@ function GroceryList({ groceries, onToggle }) {
 // Builds a day's meal slots from the plan's calorie and macro targets.
 // Distributes calories across 4 meals in a realistic split.
 // Returns the same shape as MEAL_DATA so everything downstream works unchanged.
+// Generates a grocery list tailored to the member's goal and calorie/protein targets.
+// Falls back to GROCERY_DATA if plan is missing.
+function buildGroceryFromPlan(plan) {
+  if (!plan?.calories) return null; // signal to use GROCERY_DATA fallback
+
+  const goal = plan.goal || "lose_fat";
+  const highProtein = (plan.protein || 140) >= 130;
+
+  const protein = { category: "Protein", emoji: "🥩", items: [
+    { name: "Chicken breast",  qty: "2 lbs",    done: false },
+    { name: "Greek yogurt",    qty: "32 oz",    done: false },
+    { name: "Eggs",            qty: "1 dozen",  done: false },
+    { name: "Salmon fillets",  qty: "4 pieces", done: false },
+    ...(highProtein ? [{ name: "Protein powder", qty: "1 tub", done: false }] : []),
+  ]};
+
+  const produce = { category: "Produce", emoji: "🥦", items: [
+    { name: "Mixed berries",  qty: "1 bag",     done: false },
+    { name: "Spinach",        qty: "5 oz bag",  done: false },
+    { name: "Broccoli",       qty: "1 head",    done: false },
+    ...(goal === "lose_fat"
+      ? [{ name: "Zucchini", qty: "2 medium", done: false }, { name: "Cucumber", qty: "1", done: false }]
+      : [{ name: "Sweet potato", qty: "3 medium", done: false }, { name: "Banana", qty: "1 bunch", done: false }]),
+  ]};
+
+  const pantry = { category: "Pantry", emoji: "🫙", items: [
+    { name: "Olive oil",  qty: "1 bottle", done: false },
+    ...(goal === "lose_fat"
+      ? [{ name: "Rice cakes", qty: "1 bag", done: false }]
+      : [{ name: "Brown rice", qty: "2 lbs", done: false }, { name: "Oats", qty: "1 bag", done: false }]),
+  ]};
+
+  return [protein, produce, pantry];
+}
+
 function buildMealsFromPlan(plan) {
   const cal   = plan?.calories  || 1800;
   const pro   = plan?.protein   || 140;
@@ -452,11 +487,13 @@ function MealPlanScreen() {
     return `morphiq_grocery_${supabaseUser?.id || "anon"}_${monday.toISOString().slice(0,10)}`;
   })();
   const [groceries, setGroceries] = useState(() => {
+    // Use plan-tailored list if available, otherwise fall back to static GROCERY_DATA
+    const baseGrocery = buildGroceryFromPlan(plan) || GROCERY_DATA;
     try {
       const saved = JSON.parse(localStorage.getItem(groceryWeekKey) || "null");
-      if (!saved) return GROCERY_DATA;
-      // Merge saved done-state back onto base data (handles new items added to GROCERY_DATA)
-      return GROCERY_DATA.map(cat => ({
+      if (!saved) return baseGrocery;
+      // Merge saved done-state back onto base data (handles new items added to list)
+      return baseGrocery.map(cat => ({
         ...cat,
         items: cat.items.map(item => {
           const savedCat = saved.find(c => c.category === cat.category);
@@ -707,3 +744,4 @@ const FALLBACK_REPLIES = {
 };
 
 export { MealPlanScreen, MacroBar, MealSlot, MealDetailScreen, GroceryList };
+
