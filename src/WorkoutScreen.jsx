@@ -404,7 +404,7 @@ function WorkoutScreen() {
           </div>
           <div style={{ paddingBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
             <button onClick={() => {
-              if (isLastCooldown) { setState("done"); }
+              if (isLastCooldown) { setPhase("complete"); setState("done"); }
               else { setCooldownStep(s => s + 1); }
             }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               {isLastCooldown ? "Finish workout ✓" : "Done — next →"}
@@ -421,6 +421,8 @@ function WorkoutScreen() {
   if (state === "done") {
     // If cool-down exercises exist and we have not done them yet, go there first.
     // This replaces the old setTimeout hack — clean phase transition, no flicker.
+    // Only redirect to cooldown if we haven't done it yet (phase is still 'active')
+    // If phase is 'complete' or 'cooldown', fall through to the completion screen
     if (cooldownExercises.length > 0 && phase === "active") {
       setPhase("cooldown");
       return null; // render nothing for one tick while phase updates
