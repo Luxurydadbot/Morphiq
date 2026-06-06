@@ -228,7 +228,9 @@ function OwnerBrandingTab() {
   async function save() {
     setSaving(true);
     setError(null);
-    const ok = await sb.saveGymBranding("demo-gym", { name: gymName, accent: brandColor, welcome });
+    // Use the real gym ID stored in context when the owner signed in
+    const gymId = gymBranding?.gymId || "demo-gym";
+    const ok = await sb.saveGymBranding(gymId, { name: gymName, accent: brandColor, welcome });
     setSaving(false);
     if (ok) {
       setGymBranding({ name: gymName, accent: brandColor, welcome, units: gymBranding.units });
