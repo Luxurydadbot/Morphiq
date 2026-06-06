@@ -209,15 +209,15 @@ const sb = {
 
   async saveGymBranding(gymId = "demo-gym", { name, accent, welcome }) {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms`, {
-        method: "POST",
-        headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" },
-        body: JSON.stringify({ gym_id: gymId, name, accent, welcome, updated_at: new Date().toISOString() }),
+      // PATCH targets the specific existing row by gym_id — correct way to update
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}`, {
+        method: "PATCH",
+        headers: { ...SB_HEADERS, "Prefer": "return=representation" },
+        body: JSON.stringify({ name, accent, welcome, updated_at: new Date().toISOString() }),
       });
       if (!res.ok) {
-        // Log the real error so we can diagnose it
         const errText = await res.text().catch(() => "no body");
-        console.error("saveGymBranding failed:", res.status, errText, "gymId:", gymId);
+        console.error("saveGymBranding PATCH failed:", res.status, errText, "gymId:", gymId);
       }
       return res.ok;
     } catch (e) { console.error("saveGymBranding exception:", e); return false; }
@@ -2691,3 +2691,4 @@ export default function Morphiq() {
     </>
   );
 }
+
