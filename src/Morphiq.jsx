@@ -1692,7 +1692,7 @@ const CHAT_SUGGESTIONS = {
 };
 
 function HomeDashboardScreen() {
-  const { navigate, user, plan, gymBranding, historicalData } = useApp();
+  const { navigate, user, plan, gymBranding, historicalData, supabaseUser } = useApp();
   const a = gymBranding.accent;
   // Read today's logged calories from MealScreen's localStorage (same key, same format)
   const calGoal = plan?.calories || 1800;
@@ -1751,9 +1751,11 @@ function HomeDashboardScreen() {
   const [gymMessages, setGymMessages] = useState([]);
   const [msgExpanded, setMsgExpanded] = useState(false);
   useEffect(() => {
-    if (!user?.profileId) return;
-    sb.getMessages(user.profileId).then(rows => setGymMessages(rows)).catch(() => {});
-  }, [user?.profileId]);
+    if (!supabaseUser?.id) return;
+    sb.getProfileId(supabaseUser.id).then(profileId => {
+      if (profileId) sb.getMessages(profileId).then(rows => setGymMessages(rows)).catch(() => {});
+    }).catch(() => {});
+  }, [supabaseUser?.id]);
   const unreadMessages = gymMessages.filter(m => !m.read);
   function dismissMessage(msg) {
     sb.markMessageRead(msg.id).catch(() => {});
