@@ -158,11 +158,19 @@ function OwnerOverviewTab() {
 function OwnerMembersTab() {
   const { members, loading } = useOwnerData();
   const { gymBranding } = useApp();
+
+  // ── Individual message state ──────────────────────────────────────────────
   const [composeTo, setComposeTo] = useState(null);
   const [msgText, setMsgText] = useState("");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
+
+  // ── Broadcast message state ───────────────────────────────────────────────
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastText, setBroadcastText] = useState("");
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState(null); // { sent, failed } after send
 
   async function sendMsg() {
     const text = msgText.trim() ||
@@ -180,6 +188,23 @@ function OwnerMembersTab() {
     }
   }
 
+  async function sendBroadcast() {
+    const text = broadcastText.trim();
+    if (!text || !members.length) return;
+    setBroadcastSending(true);
+    setBroadcastResult(null);
+    const gymId = gymBranding?.gymId || "demo-gym";
+    const profileIds = members.map(m => m.id);
+    const result = await sb.broadcastMessage(gymId, profileIds, text);
+    setBroadcastSending(false);
+    setBroadcastResult(result);
+    if (result.sent > 0) {
+      setBroadcastText("");
+      // Auto-collapse the panel after 3 seconds so the owner can see members again
+      setTimeout(() => { setBroadcastOpen(false); setBroadcastResult(null); }, 3000);
+    }
+  }
+
   if (loading) return <OwnerSpinner />;
 
   if (!members.length) {
@@ -192,6 +217,76 @@ function OwnerMembersTab() {
 
   return (
     <div className="mq-fade">
+
+      {/* ── Broadcast panel ── */}
+      <div style={{ marginBottom: 14 }}>
+        <button
+          onClick={() => { setBroadcastOpen(v => !v); setBroadcastResult(null); }}
+          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: broadcastOpen ? "#1A2E2B" : "#1A2332", border: `1px solid ${broadcastOpen ? "rgba(0,212,177,0.35)" : "rgba(255,255,255,0.06)"}`, borderRadius: broadcastOpen ? "14px 14px 0 0" : 14, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(0,212,177,0.12)", border: "1px solid rgba(0,212,177,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>📢</div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Message all members</div>
+              <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 1 }}>{members.length} member{members.length !== 1 ? "s" : ""} will receive this</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 18, color: "#6B7A8D", transform: broadcastOpen ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
+        </button>
+
+        {broadcastOpen && (
+          <div className="mq-fade" style={{ background: "#1A2E2B", border: "1px solid rgba(0,212,177,0.35)", borderTop: "none", borderRadius: "0 0 14px 14px", padding: "14px" }}>
+            {/* Recipient preview chips */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
+              {members.slice(0, 8).map(m => (
+                <div key={m.id} style={{ background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "3px 9px", fontSize: 10, color: "#9BB3C8", display: "flex", alignItems: "center", gap: 5 }}>
+                  <div style={{ width: 14, height: 14, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: m.color, fontWeight: 700 }}>{m.initials}</div>
+                  {m.name.split(" ")[0]}
+                </div>
+              ))}
+              {members.length > 8 && (
+                <div style={{ background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "3px 9px", fontSize: 10, color: "#6B7A8D" }}>+{members.length - 8} more</div>
+              )}
+            </div>
+
+            <textarea
+              value={broadcastText}
+              onChange={e => setBroadcastText(e.target.value)}
+              placeholder={`Hey everyone at ${gymBranding?.name || "the gym"} — just a quick update from your coach...`}
+              style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 88, lineHeight: 1.55, marginBottom: 10, boxSizing: "border-box" }}
+            />
+
+            {/* Character count */}
+            <div style={{ fontSize: 10, color: broadcastText.length > 280 ? "#F87171" : "#6B7A8D", textAlign: "right", marginTop: -6, marginBottom: 10 }}>
+              {broadcastText.length} / 280 characters
+            </div>
+
+            {broadcastResult && (
+              <div style={{ background: broadcastResult.failed === 0 ? "#003D35" : "#1F1010", border: `1px solid ${broadcastResult.failed === 0 ? "rgba(0,212,177,0.4)" : "rgba(248,113,113,0.3)"}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: broadcastResult.failed === 0 ? "#00D4B1" : "#F87171" }}>
+                {broadcastResult.failed === 0
+                  ? `✓ Sent to all ${broadcastResult.sent} member${broadcastResult.sent !== 1 ? "s" : ""} — they'll see it next time they open the app.`
+                  : `Sent to ${broadcastResult.sent}, failed for ${broadcastResult.failed}. Check your connection and try again.`}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { setBroadcastOpen(false); setBroadcastText(""); setBroadcastResult(null); }}
+                style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>
+                Cancel
+              </button>
+              <button
+                onClick={sendBroadcast}
+                disabled={!broadcastText.trim() || broadcastSending || broadcastText.length > 280}
+                style={{ flex: 2, background: broadcastResult?.sent > 0 ? "#003D35" : "#00D4B1", color: broadcastResult?.sent > 0 ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: (!broadcastText.trim() || broadcastSending) ? "default" : "pointer", fontFamily: "inherit", opacity: (!broadcastText.trim() || broadcastSending) ? 0.5 : 1, transition: "all .2s" }}
+              >
+                {broadcastSending ? "Sending..." : broadcastResult?.sent > 0 ? "Sent ✓" : `Send to all ${members.length} members`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Member list ── */}
       <div style={{ background: "#1A2332", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
         {members.map((m, i) => (
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < members.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
@@ -204,7 +299,7 @@ function OwnerMembersTab() {
               <div style={{ fontSize: 13, fontWeight: 700, color: m.deltaColor }}>{m.delta}</div>
               <div style={{ fontSize: 10, color: "#6B7A8D" }}>weight</div>
             </div>
-            <button onClick={() => { setComposeTo(m); setSent(false); setMsgText(""); }}
+            <button onClick={() => { setComposeTo(m); setSent(false); setMsgText(""); setBroadcastOpen(false); }}
               style={{ width: 28, height: 28, borderRadius: 8, background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.4-.6 2.6-1.5 3.5L10.5 12H6.5c-2.76 0-5-2.24-5-5z" stroke="#00D4B1" strokeWidth="1" /></svg>
             </button>
@@ -212,6 +307,7 @@ function OwnerMembersTab() {
         ))}
       </div>
 
+      {/* ── Individual compose panel ── */}
       {composeTo && (
         <div className="mq-fade" style={{ background: "#1A2332", borderRadius: 14, padding: "14px" }}>
           <div style={{ fontSize: 12, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Message</div>
