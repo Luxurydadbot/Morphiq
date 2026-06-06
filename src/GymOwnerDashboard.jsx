@@ -157,11 +157,28 @@ function OwnerOverviewTab() {
 
 function OwnerMembersTab() {
   const { members, loading } = useOwnerData();
+  const { gymBranding } = useApp();
   const [composeTo, setComposeTo] = useState(null);
   const [msgText, setMsgText] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(null);
 
-  function sendMsg() { setSent(true); setTimeout(() => { setSent(false); setComposeTo(null); setMsgText(""); }, 1400); }
+  async function sendMsg() {
+    const text = msgText.trim() ||
+      `Hey ${composeTo.name.split(" ")[0]} — we noticed you haven't logged in for a while. How's everything going? We're here if you need support 💪`;
+    setSending(true);
+    setSendError(null);
+    const gymId = gymBranding?.gymId || "demo-gym";
+    const ok = await sb.saveMessage(gymId, composeTo.id, text);
+    setSending(false);
+    if (ok) {
+      setSent(true);
+      setTimeout(() => { setSent(false); setComposeTo(null); setMsgText(""); }, 1400);
+    } else {
+      setSendError("Send failed — check your connection.");
+    }
+  }
 
   if (loading) return <OwnerSpinner />;
 
@@ -207,8 +224,9 @@ function OwnerMembersTab() {
           <textarea value={msgText} onChange={e => setMsgText(e.target.value)}
             placeholder={`Hey ${composeTo.name.split(" ")[0]} — we noticed you haven't logged in for a while. How's everything going? We're here if you need support 💪`}
             style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 80, lineHeight: 1.5, marginBottom: 10 }} />
-          <button onClick={sendMsg} style={{ width: "100%", background: sent ? "#003D35" : "#00D4B1", color: sent ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            {sent ? "Sent ✓" : "Send message"}
+          {sendError && <div style={{ fontSize: 12, color: "#F87171", marginBottom: 8 }}>{sendError}</div>}
+          <button onClick={sendMsg} disabled={sending} style={{ width: "100%", background: sent ? "#003D35" : "#00D4B1", color: sent ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: sending ? "default" : "pointer", fontFamily: "inherit", opacity: sending ? 0.7 : 1 }}>
+            {sent ? "Sent ✓" : sending ? "Sending..." : "Send message"}
           </button>
         </div>
       )}
