@@ -89,7 +89,7 @@ const SWAP_FALLBACK = [
 ];
 
 function WorkoutScreen() {
-  const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext } = useApp();
+  const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap } = useApp();
   const a = gymBranding.accent;
 
   // Use AI-generated exercises if available, else fall back to defaults.
@@ -295,6 +295,17 @@ function WorkoutScreen() {
     setSwapConfirmName(alt.name);
     setTimeout(() => setSwapConfirmName(null), 2500);
   }
+
+  // When the AI chat sends a swap action, pendingAISwap is set in AppContext.
+  // We watch it here and apply it exactly like a manual swap, then clear it
+  // so it doesn't fire again. This is the bridge between chat and workout.
+  useEffect(() => {
+    if (!pendingAISwap) return;
+    doSwap(pendingAISwap);
+    setPendingAISwap(null);
+  // doSwap reads exIdx from closure — eslint would warn about deps but this is correct
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAISwap]);
 
   function simulateListen() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
