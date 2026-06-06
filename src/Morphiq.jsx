@@ -504,6 +504,9 @@ function AppProvider({ children }) {
   // Tracks the current exercise + set while WorkoutScreen is active
   // so ChatScreen can pass exact context to Claude (e.g. "Set 2 of 3 · Goblet Squat")
   const [workoutContext, setWorkoutContext] = useState(null);
+  // When AI chat suggests swapping an exercise mid-workout, this holds the swap payload.
+  // WorkoutScreen watches this and calls doSwap when it's non-null, then clears it.
+  const [pendingAISwap, setPendingAISwap] = useState(null);
 
   // ── On mount: load gym branding from Supabase ────────────────────────────
   useEffect(() => {
@@ -682,7 +685,7 @@ Include exactly ${(currentPlan.exercises||[]).length || 5} exercises. All numeri
   }
 
   return (
-    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext, pendingAISwap, setPendingAISwap }}>
       {children}
     </AppContext.Provider>
   );
@@ -1051,11 +1054,17 @@ function OnboardingScreen() {
   const [recentActivity, setRecentActivity] = useState(null);
   const [restPref, setRestPref] = useState(120);
   const [checklist, setChecklist] = useState([false, false, false, false]);
+  // Tracks whether each checklist item is visible yet (fades in before turning teal)
+  const [checklistVisible, setChecklistVisible] = useState([false, false, false, false]);
 
   useEffect(() => {
     if (step !== 12) return;
     let cancelled = false;
-    [0,1,2,3].forEach(i => setTimeout(() => { if(!cancelled) setChecklist(c => c.map((v,idx) => idx<=i ? true : v)); }, i*550+300));
+    [0,1,2,3].forEach(i => {
+      // Item appears (fades in) first, then turns teal shortly after
+      setTimeout(() => { if(!cancelled) setChecklistVisible(v => v.map((x,idx) => idx<=i ? true : x)); }, i*550+100);
+      setTimeout(() => { if(!cancelled) setChecklist(c => c.map((v,idx) => idx<=i ? true : v)); }, i*550+300);
+    });
 
     async function generatePlan() {
       const historyMap = { new: "beginner with no training history", some: "intermediate, 6 months to 2 years experience", years: "experienced lifter, several years of training" };
@@ -1501,7 +1510,7 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
               </div>
             ))}
           </div>
-          <button onClick={() => { setChecklist([false, false, false, false]); setStep(12); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
+          <button onClick={() => { setChecklist([false, false, false, false]); setChecklistVisible([false, false, false, false]); setStep(12); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
           <button onClick={() => setStep(0)} style={{ ...s.outlineBtn, width: "100%", marginTop: 6 }}>Start over</button>
         </div>}
 
@@ -1518,7 +1527,7 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
               <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>Building your plan</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", marginTop: 4 }}>
                 {["Analyzing your goal", "Selecting best exercises", "Building your meal guide", "Personalizing week one..."].map((item, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: checklist[i] ? a : ob.muted, padding: "3px 0" }}>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: checklist[i] ? a : ob.muted, padding: "3px 0", opacity: checklistVisible[i] ? 1 : 0, transform: checklistVisible[i] ? "translateY(0)" : "translateY(6px)", transition: "opacity .35s ease, transform .35s ease, color .3s" }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: checklist[i] ? a : ob.card, flexShrink: 0, transition: "background .3s" }} />{item}
                   </div>
                 ))}
@@ -1972,7 +1981,7 @@ async function fetchAIReply(messages, user, context, workoutContext = null) {
 }
 
 function ChatScreen({ fromScreen = "home" }) {
-  const { navigate, user, plan, gymBranding, workoutContext, supabaseUser } = useApp();
+  const { navigate, user, plan, gymBranding, workoutContext, supabaseUser, setPendingAISwap } = useApp();
   const [msgUsage, setMsgUsage] = useState(null);
   const a = gymBranding.accent;
   const [messages, setMessages] = useState([
@@ -2042,8 +2051,20 @@ function ChatScreen({ fromScreen = "home" }) {
       if (chips?.length) setDynamicChips(chips);
       // Action handling — swap exercise or adjust meal
       if (action?.type === "swap_exercise") {
-        console.log("[Morphiq] AI action: swap", action.from, "→", action.to);
-        // TODO: wire to workoutExercises in AppContext when Supabase is added
+        // Store the swap in shared context. WorkoutScreen watches this and
+        // calls doSwap() automatically, then clears it. This wires the AI
+        // chat action to the live workout screen without prop drilling.
+        // workoutContext has the current exercise's stats so the new exercise
+        // starts with sensible defaults (slightly lighter weight to be safe).
+        setPendingAISwap({
+          name: action.to,
+          muscle: action.muscle || "",
+          sets: workoutContext?.totalSets || 3,
+          targetReps: workoutContext?.targetReps || 10,
+          weight: workoutContext?.weight ? Math.round(workoutContext.weight * 0.85) : 20,
+          rpe: 7,
+          alternative: null,
+        });
       }
     } catch (err) {
       console.warn("[Morphiq] API unavailable, using fallback:", err.message);
