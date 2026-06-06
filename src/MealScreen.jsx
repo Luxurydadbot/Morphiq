@@ -176,7 +176,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         {hasAdjustment && (
           <div style={{ background: "#080E1A", borderLeft: "2px solid #00D4B1", borderRadius: "0 10px 10px 0", padding: "8px 12px", marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: "#9BB3C8", lineHeight: 1.6 }}>
-              You had a bigger lunch today — no problem. I've lightened dinner to keep you close to your daily target.
+              You ate more than planned earlier today — no problem. I've lightened this meal to keep you as close to your daily target as possible.
             </div>
           </div>
         )}
@@ -512,6 +512,12 @@ function MealPlanScreen() {
     // Split remaining budget evenly across upcoming meals by their original proportions
     const upcomingOriginalTotal = upcoming.reduce((acc, m) => acc + (m.suggested?.cal || 0), 0);
 
+    // Light meal name options — used when calories drop significantly
+    const lightNames = [
+      "Light salmon salad", "Grilled chicken & greens", "Tuna & cucumber salad",
+      "Egg white omelette & spinach", "Greek yogurt & berries", "Shrimp & veggie stir-fry"
+    ];
+
     setMeals(prev => prev.map(m => {
       if (m.status !== "upcoming") return m;
       if (m.originalSuggested) return m; // already adjusted, don't adjust twice
@@ -521,13 +527,26 @@ function MealPlanScreen() {
       const proShare = upcomingOriginalTotal > 0
         ? (m.suggested?.protein || 0) / Math.max(upcoming.reduce((a, u) => a + (u.suggested?.protein || 0), 0), 1)
         : 1 / upcoming.length;
+
+      // Enforce a sensible minimum — dinner should always be a real meal
+      const newCal = Math.max(Math.round(remainingCal * share), 300);
+      const newPro = Math.max(Math.round(remainingPro * proShare), 25);
+
+      // If calories dropped by more than 20%, rename the meal so the before/after makes sense
+      const originalCal = m.suggested?.cal || 0;
+      const dropped = originalCal > 0 && newCal < originalCal * 0.8;
+      const newName = dropped
+        ? lightNames[Math.floor(Math.random() * lightNames.length)]
+        : m.suggested.name;
+
       return {
         ...m,
         originalSuggested: { ...m.suggested },
         suggested: {
           ...m.suggested,
-          cal:     Math.max(Math.round(remainingCal * share), 150),
-          protein: Math.max(Math.round(remainingPro * proShare), 8),
+          cal:     newCal,
+          protein: newPro,
+          name:    newName,
         }
       };
     }));
