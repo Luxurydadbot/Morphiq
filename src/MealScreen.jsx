@@ -434,7 +434,30 @@ function MealPlanScreen() {
     } catch {}
     return base;
   });
-  const [groceries, setGroceries] = useState(GROCERY_DATA);
+  // Load groceries from localStorage (week-scoped key so list resets each Monday).
+  // Merges saved check-off state onto the base GROCERY_DATA list.
+  const groceryWeekKey = (() => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(now.setDate(diff));
+    return `morphiq_grocery_${supabaseUser?.id || "anon"}_${monday.toISOString().slice(0,10)}`;
+  })();
+  const [groceries, setGroceries] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(groceryWeekKey) || "null");
+      if (!saved) return GROCERY_DATA;
+      // Merge saved done-state back onto base data (handles new items added to GROCERY_DATA)
+      return GROCERY_DATA.map(cat => ({
+        ...cat,
+        items: cat.items.map(item => {
+          const savedCat = saved.find(c => c.category === cat.category);
+          const savedItem = savedCat?.items.find(i => i.name === item.name);
+          return savedItem ? { ...item, done: savedItem.done } : item;
+        }),
+      }));
+    } catch { return GROCERY_DATA; }
+  });
   const [detailMeal, setDetailMeal] = useState(null);
 
   // Persist meals to localStorage whenever they change
@@ -497,6 +520,13 @@ function MealPlanScreen() {
       }).catch(() => {});
     }
   }
+  // Persist grocery check-off state whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(groceryWeekKey, JSON.stringify(groceries));
+    } catch {}
+  }, [groceries, groceryWeekKey]);
+
   function toggleGrocery(category, idx) {
     setGroceries(prev => prev.map(cat => cat.category !== category ? cat : {
       ...cat, items: cat.items.map((item, i) => i !== idx ? item : { ...item, done: !item.done })
