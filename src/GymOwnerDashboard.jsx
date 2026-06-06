@@ -92,6 +92,22 @@ function OwnerSpinner() {
 
 function OwnerOverviewTab() {
   const { members, loading } = useOwnerData();
+  const { gymBranding } = useApp();
+  const [nudgeSending, setNudgeSending] = useState(false);
+  const [nudgeResult, setNudgeResult] = useState(null); // { sent, failed } or null
+
+  async function sendNudge() {
+    const atRiskIds = members.filter(m => m.atRisk).map(m => m.id);
+    if (!atRiskIds.length) return;
+    setNudgeSending(true);
+    setNudgeResult(null);
+    const gymId = gymBranding?.gymId || "demo-gym";
+    const msg = "Hey — we noticed you haven't been active lately. Your plan is still here whenever you're ready. Even one session this week makes a difference 💪 We're cheering for you.";
+    const result = await sb.broadcastMessage(gymId, atRiskIds, msg);
+    setNudgeSending(false);
+    setNudgeResult(result);
+    setTimeout(() => setNudgeResult(null), 4000);
+  }
 
   if (loading) return <OwnerSpinner />;
 
@@ -143,6 +159,22 @@ function OwnerOverviewTab() {
               </div>
             </div>
           ))}
+
+          {/* Nudge button — sends a pre-written re-engagement message to all at-risk members only */}
+          {nudgeResult ? (
+            <div style={{ background: "#0A1A14", border: "1px solid rgba(0,212,177,0.3)", borderRadius: 10, padding: "10px 14px", textAlign: "center", fontSize: 12, color: "#00D4B1", marginTop: 4 }}>
+              ✓ Nudge sent to {nudgeResult.sent} member{nudgeResult.sent !== 1 ? "s" : ""}
+              {nudgeResult.failed > 0 && <span style={{ color: "#F87171", marginLeft: 6 }}>({nudgeResult.failed} failed)</span>}
+            </div>
+          ) : (
+            <button
+              onClick={sendNudge}
+              disabled={nudgeSending}
+              style={{ width: "100%", marginTop: 4, background: nudgeSending ? "#1A2332" : "transparent", border: "1px solid rgba(248,113,113,0.35)", borderRadius: 10, padding: "10px 14px", fontSize: 12, fontWeight: 600, color: nudgeSending ? "#6B7A8D" : "#F87171", cursor: nudgeSending ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+            >
+              {nudgeSending ? "Sending nudges..." : `💬 Nudge ${atRisk.length} at-risk member${atRisk.length !== 1 ? "s" : ""}`}
+            </button>
+          )}
         </>
       )}
 
@@ -766,3 +798,4 @@ function LoadingScreen() {
 }
 
 export { GymOwnerDashboard, PricingScreen, OwnerUsageTab };
+
