@@ -214,8 +214,13 @@ const sb = {
         headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" },
         body: JSON.stringify({ gym_id: gymId, name, accent, welcome, updated_at: new Date().toISOString() }),
       });
+      if (!res.ok) {
+        // Log the real error so we can diagnose it
+        const errText = await res.text().catch(() => "no body");
+        console.error("saveGymBranding failed:", res.status, errText, "gymId:", gymId);
+      }
       return res.ok;
-    } catch { return false; }
+    } catch (e) { console.error("saveGymBranding exception:", e); return false; }
   },
 
   // ── WEIGHT LOGS ───────────────────────────────────────────────────────────
