@@ -1074,6 +1074,16 @@ function OnboardingScreen() {
   const [checklist, setChecklist] = useState([false, false, false, false]);
   // Tracks whether each checklist item is visible yet (fades in before turning teal)
   const [checklistVisible, setChecklistVisible] = useState([false, false, false, false]);
+  const [revealStep, setRevealStep] = useState(0); // 0=hidden, 1=header, 2=ai msg, 3=workouts, 4=targets, 5=button
+
+  // When step 13 (plan reveal) is reached, stagger in each section for a celebration feel
+  useEffect(() => {
+    if (step !== 13) { setRevealStep(0); return; }
+    setRevealStep(0);
+    const delays = [120, 380, 640, 900, 1180];
+    const timers = delays.map((d, i) => setTimeout(() => setRevealStep(i + 1), d));
+    return () => timers.forEach(clearTimeout);
+  }, [step]);
 
   useEffect(() => {
     if (step !== 12) return;
@@ -1555,51 +1565,83 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
         </div>}
 
         {step === 13 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ textAlign: "center", marginBottom: 10 }}>
-            <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>Your plan is ready</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: ob.white }}>{name}&apos;s {goalLabel} Plan</div>
-            <div style={{ fontSize: 9, color: ob.muted }}>Built by Morphiq AI · Week 1</div>
+
+          {/* ── Celebration header — fades in first ── */}
+          <div style={{ opacity: revealStep >= 1 ? 1 : 0, transform: revealStep >= 1 ? "translateY(0)" : "translateY(-10px)", transition: "opacity .4s ease, transform .4s ease" }}>
+            <div style={{ textAlign: "center", marginBottom: 14 }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: ob.tealDk, border: `1px solid ${a}`, borderRadius: 20, padding: "5px 14px", marginBottom: 10 }}>
+                <span style={{ fontSize: 13 }}>✦</span>
+                <span style={{ fontSize: 10, color: a, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Your plan is ready</span>
+                <span style={{ fontSize: 13 }}>✦</span>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: ob.white, letterSpacing: "-0.3px" }}>{name}&apos;s {goalLabel} Plan</div>
+              <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>Built by Morphiq AI · Week 1</div>
+            </div>
           </div>
-          <div style={{ background: ob.card, borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
-            <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Workouts — {plan.workoutType}</div>
-            {(plan.workoutDays || []).map((day, i, arr) => (
-              <div key={day} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                <span style={{ fontSize: 11, color: ob.white }}>{day}</span>
-                <Pill>{plan.workoutType} · {plan.workoutDuration} min</Pill>
-              </div>
-            ))}
-          </div>
-          <div style={{ background: ob.card, borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
-            <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Daily targets</div>
-            {[["Calories", `${plan.calories?.toLocaleString()}/day`], ["Protein", `${plan.protein}g/day`], ["Carbs", `${plan.carbs}g/day`], ["Fat", `${plan.fat}g/day`]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                <span style={{ fontSize: 11, color: ob.white }}>{k}</span>
-                <span style={{ fontSize: 11, color: a, fontWeight: 600 }}>{v}</span>
-              </div>
-            ))}
-          </div>
-          {/* Calorie breakdown — shows how the number was calculated */}
-          {plan.bmr && plan.tdee && (
-            <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.12)", borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
-              <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>How your calories were calculated</div>
-              <div style={{ fontSize: 11, color: ob.body, lineHeight: 1.7 }}>
-                Your body burns approximately <span style={{ color: ob.white, fontWeight: 600 }}>{plan.bmr?.toLocaleString()} cal</span> at rest each day.
-              </div>
-              <div style={{ fontSize: 11, color: ob.body, lineHeight: 1.7 }}>
-                With your activity level that becomes <span style={{ color: ob.white, fontWeight: 600 }}>{plan.tdee?.toLocaleString()} cal</span>.
-              </div>
-              <div style={{ fontSize: 11, color: a, lineHeight: 1.7, fontWeight: 500 }}>
-                {plan.goalAdjustment > 0
-                  ? `We added ${plan.goalAdjustment} calories to support muscle growth — your target is ${plan.calories?.toLocaleString()} cal/day.`
-                  : plan.goalAdjustment < 0
-                  ? `We reduced that by ${Math.abs(plan.goalAdjustment)} calories for steady fat loss — your target is ${plan.calories?.toLocaleString()} cal/day.`
-                  : `Your maintenance target is ${plan.calories?.toLocaleString()} calories per day.`}
+
+          {/* ── Personalised AI message — slides in second ── */}
+          <div style={{ opacity: revealStep >= 2 ? 1 : 0, transform: revealStep >= 2 ? "translateY(0)" : "translateY(8px)", transition: "opacity .4s ease, transform .4s ease", marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: ob.tealDk, border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 700, flexShrink: 0 }}>AI</div>
+              <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 11, color: ob.body, lineHeight: 1.55, flex: 1 }}>
+                {goal === "lose_fat"
+                  ? `${name}, you're all set. ${daysPerWeek} days a week is the sweet spot for fat loss — enough to burn, enough rest to recover. Here's exactly what week one looks like.`
+                  : goal === "build_muscle"
+                  ? `${name}, your muscle-building plan is locked in. ${daysPerWeek} training days with progressive overload built in from day one. This is how size gets built. Let's go.`
+                  : `${name}, your plan is ready. ${daysPerWeek} days a week, balanced workouts, and nutrition targets tailored to you. Everything adjusts as you progress.`}
               </div>
             </div>
-          )}
-          {plan.tip && <div style={{ background: "#0A1628", borderLeft: `2px solid ${a}`, borderRadius: "0 8px 8px 0", padding: "7px 10px", marginBottom: 8, fontSize: 11, color: ob.body, lineHeight: 1.5 }}>{plan.tip}</div>}
-          <button onClick={() => navigate("plan")} style={{ ...s.tealBtn(false), marginTop: "auto", padding: 10, fontSize: 12 }}>Start Day 1 →</button>
-          <button onClick={() => { const adj = { ...plan, exercises: (plan.exercises||[]).map(e => ({ ...e, weight: Math.max(5, Math.round(e.weight * 0.75)) })) }; setPlan(adj); }} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: 8, fontSize: 11, color: ob.muted, cursor: "pointer", marginTop: 6, fontFamily: ob.font }}>Weights feel too heavy? Reduce all by 25%</button>
+          </div>
+
+          {/* ── Workout days card — slides in third ── */}
+          <div style={{ opacity: revealStep >= 3 ? 1 : 0, transform: revealStep >= 3 ? "translateY(0)" : "translateY(8px)", transition: "opacity .4s ease, transform .4s ease", marginBottom: 8 }}>
+            <div style={{ background: ob.card, borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Workouts — {plan.workoutType}</div>
+              {(plan.workoutDays || []).map((day, i, arr) => (
+                <div key={day} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <span style={{ fontSize: 11, color: ob.white }}>{day}</span>
+                  <Pill>{plan.workoutType} · {plan.workoutDuration} min</Pill>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Daily targets grid — slides in fourth ── */}
+          <div style={{ opacity: revealStep >= 4 ? 1 : 0, transform: revealStep >= 4 ? "translateY(0)" : "translateY(8px)", transition: "opacity .4s ease, transform .4s ease", marginBottom: 8 }}>
+            <div style={{ background: ob.card, borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Daily targets</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {[["🔥 Calories", `${plan.calories?.toLocaleString()}`, "cal/day"], ["🥩 Protein", `${plan.protein}g`, "per day"], ["🌾 Carbs", `${plan.carbs}g`, "per day"], ["🫒 Fat", `${plan.fat}g`, "per day"]].map(([label, val, unit]) => (
+                  <div key={label} style={{ background: "#0A1628", borderRadius: 10, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 9, color: ob.muted, marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: a }}>{val}</div>
+                    <div style={{ fontSize: 9, color: ob.muted }}>{unit}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {plan.bmr && plan.tdee && (
+              <div style={{ background: "#0A1628", borderLeft: `2px solid ${a}`, borderRadius: "0 8px 8px 0", padding: "7px 10px", marginTop: 6, fontSize: 11, color: ob.body, lineHeight: 1.6 }}>
+                {plan.goalAdjustment < 0
+                  ? `Your body burns ~${plan.tdee?.toLocaleString()} cal/day. We've reduced that by ${Math.abs(plan.goalAdjustment)} for steady fat loss.`
+                  : plan.goalAdjustment > 0
+                  ? `Your body burns ~${plan.tdee?.toLocaleString()} cal/day. We've added ${plan.goalAdjustment} to fuel muscle growth.`
+                  : `Your maintenance is ~${plan.tdee?.toLocaleString()} cal/day — we're keeping you right there.`}
+              </div>
+            )}
+          </div>
+
+          {/* ── Start Day 1 CTA — slides in last with glow ── */}
+          <div style={{ opacity: revealStep >= 5 ? 1 : 0, transform: revealStep >= 5 ? "translateY(0)" : "translateY(10px)", transition: "opacity .5s ease, transform .5s ease", marginTop: "auto" }}>
+            <button
+              onClick={() => navigate("plan")}
+              style={{ ...s.tealBtn(false), padding: "13px 10px", fontSize: 14, fontWeight: 700, borderRadius: 14, boxShadow: `0 0 28px rgba(0,212,177,0.4)`, letterSpacing: "0.2px" }}
+            >
+              Start Day 1 →
+            </button>
+            <button onClick={() => { const adj = { ...plan, exercises: (plan.exercises||[]).map(e => ({ ...e, weight: Math.max(5, Math.round(e.weight * 0.75)) })) }; setPlan(adj); }} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 8, fontSize: 11, color: ob.muted, cursor: "pointer", marginTop: 8, fontFamily: ob.font }}>Weights feel too heavy? Reduce all by 25%</button>
+          </div>
+
         </div>}
       </div>
       <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: "0.5px", padding: "4px 0 6px", flexShrink: 0 }}>POWERED BY MORPHIQ</div>
@@ -2818,4 +2860,5 @@ export default function Morphiq() {
     </>
   );
 }
+
 
