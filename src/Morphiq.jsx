@@ -547,9 +547,15 @@ function AppProvider({ children }) {
       if (profile?.plan) {
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
         setUser({ name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" });
-        setPlan(profile.plan);
+        // Patch missing weekStartDate — if the plan was saved without it, fill in today
+        // so the 7-day check has something to work from. Save back to Supabase immediately.
+        const patchedPlan = profile.plan?.weekStartDate
+          ? profile.plan
+          : { ...profile.plan, weekStartDate: new Date().toISOString().split("T")[0], weekNumber: profile.plan?.weekNumber || 1 };
+        if (!profile.plan?.weekStartDate) sb.upsertProfile(savedSession.uid, profile, patchedPlan).catch(() => {});
+        setPlan(patchedPlan);
         loadHistoricalData(savedSession.uid);
-        checkAndGenerateNextWeek(savedSession.uid, profile.plan, profile).catch(() => {});
+        checkAndGenerateNextWeek(savedSession.uid, patchedPlan, profile).catch(() => {});
         setScreen("home");
       } else {
         localStorage.removeItem(SESSION_KEY);
@@ -596,10 +602,17 @@ function AppProvider({ children }) {
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
-        setPlan(profile.plan);
+        // Patch missing weekStartDate — if the plan was saved without it, fill in today
+        // so the 7-day check has something to work from. Save back to Supabase immediately.
+        const patchedPlan = profile.plan?.weekStartDate
+          ? profile.plan
+          : { ...profile.plan, weekStartDate: new Date().toISOString().split("T")[0], weekNumber: profile.plan?.weekNumber || 1 };
+        if (!profile.plan?.weekStartDate) sb.upsertProfile(uid, u, patchedPlan).catch(() => {});
+        setPlan(patchedPlan);
         // Save session so next open skips login
         try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
         loadHistoricalData(uid);
+        checkAndGenerateNextWeek(uid, patchedPlan, u).catch(() => {});
         setScreen("home");
       } else {
         setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding");
@@ -2890,6 +2903,7 @@ export default function Morphiq() {
     </>
   );
 }
+
 
 
 
