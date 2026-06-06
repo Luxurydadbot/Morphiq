@@ -468,48 +468,58 @@ function MealPlanScreen() {
     } catch {}
   }, [meals, supabaseUser?.id]);
 
-  // When lunch is swapped for something higher-calorie, recalculate dinner
-  // to fit the remaining daily budget. This is the core AI adjustment behavior.
+  // When ANY meal is swapped for something higher-calorie, recalculate
+  // all remaining upcoming meals to fit the remaining daily budget.
+  // This is the core AI adjustment behavior from the blueprint.
   useEffect(() => {
-    const lunch = meals.find(m => m.id === "lunch");
-    const dinner = meals.find(m => m.id === "dinner");
-    if (!lunch || !dinner) return;
-    if (lunch.status !== "swapped" || !lunch.logged) return;
-    if (dinner.status !== "upcoming") return; // don't touch dinner if already logged
+    const hasAnySwap = meals.some(m => m.status === "swapped" && m.logged);
+    if (!hasAnySwap) return;
 
     const calGoal = plan?.calories || 1800;
     const proGoal = plan?.protein || 140;
 
-    // Add up everything logged so far (breakfast + lunch)
+    // Total logged so far across all logged meals
     const loggedSoFar = meals
-      .filter(m => m.id !== "dinner" && (m.status === "done" || m.status === "swapped"))
+      .filter(m => m.status === "done" || m.status === "swapped")
       .reduce((acc, m) => {
         const src = m.logged || m.suggested;
         return { cal: acc.cal + (src.cal || 0), protein: acc.protein + (src.protein || 0) };
       }, { cal: 0, protein: 0 });
 
-    // How much budget is left for dinner?
-    const remainingCal = Math.max(calGoal - loggedSoFar.cal, 200);
-    const remainingPro = Math.max(proGoal - loggedSoFar.protein, 10);
+    // How many upcoming meals still need calories allocated?
+    const upcoming = meals.filter(m => m.status === "upcoming");
+    if (upcoming.length === 0) return;
 
-    // Only adjust if lunch calories were meaningfully higher than planned
-    const lunchOriginal = dinner.originalSuggested ? null : lunch.suggested?.cal || 0;
-    const lunchActual = lunch.logged?.cal || 0;
-    if (lunchActual <= (lunchOriginal || 0) + 50) return; // no big overage, don't adjust
+    // Budget remaining — always leave at least 150 cal per remaining meal
+    const remainingCal = Math.max(calGoal - loggedSoFar.cal, upcoming.length * 150);
+    const remainingPro = Math.max(proGoal - loggedSoFar.protein, upcoming.length * 10);
 
-    // Update dinner's suggested calories to the remaining budget
-    // and save the original suggestion so the before/after UI can show it
+    // Was there a meaningful overage? (more than 50 cal over what was planned)
+    const plannedSoFar = meals
+      .filter(m => m.status === "done" || m.status === "swapped")
+      .reduce((acc, m) => acc + (m.suggested?.cal || 0), 0);
+    const overage = loggedSoFar.cal - plannedSoFar;
+    if (overage <= 50) return; // no significant overage — don't adjust
+
+    // Split remaining budget evenly across upcoming meals by their original proportions
+    const upcomingOriginalTotal = upcoming.reduce((acc, m) => acc + (m.suggested?.cal || 0), 0);
+
     setMeals(prev => prev.map(m => {
-      if (m.id !== "dinner") return m;
+      if (m.status !== "upcoming") return m;
       if (m.originalSuggested) return m; // already adjusted, don't adjust twice
+      const share = upcomingOriginalTotal > 0
+        ? (m.suggested?.cal || 0) / upcomingOriginalTotal
+        : 1 / upcoming.length;
+      const proShare = upcomingOriginalTotal > 0
+        ? (m.suggested?.protein || 0) / Math.max(upcoming.reduce((a, u) => a + (u.suggested?.protein || 0), 0), 1)
+        : 1 / upcoming.length;
       return {
         ...m,
-        originalSuggested: { ...m.suggested }, // save original for before/after display
+        originalSuggested: { ...m.suggested },
         suggested: {
           ...m.suggested,
-          cal:     Math.round(remainingCal),
-          protein: Math.round(remainingPro),
-          name:    m.suggested.name, // keep the same meal name
+          cal:     Math.max(Math.round(remainingCal * share), 150),
+          protein: Math.max(Math.round(remainingPro * proShare), 8),
         }
       };
     }));
@@ -632,7 +642,10 @@ function MealPlanScreen() {
             <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
               <div style={{ fontSize: 11, color: a, fontWeight: 500, marginBottom: 4 }}>Still hungry?</div>
               <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5 }}>
-                You have <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{Math.max(0, CAL_GOAL - macros.cal)} cal</span> and <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{Math.max(0, PROTEIN_GOAL - macros.protein)}g protein</span> left today.
+                {CAL_GOAL - macros.cal <= 0
+                  ? <span>You've hit your calorie goal today — no problem. Stay hydrated and your body will take care of the rest. 💧</span>
+                  : <span>You have <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{CAL_GOAL - macros.cal} cal</span> and <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{Math.max(0, PROTEIN_GOAL - macros.protein)}g protein</span> left today.</span>
+                }
               </div>
             </div>
           </div>
