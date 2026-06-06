@@ -1748,9 +1748,9 @@ function HomeDashboardScreen() {
     : `${greeting}, ${user.name || "there"}. Your plan is ready — let's get your first session in today.`;
 
   // Gym messages — load once on mount
-  const [gymMessages, setGymMessages] = React.useState([]);
-  const [msgExpanded, setMsgExpanded] = React.useState(false);
-  React.useEffect(() => {
+  const [gymMessages, setGymMessages] = useState([]);
+  const [msgExpanded, setMsgExpanded] = useState(false);
+  useEffect(() => {
     if (!user?.profileId) return;
     sb.getMessages(user.profileId).then(rows => setGymMessages(rows)).catch(() => {});
   }, [user?.profileId]);
