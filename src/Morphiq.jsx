@@ -2046,21 +2046,38 @@ const MEAL_DATA = [
 
 const GROCERY_DATA = [
   { category: "Protein", emoji: "🥩", items: [
-    { name: "Chicken breast", qty: "2 lbs", done: true },
-    { name: "Greek yogurt", qty: "32 oz", done: false },
-    { name: "Salmon fillets", qty: "4 pieces", done: false },
-    { name: "Eggs", qty: "1 dozen", done: false },
+    { name: "Chicken breast",  qty: "3 lbs",    done: false },
+    { name: "Salmon fillets",  qty: "4 pieces", done: false },
+    { name: "Eggs",            qty: "1 dozen",  done: false },
+    { name: "Canned tuna",     qty: "4 cans",   done: false },
+    { name: "Protein powder",  qty: "1 tub",    done: false },
+  ]},
+  { category: "Dairy", emoji: "🧀", items: [
+    { name: "Greek yogurt",    qty: "32 oz",    done: false },
+    { name: "Low-fat milk",    qty: "½ gallon", done: false },
+    { name: "String cheese",   qty: "1 pack",   done: false },
   ]},
   { category: "Produce", emoji: "🥦", items: [
-    { name: "Mixed berries", qty: "1 bag", done: true },
-    { name: "Broccoli", qty: "1 head", done: false },
-    { name: "Sweet potato", qty: "3 medium", done: false },
-    { name: "Spinach", qty: "5 oz bag", done: false },
+    { name: "Spinach",         qty: "5 oz bag", done: false },
+    { name: "Broccoli",        qty: "1 head",   done: false },
+    { name: "Mixed berries",   qty: "1 bag",    done: false },
+    { name: "Avocado",         qty: "3",        done: false },
+    { name: "Cherry tomatoes", qty: "1 pint",   done: false },
+    { name: "Lemons",          qty: "3",        done: false },
+    { name: "Apples",          qty: "4",        done: false },
   ]},
   { category: "Pantry", emoji: "🫙", items: [
-    { name: "Brown rice", qty: "2 lbs", done: true },
-    { name: "Olive oil", qty: "1 bottle", done: false },
-    { name: "Protein powder", qty: "1 tub", done: false },
+    { name: "Olive oil",       qty: "1 bottle", done: false },
+    { name: "Almond butter",   qty: "1 jar",    done: false },
+    { name: "Brown rice",      qty: "2 lbs",    done: false },
+    { name: "Oats",            qty: "1 bag",    done: false },
+    { name: "Sea salt & pepper",qty: "if needed",done: false },
+  ]},
+  { category: "Snacks", emoji: "🍎", items: [
+    { name: "Baby carrots",    qty: "1 bag",    done: false },
+    { name: "Rice cakes",      qty: "1 bag",    done: false },
+    { name: "Mixed nuts",      qty: "1 bag",    done: false },
+    { name: "Dark chocolate",  qty: "1 bar",    done: false },
   ]},
 ];
 
