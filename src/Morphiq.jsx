@@ -1205,15 +1205,19 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           setUser(userData);
           setPlan(parsed);
-          // Persist to Supabase profiles table (fire-and-forget — UI doesn't block on this)
+          // Persist to Supabase — upsertProfile MUST finish before insertWeightLog
+          // because insertWeightLog does getProfileId() which needs the profile row to exist first.
+          // If we fire both at the same time (race condition), weight save silently fails.
           if (supabaseUser?.id) {
-            sb.upsertProfile(supabaseUser.id, userData, parsed).catch(() => {});
-            // Also insert starting weight into weight_logs so Progress screen
-            // has a baseline data point from day one — weight is a plain number here (e.g. 175)
-            const startingWeight = parseFloat(weight);
-            if (startingWeight > 0) {
-              sb.insertWeightLog(supabaseUser.id, startingWeight).catch(() => {});
-            }
+            sb.upsertProfile(supabaseUser.id, userData, parsed)
+              .then(() => {
+                // Profile row now exists — safe to write the starting weight
+                const startingWeight = parseFloat(weight);
+                if (startingWeight > 0) {
+                  sb.insertWeightLog(supabaseUser.id, startingWeight).catch(() => {});
+                }
+              })
+              .catch(() => {});
           }
           setTimeout(() => { if (!cancelled) setStep(13); }, 400);
         }
@@ -2546,31 +2550,35 @@ function ProgressScreen() {
                   <div style={{ background: weightError ? "#1F1010" : "#003D35", borderRadius:8, padding:"4px 10px", fontSize:11, color: weightError ? "#F87171" : a, fontWeight:500 }}>
                     {weightError ? "Save failed — try again" : weightSaved ? "Saved ✓" : "On track ✓"}
                   </div>
-                  <button onClick={() => setShowLogWeight(!showLogWeight)}
-                    style={{ background:"transparent", border:`1px solid rgba(0,212,177,0.3)`, borderRadius:8, padding:"4px 10px", fontSize:11, color:a, cursor:"pointer", fontFamily:"inherit" }}>
-                    {showLogWeight ? "Cancel" : "+ Log weight"}
-                  </button>
                 </div>
               </div>
 
+              {/* Log weight button — large and prominent */}
+              <button onClick={() => setShowLogWeight(!showLogWeight)}
+                style={{ width:"100%", background: showLogWeight ? "transparent" : a, border: showLogWeight ? "1px solid rgba(255,255,255,0.12)" : "none", borderRadius:12, padding:"13px", fontSize:15, fontWeight:600, color: showLogWeight ? "#6B7A8D" : "#003D35", cursor:"pointer", fontFamily:"inherit", marginBottom:10 }}>
+                {showLogWeight ? "Cancel" : "＋ Log today's weight"}
+              </button>
+
               {/* Log weight inline form */}
               {showLogWeight && (
-                <div className="mq-fade" style={{ background:"#0A1628", borderRadius:10, padding:"10px 12px", marginBottom:10, display:"flex", gap:8, alignItems:"center" }}>
-                  <div style={{ fontSize:11, color:"#9BB3C8", flexShrink:0 }}>Today's weight:</div>
-                  <input
-                    type="number"
-                    value={newWeightInput}
-                    onChange={e => setNewWeightInput(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && saveWeight()}
-                    placeholder="e.g. 182.5"
-                    autoFocus
-                    style={{ flex:1, background:"#111827", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"6px 10px", fontSize:13, color:"#E8EDF2", outline:"none", fontFamily:"inherit" }}
-                  />
-                  <div style={{ fontSize:11, color:"#6B7A8D", flexShrink:0 }}>lbs</div>
-                  <button onClick={saveWeight} disabled={savingWeight || !newWeightInput}
-                    style={{ background: newWeightInput ? a : "#1A2332", border:"none", borderRadius:8, padding:"6px 12px", fontSize:11, color: newWeightInput ? "#003D35" : "#6B7A8D", fontWeight:600, cursor: newWeightInput ? "pointer" : "default", fontFamily:"inherit", flexShrink:0 }}>
-                    {savingWeight ? "..." : "Save"}
-                  </button>
+                <div className="mq-fade" style={{ background:"#0A1628", borderRadius:12, padding:"14px", marginBottom:10 }}>
+                  <div style={{ fontSize:13, color:"#9BB3C8", marginBottom:10, fontWeight:500 }}>What's your weight today?</div>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <input
+                      type="number"
+                      value={newWeightInput}
+                      onChange={e => setNewWeightInput(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && saveWeight()}
+                      placeholder="e.g. 182.5"
+                      autoFocus
+                      style={{ flex:1, background:"#111827", border:"1px solid rgba(255,255,255,0.12)", borderRadius:10, padding:"12px 14px", fontSize:16, color:"#E8EDF2", outline:"none", fontFamily:"inherit" }}
+                    />
+                    <div style={{ fontSize:13, color:"#6B7A8D", flexShrink:0 }}>lbs</div>
+                    <button onClick={saveWeight} disabled={savingWeight || !newWeightInput}
+                      style={{ background: newWeightInput ? a : "#1A2332", border:"none", borderRadius:10, padding:"12px 18px", fontSize:14, color: newWeightInput ? "#003D35" : "#6B7A8D", fontWeight:600, cursor: newWeightInput ? "pointer" : "default", fontFamily:"inherit", flexShrink:0 }}>
+                      {savingWeight ? "..." : "Save"}
+                    </button>
+                  </div>
                 </div>
               )}
 
