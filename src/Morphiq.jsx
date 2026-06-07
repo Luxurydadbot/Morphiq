@@ -654,7 +654,7 @@ function AppProvider({ children }) {
 Member: goal=${currentUser.goal}, equipment=${currentUser.equipment||"dumbbells"}, injuries=${currentUser.injuries||"none"}.
 Last week exercises: ${prevEx}.
 Week ${nextWeekNum} instruction: ${weekGuide}.
-Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${currentPlan.daysPerWeek||3},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"string","warmup":[{"name":"string","duration":"string"}],"cooldown":[{"name":"string","duration":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
+Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${currentPlan.daysPerWeek||3},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"string","warmup":[{"name":"string","duration":"string","description":"string"}],"cooldown":[{"name":"string","duration":"string","description":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
 Include exactly ${(currentPlan.exercises||[]).length || 5} exercises. All numeric values must be plain numbers.`;
       const res = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
       const data = await res.json();
@@ -1152,9 +1152,19 @@ function OnboardingScreen() {
 
       // Warm-up and cool-down instructions
       const warmupGuide = daysPerWeek >= 4
-        ? "Include warmup array with: 90s light cardio, 10 reps arm circles, 10 reps band pull-apart, 10 reps scapular push-ups, 10 reps light dumbbell press."
-        : "Include warmup array with: 90s light cardio, 10 reps bodyweight squat, 10 reps hip hinge, 10 reps arm circles each direction, 10 reps band pull-apart.";
-      const cooldownGuide = "Include cooldown array with: 30s quad stretch each side, 30s hamstring stretch, 30s chest stretch, 30s shoulder stretch, 60s child's pose.";
+        ? `Include warmup array with exactly these 5 exercises in order, each with a name, duration, and description field:
+1. name="Light cardio" duration="90 seconds" description="March in place, do jumping jacks, or walk briskly. Move your whole body to raise your heart rate and warm up your muscles before lifting."
+2. name="Arm circles" duration="30 seconds each direction" description="Stand tall and extend both arms out to your sides. Make slow, smooth circles — start big, then smaller. You'll feel your shoulders loosen up as you go."
+3. name="Chest opener stretch" duration="10 slow reps" description="Stand with your feet hip-width apart. Reach both arms wide open to your sides, squeeze your shoulder blades together, then bring your arms back in front. Opens up your chest and upper back."
+4. name="Shoulder squeeze" duration="10 slow reps" description="Sit or stand. Pull both elbows back behind you, pinch your shoulder blades together, hold for a second, then release. Wakes up the muscles between your shoulder blades."
+5. name="Light dumbbell press" duration="10 reps — very light weight" description="Use the lightest dumbbells available. Press them straight up overhead slowly, then lower back down. This is not a working set — it's just getting your shoulders and chest ready for the workout."`
+        : `Include warmup array with exactly these 5 exercises in order, each with a name, duration, and description field:
+1. name="Light cardio" duration="90 seconds" description="March in place, do jumping jacks, or walk briskly. Move your whole body to raise your heart rate and warm up your muscles before lifting."
+2. name="Slow squat hold" duration="10 slow reps" description="Stand with feet shoulder-width apart, toes slightly out. Slowly lower yourself down as far as comfortable, pause for a second at the bottom, then stand back up. Wakes up your hips, knees, and glutes."
+3. name="Toe touch to stand" duration="10 slow reps" description="Stand with feet hip-width apart. Slowly bend forward and reach your hands toward the floor — bend your knees as much as you need. Then slowly roll back up to standing. Loosens your lower back and hamstrings."
+4. name="Arm circles" duration="30 seconds each direction" description="Stand tall and extend both arms out to your sides. Make slow, smooth circles — start big, then smaller. You'll feel your shoulders loosen up as you go."
+5. name="Hip circles" duration="30 seconds each direction" description="Stand with feet shoulder-width apart and hands on your hips. Make big slow circles with your hips, like you're using a hula hoop. Loosens up your lower back and hip joints before squatting or hinging movements."`;
+      const cooldownGuide = "Include cooldown array with: 30s quad stretch each side, 30s hamstring stretch, 30s chest stretch, 30s shoulder stretch, 60s child's pose. Each item must have name, duration, and description fields with plain-language instructions.";
 
       const exerciseCount = goal === "lose_fat" && daysPerWeek <= 3 ? 6 : 5;
 
@@ -1169,7 +1179,7 @@ RPE: ${rpeGuide}
 ${warmupGuide}
 ${cooldownGuide}
 Return exactly this JSON structure:
-{"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"Weeks 1-3 add reps within range, week 4 deload 40%, week 5+ increase weight","warmup":[{"name":"string","duration":"string"}],"cooldown":[{"name":"string","duration":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
+{"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"Weeks 1-3 add reps within range, week 4 deload 40%, week 5+ increase weight","warmup":[{"name":"string","duration":"string","description":"string"}],"cooldown":[{"name":"string","duration":"string","description":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
 Include exactly ${exerciseCount} exercises. All numeric values must be plain numbers, not strings.`;
 
       try {
