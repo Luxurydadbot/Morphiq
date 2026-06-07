@@ -1632,7 +1632,7 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
             >
               Start Day 1 →
             </button>
-            <button onClick={() => { const adj = { ...plan, exercises: (plan.exercises||[]).map(e => ({ ...e, weight: Math.max(5, Math.round(e.weight * 0.75)) })) }; setPlan(adj); }} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 8, fontSize: 11, color: ob.muted, cursor: "pointer", marginTop: 8, fontFamily: ob.font }}>Weights feel too heavy? Reduce all by 25%</button>
+
           </div>
 
         </div>}
