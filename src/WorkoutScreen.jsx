@@ -357,20 +357,6 @@ function WorkoutScreen() {
     const currentWarmup = warmupExercises[warmupStep];
     const isLastWarmup = warmupStep >= warmupExercises.length - 1;
 
-    // Coaching cues for common warmup movements — shown below the exercise name
-    const warmupCues = {
-      "light cardio":        { cue: "Walk, march in place, or do jumping jacks. Get your blood moving and your body temperature up before any resistance work.", focus: "Blood flow" },
-      "arm circles":         { cue: "Slow and controlled — big circles first, then small. Feel your shoulder joint loosening up with each rotation.", focus: "Shoulder mobility" },
-      "bodyweight squat":    { cue: "Feet shoulder-width apart, toes slightly out. Sit back and down, keep your chest up. This wakes up your glutes and knees.", focus: "Hip & knee activation" },
-      "hip hinge":           { cue: "Soft knees, push your hips back like you're closing a car door with your backside. Feel the stretch in your hamstrings.", focus: "Hamstring activation" },
-      "band pull-apart":     { cue: "Arms straight out in front, pull the band apart to your sides. Squeeze your shoulder blades together at the end of each rep.", focus: "Upper back & rotator cuff" },
-      "scapular push-up":    { cue: "In a push-up position, let your shoulder blades come together, then push them apart. Arms stay straight the whole time.", focus: "Shoulder blade control" },
-      "scapular push-ups":   { cue: "In a push-up position, let your shoulder blades come together, then push them apart. Arms stay straight the whole time.", focus: "Shoulder blade control" },
-      "light dumbbell press":{ cue: "Use very light weight — this is just waking up your chest and shoulders, not a working set. Focus on feeling the movement.", focus: "Chest & shoulder prep" },
-    };
-    const cueKey = Object.keys(warmupCues).find(k => currentWarmup?.name?.toLowerCase().includes(k));
-    const cueData = cueKey ? warmupCues[cueKey] : null;
-
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
@@ -378,7 +364,7 @@ function WorkoutScreen() {
           {/* Header */}
           <div style={{ textAlign: "center", marginBottom: 14 }}>
             <div style={{ fontSize: 10, color: a, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Warm-up · {warmupStep + 1} of {warmupExercises.length}</div>
-            <div style={{ fontSize: 13, color: theme.textDim }}>5 minutes before your workout</div>
+            <div style={{ fontSize: 13, color: theme.textDim }}>A few minutes before your workout</div>
           </div>
 
           {/* Progress bar */}
@@ -386,27 +372,27 @@ function WorkoutScreen() {
             <div style={{ height: 4, borderRadius: 2, background: a, width: `${Math.round(((warmupStep + 1) / warmupExercises.length) * 100)}%`, transition: "width .4s" }} />
           </div>
 
-          {/* Exercise name + duration — the main event */}
+          {/* Exercise name + duration */}
           <div style={{ textAlign: "center", marginBottom: 20 }}>
             <div style={{ fontSize: 42 }}>🔥</div>
             <div style={{ fontSize: 34, fontWeight: 700, color: theme.text, lineHeight: 1.2, marginTop: 10 }}>{currentWarmup?.name}</div>
             <div style={{ fontSize: 22, color: a, fontWeight: 600, marginTop: 8 }}>{currentWarmup?.duration}</div>
           </div>
 
-          {/* Main tip — large and impossible to miss */}
-          <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 14, padding: "1rem 1.25rem", marginBottom: 14 }}>
-            <div style={{ fontSize: 17, color: "#D8E4E0", lineHeight: 1.65 }}>
-              Take your time — a proper warm-up <span style={{ color: a, fontWeight: 600 }}>reduces injury risk</span> and <span style={{ color: a, fontWeight: 600 }}>improves performance</span> in every set that follows.
-            </div>
-          </div>
-
-          {/* Exercise-specific coaching cue — fills the dead space with useful info */}
-          {cueData && (
-            <div style={{ background: "#111827", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "1rem 1.25rem", marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 8, fontWeight: 600 }}>Focus: {cueData.focus}</div>
-              <div style={{ fontSize: 15, color: "#B8CAD5", lineHeight: 1.65 }}>{cueData.cue}</div>
+          {/* How to do it — plain language description from the plan */}
+          {currentWarmup?.description && (
+            <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 14, padding: "1.1rem 1.25rem", marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 8, fontWeight: 600 }}>How to do it</div>
+              <div style={{ fontSize: 16, color: "#D8E4E0", lineHeight: 1.7 }}>{currentWarmup.description}</div>
             </div>
           )}
+
+          {/* Why it matters — always visible */}
+          <div style={{ background: "#111827", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "1rem 1.25rem", marginBottom: 14 }}>
+            <div style={{ fontSize: 15, color: "#8A9EAD", lineHeight: 1.65 }}>
+              Take your time. A proper warm-up <span style={{ color: a, fontWeight: 600 }}>reduces your injury risk</span> and <span style={{ color: a, fontWeight: 600 }}>makes every working set feel better</span>.
+            </div>
+          </div>
 
           {/* Buttons */}
           <div style={{ marginTop: "auto", paddingBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
