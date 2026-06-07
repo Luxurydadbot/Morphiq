@@ -682,17 +682,21 @@ function AppProvider({ children }) {
 
       const exerciseCount = (currentPlan.exercises || []).length || 5;
 
+      const week2SplitRule = daysPerWeek <= 3
+        ? "FULL BODY — every session must include a squat pattern, a hinge pattern, a push, and a pull. Keep same exercises as last week unless progression requires a change."
+        : daysPerWeek === 4
+        ? "UPPER/LOWER — upper days: push and pull only. Lower days: squat and hinge only. Keep same exercises as last week."
+        : "PUSH/PULL/LEGS — keep same exercises as last week.";
+
       const prompt = `Generate Week ${nextWeekNum} fitness plan. Return ONLY valid JSON, no markdown.
 Member: goal=${goal}, equipment=${equipment}, injuries=${injuries}, trainingHistory=${trainingHistory}, daysPerWeek=${daysPerWeek}.
 PREVIOUS WEEK: ${prevEx}
 PROGRESSION: ${progressionGuide}
 EQUIPMENT: ${equipGuide}
+SPLIT RULE: ${week2SplitRule}
 ${injuryGuide ? "INJURIES: " + injuryGuide : ""}
-MOVEMENT PATTERNS: ${patternGuide}
 RPE: ${rpeGuide}
-WARMUP: Include 5 warmup exercises. Each needs name, duration, and description fields with plain-language instructions.
-COOLDOWN: Include 5 cooldown stretches. Each needs name, duration, and description fields.
-Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"string","warmup":[{"name":"string","duration":"string","description":"string"}],"cooldown":[{"name":"string","duration":"string","description":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
+Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
 Include exactly ${exerciseCount} exercises. All numeric values must be plain numbers.`;
 
       const res = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
@@ -1194,10 +1198,17 @@ function OnboardingScreen() {
       // Fat loss = 6 exercises (5 compounds + metabolic finisher), all other goals = 5
       const exerciseCount = goal === "lose_fat" ? 6 : 5;
 
+      const splitRule = daysPerWeek <= 3
+        ? "FULL BODY — every session must include: (1) a squat pattern (e.g. back squat, goblet squat, leg press), (2) a hinge pattern (e.g. deadlift, Romanian deadlift), (3) a horizontal push, (4) a horizontal pull. No exceptions. Do not fill all slots with upper body exercises."
+        : daysPerWeek === 4
+        ? "UPPER/LOWER SPLIT — alternate upper and lower days. Upper days: horizontal push, horizontal pull, vertical push, vertical pull. Lower days: squat pattern, hinge pattern, unilateral leg, leg curl. Each muscle hit twice per week."
+        : "PUSH/PULL/LEGS — Push: chest, shoulders, triceps. Pull: back, biceps. Legs: quads, hamstrings, glutes. Rotate through all three.";
+
       const prompt = `Generate a week 1 fitness plan as JSON only. No markdown, no explanation.
 Member: goal=${goal}, sex=${sex}, ${heightFt}ft${heightIn||0}in, ${weight}lbs, age ${age}, ${daysPerWeek} days/week.
-Equipment: ${equipGuide}. Experience: ${expLevel}. Split: ${splitType}.
+Equipment: ${equipGuide}. Experience: ${expLevel}.
 ${injuryNote}
+SPLIT RULE: ${splitRule}
 Nutrition (already calculated — use exactly): calories=${targetCals}, protein=${targetProtein}g, carbs=${targetCarbs}g, fat=${targetFat}g.
 Return this exact JSON (${exerciseCount} exercises, all numbers as numbers not strings):
 {"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}`;
