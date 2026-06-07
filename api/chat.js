@@ -188,7 +188,7 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 400, system, messages: dedupedMessages }),
+      body: JSON.stringify({ model: process.env.AI_MODEL || "claude-sonnet-4-6", max_tokens: 400, system, messages: dedupedMessages }),
     });
 
     if (!claudeRes.ok) {
