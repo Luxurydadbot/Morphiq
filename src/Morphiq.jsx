@@ -640,29 +640,96 @@ function AppProvider({ children }) {
 
   // Load historical workout + weight data once we have a real user ID
 
-  // Checks if 7+ days have passed since weekStartDate — if so, silently generates next week
+  // Checks if 7+ days have passed since weekStartDate — if so, silently generates next week.
+  // CRITICAL: passes the same full rulebook as week 1 — equipment, injuries, movement patterns,
+  // RPE, and periodization. Every week must be as high quality as week 1. Always.
   async function checkAndGenerateNextWeek(uid, currentPlan, currentUser) {
     try {
       if (!currentPlan?.weekStartDate) return;
       const daysSince = Math.floor((Date.now() - new Date(currentPlan.weekStartDate)) / 86400000);
       if (daysSince < 7) return;
+
       const nextWeekNum = (currentPlan.weekNumber || 1) + 1;
-      const prevEx = (currentPlan.exercises || []).map(e => `${e.name} ${e.sets}x${e.reps} @ ${e.weight}lbs`).join(", ");
-      const deload = nextWeekNum % 4 === 0;
-      const weekGuide = nextWeekNum <= 2 ? "add 1 rep or 2.5-5lbs to last week" : deload ? "deload: reduce weight 10%, same reps, focus on form" : "increase weight 5-10% or add a set vs last week";
-      const prompt = `Generate Week ${nextWeekNum} fitness plan based on Week ${currentPlan.weekNumber||1}. Return ONLY valid JSON, no markdown.
-Member: goal=${currentUser.goal}, equipment=${currentUser.equipment||"dumbbells"}, injuries=${currentUser.injuries||"none"}.
-Last week exercises: ${prevEx}.
-Week ${nextWeekNum} instruction: ${weekGuide}.
-Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${currentPlan.daysPerWeek||3},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"string","warmup":[{"name":"string","duration":"string","description":"string"}],"cooldown":[{"name":"string","duration":"string","description":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
-Include exactly ${(currentPlan.exercises||[]).length || 5} exercises. All numeric values must be plain numbers.`;
+      const equipment = currentUser.equipment || "dumbbell";
+      const injuries = currentUser.injuries || "none";
+      const goal = currentUser.goal || "general_fitness";
+      const trainingHistory = currentUser.trainingHistory || "some";
+      const recentActivity = currentUser.recentActivity || "consistent";
+      const daysPerWeek = currentPlan.daysPerWeek || 3;
+
+      // Previous week details — AI uses these to apply exact progressive overload per exercise
+      const prevEx = (currentPlan.exercises || []).map(e =>
+        `${e.name}: ${e.sets}x${e.reps} @ ${e.weight}lbs RPE${e.rpe || 7}`
+      ).join(" | ");
+
+      // ── PERIODIZATION — week 4/8/12 = deload, all others = progressive overload ──
+      const isDeload = nextWeekNum % 4 === 0;
+      const isPostDeload = nextWeekNum % 4 === 1 && nextWeekNum > 1;
+      const progressionGuide = isDeload
+        ? `WEEK ${nextWeekNum} IS A DELOAD WEEK. Use the exact same exercises as last week. Reduce ALL weights by 40-50%. Keep same sets and reps. RPE target 5-6 — must feel easy. Purpose: full recovery and supercompensation so the member is stronger next week. Do not change exercises.`
+        : isPostDeload
+        ? `WEEK ${nextWeekNum} IS POST-DELOAD — NEW MESOCYCLE. Member is now recovered and stronger. Increase weights 5-10% above pre-deload levels. Reset to the bottom of rep ranges. Same exercises and movement patterns as the mesocycle before the deload.`
+        : `WEEK ${nextWeekNum} — PROGRESSIVE OVERLOAD. Apply double progression to each exercise: if the member hit the top of their rep range on ALL sets last week, add the smallest available weight increment (2.5-5lbs barbell, 2-5lbs dumbbell). If they did not hit the top of the range, keep the same weight and add 1 rep per set. Keep the same exercises — do not swap or add new exercises mid-mesocycle. Consistency is required for strength adaptation.`;
+
+      // ── EQUIPMENT (mirrors week 1 generator exactly) ──────────────────────
+      const equipGuide = equipment === "barbell"
+        ? "BARBELL GYM. All primary compounds must use barbell. squat=barbell back squat, hinge=barbell Romanian deadlift or conventional deadlift, horizontal push=barbell bench press, horizontal pull=barbell bent over row. Dumbbells only for accessories. No push-up variations. No goblet squat as a primary."
+        : equipment === "dumbbell"
+        ? "DUMBBELLS AND CABLES. No barbell. squat=goblet squat or Bulgarian split squat, hinge=dumbbell Romanian deadlift, push=dumbbell bench press or incline press, pull=single-arm dumbbell row or cable row."
+        : equipment === "kettlebell"
+        ? "KETTLEBELLS AND BODYWEIGHT ONLY. squat=kettlebell goblet squat, hinge=kettlebell deadlift or single-leg RDL, push=push-up or kettlebell press, pull=inverted row or TRX row."
+        : equipment === "machine"
+        ? "MACHINES AND CABLES. No free barbell. squat=leg press or hack squat machine, hinge=RDL machine or cable pull-through, push=chest press machine, pull=seated cable row."
+        : "DUMBBELLS ONLY. squat=goblet squat, hinge=dumbbell RDL, push=dumbbell floor press, pull=single-arm dumbbell row.";
+
+      // ── INJURY RULES (mirrors week 1 generator exactly) ───────────────────
+      const injuryGuide = !injuries || injuries === "none" ? ""
+        : injuries.toLowerCase().includes("knee") ? "KNEE INJURY: no squat variations or lunges. Leg press, leg curl, hip thrust only for lower body."
+        : injuries.toLowerCase().includes("back") ? "LOWER BACK: no conventional deadlift or barbell row. Use trap bar, cable pull-through, chest-supported row."
+        : injuries.toLowerCase().includes("shoulder") ? "SHOULDER: no overhead pressing. Landmine press, neutral grip incline press, cable fly only."
+        : injuries.toLowerCase().includes("wrist") ? "WRIST: neutral grip only. No barbell front squat."
+        : `INJURY — ${injuries}: avoid all movements loading this area.`;
+
+      // ── MOVEMENT PATTERN RULES (mirrors week 1 generator exactly) ─────────
+      const patternGuide = goal === "build_muscle"
+        ? "MANDATORY every session: (1) squat pattern, (2) hinge pattern, (3) horizontal push, (4) horizontal pull. These four are non-negotiable every week. Isolation exercises are accessories only — never replace a compound slot."
+        : goal === "lose_fat"
+        ? "MANDATORY every session: (1) squat pattern, (2) hinge pattern, (3) push, (4) pull, (5) metabolic finisher. Heavy compounds preserve muscle during a deficit — never replace them with isolation work."
+        : "MANDATORY every session: squat, hinge, push, pull. All four patterns every week without exception.";
+
+      // ── RPE TARGETS ────────────────────────────────────────────────────────
+      const rpeGuide = isDeload
+        ? "DELOAD: all sets RPE 5-6. Intentionally easy."
+        : trainingHistory === "new"
+        ? "RPE: compound working sets RPE 6-7. Never train to failure — always leave 3 reps in the tank."
+        : trainingHistory === "some"
+        ? "RPE: compound working sets RPE 7-8. Final set RPE 8-9."
+        : recentActivity === "returning"
+        ? "RPE: compound working sets RPE 7-8. Still rebuilding to full intensity."
+        : "RPE: compound working sets RPE 8-9. Push close to failure on final sets. Isolation RPE 8-9.";
+
+      const exerciseCount = (currentPlan.exercises || []).length || 5;
+
+      const prompt = `Generate Week ${nextWeekNum} fitness plan. Return ONLY valid JSON, no markdown.
+Member: goal=${goal}, equipment=${equipment}, injuries=${injuries}, trainingHistory=${trainingHistory}, daysPerWeek=${daysPerWeek}.
+PREVIOUS WEEK: ${prevEx}
+PROGRESSION: ${progressionGuide}
+EQUIPMENT: ${equipGuide}
+${injuryGuide ? "INJURIES: " + injuryGuide : ""}
+MOVEMENT PATTERNS: ${patternGuide}
+RPE: ${rpeGuide}
+WARMUP: Include 5 warmup exercises. Each needs name, duration, and description fields with plain-language instructions.
+COOLDOWN: Include 5 cooldown stretches. Each needs name, duration, and description fields.
+Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"string","warmup":[{"name":"string","duration":"string","description":"string"}],"cooldown":[{"name":"string","duration":"string","description":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
+Include exactly ${exerciseCount} exercises. All numeric values must be plain numbers.`;
+
       const res = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
       const data = await res.json();
       const nextPlan = JSON.parse((data.text || "").replace(/```json|```/g, "").trim());
       setPlan(nextPlan);
       if (uid) sb.upsertProfile(uid, currentUser, nextPlan).catch(() => {});
-      console.log("[Morphiq] Auto-generated Week", nextWeekNum);
-    } catch (e) { console.log("[Morphiq] Next week skipped:", e.message); }
+      console.log("[Morphiq] Auto-generated Week", nextWeekNum, isDeload ? "(DELOAD)" : isPostDeload ? "(POST-DELOAD)" : "(progressive overload)");
+    } catch (e) { console.log("[Morphiq] Next week generation skipped:", e.message); }
   }
 
   async function loadHistoricalData(uid) {
