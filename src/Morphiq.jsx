@@ -1665,12 +1665,12 @@ function PlanOverviewScreen() {
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: a }} />Plan ready
         </div>
         <div style={{ fontSize: 22, fontWeight: 500, color: "#F0F0F0", lineHeight: 1.3, marginBottom: ".4rem" }}>Your 4-week {goalLabel} program is live</div>
-        <div style={{ fontSize: 14, color: theme.textDim }}>3 workouts per week · Full body · Beginner</div>
+        <div style={{ fontSize: 14, color: theme.textDim }}>{user.daysPerWeek || plan?.daysPerWeek || 3} workouts per week · {plan?.workoutType || "Full body"} · {user.fitnessLevel || "Intermediate"}</div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Daily targets</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
-          {[["1,840", "Calories", "100%", a], ["155g", "Protein", "72%", "#5DCAA5"], ["185g", "Carbs", "55%", "#1D9E75"]].map(([v, l, w, c]) => (
+          {[[plan?.calories?.toLocaleString() || "—", "Calories", "100%", a], [`${plan?.protein || "—"}g`, "Protein", "72%", "#5DCAA5"], [`${plan?.carbs || "—"}g`, "Carbs", "55%", "#1D9E75"]].map(([v, l, w, c]) => (
             <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
               <div style={{ fontSize: 20, fontWeight: 500, color: "#F0F0F0" }}>{v}</div>
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
@@ -1679,25 +1679,14 @@ function PlanOverviewScreen() {
           ))}
         </div>
       </div>
+
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
-        <div style={sL}>This week</div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {WEEK.map((d, i) => (
-            <button key={i} onClick={() => setActiveDay(i)} style={{ flex: 1, background: i === activeDay ? "rgba(0,212,177,0.07)" : theme.surface, border: `0.5px solid ${i === activeDay ? a : theme.border}`, borderRadius: 10, padding: ".6rem .25rem", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer", opacity: !d.isWorkout ? 0.5 : 1, fontFamily: "inherit" }}>
-              <span style={{ fontSize: 10, color: i === activeDay ? a : theme.textDim, textTransform: "uppercase", letterSpacing: ".06em" }}>{d.name}</span>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: i === activeDay ? a : d.isWorkout ? "#1A4A44" : "#2A2A2A" }} />
-              <span style={{ fontSize: 9, color: i === activeDay ? "#5DCAA5" : "#444", textAlign: "center", lineHeight: 1.3 }}>{d.type}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{ padding: "1.25rem 1.25rem 0" }}>
-        <div style={sL}>{activeDay === 0 ? "Today's workout" : `${day.name}'s workout`}</div>
+        <div style={sL}>Your first workout</div>
         <div className="mq-fade" style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
           {day.isWorkout ? <>
             <div style={{ padding: "1rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div><div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>Full body A</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>5 exercises · ~40 min</div></div>
-              <div style={{ background: "#1E1E1E", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: theme.textMuted }}>40 min</div>
+              <div><div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>{plan?.workoutType || "Full body"}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{plan?.exercises?.length || 5} exercises · ~{plan?.workoutDuration || 40} min</div></div>
+              <div style={{ background: "#1E1E1E", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: theme.textMuted }}>{plan?.workoutDuration || 40} min</div>
             </div>
             {EXERCISES_DISPLAY.map((ex, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".8rem 1.25rem", borderBottom: i < 4 ? `0.5px solid #1A1A1A` : "none" }}>
