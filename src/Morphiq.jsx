@@ -546,8 +546,10 @@ function AppProvider({ children }) {
         checkAndGenerateNextWeek(savedSession.uid, patchedPlan, profile).catch(() => {});
         setScreen("home");
       } else {
-        localStorage.removeItem(SESSION_KEY);
-        setScreen("auth");
+        // No plan yet — stay logged in but go to onboarding. Do NOT wipe the session.
+        // This prevents OTP being required every time when plan is null.
+        setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
+        setScreen("onboarding");
       }
     }).catch(() => { localStorage.removeItem(SESSION_KEY); setScreen("auth"); });
   }, []);
@@ -587,7 +589,10 @@ function AppProvider({ children }) {
         checkAndGenerateNextWeek(uid, patchedPlan, u).catch(() => {});
         setScreen("home");
       } else {
-        setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding");
+        setUser(DEFAULT_USER); setPlan(null);
+        // Save session even with no plan — user stays logged in through onboarding
+        try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
+        setScreen("onboarding");
       }
     } catch { setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding"); }
   }
@@ -2928,6 +2933,7 @@ export default function Morphiq() {
     </>
   );
 }
+
 
 
 
