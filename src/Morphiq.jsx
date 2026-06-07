@@ -412,9 +412,6 @@ const theme = {
   sL: { fontSize: 11, color: "#888", letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" },
 };
 
-// Set DEV_SKIP to "member_new", "member_new", "owner", or null for real auth.
-const DEV_SKIP = null; // null = shows real auth screen
-
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 
@@ -504,19 +501,10 @@ function AppProvider({ children }) {
     try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
   })();
 
-  const [screen, setScreen] = useState(
-    DEV_SKIP === "owner" ? "owner" :
-    DEV_SKIP === "member_returning" ? "home" :
-    DEV_SKIP === "member_new" ? "onboarding" :
-    savedSession ? "loading" : "auth"   // if saved session exists, start at loading while we verify
-  );
-  const [user, setUser] = useState(
-    DEV_SKIP === "member_returning"
-      ? { name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" }
-      : DEFAULT_USER
-  );
-  const [plan, setPlan] = useState(DEV_SKIP === "member_returning" ? MOCK_RETURNING_PLAN : null);
-  const [supabaseUser, setSupabaseUser] = useState(DEV_SKIP ? { email: "dev@morphiq.app", id: "dev-001" } : null);
+  const [screen, setScreen] = useState(savedSession ? "loading" : "auth");
+  const [user, setUser] = useState(DEFAULT_USER);
+  const [plan, setPlan] = useState(null);
+  const [supabaseUser, setSupabaseUser] = useState(null);
   const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
   const [historicalData, setHistoricalData] = useState(null);
   // Tracks the current exercise + set while WorkoutScreen is active
@@ -542,7 +530,7 @@ function AppProvider({ children }) {
 
   // ── On mount: if we have a saved session, restore it from Supabase ────────
   useEffect(() => {
-    if (DEV_SKIP || !savedSession?.uid) return;
+    if (!savedSession?.uid) return;
     sb.getProfile(savedSession.uid).then(profile => {
       if (profile?.plan) {
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
@@ -565,10 +553,8 @@ function AppProvider({ children }) {
   }, []);
 
   // Called after successful auth. role = "member" | "owner".
-  // hasPlan=true|false = dev shortcut (bypasses DB). hasPlan=null = production path (reads DB).
-  async function signIn(email, role, hasPlan = null, realAuthUserId = null) {
-    // Dev bypass always uses a fixed ID so getProfileId finds a real Supabase row
-    const uid = realAuthUserId || (hasPlan !== null ? "dev-bypass-001" : ("sim-" + Date.now()));
+  async function signIn(email, role, realAuthUserId = null) {
+    const uid = realAuthUserId || ("sim-" + Date.now());
     setSupabaseUser({ email, id: uid });
     if (role === "owner") {
       // Look up the owner's gym and store the real gym_id in branding context
@@ -579,20 +565,6 @@ function AppProvider({ children }) {
       }
       setScreen("owner");
       return;
-    }
-
-    if (hasPlan === true) {
-      // Ensure dev profile row exists in Supabase so cloud save works during testing
-      sb.ensureDevProfile().catch(() => {});
-      setUser({ name: "Alex", goal: "lose_fat", sex: "Male", height: "5′ 11″", weight: "183 lbs", age: "28", daysPerWeek: 3, injuries: "", unit: "imperial" });
-      setPlan(MOCK_RETURNING_PLAN);
-      setScreen("home");
-      return;
-    }
-    if (hasPlan === false) {
-      // Ensure dev profile row exists in Supabase so cloud save works during testing
-      sb.ensureDevProfile().catch(() => {});
-      setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding"); return;
     }
 
     // Production: query profile from Supabase using the real auth UID
@@ -1178,15 +1150,7 @@ function OnboardingScreen() {
       const targetFat = Math.round(parseFloat(weight) * fatPer);
       const targetCarbs = Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4);
 
-      // ─── PROGRAM STRUCTURE ──────────────────────────────────────────────────────
-      // Based on current hypertrophy research (Schoenfeld, Israetel, Helms):
-      // - 10-20 hard sets per muscle group per week drives optimal muscle growth
-      // - 6-12 rep range is hypertrophy sweet spot for compounds; 10-20 for isolations
-      // - 2x/week frequency per muscle group outperforms 1x/week at equal volume
-      // - Double progression: add reps first, then add weight when top of range is hit
-      // - Rest 2-3 min compounds (full phosphocreatine recovery), 60-90s isolations
-      // - RIR (reps in reserve): compounds 1-2 RIR, isolations 0-1 RIR (near failure)
-      // ─────────────────────────────────────────────────────────────────────────────
+      // Program structure — evidence-based splits by goal and training frequency
       const programGuide = goal === "build_muscle"
         ? (daysPerWeek <= 2
           ? "FULL BODY — 2 days/week. Both sessions identical. MANDATORY movement pattern order: (1) squat pattern, (2) hinge pattern, (3) horizontal push, (4) horizontal pull, (5) vertical push or pull. No isolation exercises — every slot is a compound. 4 sets per exercise. Rep ranges: squats and hinges 4-6 reps heavy; presses and rows 6-10 reps; vertical movements 8-12 reps. Rest 2-3 min between all sets. Each muscle hit 2x/week at full intensity. Progressive overload: add 1 rep per set each session until top of range is hit on all sets, then add the smallest weight increment available and reset to bottom of rep range."
@@ -1212,27 +1176,25 @@ function OnboardingScreen() {
           : "GENERAL FITNESS HIGH FREQUENCY — 5+ days/week. Use full body sessions but alternate A and B. SESSION A: squat, horizontal push, horizontal pull, core. SESSION B: hinge, vertical push, vertical pull, unilateral leg. 3 sets, 10-12 reps, rest 90s. Keep intensity moderate — RPE 6-7 — because frequency is high. One session per week should include a 15-20 min cardio block (rowing, cycling, or brisk walking) for cardiovascular base. Progression: add reps weekly, add weight monthly.");
 
       // Equipment constraints — IDs match onboarding: barbell | dumbbell | kettlebell | machine
-      // Each option enforces movement patterns appropriate for that equipment
       const equipGuide = equipment === "barbell"
-        ? "BARBELL GYM — full rack, barbell, plates, dumbbells, cables. RULE: all primary compounds MUST use barbell. squat=barbell back squat (not goblet, not dumbbell), hinge=barbell conventional deadlift or barbell Romanian deadlift (not dumbbell RDL), horizontal push=barbell bench press (flat or incline), horizontal pull=barbell bent over row or cable row, vertical push=barbell overhead press. Dumbbells permitted only for accessory and isolation slots (incline dumbbell press as secondary push, lateral raise, curl, etc.). BANNED: push-up variations, goblet squat, dumbbell RDL as primary hinge — these are barbell substitutes only used when no barbell is available."
+        ? "BARBELL GYM. All primary compounds must use barbell: squat=barbell back squat, hinge=barbell conventional deadlift or Romanian deadlift, horizontal push=barbell bench press, horizontal pull=barbell bent over row, vertical push=barbell overhead press. Dumbbells for accessories only. No push-up variations, no goblet squat as primary."
         : equipment === "dumbbell"
-        ? "DUMBBELLS AND CABLES — full commercial gym with dumbbells up to 100lbs+, cable stacks, and machines, but no barbell. squat=dumbbell goblet squat (light/moderate) or dumbbell Bulgarian split squat (advanced), hinge=dumbbell Romanian deadlift or single-leg RDL, horizontal push=dumbbell bench press or incline dumbbell press, horizontal pull=single-arm dumbbell row or cable row (prefer cable for heavier loads), vertical push=dumbbell shoulder press or Arnold press, vertical pull=cable lat pulldown or assisted pull-up. Cables preferred over dumbbells for all pulling movements. No barbell movements."
+        ? "DUMBBELLS AND CABLES. No barbell. squat=goblet squat or Bulgarian split squat, hinge=dumbbell Romanian deadlift or single-leg RDL, push=dumbbell bench press or incline press, pull=single-arm dumbbell row or cable row, vertical push=dumbbell shoulder press. Cables preferred for pulling. No barbell movements."
         : equipment === "kettlebell"
-        ? "KETTLEBELLS AND BODYWEIGHT ONLY — no barbell, no cable machines, no dumbbells over 50lbs. squat=kettlebell goblet squat or double kettlebell front squat, hinge=kettlebell deadlift or single-leg Romanian deadlift, push=push-up (standard, elevated, archer for advanced) or kettlebell floor press, pull=table inverted row, TRX row, or ring row, vertical pull=pull-up or jumping pull-up, carry=farmer carry or suitcase carry for core. Swing, Turkish get-up, and clean and press are excellent for conditioning. Core: plank, dead bug, hollow hold, ab wheel."
+        ? "KETTLEBELLS AND BODYWEIGHT ONLY. squat=kettlebell goblet squat or double KB front squat, hinge=kettlebell deadlift or single-leg RDL, push=push-up variations or kettlebell floor press, pull=inverted row or TRX row, vertical pull=pull-up. Core: plank, dead bug, hollow hold."
         : equipment === "machine"
-        ? "MACHINES AND CABLES — guided resistance machines, cable stacks, and dumbbells. No free barbell. squat=leg press (foot position: shoulder-width, mid-platform) or hack squat machine, hinge=Romanian deadlift machine, cable pull-through, or 45-degree back extension, horizontal push=chest press machine or cable chest press, horizontal pull=seated cable row (neutral grip) or machine row, vertical push=machine shoulder press or cable lateral raise, vertical pull=lat pulldown machine (wide or neutral grip). Machines are excellent for beginners — guided range of motion reduces injury risk and teaches movement patterns."
-        : "DUMBBELLS ONLY — no barbell, no cable, no machines. squat=dumbbell goblet squat, hinge=dumbbell Romanian deadlift, horizontal push=dumbbell floor press or push-up, horizontal pull=single-arm dumbbell row (use bench or knee for support), vertical push=dumbbell shoulder press seated, vertical pull=cannot be loaded without cable — use best push/pull balance available. Keep loads challenging within available dumbbell range.";
+        ? "MACHINES AND CABLES. No free barbell. squat=leg press or hack squat machine, hinge=RDL machine or cable pull-through, push=chest press machine or cable press, pull=seated cable row or machine row, vertical pull=lat pulldown machine."
+        : "DUMBBELLS ONLY. squat=goblet squat, hinge=dumbbell Romanian deadlift, push=dumbbell floor press or push-up, pull=single-arm dumbbell row. No barbell, cable, or machines.";
 
-      // Injury modifications — conservative but not overly restrictive
+      // Injury modifications
       const injuryGuide = !injuries || injuries === "none" ? ""
-        : injuries.toLowerCase().includes("knee") ? "KNEE INJURY: remove all squat variations, lunges, and leg extensions. Replace squat slot with: leg press (limited depth), step-up onto low box, or seated leg press machine at comfortable range. Hinge movements (RDL, deadlift) are generally safe if knee stays neutral — keep them unless they cause pain."
-        : injuries.toLowerCase().includes("back") ? "LOWER BACK INJURY: remove conventional deadlift and any barbell bent over row. Replace hinge with: trap bar deadlift (more upright), cable pull-through, or 45-degree back extension with bodyweight only. Replace barbell row with: chest-supported dumbbell row, seated cable row, or machine row. Avoid any loaded spinal flexion."
-        : injuries.toLowerCase().includes("shoulder") ? "SHOULDER INJURY: remove all overhead pressing (barbell OHP, dumbbell shoulder press, Arnold press). Replace with: landmine press (shoulder-friendly arc), neutral grip dumbbell press at 30-degree incline, or cable chest fly. Remove upright row entirely — it impinges the rotator cuff. Keep horizontal pressing if pain-free."
-        : injuries.toLowerCase().includes("wrist") ? "WRIST INJURY: avoid barbell front squat and any exercise requiring wrist extension under load. Replace barbell front squat with safety bar squat or goblet squat (wrist neutral). Use straps or neutral grip handles for rowing movements. Dumbbell pressing with neutral grip (palms facing each other) is usually more comfortable than barbell."
-        : `INJURY NOTE: ${injuries} — avoid all movements that load or aggravate this area. Substitute with machine or cable alternatives that allow pain-free range of motion.`;
+        : injuries.toLowerCase().includes("knee") ? "KNEE INJURY: remove all squat variations and lunges. Replace with leg press (limited depth) or step-up. Hinge movements safe if knee stays neutral."
+        : injuries.toLowerCase().includes("back") ? "LOWER BACK INJURY: remove conventional deadlift and barbell row. Use trap bar deadlift, cable pull-through, or chest-supported row. No loaded spinal flexion."
+        : injuries.toLowerCase().includes("shoulder") ? "SHOULDER INJURY: remove all overhead pressing. Use landmine press, neutral grip incline dumbbell press, or cable fly. Remove upright row. Horizontal pressing fine if pain-free."
+        : injuries.toLowerCase().includes("wrist") ? "WRIST INJURY: neutral grip only. Replace barbell front squat with safety bar squat or goblet squat."
+        : `INJURY NOTE: ${injuries} — avoid all movements loading this area. Use machine or cable alternatives.`;
 
-      // Starting weight guidance — based on experience level AND equipment
-      // These are STARTING weights for Week 1, not maxes. Always conservative.
+      // Starting weights for Week 1 — conservative, based on experience and equipment
       const isBarbellUser = equipment === "barbell";
       const weightGuide = trainingHistory === "new"
         ? isBarbellUser
@@ -1250,12 +1212,10 @@ function OnboardingScreen() {
           ? "EXPERIENCED ACTIVE BARBELL LIFTER — currently training regularly. Use true working weights near current strength. Barbell back squat: 185-265lbs. Barbell bench press: 165-235lbs. Barbell bent over row: 145-195lbs. Barbell overhead press: 95-145lbs. Conventional deadlift: 225-315lbs. Romanian deadlift: 185-255lbs. Push to RPE 8-9 on final sets of compounds. These are not warmup weights."
           : "EXPERIENCED ACTIVE — goblet squat: 60-80lbs. Dumbbell row: 60-85lbs. Dumbbell bench: 50-75lbs each. Shoulder press: 40-60lbs each. RDL: 65-90lbs per hand. Train close to failure on working sets.";
 
-      // RPE (Rate of Perceived Exertion) targets — 1-10 scale, 10 = absolute max effort
-      // Research shows proximity to failure is the primary driver of hypertrophy
-      const rpeGuide = "RPE scale: RPE 6 = easy, 4+ reps left. RPE 7 = moderate, 3 reps left. RPE 8 = hard, 2 reps left. RPE 9 = very hard, 1 rep left. RPE 10 = max effort, no reps left. TARGETS: first set of any new exercise RPE 6 (learning the movement). Compound working sets week 1: RPE 7 (3 reps in reserve). Compound working sets week 2+: RPE 8 (2 RIR). Final set of any compound: RPE 8-9. Isolation exercises all sets: RPE 8-9 (1 RIR). Never train compound movements to absolute failure — too much CNS fatigue and injury risk.";
+      // RPE targets (1-10 scale: RPE 8 = 2 reps left in tank, RPE 9 = 1 rep left)
+      const rpeGuide = "Week 1 compounds: RPE 7 (3 RIR — learning loads). Week 2+ compounds: RPE 8 (2 RIR). Final set compounds: RPE 8-9. Isolations all sets: RPE 8-9. First set new exercise: RPE 6. Never take compounds to absolute failure.";
 
-      // Warm-up and cool-down — specific to the session type
-      // Warmup purpose: raise core temp, activate target muscles, rehearse movement patterns
+      // Warmup and cooldown
       const warmupGuide = daysPerWeek >= 4
         ? `Include warmup array with exactly these 5 exercises in order, each with a name, duration, and description field:
 1. name="Light cardio" duration="90 seconds" description="March in place, do jumping jacks, or walk briskly. Move your whole body to raise your heart rate and warm up your muscles before lifting."
@@ -1271,8 +1231,7 @@ function OnboardingScreen() {
 5. name="Hip circles" duration="30 seconds each direction" description="Stand with feet shoulder-width apart and hands on your hips. Make big slow circles with your hips, like you're using a hula hoop. Loosens up your lower back and hip joints before squatting or hinging movements."`;
       const cooldownGuide = "Include cooldown array with: 30s quad stretch each side, 30s hamstring stretch, 30s chest stretch, 30s shoulder stretch, 60s child's pose. Each item must have name, duration, and description fields with plain-language instructions.";
 
-      // Exercise count: muscle building and general fitness = 5 exercises (all compounds)
-      // Fat loss gets 6 to include the metabolic finisher as the 6th slot
+      // Fat loss = 6 exercises (5 compounds + metabolic finisher), all other goals = 5
       const exerciseCount = goal === "lose_fat" ? 6 : 5;
 
       const prompt = `Generate a week 1 fitness plan. Return ONLY valid JSON, no markdown.
