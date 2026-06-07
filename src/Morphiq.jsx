@@ -1576,7 +1576,7 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
           <div style={{ opacity: revealStep >= 2 ? 1 : 0, transform: revealStep >= 2 ? "translateY(0)" : "translateY(8px)", transition: "opacity .4s ease, transform .4s ease", marginBottom: 12 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               <div style={{ width: 28, height: 28, borderRadius: "50%", background: ob.tealDk, border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 700, flexShrink: 0 }}>AI</div>
-              <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 11, color: ob.body, lineHeight: 1.55, flex: 1 }}>
+              <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 13, color: ob.body, lineHeight: 1.55, flex: 1 }}>
                 {goal === "lose_fat"
                   ? `${name}, you're all set. ${daysPerWeek} days a week is the sweet spot for fat loss — enough to burn, enough rest to recover. Here's exactly what week one looks like.`
                   : goal === "build_muscle"
@@ -1589,10 +1589,10 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
           {/* ── Workout days card — slides in third ── */}
           <div style={{ opacity: revealStep >= 3 ? 1 : 0, transform: revealStep >= 3 ? "translateY(0)" : "translateY(8px)", transition: "opacity .4s ease, transform .4s ease", marginBottom: 8 }}>
             <div style={{ background: ob.card, borderRadius: 12, padding: "10px 12px" }}>
-              <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Workouts — {plan.workoutType}</div>
+              <div style={{ fontSize: 10, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Workouts — {plan.workoutType}</div>
               {(plan.workoutDays || []).map((day, i, arr) => (
                 <div key={day} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                  <span style={{ fontSize: 11, color: ob.white }}>{day}</span>
+                  <span style={{ fontSize: 13, color: ob.white }}>{day}</span>
                   <Pill>{plan.workoutType} · {plan.workoutDuration} min</Pill>
                 </div>
               ))}
@@ -1602,19 +1602,19 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
           {/* ── Daily targets grid — slides in fourth ── */}
           <div style={{ opacity: revealStep >= 4 ? 1 : 0, transform: revealStep >= 4 ? "translateY(0)" : "translateY(8px)", transition: "opacity .4s ease, transform .4s ease", marginBottom: 8 }}>
             <div style={{ background: ob.card, borderRadius: 12, padding: "10px 12px" }}>
-              <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Daily targets</div>
+              <div style={{ fontSize: 10, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Daily targets</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                {[["🔥 Calories", `${plan.calories?.toLocaleString()}`, "cal/day"], ["🥩 Protein", `${plan.protein}g`, "per day"], ["🌾 Carbs", `${plan.carbs}g`, "per day"], ["🫒 Fat", `${plan.fat}g`, "per day"]].map(([label, val, unit]) => (
-                  <div key={label} style={{ background: "#0A1628", borderRadius: 10, padding: "8px 10px" }}>
-                    <div style={{ fontSize: 9, color: ob.muted, marginBottom: 2 }}>{label}</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: a }}>{val}</div>
-                    <div style={{ fontSize: 9, color: ob.muted }}>{unit}</div>
+                {[["Calories", `${plan.calories?.toLocaleString()}`, "cal / day"], ["Protein", `${plan.protein}g`, "per day"], ["Carbs", `${plan.carbs}g`, "per day"], ["Fat", `${plan.fat}g`, "per day"]].map(([label, val, unit]) => (
+                  <div key={label} style={{ background: "#0A1628", borderRadius: 10, padding: "12px 10px" }}>
+                    <div style={{ fontSize: 10, color: ob.muted, marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: a, lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: 10, color: ob.muted, marginTop: 3 }}>{unit}</div>
                   </div>
                 ))}
               </div>
             </div>
             {plan.bmr && plan.tdee && (
-              <div style={{ background: "#0A1628", borderLeft: `2px solid ${a}`, borderRadius: "0 8px 8px 0", padding: "7px 10px", marginTop: 6, fontSize: 11, color: ob.body, lineHeight: 1.6 }}>
+              <div style={{ background: "#0A1628", borderLeft: `2px solid ${a}`, borderRadius: "0 8px 8px 0", padding: "10px 12px", marginTop: 8, fontSize: 13, color: ob.body, lineHeight: 1.6 }}>
                 {plan.goalAdjustment < 0
                   ? `Your body burns ~${plan.tdee?.toLocaleString()} cal/day. We've reduced that by ${Math.abs(plan.goalAdjustment)} for steady fat loss.`
                   : plan.goalAdjustment > 0
