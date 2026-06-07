@@ -1121,14 +1121,16 @@ function OnboardingScreen() {
           : "Upper/Lower split same structure but shorter rest and higher reps. 3 sets 10-15 reps. Rest 60-90s max.")
         : "Full Body 5-6 exercises. Mix strength and conditioning. 3 sets 10-12 reps. Rest 90s. Finish each session with 5 min conditioning finisher.";
 
-      // Equipment constraints
-      const equipGuide = equipment === "dumbbells"
-        ? "DUMBBELLS ONLY. No barbell, no cable, no machine movements. Squat=goblet squat. Hinge=dumbbell Romanian deadlift. Row=single arm dumbbell row. Press=dumbbell floor press or dumbbell bench press."
-        : equipment === "dumbbells_barbell"
-        ? "Dumbbells and barbell available. Prefer barbell for primary compounds. Dumbbell for accessories and isolation."
-        : equipment === "full_gym"
-        ? "Full gym available (cables, machines, barbell, dumbbells). Prefer barbell for primary compounds. Cables preferred over dumbbells for isolation."
-        : "BODYWEIGHT ONLY. No equipment. Squat=bodyweight squat or split squat. Hinge=glute bridge or single leg RDL. Push=push-up variations. Pull=table row or door frame row.";
+      // Equipment constraints — IDs match onboarding: barbell | dumbbell | kettlebell | machine
+      const equipGuide = equipment === "barbell"
+        ? "BARBELL GYM. Full rack, barbell, plates, and dumbbells available. PRIMARY compounds must use barbell: squat=barbell back squat, hinge=barbell Romanian deadlift or conventional deadlift, horizontal push=barbell bench press, horizontal pull=barbell bent over row or cable row, vertical push=barbell overhead press. Dumbbells only for accessories and isolation. No push-up variations — use pressing movements with a barbell or dumbbell instead."
+        : equipment === "dumbbell"
+        ? "DUMBBELLS AND CABLES. Full commercial gym with dumbbells, cables, and machines but no barbell. Squat=goblet squat or dumbbell Bulgarian split squat. Hinge=dumbbell Romanian deadlift. Row=single arm dumbbell row or cable row. Press=dumbbell bench press or incline dumbbell press. Cables preferred for isolation. No barbell movements."
+        : equipment === "kettlebell"
+        ? "KETTLEBELLS AND BODYWEIGHT. Kettlebells and bodyweight only — no barbell or cable machines. Squat=kettlebell goblet squat or bodyweight squat. Hinge=kettlebell deadlift or single leg RDL. Push=push-up variations or kettlebell press. Pull=table row or TRX row. Core=plank, dead bug, hollow hold."
+        : equipment === "machine"
+        ? "MACHINES PRIMARILY. Guided machines, cable stacks, and dumbbells. No free barbell. Squat=leg press or hack squat machine. Hinge=Romanian deadlift machine or cable pull-through. Row=seated cable row or machine row. Press=chest press machine or incline dumbbell press. Good for beginners — guided range of motion reduces injury risk."
+        : "DUMBBELLS ONLY. No barbell, no cable, no machines. Squat=goblet squat. Hinge=dumbbell Romanian deadlift. Row=single arm dumbbell row. Press=dumbbell floor press.";
 
       // Injury modifications
       const injuryGuide = !injuries || injuries === "none" ? "" 
@@ -1138,14 +1140,23 @@ function OnboardingScreen() {
         : injuries.toLowerCase().includes("wrist") ? "WRIST INJURY: remove barbell front squat. Replace with safety bar squat or goblet squat."
         : `INJURY NOTE: ${injuries} — avoid movements that aggravate this area.`;
 
-      // Weight guidance by experience
+      // Weight guidance by experience AND equipment
+      const isBarbellUser = equipment === "barbell";
       const weightGuide = trainingHistory === "new"
-        ? "Beginner weights: goblet squat 15-25lbs, dumbbell row 15-25lbs, dumbbell press 10-20lbs, RDL 20-30lbs. Start conservative."
+        ? isBarbellUser
+          ? "Beginner with barbell access: barbell squat 45-95lbs (start with bar only if needed), barbell bench 45-95lbs, barbell row 45-75lbs, RDL 45-95lbs. Prioritize form over load."
+          : "Beginner weights: goblet squat 15-25lbs, dumbbell row 15-25lbs, dumbbell press 10-20lbs, RDL 20-30lbs. Start conservative."
         : trainingHistory === "some"
-        ? "Intermediate weights: goblet squat 35-55lbs, dumbbell row 35-50lbs, dumbbell press 25-40lbs, RDL 50-70lbs, barbell bench 95-155lbs."
+        ? isBarbellUser
+          ? "Intermediate with barbell: barbell squat 95-155lbs, barbell bench 95-155lbs, barbell row 75-115lbs, barbell overhead press 55-95lbs, RDL 115-155lbs."
+          : "Intermediate weights: goblet squat 35-55lbs, dumbbell row 35-50lbs, dumbbell press 25-40lbs, RDL 50-70lbs, barbell bench 95-155lbs."
         : recentActivity === "returning"
-        ? "Returning lifter — rebuild carefully: goblet squat 35-55lbs, dumbbell row 35-50lbs, barbell bench 115-155lbs, barbell squat 135-175lbs."
-        : "Experienced active: goblet squat 55-75lbs, dumbbell row 55-75lbs, barbell squat 155-205lbs, bench press 155-205lbs, RDL 135-185lbs.";
+        ? isBarbellUser
+          ? "Returning experienced lifter with barbell — rebuild carefully at 70-80% of previous maxes: barbell squat 135-185lbs, barbell bench 115-165lbs, barbell row 95-135lbs, RDL 135-175lbs."
+          : "Returning lifter — rebuild carefully: goblet squat 35-55lbs, dumbbell row 35-50lbs, barbell bench 115-155lbs, barbell squat 135-175lbs."
+        : isBarbellUser
+          ? "Experienced active barbell lifter: barbell squat 185-255lbs, barbell bench 165-225lbs, barbell row 135-185lbs, barbell overhead press 95-135lbs, deadlift 205-295lbs. Push compound sets to RPE 8-9."
+          : "Experienced active: goblet squat 55-75lbs, dumbbell row 55-75lbs, barbell squat 155-205lbs, bench press 155-205lbs, RDL 135-185lbs.";
 
       // RPE targets
       const rpeGuide = "First set any new exercise: RPE 6. Compound working sets: RPE 7-8. Final set compounds: RPE 8-9. Isolation working sets: RPE 8-9.";
