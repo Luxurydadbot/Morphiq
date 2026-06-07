@@ -9,7 +9,7 @@ export default async function handler(req, res) {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: process.env.AI_MODEL || "claude-sonnet-4-6",
         max_tokens: 6000,
         system: `You are an elite certified strength and conditioning coach with expertise in evidence-based hypertrophy training, fat loss programming, and movement science. Your programming is based on current peer-reviewed research (Schoenfeld, Israetel, Helms, Krieger).
 
