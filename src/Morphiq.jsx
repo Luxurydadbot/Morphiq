@@ -1703,23 +1703,6 @@ function PlanOverviewScreen() {
   );
 }
 
-const WEEK = [
-  {name:"Mon",type:"Full body",isWorkout:true},
-  {name:"Tue",type:"Rest",isWorkout:false},
-  {name:"Wed",type:"Full body",isWorkout:true},
-  {name:"Thu",type:"Rest",isWorkout:false},
-  {name:"Fri",type:"Full body",isWorkout:true},
-  {name:"Sat",type:"Rest",isWorkout:false},
-  {name:"Sun",type:"Rest",isWorkout:false},
-];
-
-const EXERCISES_DISPLAY = [
-  {name:"Goblet squat",weight:"35 lbs",reps:"10 reps",sets:"3 sets"},
-  {name:"Dumbbell row",weight:"30 lbs",reps:"10 reps",sets:"3 sets"},
-  {name:"Incline press",weight:"25 lbs",reps:"10 reps",sets:"3 sets"},
-  {name:"Romanian deadlift",weight:"60 lbs",reps:"10 reps",sets:"3 sets"},
-];
-
 const FALLBACK_REPLIES = {
   "how many calories should i eat": "Based on your goal and weight, your target is already set in your plan. Check the Meals tab for your daily targets.",
   "what should i eat today": "Check your Meals tab — your full day is planned out with breakfast, lunch, and dinner suggestions.",
@@ -1739,7 +1722,7 @@ function HomeDashboardScreen() {
   const a = gymBranding.accent;
   // Read today's logged calories from MealScreen's localStorage (same key, same format)
   const calGoal = plan?.calories || 1800;
-  const todayNutritionKey = `morphiq_meals_${user?.id || "anon"}_${new Date().toISOString().slice(0,10)}`;
+  const todayNutritionKey = `morphiq_meals_${supabaseUser?.id || user?.id || "anon"}_${new Date().toISOString().slice(0,10)}`;
   const todayNutritionCals = (() => {
     try {
       const saved = JSON.parse(localStorage.getItem(todayNutritionKey) || "[]");
@@ -1756,6 +1739,33 @@ function HomeDashboardScreen() {
   const h = new Date().getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   const sL = theme.sL;
+
+  // Find the next upcoming meal — reads localStorage (same source as MealScreen)
+  // so we show the real meal name and real macros, not hardcoded text
+  const nextMeal = (() => {
+    // Default meals built from the plan's macros (same split as MealScreen)
+    const cal = plan?.calories || 1800;
+    const pro = plan?.protein  || 140;
+    const r = (n) => Math.round(n);
+    const defaultMeals = [
+      { id: "breakfast", label: "Breakfast", name: "Greek yogurt, berries & granola", cal: r(cal*0.22), protein: r(pro*0.22) },
+      { id: "lunch",     label: "Lunch",     name: "Grilled chicken wrap with salad", cal: r(cal*0.30), protein: r(pro*0.30) },
+      { id: "snack",     label: "Snack",     name: "Protein shake + banana",          cal: r(cal*0.14), protein: r(pro*0.14) },
+      { id: "dinner",    label: "Dinner",    name: "Salmon fillet with roasted veg",  cal: r(cal*0.34), protein: r(pro*0.34) },
+    ];
+    try {
+      const saved = JSON.parse(localStorage.getItem(todayNutritionKey) || "[]");
+      // Merge saved status onto defaults
+      const merged = defaultMeals.map(m => {
+        const s = saved.find(sm => sm.id === m.id);
+        return s ? { ...m, status: s.status } : { ...m, status: "upcoming" };
+      });
+      // Return the first meal that hasn't been logged, swapped, or skipped
+      return merged.find(m => m.status === "upcoming") || null;
+    } catch {
+      return defaultMeals.find(m => h < 10) || defaultMeals[1]; // fallback by time of day
+    }
+  })();
 
   // Weekly workout queue — resets every Monday, stored in localStorage
   const getWeekKey = () => {
@@ -1928,26 +1938,28 @@ function HomeDashboardScreen() {
               <div style={{ height: 6, borderRadius: 3, background: a, width: `${Math.round((cals / calGoal) * 100)}%`, transition: "width .5s" }} />
             </div>
           </div>
-          <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 2 }}>Next suggested meal</div>
-              <div style={{ fontSize: 14, color: "#D0D0D0", fontWeight: 500 }}>Grilled chicken + rice</div>
-              <div style={{ fontSize: 12, color: theme.textDim }}>~480 cal · 42g protein</div>
+          {nextMeal ? (
+            <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 2 }}>Next suggested meal</div>
+                <div style={{ fontSize: 14, color: "#D0D0D0", fontWeight: 500 }}>{nextMeal.name}</div>
+                <div style={{ fontSize: 12, color: theme.textDim }}>{nextMeal.cal} cal · {nextMeal.protein}g protein</div>
+              </div>
+              <button onClick={() => navigate("meals")} style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+                Log meal →
+              </button>
             </div>
-            <button onClick={() => navigate("meals")} style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-              Log meal →
-            </button>
-          </div>
+          ) : (
+            <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, textAlign: "center" }}>
+              <div style={{ fontSize: 13, color: a, fontWeight: 500 }}>All meals logged today 🎉</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 3 }}>Great job hitting your nutrition targets.</div>
+            </div>
+          )}
         </div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <button onClick={() => navigate("meals")} style={{ width: "100%", background: "transparent", border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
           View full meal plan →
-        </button>
-      </div>
-      <div style={{ padding: ".75rem 1.25rem 0" }}>
-        <button onClick={() => navigate("owner")} style={{ width: "100%", background: "transparent", border: `0.5px solid rgba(167,139,250,0.3)`, borderRadius: 12, padding: ".75rem", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit" }}>
-          ⚙️ Gym owner dashboard →
         </button>
       </div>
     </Layout>
@@ -2864,6 +2876,7 @@ export default function Morphiq() {
     </>
   );
 }
+
 
 
 
