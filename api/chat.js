@@ -19,9 +19,6 @@ export default async function handler(req, res) {
   const { messages = [], user = {}, context = "home", workoutContext = null } = body;
 
   // ── OFF-TOPIC GUARDRAIL ────────────────────────────────────────────────────
-  // Check the latest user message before hitting Claude at all.
-  // If it's clearly off-topic, return a canned response immediately.
-  // This costs zero tokens and does NOT count against the usage limit.
   const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
   const msgText = (lastUserMsg?.text || "").toLowerCase().trim();
 
@@ -32,7 +29,7 @@ export default async function handler(req, res) {
     "pain","sore","hurt","injury","shoulder","knee","back","hip","wrist","elbow","ankle",
     "goal","progress","plan","program","routine","schedule","streak","session","gym","lift",
     "motivation","tired","energy","supplement","creatine","whey","cut","bulk","maintain",
-    "bmi","body","fat","lean","strong","fit","health","lose","gain","tone","build"
+    "bmi","body","fat","lean","strong","fit","health","lose","gain","tone","build","swap","replace","alternative"
   ];
 
   const OFFTOPIC_PATTERNS = [
@@ -42,7 +39,7 @@ export default async function handler(req, res) {
     /who (is|was|are|were) (the )?(president|prime minister|ceo|founder|inventor|author|actor|singer|artist)/i,
     /how (do|does|did) .*(work|make|build|create|cook|bake|drive|play|install|download|hack)/i,
     /math|equation|calculate \d|solve for/i,
-    /(weather|stock|crypto|bitcoin|news|sports score|movie|tv show|recipe for|book recommend)/i,
+    /\b(weather|stock|crypto|bitcoin|news|sports score|movie|tv show|recipe for|book recommend)\b/i,
     /tell me (a |an )?(joke|fact|story|fun fact)/i,
     /what (time|day|date|year) is it/i,
   ];
@@ -64,7 +61,7 @@ export default async function handler(req, res) {
 
   // ── USAGE LIMIT CHECK ──────────────────────────────────────────────────────
   const MONTHLY_LIMIT = 50;
-  const month = new Date().toISOString().slice(0, 7); // "2026-05"
+  const month = new Date().toISOString().slice(0, 7);
   let usageCount = 0;
 
   if (user.profileId) {
@@ -87,17 +84,57 @@ export default async function handler(req, res) {
     }
   }
 
-  // Build message array for Claude — must start with user, alternate user/assistant
+  // ── BUILD MEMBER CONTEXT ───────────────────────────────────────────────────
+  // Full context passed to Claude so swap recommendations match the original plan rules.
+  // Equipment, injuries, and experience must be respected — same logic as plan generator.
+  const equipment = user.equipment || "dumbbell";
+  const injuries = user.injuries || "none";
+  const trainingHistory = user.trainingHistory || "some";
+  const recentActivity = user.recentActivity || "consistent";
+  const goal = user.goal || "general_fitness";
+
+  // Equipment swap rules — mirrors the constraints in the plan generator exactly.
+  // When recommending a swap, Claude must respect these or the member can't do the exercise.
+  const equipmentSwapRules = equipment === "barbell"
+    ? "EQUIPMENT: Member has a full barbell gym — rack, barbell, plates, dumbbells, cables. For any swap: use barbell movements as the primary replacement for compound slots. A squat must be replaced with another barbell squat variation (front squat, pause squat, box squat) or leg press only if barbell is unavailable. A hinge must be replaced with another barbell hinge (conventional deadlift, sumo deadlift, RDL). A press must be replaced with another barbell or dumbbell press. NEVER suggest goblet squat, bodyweight squat, or push-ups as a replacement for a barbell compound — these are not appropriate alternatives for a barbell gym member."
+    : equipment === "dumbbell"
+    ? "EQUIPMENT: Member has dumbbells, cables, and machines but NO barbell. For any swap: use dumbbell or cable alternatives. Squat replacements: goblet squat, dumbbell Bulgarian split squat, leg press. Hinge replacements: dumbbell Romanian deadlift, single-leg RDL, cable pull-through. Press replacements: dumbbell bench press, incline dumbbell press, cable chest press. Row replacements: single-arm dumbbell row, cable row, chest-supported row. NEVER suggest barbell movements."
+    : equipment === "kettlebell"
+    ? "EQUIPMENT: Member has kettlebells and bodyweight only — no barbell, no cables, no machines. For any swap: use kettlebell or bodyweight alternatives only. Squat replacements: kettlebell goblet squat, single-leg squat to box, step-up. Hinge replacements: kettlebell deadlift, single-leg RDL, good morning. Push replacements: push-up variations (standard, archer, elevated feet), kettlebell floor press. Pull replacements: inverted row, table row, ring row. NEVER suggest barbell or cable movements."
+    : equipment === "machine"
+    ? "EQUIPMENT: Member uses machines, cables, and dumbbells — no free barbell. For any swap: use machine or cable alternatives. Squat replacements: leg press, hack squat machine, Smith machine squat. Hinge replacements: Romanian deadlift machine, cable pull-through, 45-degree back extension. Press replacements: chest press machine, cable chest press, incline dumbbell press. Row replacements: seated cable row, machine row, chest-supported dumbbell row. NEVER suggest free barbell movements."
+    : "EQUIPMENT: Member has dumbbells only — no barbell, no cables, no machines. Squat replacements: goblet squat, dumbbell split squat, step-up. Hinge replacements: dumbbell Romanian deadlift, single-leg RDL. Press replacements: dumbbell floor press, push-up. Row replacements: single-arm dumbbell row. Keep all suggestions to dumbbell or bodyweight only.";
+
+  // Injury swap rules — never suggest movements that load the injured area
+  const injurySwapRules = !injuries || injuries === "none" ? ""
+    : injuries.toLowerCase().includes("knee")
+    ? "INJURY — KNEE: Never suggest any squat variation, lunge, leg extension, or step-up. Safe replacements for lower body: leg press (limited depth), seated leg curl, hip thrust, or glute bridge. Upper body swaps are unrestricted."
+    : injuries.toLowerCase().includes("back")
+    ? "INJURY — LOWER BACK: Never suggest conventional deadlift, barbell bent over row, good morning, or any loaded spinal flexion. Safe hinge replacements: trap bar deadlift, cable pull-through, 45-degree back extension with bodyweight. Safe row replacements: chest-supported row, seated cable row, single-arm dumbbell row with bench support."
+    : injuries.toLowerCase().includes("shoulder")
+    ? "INJURY — SHOULDER: Never suggest overhead pressing of any kind (barbell OHP, dumbbell shoulder press, Arnold press, push press). Never suggest upright row. Safe press replacements: landmine press, neutral grip incline dumbbell press at 30 degrees, cable chest fly. Horizontal pressing is usually safe — keep it if pain-free."
+    : injuries.toLowerCase().includes("wrist")
+    ? "INJURY — WRIST: Avoid any exercise requiring wrist extension under load. Use neutral grip (palms facing each other) for all pressing. Dumbbell pressing neutral grip is preferred over barbell. Avoid barbell front squat."
+    : `INJURY — ${injuries.toUpperCase()}: Avoid all movements that load or aggravate this area. Suggest machine or cable alternatives with pain-free range of motion.`;
+
+  // Experience context — swap should match member's ability level
+  const experienceContext = trainingHistory === "new"
+    ? "EXPERIENCE: Beginner. Suggest simple, easy-to-learn alternatives. Prioritize movement safety and clear form cues over advanced variations."
+    : trainingHistory === "some"
+    ? "EXPERIENCE: Intermediate (6 months to 2 years). Can handle moderately technical movements. Standard alternatives are appropriate."
+    : recentActivity === "returning"
+    ? "EXPERIENCE: Returning experienced lifter, rebuilding after a break. Technically capable but conservative with load. Use slightly easier variations of advanced movements."
+    : "EXPERIENCE: Advanced active lifter. Can handle technically demanding movements. Suggest true like-for-like compound replacements, not beginner regressions.";
+
+  // Build message array for Claude
   const anthropicMessages = messages
     .filter(m => m.role === "ai" || m.role === "user")
     .map(m => ({ role: m.role === "ai" ? "assistant" : "user", content: m.text || "" }));
 
-  // Drop leading assistant messages (the opening AI greeting) — Claude requires user first
   while (anthropicMessages.length && anthropicMessages[0].role === "assistant") {
     anthropicMessages.shift();
   }
 
-  // Also ensure no two consecutive same-role messages (merge or drop duplicates)
   const dedupedMessages = [];
   for (const msg of anthropicMessages) {
     const last = dedupedMessages[dedupedMessages.length - 1];
@@ -114,7 +151,7 @@ export default async function handler(req, res) {
 
   const ctxLabel = { home: "the home dashboard", workout: "mid-workout", meals: "the meal plan screen" }[context] || "the app";
   const planSummary = user.plan
-    ? `Workout days: ${(user.plan.workoutDays||[]).join(", ")}, Calories: ${user.plan.calories}, Protein: ${user.plan.protein}g, Exercises: ${(user.plan.exercises||[]).map(e=>e.name).join(", ")}`
+    ? `Workout type: ${user.plan.workoutType||"Full Body"}, Calories: ${user.plan.calories}, Protein: ${user.plan.protein}g, Exercises: ${(user.plan.exercises||[]).map(e=>e.name).join(", ")}`
     : "No plan yet";
 
   let workoutDetail = "";
@@ -123,20 +160,27 @@ export default async function handler(req, res) {
     workoutDetail = `\nLIVE WORKOUT: Member is on Set ${setNumber||"??"} of ${setsTotal||"??"} — ${exercise}, targeting ${targetReps||"??"} reps at ${weight ? weight + " lbs" : "bodyweight"}. Reference this specifically in your reply.`;
   }
 
+  // ── SYSTEM PROMPT ──────────────────────────────────────────────────────────
+  // The swap rules below match exactly what the plan generator used when building
+  // this member's plan. This ensures chat swaps are consistent with the original program.
   const system = `You are the Morphiq AI personal trainer inside ${user.gymName||"the gym"} app.
-Member: ${user.name||"Member"}, Goal: ${user.goal||"get fit"}, Weight: ${user.weight||"—"}, Age: ${user.age||"—"}.
+Member: ${user.name||"Member"}, Goal: ${goal}, Weight: ${user.weight||"—"}, Age: ${user.age||"—"}.
 Plan: ${planSummary}.
 Context: Member is viewing ${ctxLabel}.${workoutDetail}
 
+${equipmentSwapRules}
+${injurySwapRules ? injurySwapRules : "INJURIES: None reported."}
+${experienceContext}
+
 STRICT RULES:
-1. You ONLY discuss fitness, workouts, nutrition, recovery, and sleep as it relates to training. Nothing else. For off-topic questions respond ONLY with: "I am your fitness coach — I can only help with your training and nutrition. What can I help you with today?"
-2. ALWAYS lead with a direct, practical answer or recommendation first. Never open with a question. The member has a limited number of messages — do not waste them asking for clarification you do not strictly need.
-3. For pain or soreness: immediately suggest whether to skip, modify, or substitute the affected exercise, and give one recovery tip. Do not ask when it started.
-4. For nutrition questions: give a specific answer based on their goal and plan. Do not ask what they already ate unless the conversation history shows you genuinely cannot answer without it.
-5. Only ask a follow-up question if you truly cannot give useful advice without more information — and only ONE question at the very end of your reply.
+1. You ONLY discuss fitness, workouts, nutrition, recovery, and sleep as it relates to training. Nothing else.
+2. ALWAYS lead with a direct, practical answer first. Never open with a question.
+3. For pain or soreness: immediately suggest whether to skip, modify, or substitute. Give one specific alternative by name that respects the equipment and injury rules above.
+4. For nutrition questions: give a specific answer based on their goal and plan.
+5. Only ask a follow-up question if you truly cannot answer without it — one question max, at the end.
 6. Keep replies to 2-3 sentences max. Use their first name. No guilt language. Be warm and direct.
 7. If live workout context is present, reference the specific exercise and set number.
-8. EXERCISE SWAP RULE: If the member reports pain, injury, or asks to swap their current exercise, recommend a specific alternative by name. At the END of your reply (after the text, before CHIPS) include exactly this tag: <!--ACTION:swap_exercise:REPLACEMENT_EXERCISE_NAME--> — replacing REPLACEMENT_EXERCISE_NAME with the actual exercise (e.g. "Leg Press", "Seated Row", "Dumbbell Curl"). Only add this tag when recommending a swap.
+8. EXERCISE SWAP RULE: When recommending a swap, the replacement MUST follow the equipment rules above — if the member has a barbell gym, give a barbell alternative. If they have dumbbells only, give a dumbbell alternative. NEVER suggest an exercise the member cannot perform with their available equipment. At the END of your reply include exactly this tag: <!--ACTION:swap_exercise:REPLACEMENT_EXERCISE_NAME--> replacing REPLACEMENT_EXERCISE_NAME with the actual exercise name (e.g. "Barbell Front Squat", "Leg Press", "Dumbbell Romanian Deadlift"). Only add this tag when recommending a swap.
 
 After every reply add: <!--CHIPS:["short followup 1","short followup 2","short followup 3"]-->`;
 
@@ -144,13 +188,12 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 400, system, messages: dedupedMessages }),
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, system, messages: dedupedMessages }),
     });
 
     if (!claudeRes.ok) {
       const errData = await claudeRes.json().catch(() => ({}));
       const errMsg = errData?.error?.message || "API error";
-      // Expose real error for diagnostics
       res.status(200).json({ text: "Sorry, I hit a snag — try again in a moment.", chips: [], error: errMsg });
       return;
     }
@@ -160,9 +203,7 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
     let chips = [];
     let action = null;
 
-    // ── PARSE SWAP ACTION ────────────────────────────────────────────────────
-    // Claude embeds <!--ACTION:swap_exercise:Exercise Name--> when recommending a swap.
-    // Extract it, build the action object, then strip the tag from the displayed text.
+    // Parse swap action tag from Claude's response
     const actionMatch = text.match(/<!--ACTION:swap_exercise:([^-]+?)-->/);
     if (actionMatch) {
       const exerciseName = actionMatch[1].trim();
@@ -176,7 +217,7 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
       text = text.replace(/<!--CHIPS:.*?-->/s, "").trim();
     }
 
-    // ── LOG USAGE ────────────────────────────────────────────────────────────
+    // Log usage to Supabase — fire and forget, never blocks the response
     if (user.profileId) {
       const inputTokens = data.usage?.input_tokens || 0;
       const outputTokens = data.usage?.output_tokens || 0;
@@ -198,4 +239,3 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
     res.status(200).json({ text: "Sorry, I hit a snag — try again in a moment.", chips: [], error: e.message });
   }
 }
-
