@@ -37,20 +37,29 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
         {{ done: <Pill variant="teal">✓ Logged</Pill>, swapped: <Pill variant="amber">⚡ Swapped</Pill>, upcoming: <Pill variant="gray">Up next</Pill>, skipped: <Pill variant="red">Skipped</Pill> }[meal.status]}
       </div>
 
-      {/* Suggested */}
-      <div style={{ padding: "0 12px 6px" }}>
-        <div style={{ fontSize: 9, color: theme.textDim, marginBottom: 2 }}>
-          {meal.status === "swapped" ? "Suggested" : meal.status === "done" ? "Eaten" : "Suggested"}
-          {meal.originalSuggested && meal.status === "upcoming" ? " · adjusted for today" : ""}
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: meal.status === "swapped" ? theme.textFaint : "#D8E4E0", textDecoration: meal.status === "swapped" ? "line-through" : "none" }}>
-          {meal.suggested.name}
-        </div>
-        {meal.status !== "swapped" && (
-          <div style={{ display: "flex", gap: 8, marginTop: 3 }}>
-            <span style={{ fontSize: 10, color: theme.textDim }}>{meal.suggested.cal} cal</span>
-            <span style={{ fontSize: 10, color: theme.textDim }}>·</span>
-            <span style={{ fontSize: 10, color: theme.textDim }}>{meal.suggested.protein}g protein</span>
+      {/* Suggestion — soft, small, not a rule */}
+      <div style={{ padding: "0 12px 8px" }}>
+        {meal.status === "upcoming" && (
+          <div style={{ fontSize: 10, color: theme.textDim, fontStyle: "italic" }}>
+            maybe try: <span style={{ color: "#6B8A7A" }}>{meal.suggested.name}</span>
+            {meal.originalSuggested && " · adjusted for today"}
+          </div>
+        )}
+        {meal.status === "done" && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#D8E4E0" }}>{meal.suggested.name}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 3 }}>
+              <span style={{ fontSize: 10, color: theme.textDim }}>{meal.suggested.cal} cal</span>
+              <span style={{ fontSize: 10, color: theme.textDim }}>·</span>
+              <span style={{ fontSize: 10, color: theme.textDim }}>{meal.suggested.protein}g protein</span>
+            </div>
+          </div>
+        )}
+        {meal.status === "swapped" && meal.logged && (
+          <div>
+            <div style={{ fontSize: 10, color: theme.textDim, fontStyle: "italic", textDecoration: "line-through", marginBottom: 4 }}>
+              suggested: {meal.suggested.name}
+            </div>
           </div>
         )}
       </div>
@@ -76,21 +85,23 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
         </div>
       )}
 
-      {/* Action buttons */}
+      {/* Action buttons — these are the focal point */}
       {meal.status === "upcoming" && (
-        <div style={{ padding: "4px 12px 10px", display: "flex", gap: 6 }}>
-          <button onClick={onOpenDetail} className="mq-meal-tap"
-            style={{ flex: 2, background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 9, padding: "7px 6px", fontSize: 10, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-            🎤 I ate something else
-          </button>
+        <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
           <button onClick={onDone} className="mq-meal-tap"
-            style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px 6px", fontSize: 10, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            ✓ Mark done
+            style={{ width: "100%", background: a, border: "none", borderRadius: 10, padding: "11px 10px", fontSize: 13, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            ✓ Log what I ate
           </button>
-          <button onClick={onSkip} className="mq-meal-tap"
-            style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "7px 4px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
-            Skip
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={onOpenDetail} className="mq-meal-tap"
+              style={{ flex: 1, background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 9, padding: "8px 6px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+              🎤 I had something else
+            </button>
+            <button onClick={onSkip} className="mq-meal-tap"
+              style={{ flex: 0, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "8px 12px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+              Skip
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -322,9 +333,12 @@ function GroceryList({ groceries, onToggle }) {
   const done = groceries.flatMap(c => c.items).filter(i => i.done).length;
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: theme.text }}>Grocery List</div>
         <Pill variant="teal">{done} of {total} ✓</Pill>
+      </div>
+      <div style={{ fontSize: 11, color: theme.textDim, fontStyle: "italic", marginBottom: 14, lineHeight: 1.5, background: "#0D1623", borderRadius: 8, padding: "8px 10px", borderLeft: "2px solid rgba(0,212,177,0.3)" }}>
+        These are smart choices based on your goal — not a strict meal plan. Buy what works for you and your family.
       </div>
       {groceries.map(cat => (
         <div key={cat.category} style={{ marginBottom: 14 }}>
@@ -696,19 +710,23 @@ function MealPlanScreen() {
   return (
     <Layout activeNav="meals" chatTarget="chat_meals">
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 600, color: theme.text }}>Today's Meals</div>
-            <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{dayName} · {goalLabel}</div>
+        {/* ── Big calorie display ── */}
+        <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 3 }}>Today's Meals</div>
+              <div style={{ fontSize: 12, color: theme.textDim }}>{dayName} · {goalLabel}</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: macros.cal > CAL_GOAL * 1.05 ? "#F59E0B" : a, lineHeight: 1 }}>{macros.cal}</div>
+              <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>of {CAL_GOAL} cal</div>
+            </div>
           </div>
-          <Pill variant={macros.cal > CAL_GOAL * 1.05 ? "amber" : "teal"}>{macros.cal} / {CAL_GOAL} cal</Pill>
-        </div>
-
-        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-          <MacroBar label="Calories" current={macros.cal} goal={CAL_GOAL} color={a} />
-          <MacroBar label="Protein" current={macros.protein} goal={PROTEIN_GOAL} color="#F59E0B" />
-          <MacroBar label="Carbs" current={macros.carbs} goal={CARBS_GOAL} color="#818cf8" />
-          <MacroBar label="Fat" current={macros.fat} goal={FAT_GOAL} color="#f472b6" />
+          <div style={{ display: "flex", gap: 6 }}>
+            <MacroBar label="Protein" current={macros.protein} goal={PROTEIN_GOAL} color="#F59E0B" />
+            <MacroBar label="Carbs" current={macros.carbs} goal={CARBS_GOAL} color="#818cf8" />
+            <MacroBar label="Fat" current={macros.fat} goal={FAT_GOAL} color="#f472b6" />
+          </div>
         </div>
 
         <div style={{ display: "flex", background: "#1A2332", borderRadius: 10, padding: 3, marginBottom: 16 }}>
