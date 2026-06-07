@@ -357,32 +357,59 @@ function buildGroceryFromPlan(plan) {
 
   const goal = plan.goal || "lose_fat";
   const highProtein = (plan.protein || 140) >= 130;
+  const isMuscleBuild = goal === "build_muscle";
+  const isLoseFat = goal === "lose_fat";
 
   const protein = { category: "Protein", emoji: "🥩", items: [
-    { name: "Chicken breast",  qty: "2 lbs",    done: false },
-    { name: "Greek yogurt",    qty: "32 oz",    done: false },
-    { name: "Eggs",            qty: "1 dozen",  done: false },
-    { name: "Salmon fillets",  qty: "4 pieces", done: false },
-    ...(highProtein ? [{ name: "Protein powder", qty: "1 tub", done: false }] : []),
+    { name: "Chicken breast",   qty: "3 lbs",    done: false },
+    { name: "Salmon fillets",   qty: "4 pieces", done: false },
+    { name: "Eggs",             qty: "1 dozen",  done: false },
+    { name: "Canned tuna",      qty: "4 cans",   done: false },
+    ...(isMuscleBuild ? [{ name: "Ground turkey",  qty: "2 lbs",  done: false }] : []),
+    ...(isMuscleBuild ? [{ name: "Cottage cheese", qty: "16 oz",  done: false }] : []),
+    ...(highProtein   ? [{ name: "Protein powder", qty: "1 tub",  done: false }] : []),
+  ]};
+
+  const dairy = { category: "Dairy", emoji: "🧀", items: [
+    { name: "Greek yogurt",     qty: "32 oz",    done: false },
+    { name: "Low-fat milk",     qty: "½ gallon", done: false },
+    ...(isMuscleBuild ? [{ name: "Shredded mozzarella", qty: "8 oz",   done: false }] : []),
+    ...(isLoseFat     ? [{ name: "String cheese",       qty: "1 pack", done: false }] : []),
   ]};
 
   const produce = { category: "Produce", emoji: "🥦", items: [
-    { name: "Mixed berries",  qty: "1 bag",     done: false },
-    { name: "Spinach",        qty: "5 oz bag",  done: false },
-    { name: "Broccoli",       qty: "1 head",    done: false },
-    ...(goal === "lose_fat"
-      ? [{ name: "Zucchini", qty: "2 medium", done: false }, { name: "Cucumber", qty: "1", done: false }]
-      : [{ name: "Sweet potato", qty: "3 medium", done: false }, { name: "Banana", qty: "1 bunch", done: false }]),
+    { name: "Spinach",          qty: "5 oz bag", done: false },
+    { name: "Broccoli",         qty: "1 head",   done: false },
+    { name: "Mixed berries",    qty: "1 bag",    done: false },
+    { name: "Avocado",          qty: "3",        done: false },
+    { name: "Cherry tomatoes",  qty: "1 pint",   done: false },
+    { name: "Lemons",           qty: "3",        done: false },
+    ...(isLoseFat     ? [{ name: "Zucchini",     qty: "2 medium", done: false }] : []),
+    ...(isLoseFat     ? [{ name: "Cucumber",     qty: "2",        done: false }] : []),
+    ...(isMuscleBuild ? [{ name: "Sweet potato", qty: "3 medium", done: false }] : []),
+    ...(isMuscleBuild ? [{ name: "Banana",       qty: "1 bunch",  done: false }] : []),
   ]};
 
   const pantry = { category: "Pantry", emoji: "🫙", items: [
-    { name: "Olive oil",  qty: "1 bottle", done: false },
-    ...(goal === "lose_fat"
-      ? [{ name: "Rice cakes", qty: "1 bag", done: false }]
-      : [{ name: "Brown rice", qty: "2 lbs", done: false }, { name: "Oats", qty: "1 bag", done: false }]),
+    { name: "Olive oil",        qty: "1 bottle", done: false },
+    { name: "Almond butter",    qty: "1 jar",    done: false },
+    { name: "Olive oil spray",  qty: "1 can",    done: false },
+    { name: "Sea salt & pepper",qty: "if needed",done: false },
+    ...(isLoseFat     ? [{ name: "Rice cakes",   qty: "1 bag",  done: false }] : []),
+    ...(isMuscleBuild ? [{ name: "Brown rice",   qty: "2 lbs",  done: false }] : []),
+    ...(isMuscleBuild ? [{ name: "Oats",         qty: "1 bag",  done: false }] : []),
   ]};
 
-  return [protein, produce, pantry];
+  const snacks = { category: "Snacks", emoji: "🍎", items: [
+    { name: "Apples",           qty: "4",        done: false },
+    { name: "Dark chocolate",   qty: "1 bar",    done: false },
+    ...(isLoseFat     ? [{ name: "Baby carrots",  qty: "1 bag",  done: false }] : []),
+    ...(isLoseFat     ? [{ name: "Rice cakes",    qty: "1 bag",  done: false }] : []),
+    ...(isMuscleBuild ? [{ name: "Granola bars",  qty: "1 box",  done: false }] : []),
+    ...(isMuscleBuild ? [{ name: "Mixed nuts",    qty: "1 bag",  done: false }] : []),
+  ]};
+
+  return [protein, dairy, produce, pantry, snacks];
 }
 
 function buildMealsFromPlan(plan) {
