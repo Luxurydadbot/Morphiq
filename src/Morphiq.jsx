@@ -1111,57 +1111,74 @@ function OnboardingScreen() {
       const targetFat = Math.round(parseFloat(weight) * fatPer);
       const targetCarbs = Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4);
 
-      // Program structure by goal and days
+      // ─── PROGRAM STRUCTURE ──────────────────────────────────────────────────────
+      // Based on current hypertrophy research (Schoenfeld, Israetel, Helms):
+      // - 10-20 hard sets per muscle group per week drives optimal muscle growth
+      // - 6-12 rep range is hypertrophy sweet spot for compounds; 10-20 for isolations
+      // - 2x/week frequency per muscle group outperforms 1x/week at equal volume
+      // - Double progression: add reps first, then add weight when top of range is hit
+      // - Rest 2-3 min compounds (full phosphocreatine recovery), 60-90s isolations
+      // - RIR (reps in reserve): compounds 1-2 RIR, isolations 0-1 RIR (near failure)
+      // ─────────────────────────────────────────────────────────────────────────────
       const programGuide = goal === "build_muscle"
-        ? (daysPerWeek <= 2 ? "Full Body both days — same exercises, focus progressive overload. Compounds 3-4 sets 6-10 reps. Isolations 3 sets 10-15 reps. Rest 2-3 min compound, 60-90s isolation."
-          : daysPerWeek === 3 ? "Full Body alternating A and B. Day A: squat pattern, horizontal push, horizontal pull, bicep or tricep isolation, core. Day B: hinge pattern, vertical push, vertical pull, unilateral leg, shoulder isolation. Compounds 3-4 sets 6-10 reps. Isolations 3 sets 10-15 reps."
-          : "Upper/Lower split. Upper: horizontal push, horizontal pull, vertical push, vertical pull, bicep and tricep isolation. Lower: squat, hinge, unilateral leg, calf, core. 3-4 sets 6-10 reps compounds, 3 sets 10-15 reps isolation.")
+        ? (daysPerWeek <= 2
+          ? "FULL BODY — 2 days/week. Both sessions identical. MANDATORY movement pattern order: (1) squat pattern, (2) hinge pattern, (3) horizontal push, (4) horizontal pull, (5) vertical push or pull. No isolation exercises — every slot is a compound. 4 sets per exercise. Rep ranges: squats and hinges 4-6 reps heavy; presses and rows 6-10 reps; vertical movements 8-12 reps. Rest 2-3 min between all sets. Each muscle hit 2x/week at full intensity. Progressive overload: add 1 rep per set each session until top of range is hit on all sets, then add the smallest weight increment available and reset to bottom of rep range."
+          : daysPerWeek === 3
+          ? "FULL BODY — 3 days/week alternating A/B/A then B/A/B. WORKOUT A mandatory pattern: (1) SQUAT — barbell back squat or equivalent, (2) HORIZONTAL PUSH — barbell bench press or equivalent, (3) HORIZONTAL PULL — barbell bent over row or equivalent, (4) VERTICAL PUSH — barbell overhead press or equivalent, (5) HINGE — barbell Romanian deadlift or conventional deadlift. WORKOUT B mandatory pattern: (1) HINGE — conventional deadlift or Romanian deadlift, (2) SQUAT VARIANT — front squat, Bulgarian split squat, or hack squat, (3) INCLINE PUSH — incline barbell or dumbbell press, (4) VERTICAL PULL — pull-up, lat pulldown, or cable pulldown, (5) UNILATERAL LEG — dumbbell reverse lunge or step-up. CRITICAL: every session must contain BOTH a squat pattern AND a hinge pattern. Zero isolation exercises in a 5-exercise full body session — isolation is a bonus exercise only when session goes 6 exercises. Compounds: 3-4 sets, 6-10 reps. Rest 2-3 min. Double progression model."
+          : daysPerWeek === 4
+          ? "UPPER/LOWER SPLIT — 4 days/week (Upper A, Lower A, Upper B, Lower B). Each muscle hit 2x/week. UPPER A: (1) barbell bench press 4x6-8, (2) barbell bent over row 4x6-8, (3) barbell overhead press 3x8-10, (4) lat pulldown or pull-up 3x8-10, (5) dumbbell incline fly or cable fly 3x12-15. LOWER A: (1) barbell back squat 4x4-6, (2) barbell Romanian deadlift 3x6-8, (3) Bulgarian split squat 3x8-10 each leg, (4) leg curl or Nordic curl 3x10-12, (5) calf raise 4x12-15. UPPER B: (1) dumbbell incline press 4x8-10, (2) cable row or chest-supported row 4x8-10, (3) dumbbell lateral raise 3x15-20, (4) face pull or rear delt fly 3x15-20, (5) barbell or EZ bar curl 3x10-12 + tricep pushdown 3x12-15. LOWER B: (1) conventional deadlift 4x3-5 heavy, (2) leg press 3x10-12, (3) walking lunge 3x10-12 each leg, (4) leg extension 3x12-15, (5) standing calf raise 4x15-20. Rest 2-3 min compounds, 60-90s isolations."
+          : "PUSH/PULL/LEGS — 5-6 days/week. PPL twice per week. PUSH: (1) barbell bench press 4x6-8, (2) incline dumbbell press 3x8-10, (3) barbell overhead press 3x8-10, (4) cable lateral raise 3x15-20, (5) tricep pushdown 3x12-15, (6) overhead tricep extension 3x12-15. PULL: (1) deadlift 4x4-6, (2) barbell bent over row 4x6-8, (3) pull-up or lat pulldown 3x8-10, (4) cable row 3x10-12, (5) face pull 3x15-20, (6) barbell curl 3x10-12. LEGS: (1) barbell back squat 4x6-8, (2) Romanian deadlift 3x8-10, (3) leg press 3x10-12, (4) Bulgarian split squat 3x10-12 each, (5) leg curl 3x12-15, (6) calf raise 4x15-20. Rest 2-3 min compounds, 60-90s isolations.")
         : goal === "lose_fat"
-        ? (daysPerWeek <= 3 ? "Full Body 6 exercises. Pair upper and lower as supersets to keep heart rate up. At least one large lower body compound per session. Finish with one 3-minute metabolic finisher: kettlebell swings, jump rope, rowing machine, or bodyweight circuit. 3 sets 10-15 reps. Rest 60-90s max."
-          : "Upper/Lower split same structure but shorter rest and higher reps. 3 sets 10-15 reps. Rest 60-90s max.")
-        : "Full Body 5-6 exercises. Mix strength and conditioning. 3 sets 10-12 reps. Rest 90s. Finish each session with 5 min conditioning finisher.";
+        ? (daysPerWeek <= 3
+          ? "FAT LOSS FULL BODY — 3 days/week. Structure: compound-first to preserve muscle, metabolic finisher at end to maximize calorie burn. MANDATORY order: (1) squat pattern compound, (2) hinge pattern compound, (3) upper body push compound, (4) upper body pull compound, (5) unilateral or core movement, (6) METABOLIC FINISHER — 3 rounds of: 15 kettlebell swings or 20 jump squats or 10 burpees, rest 30s between rounds. For compounds: 3 sets, 8-12 reps, rest 90s. Superset upper push with upper pull to keep heart rate elevated. Weight: challenging but form stays perfect. Caloric deficit + heavy compounds = muscle retention. No machine isolation work during fat loss phase."
+          : "FAT LOSS UPPER/LOWER — 4 days/week. UPPER (2x/week): (1) barbell bench or dumbbell press 3x8-10, (2) barbell or dumbbell row 3x8-10, (3) overhead press 3x10-12, (4) lat pulldown 3x10-12, (5) superset: lateral raise 3x15 + face pull 3x15. LOWER (2x/week): (1) barbell squat 3x8-10, (2) Romanian deadlift 3x8-10, (3) Bulgarian split squat 3x10-12, (4) leg curl 3x12-15, (5) finisher: 3 rounds of 20 jump squats or 15 kettlebell swings. Rest 60-90s all exercises. Superset antagonist movements to keep density high.")
+        : "GENERAL FITNESS FULL BODY — 3-4 days/week. Goal is building a base of strength, endurance, and mobility. MANDATORY: include squat, hinge, push, and pull each session. 3 sets, 10-12 reps, rest 90s. Finish each session with 5 min low-intensity cardio cooldown. Progression: add 1 rep each session, add weight when all sets hit top of range.";
 
       // Equipment constraints — IDs match onboarding: barbell | dumbbell | kettlebell | machine
+      // Each option enforces movement patterns appropriate for that equipment
       const equipGuide = equipment === "barbell"
-        ? "BARBELL GYM. Full rack, barbell, plates, and dumbbells available. PRIMARY compounds must use barbell: squat=barbell back squat, hinge=barbell Romanian deadlift or conventional deadlift, horizontal push=barbell bench press, horizontal pull=barbell bent over row or cable row, vertical push=barbell overhead press. Dumbbells only for accessories and isolation. No push-up variations — use pressing movements with a barbell or dumbbell instead."
+        ? "BARBELL GYM — full rack, barbell, plates, dumbbells, cables. RULE: all primary compounds MUST use barbell. squat=barbell back squat (not goblet, not dumbbell), hinge=barbell conventional deadlift or barbell Romanian deadlift (not dumbbell RDL), horizontal push=barbell bench press (flat or incline), horizontal pull=barbell bent over row or cable row, vertical push=barbell overhead press. Dumbbells permitted only for accessory and isolation slots (incline dumbbell press as secondary push, lateral raise, curl, etc.). BANNED: push-up variations, goblet squat, dumbbell RDL as primary hinge — these are barbell substitutes only used when no barbell is available."
         : equipment === "dumbbell"
-        ? "DUMBBELLS AND CABLES. Full commercial gym with dumbbells, cables, and machines but no barbell. Squat=goblet squat or dumbbell Bulgarian split squat. Hinge=dumbbell Romanian deadlift. Row=single arm dumbbell row or cable row. Press=dumbbell bench press or incline dumbbell press. Cables preferred for isolation. No barbell movements."
+        ? "DUMBBELLS AND CABLES — full commercial gym with dumbbells up to 100lbs+, cable stacks, and machines, but no barbell. squat=dumbbell goblet squat (light/moderate) or dumbbell Bulgarian split squat (advanced), hinge=dumbbell Romanian deadlift or single-leg RDL, horizontal push=dumbbell bench press or incline dumbbell press, horizontal pull=single-arm dumbbell row or cable row (prefer cable for heavier loads), vertical push=dumbbell shoulder press or Arnold press, vertical pull=cable lat pulldown or assisted pull-up. Cables preferred over dumbbells for all pulling movements. No barbell movements."
         : equipment === "kettlebell"
-        ? "KETTLEBELLS AND BODYWEIGHT. Kettlebells and bodyweight only — no barbell or cable machines. Squat=kettlebell goblet squat or bodyweight squat. Hinge=kettlebell deadlift or single leg RDL. Push=push-up variations or kettlebell press. Pull=table row or TRX row. Core=plank, dead bug, hollow hold."
+        ? "KETTLEBELLS AND BODYWEIGHT ONLY — no barbell, no cable machines, no dumbbells over 50lbs. squat=kettlebell goblet squat or double kettlebell front squat, hinge=kettlebell deadlift or single-leg Romanian deadlift, push=push-up (standard, elevated, archer for advanced) or kettlebell floor press, pull=table inverted row, TRX row, or ring row, vertical pull=pull-up or jumping pull-up, carry=farmer carry or suitcase carry for core. Swing, Turkish get-up, and clean and press are excellent for conditioning. Core: plank, dead bug, hollow hold, ab wheel."
         : equipment === "machine"
-        ? "MACHINES PRIMARILY. Guided machines, cable stacks, and dumbbells. No free barbell. Squat=leg press or hack squat machine. Hinge=Romanian deadlift machine or cable pull-through. Row=seated cable row or machine row. Press=chest press machine or incline dumbbell press. Good for beginners — guided range of motion reduces injury risk."
-        : "DUMBBELLS ONLY. No barbell, no cable, no machines. Squat=goblet squat. Hinge=dumbbell Romanian deadlift. Row=single arm dumbbell row. Press=dumbbell floor press.";
+        ? "MACHINES AND CABLES — guided resistance machines, cable stacks, and dumbbells. No free barbell. squat=leg press (foot position: shoulder-width, mid-platform) or hack squat machine, hinge=Romanian deadlift machine, cable pull-through, or 45-degree back extension, horizontal push=chest press machine or cable chest press, horizontal pull=seated cable row (neutral grip) or machine row, vertical push=machine shoulder press or cable lateral raise, vertical pull=lat pulldown machine (wide or neutral grip). Machines are excellent for beginners — guided range of motion reduces injury risk and teaches movement patterns."
+        : "DUMBBELLS ONLY — no barbell, no cable, no machines. squat=dumbbell goblet squat, hinge=dumbbell Romanian deadlift, horizontal push=dumbbell floor press or push-up, horizontal pull=single-arm dumbbell row (use bench or knee for support), vertical push=dumbbell shoulder press seated, vertical pull=cannot be loaded without cable — use best push/pull balance available. Keep loads challenging within available dumbbell range.";
 
-      // Injury modifications
-      const injuryGuide = !injuries || injuries === "none" ? "" 
-        : injuries.toLowerCase().includes("knee") ? "KNEE INJURY: remove all squat variations and lunges. Replace with leg press, leg extension, step-up, or box squat limited range."
-        : injuries.toLowerCase().includes("back") ? "LOWER BACK INJURY: remove conventional deadlift and barbell bent over row. Use trap bar deadlift, light Romanian deadlift, cable row, or single arm dumbbell row with chest support."
-        : injuries.toLowerCase().includes("shoulder") ? "SHOULDER INJURY: remove all overhead pressing. Use landmine press, neutral grip dumbbell press at 30 degree incline, or cable chest fly. Remove upright row entirely."
-        : injuries.toLowerCase().includes("wrist") ? "WRIST INJURY: remove barbell front squat. Replace with safety bar squat or goblet squat."
-        : `INJURY NOTE: ${injuries} — avoid movements that aggravate this area.`;
+      // Injury modifications — conservative but not overly restrictive
+      const injuryGuide = !injuries || injuries === "none" ? ""
+        : injuries.toLowerCase().includes("knee") ? "KNEE INJURY: remove all squat variations, lunges, and leg extensions. Replace squat slot with: leg press (limited depth), step-up onto low box, or seated leg press machine at comfortable range. Hinge movements (RDL, deadlift) are generally safe if knee stays neutral — keep them unless they cause pain."
+        : injuries.toLowerCase().includes("back") ? "LOWER BACK INJURY: remove conventional deadlift and any barbell bent over row. Replace hinge with: trap bar deadlift (more upright), cable pull-through, or 45-degree back extension with bodyweight only. Replace barbell row with: chest-supported dumbbell row, seated cable row, or machine row. Avoid any loaded spinal flexion."
+        : injuries.toLowerCase().includes("shoulder") ? "SHOULDER INJURY: remove all overhead pressing (barbell OHP, dumbbell shoulder press, Arnold press). Replace with: landmine press (shoulder-friendly arc), neutral grip dumbbell press at 30-degree incline, or cable chest fly. Remove upright row entirely — it impinges the rotator cuff. Keep horizontal pressing if pain-free."
+        : injuries.toLowerCase().includes("wrist") ? "WRIST INJURY: avoid barbell front squat and any exercise requiring wrist extension under load. Replace barbell front squat with safety bar squat or goblet squat (wrist neutral). Use straps or neutral grip handles for rowing movements. Dumbbell pressing with neutral grip (palms facing each other) is usually more comfortable than barbell."
+        : `INJURY NOTE: ${injuries} — avoid all movements that load or aggravate this area. Substitute with machine or cable alternatives that allow pain-free range of motion.`;
 
-      // Weight guidance by experience AND equipment
+      // Starting weight guidance — based on experience level AND equipment
+      // These are STARTING weights for Week 1, not maxes. Always conservative.
       const isBarbellUser = equipment === "barbell";
       const weightGuide = trainingHistory === "new"
         ? isBarbellUser
-          ? "Beginner with barbell access: barbell squat 45-95lbs (start with bar only if needed), barbell bench 45-95lbs, barbell row 45-75lbs, RDL 45-95lbs. Prioritize form over load."
-          : "Beginner weights: goblet squat 15-25lbs, dumbbell row 15-25lbs, dumbbell press 10-20lbs, RDL 20-30lbs. Start conservative."
+          ? "BEGINNER BARBELL — prioritize form over load. Barbell back squat: 45-65lbs (start with empty bar if form is shaky). Barbell bench press: 45-75lbs. Barbell bent over row: 45-65lbs. Barbell Romanian deadlift: 45-75lbs. Barbell overhead press: 33-45lbs (bar only is fine). These are working set weights after warmup. Never ego-lift in week 1."
+          : "BEGINNER DUMBBELL/MACHINE — start very conservative. Goblet squat: 15-25lbs. Dumbbell RDL: 20-30lbs per hand. Dumbbell row: 15-25lbs. Dumbbell press: 10-20lbs each. Leg press: 90-135lbs total. Form and range of motion matter more than weight in weeks 1-2."
         : trainingHistory === "some"
         ? isBarbellUser
-          ? "Intermediate with barbell: barbell squat 95-155lbs, barbell bench 95-155lbs, barbell row 75-115lbs, barbell overhead press 55-95lbs, RDL 115-155lbs."
-          : "Intermediate weights: goblet squat 35-55lbs, dumbbell row 35-50lbs, dumbbell press 25-40lbs, RDL 50-70lbs, barbell bench 95-155lbs."
+          ? "INTERMEDIATE BARBELL — has 6 months to 2 years of experience. Barbell back squat: 115-165lbs. Barbell bench press: 105-155lbs. Barbell bent over row: 85-125lbs. Barbell overhead press: 65-95lbs. Barbell Romanian deadlift: 125-175lbs. Conventional deadlift: 135-205lbs. Use RPE 7 for week 1 — should feel challenging but have 2-3 reps left in tank."
+          : "INTERMEDIATE DUMBBELL — goblet squat: 35-55lbs. Dumbbell RDL: 40-60lbs per hand. Dumbbell row: 35-55lbs. Dumbbell bench: 30-50lbs each. Shoulder press: 25-40lbs each. These are working weights — warmup with lighter first set."
         : recentActivity === "returning"
         ? isBarbellUser
-          ? "Returning experienced lifter with barbell — rebuild carefully at 70-80% of previous maxes: barbell squat 135-185lbs, barbell bench 115-165lbs, barbell row 95-135lbs, RDL 135-175lbs."
-          : "Returning lifter — rebuild carefully: goblet squat 35-55lbs, dumbbell row 35-50lbs, barbell bench 115-155lbs, barbell squat 135-175lbs."
+          ? "RETURNING EXPERIENCED BARBELL LIFTER — has trained for years but took a break. Rebuild at 70-75% of old maxes. Barbell squat: 135-185lbs. Bench press: 115-165lbs. Row: 95-135lbs. Overhead press: 75-105lbs. Deadlift: 185-245lbs. Muscle memory returns fast — can add weight weekly."
+          : "RETURNING LIFTER — rebuild conservatively. Goblet squat: 40-60lbs. Dumbbell row: 40-60lbs. Dumbbell press: 35-50lbs each. RDL: 50-75lbs per hand. Expect to progress quickly back to previous levels."
         : isBarbellUser
-          ? "Experienced active barbell lifter: barbell squat 185-255lbs, barbell bench 165-225lbs, barbell row 135-185lbs, barbell overhead press 95-135lbs, deadlift 205-295lbs. Push compound sets to RPE 8-9."
-          : "Experienced active: goblet squat 55-75lbs, dumbbell row 55-75lbs, barbell squat 155-205lbs, bench press 155-205lbs, RDL 135-185lbs.";
+          ? "EXPERIENCED ACTIVE BARBELL LIFTER — currently training regularly. Use true working weights near current strength. Barbell back squat: 185-265lbs. Barbell bench press: 165-235lbs. Barbell bent over row: 145-195lbs. Barbell overhead press: 95-145lbs. Conventional deadlift: 225-315lbs. Romanian deadlift: 185-255lbs. Push to RPE 8-9 on final sets of compounds. These are not warmup weights."
+          : "EXPERIENCED ACTIVE — goblet squat: 60-80lbs. Dumbbell row: 60-85lbs. Dumbbell bench: 50-75lbs each. Shoulder press: 40-60lbs each. RDL: 65-90lbs per hand. Train close to failure on working sets.";
 
-      // RPE targets
-      const rpeGuide = "First set any new exercise: RPE 6. Compound working sets: RPE 7-8. Final set compounds: RPE 8-9. Isolation working sets: RPE 8-9.";
+      // RPE (Rate of Perceived Exertion) targets — 1-10 scale, 10 = absolute max effort
+      // Research shows proximity to failure is the primary driver of hypertrophy
+      const rpeGuide = "RPE scale: RPE 6 = easy, 4+ reps left. RPE 7 = moderate, 3 reps left. RPE 8 = hard, 2 reps left. RPE 9 = very hard, 1 rep left. RPE 10 = max effort, no reps left. TARGETS: first set of any new exercise RPE 6 (learning the movement). Compound working sets week 1: RPE 7 (3 reps in reserve). Compound working sets week 2+: RPE 8 (2 RIR). Final set of any compound: RPE 8-9. Isolation exercises all sets: RPE 8-9 (1 RIR). Never train compound movements to absolute failure — too much CNS fatigue and injury risk.";
 
-      // Warm-up and cool-down instructions
+      // Warm-up and cool-down — specific to the session type
+      // Warmup purpose: raise core temp, activate target muscles, rehearse movement patterns
       const warmupGuide = daysPerWeek >= 4
         ? `Include warmup array with exactly these 5 exercises in order, each with a name, duration, and description field:
 1. name="Light cardio" duration="90 seconds" description="March in place, do jumping jacks, or walk briskly. Move your whole body to raise your heart rate and warm up your muscles before lifting."
@@ -1177,7 +1194,9 @@ function OnboardingScreen() {
 5. name="Hip circles" duration="30 seconds each direction" description="Stand with feet shoulder-width apart and hands on your hips. Make big slow circles with your hips, like you're using a hula hoop. Loosens up your lower back and hip joints before squatting or hinging movements."`;
       const cooldownGuide = "Include cooldown array with: 30s quad stretch each side, 30s hamstring stretch, 30s chest stretch, 30s shoulder stretch, 60s child's pose. Each item must have name, duration, and description fields with plain-language instructions.";
 
-      const exerciseCount = goal === "lose_fat" && daysPerWeek <= 3 ? 6 : 5;
+      // Exercise count: muscle building and general fitness = 5 exercises (all compounds)
+      // Fat loss gets 6 to include the metabolic finisher as the 6th slot
+      const exerciseCount = goal === "lose_fat" ? 6 : 5;
 
       const prompt = `Generate a week 1 fitness plan. Return ONLY valid JSON, no markdown.
 Member: goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile=${fitnessProfile}.
