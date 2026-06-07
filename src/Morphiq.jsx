@@ -1651,10 +1651,8 @@ const WORKOUT_EXERCISES = [
 ];
 
 function PlanOverviewScreen() {
-  const { navigate, user, gymBranding } = useApp();
+  const { navigate, user, gymBranding, plan } = useApp();
   const a = gymBranding.accent;
-  const [activeDay, setActiveDay] = useState(0);
-  const day = WEEK[activeDay];
   const sL = theme.sL;
   const goalLabel = GOAL_OPTIONS.find(g => g.id === user.goal)?.label?.toLowerCase() || "fitness";
 
@@ -1683,25 +1681,19 @@ function PlanOverviewScreen() {
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Your first workout</div>
         <div className="mq-fade" style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
-          {day.isWorkout ? <>
             <div style={{ padding: "1rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div><div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>{plan?.workoutType || "Full body"}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{plan?.exercises?.length || 5} exercises · ~{plan?.workoutDuration || 40} min</div></div>
               <div style={{ background: "#1E1E1E", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: theme.textMuted }}>{plan?.workoutDuration || 40} min</div>
             </div>
-            {EXERCISES_DISPLAY.map((ex, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".8rem 1.25rem", borderBottom: i < 4 ? `0.5px solid #1A1A1A` : "none" }}>
+            {(plan?.exercises || []).slice(0, 5).map((ex, i, arr) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".8rem 1.25rem", borderBottom: i < arr.length - 1 ? `0.5px solid #1A1A1A` : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 24, height: 24, borderRadius: 6, background: "#1E1E1E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: theme.textDim, fontWeight: 500, flexShrink: 0 }}>{i + 1}</div>
-                  <div><div style={{ fontSize: 14, color: "#D0D0D0" }}>{ex.name}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{ex.weight} · {ex.reps}</div></div>
+                  <div><div style={{ fontSize: 14, color: "#D0D0D0" }}>{ex.name}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{ex.weight} lbs · {ex.reps} reps</div></div>
                 </div>
-                <div style={{ fontSize: 12, color: theme.textMuted, background: "#1A1A1A", borderRadius: 6, padding: "3px 8px" }}>{ex.sets}</div>
+                <div style={{ fontSize: 12, color: theme.textMuted, background: "#1A1A1A", borderRadius: 6, padding: "3px 8px" }}>{ex.sets} sets</div>
               </div>
             ))}
-          </> : (
-            <div style={{ padding: "2rem", display: "flex", flexDirection: "column", alignItems: "center", gap: ".75rem", textAlign: "center" }}>
-              <div style={{ fontSize: 20 }}>💤</div><div style={{ fontSize: 15, fontWeight: 500, color: theme.textMuted }}>Recovery day</div>
-            </div>
-          )}
         </div>
       </div>
       <div style={{ padding: "1.25rem" }}>
