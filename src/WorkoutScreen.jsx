@@ -356,33 +356,71 @@ function WorkoutScreen() {
   if (phase === "warmup") {
     const currentWarmup = warmupExercises[warmupStep];
     const isLastWarmup = warmupStep >= warmupExercises.length - 1;
+
+    // Coaching cues for common warmup movements — shown below the exercise name
+    const warmupCues = {
+      "light cardio":        { cue: "Walk, march in place, or do jumping jacks. Get your blood moving and your body temperature up before any resistance work.", focus: "Blood flow" },
+      "arm circles":         { cue: "Slow and controlled — big circles first, then small. Feel your shoulder joint loosening up with each rotation.", focus: "Shoulder mobility" },
+      "bodyweight squat":    { cue: "Feet shoulder-width apart, toes slightly out. Sit back and down, keep your chest up. This wakes up your glutes and knees.", focus: "Hip & knee activation" },
+      "hip hinge":           { cue: "Soft knees, push your hips back like you're closing a car door with your backside. Feel the stretch in your hamstrings.", focus: "Hamstring activation" },
+      "band pull-apart":     { cue: "Arms straight out in front, pull the band apart to your sides. Squeeze your shoulder blades together at the end of each rep.", focus: "Upper back & rotator cuff" },
+      "scapular push-up":    { cue: "In a push-up position, let your shoulder blades come together, then push them apart. Arms stay straight the whole time.", focus: "Shoulder blade control" },
+      "scapular push-ups":   { cue: "In a push-up position, let your shoulder blades come together, then push them apart. Arms stay straight the whole time.", focus: "Shoulder blade control" },
+      "light dumbbell press":{ cue: "Use very light weight — this is just waking up your chest and shoulders, not a working set. Focus on feeling the movement.", focus: "Chest & shoulder prep" },
+    };
+    const cueKey = Object.keys(warmupCues).find(k => currentWarmup?.name?.toLowerCase().includes(k));
+    const cueData = cueKey ? warmupCues[cueKey] : null;
+
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
-          <div style={{ textAlign: "center", marginBottom: 16 }}>
+
+          {/* Header */}
+          <div style={{ textAlign: "center", marginBottom: 14 }}>
             <div style={{ fontSize: 10, color: a, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Warm-up · {warmupStep + 1} of {warmupExercises.length}</div>
             <div style={{ fontSize: 13, color: theme.textDim }}>5 minutes before your workout</div>
           </div>
-          <div style={{ height: 4, background: "#1A2332", borderRadius: 2, marginBottom: 20 }}>
+
+          {/* Progress bar */}
+          <div style={{ height: 4, background: "#1A2332", borderRadius: 2, marginBottom: 24 }}>
             <div style={{ height: 4, borderRadius: 2, background: a, width: `${Math.round(((warmupStep + 1) / warmupExercises.length) * 100)}%`, transition: "width .4s" }} />
           </div>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 12 }}>
-            <div style={{ fontSize: 40 }}>🔥</div>
-            <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, lineHeight: 1.2 }}>{currentWarmup?.name}</div>
-            <div style={{ fontSize: 18, color: a, fontWeight: 500 }}>{currentWarmup?.duration}</div>
-            <div style={{ fontSize: 13, color: theme.textDim, maxWidth: 240, lineHeight: 1.5 }}>Take your time — a proper warm-up reduces injury risk and improves performance.</div>
+
+          {/* Exercise name + duration — the main event */}
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontSize: 42 }}>🔥</div>
+            <div style={{ fontSize: 34, fontWeight: 700, color: theme.text, lineHeight: 1.2, marginTop: 10 }}>{currentWarmup?.name}</div>
+            <div style={{ fontSize: 22, color: a, fontWeight: 600, marginTop: 8 }}>{currentWarmup?.duration}</div>
           </div>
-          <div style={{ paddingBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
+
+          {/* Main tip — large and impossible to miss */}
+          <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 14, padding: "1rem 1.25rem", marginBottom: 14 }}>
+            <div style={{ fontSize: 17, color: "#D8E4E0", lineHeight: 1.65 }}>
+              Take your time — a proper warm-up <span style={{ color: a, fontWeight: 600 }}>reduces injury risk</span> and <span style={{ color: a, fontWeight: 600 }}>improves performance</span> in every set that follows.
+            </div>
+          </div>
+
+          {/* Exercise-specific coaching cue — fills the dead space with useful info */}
+          {cueData && (
+            <div style={{ background: "#111827", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "1rem 1.25rem", marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 8, fontWeight: 600 }}>Focus: {cueData.focus}</div>
+              <div style={{ fontSize: 15, color: "#B8CAD5", lineHeight: 1.65 }}>{cueData.cue}</div>
+            </div>
+          )}
+
+          {/* Buttons */}
+          <div style={{ marginTop: "auto", paddingBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
             <button onClick={() => {
               if (isLastWarmup) { setPhase("active"); }
               else { setWarmupStep(s => s + 1); }
-            }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               {isLastWarmup ? "Start workout →" : "Done — next →"}
             </button>
             <button onClick={() => setPhase("active")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
               Skip warm-up
             </button>
           </div>
+
         </div>
       </Layout>
     );
@@ -773,3 +811,4 @@ const EXERCISES_DISPLAY = [{name:"Goblet squat",weight:"35 lbs",reps:"10 reps",s
 const WEEK = [{name:"Mon",type:"Full body",isWorkout:true},{name:"Tue",type:"Rest",isWorkout:false},{name:"Wed",type:"Full body",isWorkout:true},{name:"Thu",type:"Rest",isWorkout:false},{name:"Fri",type:"Full body",isWorkout:true},{name:"Sat",type:"Rest",isWorkout:false},{name:"Sun",type:"Rest",isWorkout:false}];
 
 export { WorkoutScreen };
+
