@@ -490,6 +490,79 @@ function todayMealKey(userId) {
   return `morphiq_meals_${userId || "anon"}_${today}`;
 }
 
+function EndOfDaySummary({ meals, macros, calGoal, proteinGoal }) {
+  const { gymBranding } = useApp();
+  const a = gymBranding.accent;
+
+  // Only show when all meals are resolved (no "upcoming" left)
+  const allDone = meals.every(m => m.status !== "upcoming");
+  if (!allDone) return null;
+
+  const swapped = meals.filter(m => m.status === "swapped");
+  const skipped = meals.filter(m => m.status === "skipped");
+  const calPct   = Math.round((macros.cal / calGoal) * 100);
+  const proShort = Math.max(0, proteinGoal - macros.protein);
+
+  // Build a short personalized note based on what actually happened
+  let note = "";
+  if (calPct >= 90 && calPct <= 110 && proShort <= 15) {
+    note = "Solid day. You hit your targets and stayed consistent — that's what progress looks like.";
+  } else if (calPct > 110) {
+    note = `You went over by about ${macros.cal - calGoal} calories today — no problem. Just pick up where you left off tomorrow.`;
+  } else if (calPct < 75) {
+    note = "You came in under today. Make sure you're eating enough — undereating slows progress just like overeating does.";
+  } else if (proShort > 20) {
+    note = `You were ${proShort}g short on protein today. Try to hit that target tomorrow — it makes a real difference for your goal.`;
+  } else if (swapped.length > 0 && calPct <= 110) {
+    note = "You swapped a meal today and still landed close to your target. That's exactly how this is supposed to work.";
+  } else {
+    note = "Day wrapped up. Every meal logged is data working for you — keep the habit going tomorrow.";
+  }
+
+  return (
+    <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10, fontWeight: 600 }}>Day Wrapped Up</div>
+
+      {/* Actual vs target */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        <div style={{ flex: 1, background: "#1A2332", borderRadius: 9, padding: "8px 10px", textAlign: "center" }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: calPct > 110 ? "#F59E0B" : a }}>{macros.cal}</div>
+          <div style={{ fontSize: 9, color: "#6B7A8D", marginTop: 1 }}>of {calGoal} cal</div>
+        </div>
+        <div style={{ flex: 1, background: "#1A2332", borderRadius: 9, padding: "8px 10px", textAlign: "center" }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: proShort > 20 ? "#F59E0B" : a }}>{macros.protein}g</div>
+          <div style={{ fontSize: 9, color: "#6B7A8D", marginTop: 1 }}>of {proteinGoal}g protein</div>
+        </div>
+        <div style={{ flex: 1, background: "#1A2332", borderRadius: 9, padding: "8px 10px", textAlign: "center" }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#E8EDF2" }}>{meals.filter(m => m.status === "done" || m.status === "swapped").length}/{meals.length}</div>
+          <div style={{ fontSize: 9, color: "#6B7A8D", marginTop: 1 }}>meals logged</div>
+        </div>
+      </div>
+
+      {/* Swapped meals summary */}
+      {swapped.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          {swapped.map(m => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 10, color: "#F59E0B" }}>⚡</span>
+              <span style={{ fontSize: 11, color: "#9BB3C8" }}>
+                {m.label}: <span style={{ textDecoration: "line-through", color: "#555" }}>{m.suggested.name}</span>
+                {" → "}
+                <span style={{ color: "#E8EDF2" }}>{m.logged?.name}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* AI note */}
+      <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.6, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10 }}>
+        {note}
+      </div>
+    </div>
+  );
+}
+
 function HungryButton({ calsLeft, proteinLeft, goal }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
@@ -838,6 +911,7 @@ function MealPlanScreen() {
                 onOpenDetail={() => setDetailMeal(meal)}
               />
             ))}
+            <EndOfDaySummary meals={meals} macros={macros} calGoal={CAL_GOAL} proteinGoal={PROTEIN_GOAL} />
             <HungryButton calsLeft={CAL_GOAL - macros.cal} proteinLeft={Math.max(0, PROTEIN_GOAL - macros.protein)} goal={plan?.goal} />
           </div>
         )}
