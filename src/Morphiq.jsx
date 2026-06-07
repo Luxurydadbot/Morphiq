@@ -1151,102 +1151,56 @@ function OnboardingScreen() {
       const targetCarbs = Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4);
 
       // Program structure — evidence-based splits by goal and training frequency
-      const programGuide = goal === "build_muscle"
-        ? (daysPerWeek <= 2
-          ? "FULL BODY — 2 days/week. Both sessions identical. MANDATORY movement pattern order: (1) squat pattern, (2) hinge pattern, (3) horizontal push, (4) horizontal pull, (5) vertical push or pull. No isolation exercises — every slot is a compound. 4 sets per exercise. Rep ranges: squats and hinges 4-6 reps heavy; presses and rows 6-10 reps; vertical movements 8-12 reps. Rest 2-3 min between all sets. Each muscle hit 2x/week at full intensity. Progressive overload: add 1 rep per set each session until top of range is hit on all sets, then add the smallest weight increment available and reset to bottom of rep range."
-          : daysPerWeek === 3
-          ? "FULL BODY — 3 days/week alternating A/B/A then B/A/B. WORKOUT A mandatory pattern: (1) SQUAT — barbell back squat or equivalent, (2) HORIZONTAL PUSH — barbell bench press or equivalent, (3) HORIZONTAL PULL — barbell bent over row or equivalent, (4) VERTICAL PUSH — barbell overhead press or equivalent, (5) HINGE — barbell Romanian deadlift or conventional deadlift. WORKOUT B mandatory pattern: (1) HINGE — conventional deadlift or Romanian deadlift, (2) SQUAT VARIANT — front squat, Bulgarian split squat, or hack squat, (3) INCLINE PUSH — incline barbell or dumbbell press, (4) VERTICAL PULL — pull-up, lat pulldown, or cable pulldown, (5) UNILATERAL LEG — dumbbell reverse lunge or step-up. CRITICAL: every session must contain BOTH a squat pattern AND a hinge pattern. Zero isolation exercises in a 5-exercise full body session — isolation is a bonus exercise only when session goes 6 exercises. Compounds: 3-4 sets, 6-10 reps. Rest 2-3 min. Double progression model."
-          : daysPerWeek === 4
-          ? "UPPER/LOWER SPLIT — 4 days/week (Upper A, Lower A, Upper B, Lower B). Each muscle hit 2x/week. UPPER A: (1) barbell bench press 4x6-8, (2) barbell bent over row 4x6-8, (3) barbell overhead press 3x8-10, (4) lat pulldown or pull-up 3x8-10, (5) dumbbell incline fly or cable fly 3x12-15. LOWER A: (1) barbell back squat 4x4-6, (2) barbell Romanian deadlift 3x6-8, (3) Bulgarian split squat 3x8-10 each leg, (4) leg curl or Nordic curl 3x10-12, (5) calf raise 4x12-15. UPPER B: (1) dumbbell incline press 4x8-10, (2) cable row or chest-supported row 4x8-10, (3) dumbbell lateral raise 3x15-20, (4) face pull or rear delt fly 3x15-20, (5) barbell or EZ bar curl 3x10-12 + tricep pushdown 3x12-15. LOWER B: (1) conventional deadlift 4x3-5 heavy, (2) leg press 3x10-12, (3) walking lunge 3x10-12 each leg, (4) leg extension 3x12-15, (5) standing calf raise 4x15-20. Rest 2-3 min compounds, 60-90s isolations."
-          : "PUSH/PULL/LEGS — 5-6 days/week. PPL twice per week. PUSH: (1) barbell bench press 4x6-8, (2) incline dumbbell press 3x8-10, (3) barbell overhead press 3x8-10, (4) cable lateral raise 3x15-20, (5) tricep pushdown 3x12-15, (6) overhead tricep extension 3x12-15. PULL: (1) deadlift 4x4-6, (2) barbell bent over row 4x6-8, (3) pull-up or lat pulldown 3x8-10, (4) cable row 3x10-12, (5) face pull 3x15-20, (6) barbell curl 3x10-12. LEGS: (1) barbell back squat 4x6-8, (2) Romanian deadlift 3x8-10, (3) leg press 3x10-12, (4) Bulgarian split squat 3x10-12 each, (5) leg curl 3x12-15, (6) calf raise 4x15-20. Rest 2-3 min compounds, 60-90s isolations.")
+      // Equipment constraint — one line, Claude knows what to do with it
+      const equipGuide = equipment === "barbell" ? "barbell gym — use barbell for all primary lifts"
+        : equipment === "dumbbell" ? "dumbbells and cables only — no barbell"
+        : equipment === "kettlebell" ? "kettlebells and bodyweight only"
+        : equipment === "machine" ? "machines and cables only — no free barbell"
+        : "dumbbells only";
+
+      // Injury note — only sent if relevant
+      const injuryNote = (!injuries || injuries === "none") ? ""
+        : `Injury/limitation: ${injuries} — avoid movements that load this area.`;
+
+      // Experience level for weight selection
+      const expLevel = trainingHistory === "new" ? "beginner (week 1, conservative weights, form first)"
+        : trainingHistory === "some" ? "intermediate (6mo-2yr experience)"
+        : recentActivity === "returning" ? "returning lifter (rebuild at ~70% of previous)"
+        : "experienced (currently training, use real working weights)";
+
+      // Split type — just the name, Claude picks the right exercises
+      const splitType = goal === "build_muscle"
+        ? (daysPerWeek <= 2 ? "full body" : daysPerWeek === 3 ? "full body A/B alternating" : daysPerWeek === 4 ? "upper/lower split" : "push/pull/legs")
         : goal === "lose_fat"
-        ? (daysPerWeek <= 2
-          ? "FAT LOSS FULL BODY — 1-2 days/week. SCIENCE: heavy compound lifting in a calorie deficit is the single most important factor for preserving lean muscle while losing fat. Light cardio-style workouts cause muscle loss — avoid them. MANDATORY movement pattern order both sessions: (1) SQUAT — barbell back squat, goblet squat, or leg press, (2) HINGE — Romanian deadlift or conventional deadlift, (3) HORIZONTAL PUSH — bench press or dumbbell press, (4) HORIZONTAL PULL — row variation, (5) METABOLIC FINISHER — 3 rounds of 15 jump squats or 12 burpees or 20 kettlebell swings, rest 30s between rounds. Compounds: 3 sets, 8-12 reps, rest 90s max. Weight: challenging — RPE 7-8. Never skip the squat or hinge to add isolation work. Progression: add 1 rep per set each session, add weight when top of range achieved across all sets."
-          : daysPerWeek === 3
-          ? "FAT LOSS FULL BODY — 3 days/week. SCIENCE: the goal during fat loss is to send a clear signal to your body to keep the muscle you have. That signal is heavy compound loading. Isolation exercises send no such signal — prioritize compounds always. MANDATORY session structure every workout: (1) SQUAT PATTERN — barbell back squat, front squat, goblet squat, or Bulgarian split squat, (2) HINGE PATTERN — conventional deadlift, Romanian deadlift, or single-leg RDL, (3) HORIZONTAL PUSH — barbell bench press, dumbbell bench, or incline press, (4) HORIZONTAL PULL — barbell row, dumbbell row, or cable row, (5) VERTICAL PUSH or PULL — overhead press or lat pulldown or pull-up, (6) METABOLIC FINISHER — immediately after last exercise, no rest: 3 rounds of 15 kettlebell swings or 20 jump squats or 200m row, 30s rest between rounds. Compounds: 3 sets, 8-12 reps, rest 75-90s. Superset slot 3 with slot 4 (push + pull back to back, rest after both) to elevate heart rate and increase calorie burn. Weight: same as you would use for muscle building — challenging, not easy. RPE 7-8 on all working sets. Zero isolation exercises — every slot is a compound."
-          : daysPerWeek === 4
-          ? "FAT LOSS UPPER/LOWER — 4 days/week, 2 upper and 2 lower. Each muscle hit 2x/week at challenging loads to maximize muscle retention. UPPER DAYS (perform both the same): (1) barbell bench press or dumbbell bench press 3x8-10 RPE 8, (2) barbell bent over row or cable row 3x8-10 RPE 8 — SUPERSET slots 1 and 2 back to back with 90s rest after both, (3) dumbbell overhead press or barbell overhead press 3x10-12 RPE 7-8, (4) lat pulldown or cable pulldown 3x10-12 RPE 7-8 — SUPERSET slots 3 and 4, (5) FINISHER: 3 rounds of 10 push-ups + 10 inverted rows + 20 mountain climbers, rest 30s between rounds. LOWER DAYS (perform both the same): (1) barbell back squat or leg press 3x8-10 RPE 8, (2) Romanian deadlift 3x8-10 RPE 8, (3) Bulgarian split squat or walking lunge 3x10-12 each leg RPE 7, (4) leg curl 3x12-15 RPE 8, (5) FINISHER: 3 rounds of 15 jump squats or 400m jog or 20 kettlebell swings, rest 30s between rounds. Rest 60-90s between all sets. No isolation work — finishers provide the conditioning stimulus."
-          : "FAT LOSS HIGH FREQUENCY — 5+ days/week. Use Push/Pull/Legs rotating structure. Each session: 4 compound exercises (same mandatory pattern rules as 3-day) followed by a 5-minute metabolic finisher. Compounds 3 sets 10-12 reps rest 60-75s. Finisher options: rowing machine 500m, assault bike 3 min, or 4 rounds of 10 burpees. High frequency means lower per-session volume — 3 sets per exercise only. Progressive overload still required: add reps each session, add weight when top of range is hit.")
-        : (daysPerWeek <= 2
-          ? "GENERAL FITNESS FULL BODY — 1-2 days/week. Best use of limited training time: full body compound movements only. MANDATORY every session: (1) SQUAT PATTERN — teaches lower body strength and hip mobility, (2) HINGE PATTERN — builds posterior chain, protects lower back, (3) PUSH — builds upper body pressing strength, (4) PULL — builds upper body pulling strength and posture. 3 sets each, 10-12 reps, rest 90s. Use a weight that feels challenging at rep 9-10. Progression: add 1 rep per set each week, add weight increment when all sets hit 12 reps. This is the minimum effective dose for building a real fitness foundation."
-          : daysPerWeek === 3
-          ? "GENERAL FITNESS FULL BODY — 3 days/week. SCIENCE: for beginners and general fitness, full body 3x/week outperforms any split because each movement pattern is practiced 3 times per week — movement quality improves faster and strength gains come quickly. MANDATORY session structure: (1) SQUAT PATTERN — barbell back squat, goblet squat, or leg press. Start light, focus on depth and control. (2) HINGE PATTERN — Romanian deadlift or conventional deadlift. The most important movement for long-term back health and posterior chain strength. (3) HORIZONTAL PUSH — bench press or dumbbell press. (4) HORIZONTAL PULL — row variation. Pulling strength prevents shoulder and postural problems. (5) CORE OR CARRY — plank 3x30-45s, or farmer carry 3x20m, or dead bug 3x8 each side. Compounds: 3 sets, 10-12 reps, rest 90s. Weight: RPE 7 — should feel like you have 3 reps left in the tank. Progression: add 1 rep per set each session, add weight when all sets hit 12. After 4 weeks, consider moving to 4 days."
-          : daysPerWeek === 4
-          ? "GENERAL FITNESS UPPER/LOWER — 4 days/week. Stepping up from full body — more volume per muscle group, still hitting everything twice per week. UPPER DAYS: (1) bench press or dumbbell press 3x10-12, (2) row variation 3x10-12, (3) overhead press 3x10-12, (4) lat pulldown or pull-up 3x10-12, (5) bicep curl 3x12-15 and tricep pushdown 3x12-15 — these are the only isolation slots permitted. LOWER DAYS: (1) barbell squat or goblet squat 3x10-12, (2) Romanian deadlift 3x10-12, (3) lunges or split squat 3x10-12 each leg, (4) leg curl 3x12-15, (5) core: plank 3x45s or ab wheel 3x8. Rest 90s all exercises. Progression: add 1 rep per set each session, add weight when top of range hit across all sets. This split builds balanced fitness — strength, muscle, and conditioning."
-          : "GENERAL FITNESS HIGH FREQUENCY — 5+ days/week. Use full body sessions but alternate A and B. SESSION A: squat, horizontal push, horizontal pull, core. SESSION B: hinge, vertical push, vertical pull, unilateral leg. 3 sets, 10-12 reps, rest 90s. Keep intensity moderate — RPE 6-7 — because frequency is high. One session per week should include a 15-20 min cardio block (rowing, cycling, or brisk walking) for cardiovascular base. Progression: add reps weekly, add weight monthly.");
+        ? (daysPerWeek <= 2 ? "full body with finisher" : daysPerWeek === 3 ? "full body with metabolic finisher" : daysPerWeek === 4 ? "upper/lower with finisher" : "high frequency full body with finisher")
+        : (daysPerWeek <= 2 ? "full body" : daysPerWeek === 3 ? "full body" : daysPerWeek === 4 ? "upper/lower" : "full body alternating");
 
-      // Equipment constraints — IDs match onboarding: barbell | dumbbell | kettlebell | machine
-      const equipGuide = equipment === "barbell"
-        ? "BARBELL GYM. All primary compounds must use barbell: squat=barbell back squat, hinge=barbell conventional deadlift or Romanian deadlift, horizontal push=barbell bench press, horizontal pull=barbell bent over row, vertical push=barbell overhead press. Dumbbells for accessories only. No push-up variations, no goblet squat as primary."
-        : equipment === "dumbbell"
-        ? "DUMBBELLS AND CABLES. No barbell. squat=goblet squat or Bulgarian split squat, hinge=dumbbell Romanian deadlift or single-leg RDL, push=dumbbell bench press or incline press, pull=single-arm dumbbell row or cable row, vertical push=dumbbell shoulder press. Cables preferred for pulling. No barbell movements."
-        : equipment === "kettlebell"
-        ? "KETTLEBELLS AND BODYWEIGHT ONLY. squat=kettlebell goblet squat or double KB front squat, hinge=kettlebell deadlift or single-leg RDL, push=push-up variations or kettlebell floor press, pull=inverted row or TRX row, vertical pull=pull-up. Core: plank, dead bug, hollow hold."
-        : equipment === "machine"
-        ? "MACHINES AND CABLES. No free barbell. squat=leg press or hack squat machine, hinge=RDL machine or cable pull-through, push=chest press machine or cable press, pull=seated cable row or machine row, vertical pull=lat pulldown machine."
-        : "DUMBBELLS ONLY. squat=goblet squat, hinge=dumbbell Romanian deadlift, push=dumbbell floor press or push-up, pull=single-arm dumbbell row. No barbell, cable, or machines.";
-
-      // Injury modifications
-      const injuryGuide = !injuries || injuries === "none" ? ""
-        : injuries.toLowerCase().includes("knee") ? "KNEE INJURY: remove all squat variations and lunges. Replace with leg press (limited depth) or step-up. Hinge movements safe if knee stays neutral."
-        : injuries.toLowerCase().includes("back") ? "LOWER BACK INJURY: remove conventional deadlift and barbell row. Use trap bar deadlift, cable pull-through, or chest-supported row. No loaded spinal flexion."
-        : injuries.toLowerCase().includes("shoulder") ? "SHOULDER INJURY: remove all overhead pressing. Use landmine press, neutral grip incline dumbbell press, or cable fly. Remove upright row. Horizontal pressing fine if pain-free."
-        : injuries.toLowerCase().includes("wrist") ? "WRIST INJURY: neutral grip only. Replace barbell front squat with safety bar squat or goblet squat."
-        : `INJURY NOTE: ${injuries} — avoid all movements loading this area. Use machine or cable alternatives.`;
-
-      // Starting weights for Week 1 — conservative, based on experience and equipment
-      const isBarbellUser = equipment === "barbell";
-      const weightGuide = trainingHistory === "new"
-        ? isBarbellUser
-          ? "BEGINNER BARBELL — prioritize form over load. Barbell back squat: 45-65lbs (start with empty bar if form is shaky). Barbell bench press: 45-75lbs. Barbell bent over row: 45-65lbs. Barbell Romanian deadlift: 45-75lbs. Barbell overhead press: 33-45lbs (bar only is fine). These are working set weights after warmup. Never ego-lift in week 1."
-          : "BEGINNER DUMBBELL/MACHINE — start very conservative. Goblet squat: 15-25lbs. Dumbbell RDL: 20-30lbs per hand. Dumbbell row: 15-25lbs. Dumbbell press: 10-20lbs each. Leg press: 90-135lbs total. Form and range of motion matter more than weight in weeks 1-2."
-        : trainingHistory === "some"
-        ? isBarbellUser
-          ? "INTERMEDIATE BARBELL — has 6 months to 2 years of experience. Barbell back squat: 115-165lbs. Barbell bench press: 105-155lbs. Barbell bent over row: 85-125lbs. Barbell overhead press: 65-95lbs. Barbell Romanian deadlift: 125-175lbs. Conventional deadlift: 135-205lbs. Use RPE 7 for week 1 — should feel challenging but have 2-3 reps left in tank."
-          : "INTERMEDIATE DUMBBELL — goblet squat: 35-55lbs. Dumbbell RDL: 40-60lbs per hand. Dumbbell row: 35-55lbs. Dumbbell bench: 30-50lbs each. Shoulder press: 25-40lbs each. These are working weights — warmup with lighter first set."
-        : recentActivity === "returning"
-        ? isBarbellUser
-          ? "RETURNING EXPERIENCED BARBELL LIFTER — has trained for years but took a break. Rebuild at 70-75% of old maxes. Barbell squat: 135-185lbs. Bench press: 115-165lbs. Row: 95-135lbs. Overhead press: 75-105lbs. Deadlift: 185-245lbs. Muscle memory returns fast — can add weight weekly."
-          : "RETURNING LIFTER — rebuild conservatively. Goblet squat: 40-60lbs. Dumbbell row: 40-60lbs. Dumbbell press: 35-50lbs each. RDL: 50-75lbs per hand. Expect to progress quickly back to previous levels."
-        : isBarbellUser
-          ? "EXPERIENCED ACTIVE BARBELL LIFTER — currently training regularly. Use true working weights near current strength. Barbell back squat: 185-265lbs. Barbell bench press: 165-235lbs. Barbell bent over row: 145-195lbs. Barbell overhead press: 95-145lbs. Conventional deadlift: 225-315lbs. Romanian deadlift: 185-255lbs. Push to RPE 8-9 on final sets of compounds. These are not warmup weights."
-          : "EXPERIENCED ACTIVE — goblet squat: 60-80lbs. Dumbbell row: 60-85lbs. Dumbbell bench: 50-75lbs each. Shoulder press: 40-60lbs each. RDL: 65-90lbs per hand. Train close to failure on working sets.";
-
-      // RPE targets (1-10 scale: RPE 8 = 2 reps left in tank, RPE 9 = 1 rep left)
-      const rpeGuide = "Week 1 compounds: RPE 7 (3 RIR — learning loads). Week 2+ compounds: RPE 8 (2 RIR). Final set compounds: RPE 8-9. Isolations all sets: RPE 8-9. First set new exercise: RPE 6. Never take compounds to absolute failure.";
-
-      // Warmup and cooldown
-      const warmupGuide = daysPerWeek >= 4
-        ? `Include warmup array with exactly these 5 exercises in order, each with a name, duration, and description field:
-1. name="Light cardio" duration="90 seconds" description="March in place, do jumping jacks, or walk briskly. Move your whole body to raise your heart rate and warm up your muscles before lifting."
-2. name="Arm circles" duration="30 seconds each direction" description="Stand tall and extend both arms out to your sides. Make slow, smooth circles — start big, then smaller. You'll feel your shoulders loosen up as you go."
-3. name="Chest opener stretch" duration="10 slow reps" description="Stand with your feet hip-width apart. Reach both arms wide open to your sides, squeeze your shoulder blades together, then bring your arms back in front. Opens up your chest and upper back."
-4. name="Shoulder squeeze" duration="10 slow reps" description="Sit or stand. Pull both elbows back behind you, pinch your shoulder blades together, hold for a second, then release. Wakes up the muscles between your shoulder blades."
-5. name="Light dumbbell press" duration="10 reps — very light weight" description="Use the lightest dumbbells available. Press them straight up overhead slowly, then lower back down. This is not a working set — it's just getting your shoulders and chest ready for the workout."`
-        : `Include warmup array with exactly these 5 exercises in order, each with a name, duration, and description field:
-1. name="Light cardio" duration="90 seconds" description="March in place, do jumping jacks, or walk briskly. Move your whole body to raise your heart rate and warm up your muscles before lifting."
-2. name="Slow squat hold" duration="10 slow reps" description="Stand with feet shoulder-width apart, toes slightly out. Slowly lower yourself down as far as comfortable, pause for a second at the bottom, then stand back up. Wakes up your hips, knees, and glutes."
-3. name="Toe touch to stand" duration="10 slow reps" description="Stand with feet hip-width apart. Slowly bend forward and reach your hands toward the floor — bend your knees as much as you need. Then slowly roll back up to standing. Loosens your lower back and hamstrings."
-4. name="Arm circles" duration="30 seconds each direction" description="Stand tall and extend both arms out to your sides. Make slow, smooth circles — start big, then smaller. You'll feel your shoulders loosen up as you go."
-5. name="Hip circles" duration="30 seconds each direction" description="Stand with feet shoulder-width apart and hands on your hips. Make big slow circles with your hips, like you're using a hula hoop. Loosens up your lower back and hip joints before squatting or hinging movements."`;
-      const cooldownGuide = "Include cooldown array with: 30s quad stretch each side, 30s hamstring stretch, 30s chest stretch, 30s shoulder stretch, 60s child's pose. Each item must have name, duration, and description fields with plain-language instructions.";
+      // Hardcoded warmup and cooldown — no need for Claude to generate these
+      const hardcodedWarmup = [
+        { name: "Light cardio", duration: "90 seconds", description: "March in place or do jumping jacks to raise your heart rate." },
+        { name: "Leg swings", duration: "10 each leg", description: "Hold a wall for balance and swing each leg forward and back to loosen your hips." },
+        { name: "Arm circles", duration: "30 seconds", description: "Extend arms out and make slow circles to warm up your shoulders." },
+        { name: "Bodyweight squat", duration: "10 slow reps", description: "Slow controlled squats to wake up your hips, knees, and glutes." },
+        { name: "Hip circles", duration: "30 seconds", description: "Hands on hips, make slow big circles to loosen your lower back and hips." }
+      ];
+      const hardcodedCooldown = [
+        { name: "Quad stretch", duration: "30 seconds each leg", description: "Stand on one leg, pull the other heel to your glute. Hold a wall for balance." },
+        { name: "Hamstring stretch", duration: "30 seconds", description: "Sit on the floor with legs straight, reach toward your toes." },
+        { name: "Chest stretch", duration: "30 seconds", description: "Clasp hands behind your back, open your chest, look up slightly." },
+        { name: "Shoulder stretch", duration: "30 seconds each", description: "Pull one arm across your chest, hold with the other hand." },
+        { name: "Child's pose", duration: "60 seconds", description: "Kneel and reach arms forward on the floor. Breathe deeply and relax." }
+      ];
 
       // Fat loss = 6 exercises (5 compounds + metabolic finisher), all other goals = 5
       const exerciseCount = goal === "lose_fat" ? 6 : 5;
 
-      const prompt = `Generate a week 1 fitness plan. Return ONLY valid JSON, no markdown.
-Member: goal=${goal}, sex=${sex}, height=${heightFt}ft${heightIn||0}in, weight=${weight}lbs, age=${age}, daysPerWeek=${daysPerWeek}, equipment=${equipment||"dumbbells"}, injuries=${injuries||"none"}, fitnessProfile=${fitnessProfile}.
-CALORIES ALREADY CALCULATED — use exactly these values: calories=${targetCals}, protein=${targetProtein}, carbs=${targetCarbs}, fat=${targetFat}, bmr=${bmrCalc}, tdee=${tdeeCalc}, goalAdjustment=${goalAdj}.
-PROGRAM: ${programGuide}
-EQUIPMENT: ${equipGuide}
-${injuryGuide ? "INJURIES: " + injuryGuide : ""}
-WEIGHTS: ${weightGuide}
-RPE: ${rpeGuide}
-${warmupGuide}
-${cooldownGuide}
-Return exactly this JSON structure:
-{"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"1 sentence","tip":"1 sentence","progressionRule":"Weeks 1-3 add reps within range, week 4 deload 40%, week 5+ increase weight","warmup":[{"name":"string","duration":"string","description":"string"}],"cooldown":[{"name":"string","duration":"string","description":"string"}],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
-Include exactly ${exerciseCount} exercises. All numeric values must be plain numbers, not strings.`;
+      const prompt = `Generate a week 1 fitness plan as JSON only. No markdown, no explanation.
+Member: goal=${goal}, sex=${sex}, ${heightFt}ft${heightIn||0}in, ${weight}lbs, age ${age}, ${daysPerWeek} days/week.
+Equipment: ${equipGuide}. Experience: ${expLevel}. Split: ${splitType}.
+${injuryNote}
+Nutrition (already calculated — use exactly): calories=${targetCals}, protein=${targetProtein}g, carbs=${targetCarbs}g, fat=${targetFat}g.
+Return this exact JSON (${exerciseCount} exercises, all numbers as numbers not strings):
+{"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}`;
 
       try {
         const res = await fetch("/api/plan", {
@@ -1256,6 +1210,9 @@ Include exactly ${exerciseCount} exercises. All numeric values must be plain num
         const data = await res.json();
         const raw = (data.text || "").replace(/```json|```/g, "").trim();
         const parsed = JSON.parse(raw);
+        // Always use hardcoded warmup/cooldown — reliable and saves tokens
+        parsed.warmup = hardcodedWarmup;
+        parsed.cooldown = hardcodedCooldown;
         if (!cancelled) {
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           setUser(userData);
