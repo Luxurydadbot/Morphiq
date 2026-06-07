@@ -490,6 +490,96 @@ function todayMealKey(userId) {
   return `morphiq_meals_${userId || "anon"}_${today}`;
 }
 
+function HungryButton({ calsLeft, proteinLeft, goal }) {
+  const { gymBranding } = useApp();
+  const a = gymBranding.accent;
+  const [state, setState] = useState("idle"); // idle | loading | done
+  const [suggestions, setSuggestions] = useState([]);
+
+  const calledOut = calsLeft <= 0;
+
+  async function getSuggestions() {
+    if (calledOut) return;
+    setState("loading");
+    try {
+      const prompt = `The user is hungry and has ${calsLeft} calories and ${proteinLeft}g protein left for today. Their goal is ${goal || "general fitness"}. Give exactly 3 quick meal or snack ideas that fit. For each one give: name, approximate calories, approximate protein in grams. Keep each suggestion to one line. No intro text, no explanation. Respond ONLY as JSON array like: [{"name":"...","cal":000,"protein":00},{"name":"...","cal":000,"protein":00},{"name":"...","cal":000,"protein":00}]`;
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: prompt }],
+          user: { goal },
+          context: "meals",
+        }),
+      });
+      const data = await res.json();
+      const text = data.text || "";
+      // Strip any markdown fences and parse JSON
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      setSuggestions(parsed);
+      setState("done");
+    } catch {
+      // Fallback if AI call fails
+      setSuggestions([
+        { name: "Greek yogurt + berries", cal: Math.min(calsLeft, 220), protein: 18 },
+        { name: "Protein shake + banana", cal: Math.min(calsLeft, 280), protein: 26 },
+        { name: "2 boiled eggs + rice cakes", cal: Math.min(calsLeft, 190), protein: 14 },
+      ]);
+      setState("done");
+    }
+  }
+
+  if (calledOut) {
+    return (
+      <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5 }}>
+          You've hit your calorie goal today — great work. Stay hydrated and your body will take care of the rest. 💧
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: state === "idle" ? 0 : 10 }}>
+        <div>
+          <div style={{ fontSize: 12, color: "#9BB3C8" }}>
+            <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{calsLeft} cal</span> and <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{proteinLeft}g protein</span> left today
+          </div>
+        </div>
+        {state === "idle" && (
+          <button onClick={getSuggestions} style={{ background: a, border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+            I'm Hungry
+          </button>
+        )}
+        {state === "loading" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: a }}>
+            <Spinner size={12} /> Finding ideas...
+          </div>
+        )}
+      </div>
+      {state === "done" && suggestions.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 10, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Ideas that fit</div>
+          {suggestions.map((s, i) => (
+            <div key={i} style={{ background: "#1A2332", borderRadius: 9, padding: "8px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 12, color: "#E8EDF2", fontWeight: 500 }}>{s.name}</div>
+              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
+                <div style={{ fontSize: 11, color: a, fontWeight: 600 }}>{s.cal} cal</div>
+                <div style={{ fontSize: 10, color: "#6B7A8D" }}>{s.protein}g protein</div>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => { setState("idle"); setSuggestions([]); }} style={{ background: "transparent", border: "none", fontSize: 10, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", marginTop: 2 }}>
+            ↺ Get different ideas
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MealPlanScreen() {
   const { gymBranding, supabaseUser, plan, user } = useApp();
   const a = gymBranding.accent;
@@ -748,15 +838,7 @@ function MealPlanScreen() {
                 onOpenDetail={() => setDetailMeal(meal)}
               />
             ))}
-            <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: a, fontWeight: 500, marginBottom: 4 }}>Still hungry?</div>
-              <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5 }}>
-                {CAL_GOAL - macros.cal <= 0
-                  ? <span>You've hit your calorie goal today — no problem. Stay hydrated and your body will take care of the rest. 💧</span>
-                  : <span>You have <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{CAL_GOAL - macros.cal} cal</span> and <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{Math.max(0, PROTEIN_GOAL - macros.protein)}g protein</span> left today.</span>
-                }
-              </div>
-            </div>
+            <HungryButton calsLeft={CAL_GOAL - macros.cal} proteinLeft={Math.max(0, PROTEIN_GOAL - macros.protein)} goal={plan?.goal} />
           </div>
         )}
 
