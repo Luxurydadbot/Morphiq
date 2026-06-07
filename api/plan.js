@@ -9,7 +9,7 @@ export default async function handler(req, res) {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 6000,
         system: `You are an elite certified strength and conditioning coach with expertise in evidence-based hypertrophy training, fat loss programming, and movement science. Your programming is based on current peer-reviewed research (Schoenfeld, Israetel, Helms, Krieger).
 
@@ -32,6 +32,7 @@ CRITICAL RULES — never violate these:
       return res.status(502).json({ error: "Claude error", detail: data?.error?.message || JSON.stringify(data) });
     }
     const text = (data.content || []).map(b => b.text || "").join("").trim();
+    if (!text) return res.status(502).json({ error: "Empty response from Claude", detail: JSON.stringify(data) });
     return res.status(200).json({ text });
   } catch (err) {
     return res.status(500).json({ error: "Failed", detail: err.message });
