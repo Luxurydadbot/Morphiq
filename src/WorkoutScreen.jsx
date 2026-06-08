@@ -291,6 +291,8 @@ function WorkoutScreen() {
   const [nudgedWeight, setNudgedWeight] = useState(null);
   const [showSwapSheet, setShowSwapSheet] = useState(false);  // controls the swap picker sheet
   const [swapConfirmName, setSwapConfirmName] = useState(null); // shows "Swapped in X ✓" briefly
+  const [voiceSwapActive, setVoiceSwapActive] = useState(false); // mic open inside swap sheet
+  const [voiceSwapHeard, setVoiceSwapHeard] = useState("");     // what the mic captured
   const [lastLoggedReps, setLastLoggedReps] = useState(null);
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [savedToCloud, setSavedToCloud] = useState(false);
@@ -509,6 +511,54 @@ function WorkoutScreen() {
     };
     rec.onerror = () => { setListening(false); setVoiceTranscript("Didn't catch that — tap Log ✓ to log your reps"); };
     rec.onend = () => setListening(false);
+    rec.start();
+  }
+
+  // Voice swap — captures a free-form exercise name instead of a rep count.
+  // Member says anything: "cable flyes", "Smith machine squat", "there's a free leg press".
+  // We clean up the transcript and use whatever real exercise name we can extract.
+  function listenForSwap() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      // Fallback: plain text prompt for browsers without mic support
+      const typed = window.prompt("Type the exercise name:");
+      if (typed && typed.trim().length > 1) {
+        const name = typed.trim();
+        setVoiceSwapHeard(name);
+        doSwap({ name, muscle: ex.muscle, pattern: ex.pattern, sets: ex.sets, targetReps: ex.targetReps, weight: ex.weight, rpe: ex.rpe, alternative: null });
+        setShowSwapSheet(false);
+        setVoiceSwapActive(false);
+        setVoiceSwapHeard("");
+      }
+      return;
+    }
+    setVoiceSwapActive(true);
+    setVoiceSwapHeard("");
+    const rec = new SpeechRecognition();
+    rec.lang = "en-US";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+      const raw = e.results[0][0].transcript.trim();
+      // Strip filler phrases so "I'll do cable flyes" → "cable flyes"
+      const cleaned = raw
+        .replace(/^(I('ll| will| want to| want)?( do| try| use)?|let('s| me)( do| try)?|switch to|swap to|how about|can I do|I'm going to do)\s+/i, "")
+        .replace(/\s*(instead|please|now|next)\s*$/i, "")
+        .trim();
+      const name = cleaned.length > 1 ? cleaned : raw;
+      // Capitalize first letter of each word for clean display
+      const titleCase = name.replace(/\b\w/g, c => c.toUpperCase());
+      setVoiceSwapHeard(titleCase);
+    };
+    rec.onerror = () => {
+      setVoiceSwapActive(false);
+      setVoiceSwapHeard("");
+    };
+    rec.onend = () => {
+      // onresult fires before onend, so voiceSwapHeard is already set
+      // We don't auto-confirm — we show what was heard and let them tap Confirm
+      setVoiceSwapActive(false);
+    };
     rec.start();
   }
 
@@ -996,7 +1046,58 @@ function WorkoutScreen() {
                 <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Swap →</div>
               </button>
             ))}
-            <button onClick={() => setShowSwapSheet(false)}
+            {/* ── Voice swap option ── */}
+            {!voiceSwapActive && !voiceSwapHeard && (
+              <button onClick={listenForSwap}
+                style={{ width: "100%", background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontFamily: "inherit" }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <rect x="8" y="2" width="8" height="12" rx="4" fill="#003D35"/>
+                    <path d="M5 12c0 3.866 3.134 7 7 7s7-3.134 7-7" stroke="#003D35" strokeWidth="2" strokeLinecap="round"/>
+                    <line x1="12" y1="19" x2="12" y2="22" stroke="#003D35" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2" }}>Say an exercise</div>
+                  <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>Speak any exercise name freely</div>
+                </div>
+              </button>
+            )}
+            {/* Listening state */}
+            {voiceSwapActive && (
+              <div style={{ background: "#0A1628", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 12, padding: "14px", marginBottom: 8, textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "#9BB3C8", marginBottom: 6 }}>Listening — say any exercise name</div>
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 6 }}>
+                  {[5,12,20,12,7,16,10].map((h,i) => (
+                    <div key={i} style={{ width: 3, height: h, borderRadius: 2, background: a, animation: `wv 0.9s ${i*0.1}s infinite ease-in-out` }}/>
+                  ))}
+                </div>
+                <div style={{ fontSize: 10, color: a }}>Speak now...</div>
+              </div>
+            )}
+            {/* Heard — confirm or retry */}
+            {!voiceSwapActive && voiceSwapHeard && (
+              <div style={{ background: "#0A1A14", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "14px", marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: "#6B7A8D", marginBottom: 5 }}>Heard:</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#E8EDF2", marginBottom: 12 }}>"{voiceSwapHeard}"</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => { setVoiceSwapHeard(""); setVoiceSwapActive(false); }}
+                    style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "9px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>
+                    Try again
+                  </button>
+                  <button onClick={() => {
+                      doSwap({ name: voiceSwapHeard, muscle: ex.muscle, pattern: ex.pattern, sets: ex.sets, targetReps: ex.targetReps, weight: ex.weight, rpe: ex.rpe, alternative: null });
+                      setShowSwapSheet(false);
+                      setVoiceSwapActive(false);
+                      setVoiceSwapHeard("");
+                    }}
+                    style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px", fontSize: 13, fontWeight: 700, color: "#003D35", cursor: "pointer", fontFamily: "inherit" }}>
+                    ✓ Use {voiceSwapHeard}
+                  </button>
+                </div>
+              </div>
+            )}
+            <button onClick={() => { setShowSwapSheet(false); setVoiceSwapActive(false); setVoiceSwapHeard(""); }}
               style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px", fontSize: 13, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit", marginTop: 2 }}>
               Cancel — keep {ex.name}
             </button>
