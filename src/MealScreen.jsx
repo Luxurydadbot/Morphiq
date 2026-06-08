@@ -31,8 +31,8 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
       {/* Header row */}
       <div style={{ padding: "8px 12px 6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", fontWeight: 500 }}>{meal.label}</span>
-          <span style={{ fontSize: 9, color: theme.textFaint }}>{meal.time}</span>
+          <span style={{ fontSize: 14, color: "#E8EDF2", fontWeight: 700 }}>{meal.label}</span>
+          <span style={{ fontSize: 11, color: theme.textDim }}>{meal.time}</span>
         </div>
         {{ done: <Pill variant="teal">✓ Logged</Pill>, swapped: <Pill variant="amber">⚡ Swapped</Pill>, upcoming: <Pill variant="gray">Up next</Pill>, skipped: <Pill variant="red">Skipped</Pill> }[meal.status]}
       </div>
