@@ -475,13 +475,38 @@ function WorkoutScreen() {
           <div style={{ fontSize: 36, marginBottom: 12 }}>🏆</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: theme.text, marginBottom: 4 }}>Workout complete!</div>
           <div style={{ fontSize: 14, color: theme.textDim, marginBottom: "1.5rem" }}>Great work, {user.name || "champ"}. Recovery starts now.</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%", marginBottom: overloadApplied ? 10 : "1.5rem" }}>
-            {[["Sets done", totalSets], ["Total volume", `${totalVol.toLocaleString()} lbs`], ["Exercises", exercises.length], ["Personal bests", "2 🔥"]].map(([l, v]) => (
+          {/* Big stats grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%", marginBottom: 12 }}>
+            {[
+              ["Sets completed", totalSets],
+              ["Total volume", `${totalVol.toLocaleString()} lbs`],
+              ["Exercises", exercises.length],
+              ["Sets per exercise", totalSets > 0 && exercises.length > 0 ? (totalSets / exercises.length).toFixed(1) : "—"],
+            ].map(([l, v]) => (
               <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
-                <div style={{ fontSize: 20, fontWeight: 600, color: a }}>{v}</div>
-                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: a }}>{v}</div>
+                <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{l}</div>
               </div>
             ))}
+          </div>
+
+          {/* Per-exercise breakdown */}
+          <div style={{ width: "100%", background: "#0D1623", borderRadius: 12, padding: "10px 14px", marginBottom: overloadApplied ? 10 : "1.5rem" }}>
+            <div style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Exercise breakdown</div>
+            {exercises.map((ex, i) => {
+              const exSets = loggedSets.filter(l => l.exerciseName === ex.name);
+              const bestReps = exSets.length > 0 ? Math.max(...exSets.map(l => l.reps)) : 0;
+              const totalExVol = exSets.reduce((acc, l) => acc + l.reps * l.weight, 0);
+              return (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, marginBottom: 6, borderBottom: i < exercises.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: theme.text }}>{ex.name}</div>
+                    <div style={{ fontSize: 10, color: theme.textDim, marginTop: 1 }}>{exSets.length} sets · best {bestReps} reps</div>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: a }}>{totalExVol > 0 ? `${totalExVol.toLocaleString()} lbs` : "—"}</div>
+                </div>
+              );
+            })}
           </div>
           {overloadApplied && (
             <div style={{ width: "100%", background: "#1A1200", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: "10px 14px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 10 }}>
@@ -674,6 +699,28 @@ function WorkoutScreen() {
           )}
         </div>
 
+        {/* Sets logged this exercise — shows after first set is done */}
+        {loggedSets.filter(l => l.exerciseName === ex.name).length > 0 && (
+          <div style={{ background: "#0D1623", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}>
+            <div style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>This exercise</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {loggedSets.filter(l => l.exerciseName === ex.name).map((l, i) => (
+                <div key={i} style={{ background: "#1A2332", borderRadius: 8, padding: "5px 9px", textAlign: "center" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: l.reps > 0 ? a : theme.textFaint }}>
+                    {l.reps > 0 ? `${l.reps} reps` : "skipped"}
+                  </div>
+                  <div style={{ fontSize: 9, color: theme.textDim, marginTop: 1 }}>{l.weight} lbs</div>
+                </div>
+              ))}
+              {/* Ghost card for current set */}
+              <div style={{ background: "#1A2332", border: `1px dashed rgba(0,212,177,0.3)`, borderRadius: 8, padding: "5px 9px", textAlign: "center", opacity: 0.5 }}>
+                <div style={{ fontSize: 11, color: a }}>Set {loggedSets.filter(l => l.exerciseName === ex.name).length + 1}</div>
+                <div style={{ fontSize: 9, color: theme.textDim, marginTop: 1 }}>current</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── REP COUNTER — the focal point ── */}
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 10 }}>Reps</div>
@@ -723,8 +770,14 @@ function WorkoutScreen() {
             style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px 6px", fontSize: 12, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Log {displayReps} reps ✓</button>
         </div>
 
-        <div style={{ marginTop: 8, fontSize: 9, color: theme.textFaint, textAlign: "center" }}>
-          Exercise {exIdx + 1} of {exercises.length} · {totalCompleted} sets logged
+        <div style={{ marginTop: 8, display: "flex", justifyContent: "center", gap: 16, alignItems: "center" }}>
+          <div style={{ fontSize: 12, color: theme.textDim, fontWeight: 500 }}>
+            Exercise <span style={{ color: theme.text, fontWeight: 700 }}>{exIdx + 1}</span> of {exercises.length}
+          </div>
+          <div style={{ width: 3, height: 3, borderRadius: "50%", background: theme.textFaint }} />
+          <div style={{ fontSize: 12, color: theme.textDim, fontWeight: 500 }}>
+            <span style={{ color: theme.text, fontWeight: 700 }}>{totalCompleted}</span> sets logged
+          </div>
         </div>
       </div>
 
