@@ -551,7 +551,12 @@ function AppProvider({ children }) {
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
         setScreen("onboarding");
       }
-    }).catch(() => { localStorage.removeItem(SESSION_KEY); setScreen("auth"); });
+    }).catch(() => {
+      // Network error — do NOT wipe the session. The user is still logged in.
+      // Show a gentle retry screen instead of dumping them back to login.
+      // This prevents testers losing their session on spotty phone connections.
+      setScreen("network_error");
+    });
   }, []);
 
   // Called after successful auth. role = "member" | "owner".
@@ -611,7 +616,7 @@ function AppProvider({ children }) {
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
       const email = payload.email || "";
       const uid = payload.sub || "";
-      if (uid) signIn(email, "member", null, uid);
+      if (uid) signIn(email, "member", uid);
     } catch(e) { console.error("Magic link error:", e); }
   }, []);
 
@@ -2948,9 +2953,37 @@ function LoadingScreen() {
   );
 }
 
+function NetworkErrorScreen() {
+  const { navigate } = useApp();
+  return (
+    <Layout>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 16, padding: "0 32px", textAlign: "center" }}>
+        <div style={{ fontSize: 40 }}>📶</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: theme.text }}>Connection issue</div>
+        <div style={{ fontSize: 14, color: theme.textMuted, lineHeight: 1.6 }}>
+          Couldn't reach the server. You're still logged in — just tap retry when you have a connection.
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ background: theme.accent, color: "#003D35", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8 }}
+        >
+          Retry
+        </button>
+        <button
+          onClick={() => navigate("auth")}
+          style={{ background: "transparent", color: theme.textDim, border: "none", fontSize: 13, cursor: "pointer" }}
+        >
+          Use a different account
+        </button>
+      </div>
+    </Layout>
+  );
+}
+
 function AppRouter() {
   const { screen } = useApp();
   if (screen === "auth") return <AuthScreen />;
+  if (screen === "network_error") return <NetworkErrorScreen />;
   if (screen === "loading") return <LoadingScreen />;
   if (screen === "onboarding") return <OnboardingScreen />;
   if (screen === "plan") return <PlanOverviewScreen />;
