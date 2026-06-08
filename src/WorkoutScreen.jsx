@@ -54,39 +54,202 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
 // ─── SWAP ALTERNATIVES ────────────────────────────────────────────────────────
 // Keyed by muscle group string — must match the muscle field in WORKOUT_EXERCISES.
 // Each entry is 3 alternatives. Weight is a sensible starting default.
-const SWAP_ALTERNATIVES = {
-  "Quads / Glutes": [
-    { name: "Leg Press",        muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 90 },
-    { name: "Step-Ups",         muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 20 },
-    { name: "Split Squat",      muscle: "Quads / Glutes", sets: 3, targetReps: 10, weight: 20 },
-  ],
-  "Back / Biceps": [
-    { name: "Lat Pulldown",     muscle: "Back / Biceps",  sets: 3, targetReps: 10, weight: 60 },
-    { name: "Cable Row",        muscle: "Back / Biceps",  sets: 3, targetReps: 10, weight: 55 },
-    { name: "Hammer Curl",      muscle: "Back / Biceps",  sets: 3, targetReps: 12, weight: 20 },
-  ],
-  "Chest / Shoulders": [
-    { name: "Dumbbell Fly",     muscle: "Chest / Shoulders", sets: 3, targetReps: 12, weight: 20 },
-    { name: "Push-Up",          muscle: "Chest / Shoulders", sets: 3, targetReps: 15, weight: 0  },
-    { name: "Cable Chest Press",muscle: "Chest / Shoulders", sets: 3, targetReps: 10, weight: 30 },
-  ],
-  "Hamstrings": [
-    { name: "Lying Leg Curl",   muscle: "Hamstrings",     sets: 3, targetReps: 12, weight: 50 },
-    { name: "Good Morning",     muscle: "Hamstrings",     sets: 3, targetReps: 10, weight: 45 },
-    { name: "Nordic Curl",      muscle: "Hamstrings",     sets: 3, targetReps: 8,  weight: 0  },
-  ],
-  "Shoulders": [
-    { name: "Lateral Raise",    muscle: "Shoulders",      sets: 3, targetReps: 15, weight: 10 },
-    { name: "Front Raise",      muscle: "Shoulders",      sets: 3, targetReps: 12, weight: 10 },
-    { name: "Arnold Press",     muscle: "Shoulders",      sets: 3, targetReps: 10, weight: 20 },
-  ],
+// ── EQUIPMENT-AWARE SWAP TABLE ─────────────────────────────────────────────
+// Organized by movement pattern (squat/hinge/push/pull/accessory) then equipment.
+// This ensures a barbell lifter swapping bench press never sees push-ups.
+// Each entry: { name, muscle, sets, targetReps, weight }
+const SWAP_BY_PATTERN = {
+  squat: {
+    barbell: [
+      { name: "Barbell Front Squat",        muscle: "Quads / Glutes", sets: 3, targetReps: 8,  weight: 95  },
+      { name: "Barbell Box Squat",           muscle: "Quads / Glutes", sets: 3, targetReps: 6,  weight: 115 },
+      { name: "Barbell Pause Squat",         muscle: "Quads / Glutes", sets: 3, targetReps: 5,  weight: 110 },
+      { name: "Barbell Hack Squat",          muscle: "Quads / Glutes", sets: 3, targetReps: 8,  weight: 95  },
+    ],
+    dumbbell: [
+      { name: "Goblet Squat",               muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 40  },
+      { name: "Bulgarian Split Squat",      muscle: "Quads / Glutes", sets: 3, targetReps: 10, weight: 30  },
+      { name: "Dumbbell Step-Up",           muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 25  },
+      { name: "Dumbbell Reverse Lunge",     muscle: "Quads / Glutes", sets: 3, targetReps: 10, weight: 25  },
+    ],
+    machine: [
+      { name: "Leg Press",                  muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 180 },
+      { name: "Hack Squat Machine",         muscle: "Quads / Glutes", sets: 3, targetReps: 10, weight: 135 },
+      { name: "Smith Machine Squat",        muscle: "Quads / Glutes", sets: 3, targetReps: 10, weight: 115 },
+      { name: "Leg Extension",              muscle: "Quads",          sets: 3, targetReps: 15, weight: 70  },
+    ],
+    kettlebell: [
+      { name: "Kettlebell Goblet Squat",    muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 35  },
+      { name: "Kettlebell Front Squat",     muscle: "Quads / Glutes", sets: 3, targetReps: 10, weight: 35  },
+      { name: "Single-Leg Box Squat",       muscle: "Quads / Glutes", sets: 3, targetReps: 8,  weight: 0   },
+    ],
+    bodyweight: [
+      { name: "Bulgarian Split Squat",      muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 0   },
+      { name: "Pistol Squat",               muscle: "Quads / Glutes", sets: 3, targetReps: 8,  weight: 0   },
+      { name: "Step-Up",                    muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 0   },
+    ],
+  },
+  hinge: {
+    barbell: [
+      { name: "Barbell Romanian Deadlift",  muscle: "Hamstrings / Glutes", sets: 3, targetReps: 8,  weight: 135 },
+      { name: "Barbell Sumo Deadlift",      muscle: "Hamstrings / Glutes", sets: 3, targetReps: 5,  weight: 185 },
+      { name: "Barbell Good Morning",       muscle: "Hamstrings / Glutes", sets: 3, targetReps: 8,  weight: 65  },
+      { name: "Trap Bar Deadlift",          muscle: "Hamstrings / Glutes", sets: 3, targetReps: 6,  weight: 185 },
+    ],
+    dumbbell: [
+      { name: "Dumbbell Romanian Deadlift", muscle: "Hamstrings / Glutes", sets: 3, targetReps: 10, weight: 50  },
+      { name: "Single-Leg Dumbbell RDL",    muscle: "Hamstrings / Glutes", sets: 3, targetReps: 10, weight: 35  },
+      { name: "Dumbbell Hip Thrust",        muscle: "Glutes / Hamstrings", sets: 3, targetReps: 12, weight: 40  },
+      { name: "Dumbbell Good Morning",      muscle: "Hamstrings",          sets: 3, targetReps: 12, weight: 25  },
+    ],
+    machine: [
+      { name: "Cable Pull-Through",         muscle: "Hamstrings / Glutes", sets: 3, targetReps: 12, weight: 50  },
+      { name: "Lying Leg Curl",             muscle: "Hamstrings",          sets: 3, targetReps: 12, weight: 55  },
+      { name: "Seated Leg Curl",            muscle: "Hamstrings",          sets: 3, targetReps: 12, weight: 55  },
+      { name: "Hip Thrust Machine",         muscle: "Glutes",              sets: 3, targetReps: 12, weight: 90  },
+    ],
+    kettlebell: [
+      { name: "Kettlebell Deadlift",        muscle: "Hamstrings / Glutes", sets: 3, targetReps: 10, weight: 53  },
+      { name: "Kettlebell Swing",           muscle: "Hamstrings / Glutes", sets: 3, targetReps: 15, weight: 35  },
+      { name: "Single-Leg Kettlebell RDL",  muscle: "Hamstrings / Glutes", sets: 3, targetReps: 10, weight: 35  },
+    ],
+    bodyweight: [
+      { name: "Single-Leg Hip Thrust",      muscle: "Glutes",              sets: 3, targetReps: 12, weight: 0   },
+      { name: "Nordic Curl",                muscle: "Hamstrings",          sets: 3, targetReps: 6,  weight: 0   },
+      { name: "Glute Bridge",               muscle: "Glutes",              sets: 3, targetReps: 15, weight: 0   },
+    ],
+  },
+  push: {
+    barbell: [
+      { name: "Barbell Incline Bench Press",muscle: "Chest / Shoulders", sets: 3, targetReps: 8,  weight: 115 },
+      { name: "Barbell Close-Grip Bench",   muscle: "Chest / Triceps",   sets: 3, targetReps: 8,  weight: 105 },
+      { name: "Barbell Overhead Press",     muscle: "Shoulders",          sets: 3, targetReps: 8,  weight: 75  },
+      { name: "Barbell Floor Press",        muscle: "Chest / Triceps",   sets: 3, targetReps: 8,  weight: 105 },
+    ],
+    dumbbell: [
+      { name: "Dumbbell Bench Press",       muscle: "Chest",              sets: 3, targetReps: 10, weight: 45  },
+      { name: "Dumbbell Incline Press",     muscle: "Chest / Shoulders",  sets: 3, targetReps: 10, weight: 35  },
+      { name: "Dumbbell Shoulder Press",    muscle: "Shoulders",          sets: 3, targetReps: 10, weight: 30  },
+      { name: "Dumbbell Floor Press",       muscle: "Chest / Triceps",   sets: 3, targetReps: 12, weight: 40  },
+    ],
+    machine: [
+      { name: "Chest Press Machine",        muscle: "Chest",              sets: 3, targetReps: 12, weight: 90  },
+      { name: "Cable Chest Press",          muscle: "Chest",              sets: 3, targetReps: 12, weight: 40  },
+      { name: "Pec Deck",                   muscle: "Chest",              sets: 3, targetReps: 15, weight: 80  },
+      { name: "Seated Shoulder Press Machine", muscle: "Shoulders",       sets: 3, targetReps: 12, weight: 70  },
+    ],
+    kettlebell: [
+      { name: "Kettlebell Floor Press",     muscle: "Chest / Triceps",   sets: 3, targetReps: 10, weight: 35  },
+      { name: "Kettlebell Overhead Press",  muscle: "Shoulders",          sets: 3, targetReps: 10, weight: 26  },
+      { name: "Push-Up",                    muscle: "Chest",              sets: 3, targetReps: 15, weight: 0   },
+    ],
+    bodyweight: [
+      { name: "Push-Up",                    muscle: "Chest",              sets: 3, targetReps: 15, weight: 0   },
+      { name: "Pike Push-Up",               muscle: "Shoulders",          sets: 3, targetReps: 12, weight: 0   },
+      { name: "Diamond Push-Up",            muscle: "Chest / Triceps",   sets: 3, targetReps: 12, weight: 0   },
+    ],
+  },
+  pull: {
+    barbell: [
+      { name: "Barbell Pendlay Row",        muscle: "Back",               sets: 3, targetReps: 8,  weight: 115 },
+      { name: "Barbell Yates Row",          muscle: "Back",               sets: 3, targetReps: 8,  weight: 135 },
+      { name: "Barbell Meadows Row",        muscle: "Back",               sets: 3, targetReps: 10, weight: 65  },
+      { name: "Barbell Chest-Supported Row",muscle: "Back",               sets: 3, targetReps: 8,  weight: 95  },
+    ],
+    dumbbell: [
+      { name: "Single-Arm Dumbbell Row",    muscle: "Back",               sets: 3, targetReps: 10, weight: 50  },
+      { name: "Dumbbell Seal Row",          muscle: "Back",               sets: 3, targetReps: 10, weight: 40  },
+      { name: "Dumbbell Renegade Row",      muscle: "Back / Core",        sets: 3, targetReps: 8,  weight: 30  },
+      { name: "Incline Dumbbell Row",       muscle: "Back",               sets: 3, targetReps: 10, weight: 35  },
+    ],
+    machine: [
+      { name: "Seated Cable Row",           muscle: "Back",               sets: 3, targetReps: 10, weight: 70  },
+      { name: "Lat Pulldown",               muscle: "Back / Biceps",      sets: 3, targetReps: 10, weight: 80  },
+      { name: "Machine Row",                muscle: "Back",               sets: 3, targetReps: 12, weight: 90  },
+      { name: "Assisted Pull-Up Machine",   muscle: "Back / Biceps",      sets: 3, targetReps: 10, weight: 60  },
+    ],
+    kettlebell: [
+      { name: "Kettlebell Single-Arm Row",  muscle: "Back",               sets: 3, targetReps: 10, weight: 35  },
+      { name: "Kettlebell Renegade Row",    muscle: "Back / Core",        sets: 3, targetReps: 8,  weight: 26  },
+      { name: "Inverted Row",               muscle: "Back",               sets: 3, targetReps: 12, weight: 0   },
+    ],
+    bodyweight: [
+      { name: "Pull-Up",                    muscle: "Back / Biceps",      sets: 3, targetReps: 8,  weight: 0   },
+      { name: "Inverted Row",               muscle: "Back",               sets: 3, targetReps: 12, weight: 0   },
+      { name: "Chin-Up",                    muscle: "Back / Biceps",      sets: 3, targetReps: 8,  weight: 0   },
+    ],
+  },
+  accessory: {
+    // Accessories are equipment-agnostic — we just show muscle-appropriate options
+    biceps:    [
+      { name: "Barbell Curl",    muscle: "Biceps", sets: 3, targetReps: 12, weight: 35 },
+      { name: "Hammer Curl",     muscle: "Biceps", sets: 3, targetReps: 12, weight: 25 },
+      { name: "Incline Curl",    muscle: "Biceps", sets: 3, targetReps: 10, weight: 20 },
+    ],
+    triceps:   [
+      { name: "Tricep Pushdown", muscle: "Triceps", sets: 3, targetReps: 15, weight: 40 },
+      { name: "Skull Crusher",   muscle: "Triceps", sets: 3, targetReps: 10, weight: 35 },
+      { name: "Overhead Tricep Extension", muscle: "Triceps", sets: 3, targetReps: 12, weight: 30 },
+    ],
+    shoulders: [
+      { name: "Lateral Raise",   muscle: "Shoulders", sets: 3, targetReps: 15, weight: 12 },
+      { name: "Face Pull",       muscle: "Rear Delt",  sets: 3, targetReps: 15, weight: 30 },
+      { name: "Arnold Press",    muscle: "Shoulders", sets: 3, targetReps: 10, weight: 25 },
+    ],
+    core:      [
+      { name: "Ab Wheel Rollout",      muscle: "Core", sets: 3, targetReps: 10, weight: 0 },
+      { name: "Hanging Leg Raise",     muscle: "Core", sets: 3, targetReps: 12, weight: 0 },
+      { name: "Cable Crunch",          muscle: "Core", sets: 3, targetReps: 15, weight: 40 },
+    ],
+  },
 };
-// Fallback alternatives when muscle group isn't in the table
-const SWAP_FALLBACK = [
-  { name: "Plank",              muscle: "Core",           sets: 3, targetReps: 30, weight: 0 },
-  { name: "Mountain Climber",   muscle: "Core",           sets: 3, targetReps: 20, weight: 0 },
-  { name: "Dead Bug",           muscle: "Core",           sets: 3, targetReps: 12, weight: 0 },
-];
+
+// ── HELPER: get the right swap list for a given exercise ────────────────────
+// Uses pattern field first (most reliable), then infers from muscle group name.
+// Always respects the member's equipment setting — never recommends wrong gear.
+function getSwapOptions(ex, equipment) {
+  const equip = (equipment || "dumbbell").toLowerCase();
+  const pattern = (ex.pattern || "").toLowerCase();
+  const muscle  = (ex.muscle  || "").toLowerCase();
+
+  // 1. Direct pattern match
+  if (pattern && SWAP_BY_PATTERN[pattern]) {
+    const byEquip = SWAP_BY_PATTERN[pattern][equip] || SWAP_BY_PATTERN[pattern]["dumbbell"] || [];
+    // Exclude the exercise currently being swapped
+    return byEquip.filter(a => a.name.toLowerCase() !== ex.name.toLowerCase());
+  }
+
+  // 2. Infer pattern from muscle group string
+  const isSquat   = /quad|glute|squat|lunge|leg press/i.test(muscle);
+  const isHinge   = /hamstring|hinge|deadlift|rdl|hip thrust|glute/i.test(muscle);
+  const isPush    = /chest|pec|shoulder|delt|tricep|press/i.test(muscle);
+  const isPull    = /back|lat|rhomboid|bicep|row|pull/i.test(muscle);
+
+  let inferredPattern = null;
+  if (isSquat)  inferredPattern = "squat";
+  else if (isHinge) inferredPattern = "hinge";
+  else if (isPush)  inferredPattern = "push";
+  else if (isPull)  inferredPattern = "pull";
+
+  if (inferredPattern) {
+    const byEquip = SWAP_BY_PATTERN[inferredPattern][equip] || SWAP_BY_PATTERN[inferredPattern]["dumbbell"] || [];
+    return byEquip.filter(a => a.name.toLowerCase() !== ex.name.toLowerCase());
+  }
+
+  // 3. Accessory fallback — check for specific small-muscle groups
+  const isBicep    = /bicep|curl/i.test(muscle);
+  const isTricep   = /tricep/i.test(muscle);
+  const isShoulder = /shoulder|delt|lateral/i.test(muscle);
+  if (isBicep)    return SWAP_BY_PATTERN.accessory.biceps;
+  if (isTricep)   return SWAP_BY_PATTERN.accessory.triceps;
+  if (isShoulder) return SWAP_BY_PATTERN.accessory.shoulders;
+
+  // 4. Last resort — return general dumbbell compound options (never planks/core)
+  return [
+    ...(SWAP_BY_PATTERN.push.dumbbell || []),
+    ...(SWAP_BY_PATTERN.pull.dumbbell || []),
+  ].slice(0, 4);
+}
 
 function WorkoutScreen() {
   const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap } = useApp();
@@ -812,23 +975,23 @@ function WorkoutScreen() {
               <span style={{ fontSize: 10, color: a }}>💪</span>
               <span style={{ fontSize: 11, color: "#9BB3C8" }}>{ex.muscle}</span>
             </div>
-            {/* Alternatives list — show plan's alternative first if available */}
+            {/* Alternatives list — plan's AI-suggested alternative shown first */}
             {ex.alternative && (
-              <button key={ex.alternative} onClick={() => doSwap({ name: ex.alternative, muscle: ex.muscle, sets: ex.sets, targetReps: ex.targetReps, weight: Math.round(ex.weight * 0.85), rpe: ex.rpe, alternative: null })}
+              <button key={ex.alternative} onClick={() => doSwap({ name: ex.alternative, muscle: ex.muscle, pattern: ex.pattern, sets: ex.sets, targetReps: ex.targetReps, weight: Math.round(ex.weight * 0.9), rpe: ex.rpe, alternative: null })}
                 style={{ width: "100%", background: "#0A1A14", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2" }}>{ex.alternative}</div>
-                  <div style={{ fontSize: 11, color: a, marginTop: 2 }}>✦ Recommended — same muscle group</div>
+                  <div style={{ fontSize: 11, color: a, marginTop: 2 }}>✦ AI recommended — same movement pattern</div>
                 </div>
                 <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Swap →</div>
               </button>
             )}
-            {(SWAP_ALTERNATIVES[ex.muscle] || SWAP_FALLBACK).map((alt) => (
-              <button key={alt.name} onClick={() => doSwap(alt)}
+            {getSwapOptions(ex, user?.equipment).map((alt) => (
+              <button key={alt.name} onClick={() => doSwap({ ...alt, sets: ex.sets, targetReps: ex.targetReps, weight: alt.weight, rpe: ex.rpe })}
                 style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(255,255,255,0.06)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2" }}>{alt.name}</div>
-                  <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>{alt.muscle} · {alt.targetReps} reps · {alt.sets} sets</div>
+                  <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>{alt.muscle} · {ex.targetReps} reps · {ex.sets} sets</div>
                 </div>
                 <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Swap →</div>
               </button>
