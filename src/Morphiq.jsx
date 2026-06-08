@@ -690,8 +690,8 @@ function AppProvider({ children }) {
       const week2SplitRule = daysPerWeek <= 3
         ? "FULL BODY — every session must include a squat pattern, a hinge pattern, a push, and a pull. Keep same exercises as last week unless progression requires a change."
         : daysPerWeek === 4
-        ? "UPPER/LOWER — upper days: push and pull only. Lower days: squat and hinge only. Keep same exercises as last week."
-        : "PUSH/PULL/LEGS — keep same exercises as last week.";
+        ? "UPPER/LOWER — upper days: push and pull only. Lower days MUST include squat pattern AND hinge pattern (e.g. Romanian deadlift) — non-negotiable. Keep same exercises as last week unless progression requires a change."
+        : "PUSH/PULL/LEGS — keep same exercises as last week. Leg days must include both squat AND hinge pattern.";
 
       const prompt = `Generate Week ${nextWeekNum} fitness plan. Return ONLY valid JSON, no markdown.
 Member: goal=${goal}, equipment=${equipment}, injuries=${injuries}, trainingHistory=${trainingHistory}, daysPerWeek=${daysPerWeek}.
@@ -1186,11 +1186,11 @@ function OnboardingScreen() {
 
       // Hardcoded warmup and cooldown — no need for Claude to generate these
       const hardcodedWarmup = [
-        { name: "Light cardio", duration: "90 seconds", description: "March in place or do jumping jacks to raise your heart rate." },
-        { name: "Leg swings", duration: "10 each leg", description: "Hold a wall for balance and swing each leg forward and back to loosen your hips." },
-        { name: "Arm circles", duration: "30 seconds", description: "Extend arms out and make slow circles to warm up your shoulders." },
-        { name: "Bodyweight squat", duration: "10 slow reps", description: "Slow controlled squats to wake up your hips, knees, and glutes." },
-        { name: "Hip circles", duration: "30 seconds", description: "Hands on hips, make slow big circles to loosen your lower back and hips." }
+        { name: "Hip circles", duration: "30 seconds", description: "Hands on hips, make slow big circles each direction to loosen your lower back and hips." },
+        { name: "Leg swings", duration: "10 each leg", description: "Hold a wall for balance and swing each leg forward and back to open up your hips." },
+        { name: "Arm circles", duration: "30 seconds", description: "Extend arms out and make slow circles forward then backward to warm up your shoulders." },
+        { name: "Bodyweight squat", duration: "10 slow reps", description: "Slow controlled squats through full range of motion to activate your hips, knees, and glutes." },
+        { name: "Cat-cow stretch", duration: "10 reps", description: "On hands and knees, arch your back up then dip it down slowly. Warms up your spine before loading it." }
       ];
       const hardcodedCooldown = [
         { name: "Quad stretch", duration: "30 seconds each leg", description: "Stand on one leg, pull the other heel to your glute. Hold a wall for balance." },
@@ -1206,8 +1206,8 @@ function OnboardingScreen() {
       const splitRule = daysPerWeek <= 3
         ? "FULL BODY — every session must include: (1) a squat pattern (e.g. back squat, goblet squat, leg press), (2) a hinge pattern (e.g. deadlift, Romanian deadlift), (3) a horizontal push, (4) a horizontal pull. No exceptions. Do not fill all slots with upper body exercises."
         : daysPerWeek === 4
-        ? "UPPER/LOWER SPLIT — alternate upper and lower days. Upper days: horizontal push, horizontal pull, vertical push, vertical pull. Lower days: squat pattern, hinge pattern, unilateral leg, leg curl. Each muscle hit twice per week."
-        : "PUSH/PULL/LEGS — Push: chest, shoulders, triceps. Pull: back, biceps. Legs: quads, hamstrings, glutes. Rotate through all three.";
+        ? "UPPER/LOWER SPLIT — alternate upper and lower days. Upper days: horizontal push, horizontal pull, vertical push or vertical pull. Lower days MUST include: (1) squat pattern e.g. barbell squat or leg press, (2) hinge pattern e.g. Romanian deadlift or conventional deadlift — this is non-negotiable for hamstring development. No all-upper-body sessions. Each muscle group hit twice per week."
+        : "PUSH/PULL/LEGS — Push: chest, shoulders, triceps. Pull: back, biceps. Legs MUST include both squat pattern AND hinge pattern — e.g. squat + Romanian deadlift. Rotate through all three.";
 
       const prompt = `Generate a week 1 fitness plan as JSON only. No markdown, no explanation.
 Member: goal=${goal}, sex=${sex}, ${heightFt}ft${heightIn||0}in, ${weight}lbs, age ${age}, ${daysPerWeek} days/week.
