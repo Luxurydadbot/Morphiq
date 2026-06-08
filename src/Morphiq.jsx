@@ -687,18 +687,20 @@ function AppProvider({ children }) {
 
       const exerciseCount = (currentPlan.exercises || []).length || 5;
 
-      const week2SplitRule = daysPerWeek <= 3
-        ? "FULL BODY — every session must include a squat pattern, a hinge pattern, a push, and a pull. Keep same exercises as last week unless progression requires a change."
+      // Week 2+ keeps the same movement pattern slots as week 1.
+      // Progression means heavier weight or more reps — not swapping patterns.
+      const week2SlotRule = daysPerWeek <= 3
+        ? `KEEP SAME MOVEMENT PATTERNS as last week: Slot 1=squat, Slot 2=hinge (${equipGuide.includes("BARBELL") ? "Romanian or conventional deadlift" : "dumbbell RDL"} — NON-NEGOTIABLE), Slot 3=horizontal push, Slot 4=horizontal pull, Slot 5=accessory. Only change exercise if a progression upgrade requires it.`
         : daysPerWeek === 4
-        ? "UPPER/LOWER — upper days: push and pull only. Lower days MUST include squat pattern AND hinge pattern (e.g. Romanian deadlift) — non-negotiable. Keep same exercises as last week unless progression requires a change."
-        : "PUSH/PULL/LEGS — keep same exercises as last week. Leg days must include both squat AND hinge pattern.";
+        ? `UPPER/LOWER — keep same exercises as last week. Upper days: push + pull. Lower days MUST keep Slot L1=squat AND Slot L2=hinge (${equipGuide.includes("BARBELL") ? "Romanian or conventional deadlift" : "dumbbell RDL"}) — do not remove or replace these with upper body work.`
+        : `PUSH/PULL/LEGS — keep same exercises as last week. Legs day must keep both squat AND hinge pattern. Do not replace hinge with an upper body exercise.`;
 
       const prompt = `Generate Week ${nextWeekNum} fitness plan. Return ONLY valid JSON, no markdown.
 Member: goal=${goal}, equipment=${equipment}, injuries=${injuries}, trainingHistory=${trainingHistory}, daysPerWeek=${daysPerWeek}.
 PREVIOUS WEEK: ${prevEx}
 PROGRESSION: ${progressionGuide}
 EQUIPMENT: ${equipGuide}
-SPLIT RULE: ${week2SplitRule}
+SLOT RULE: ${week2SlotRule}
 ${injuryGuide ? "INJURIES: " + injuryGuide : ""}
 RPE: ${rpeGuide}
 Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
@@ -1200,22 +1202,48 @@ function OnboardingScreen() {
         { name: "Child's pose", duration: "60 seconds", description: "Kneel and reach arms forward on the floor. Breathe deeply and relax." }
       ];
 
-      // Fat loss = 6 exercises (5 compounds + metabolic finisher), all other goals = 5
-      const exerciseCount = goal === "lose_fat" ? 6 : 5;
-
-      const splitRule = daysPerWeek <= 3
-        ? "FULL BODY — every session must include: (1) a squat pattern (e.g. back squat, goblet squat, leg press), (2) a hinge pattern (e.g. deadlift, Romanian deadlift), (3) a horizontal push, (4) a horizontal pull. No exceptions. Do not fill all slots with upper body exercises."
-        : daysPerWeek === 4
-        ? "UPPER/LOWER SPLIT — alternate upper and lower days. Upper days: horizontal push, horizontal pull, vertical push or vertical pull. Lower days MUST include: (1) squat pattern e.g. barbell squat or leg press, (2) hinge pattern e.g. Romanian deadlift or conventional deadlift — this is non-negotiable for hamstring development. No all-upper-body sessions. Each muscle group hit twice per week."
-        : "PUSH/PULL/LEGS — Push: chest, shoulders, triceps. Pull: back, biceps. Legs MUST include both squat pattern AND hinge pattern — e.g. squat + Romanian deadlift. Rotate through all three.";
+      // Build named exercise slots based on split — this guarantees the right
+      // movement patterns are always present regardless of what Claude prefers.
+      // A real trainer programs by pattern first, exercise second.
+      let exerciseSlots = "";
+      if (daysPerWeek <= 3) {
+        // Full body — all 4 patterns every session
+        exerciseSlots = `EXERCISE SLOTS — fill each exactly as described, in this order:
+Slot 1 (SQUAT): A squat-pattern lower body exercise. ${equipGuide.includes("BARBELL") ? "Use barbell back squat." : equipGuide.includes("DUMBBELL") ? "Use goblet squat or Bulgarian split squat." : equipGuide.includes("MACHINE") ? "Use leg press or hack squat machine." : "Use goblet squat."}
+Slot 2 (HINGE): A hip-hinge lower body exercise targeting hamstrings and glutes. ${equipGuide.includes("BARBELL") ? "Use Romanian deadlift or conventional deadlift." : equipGuide.includes("DUMBBELL") ? "Use dumbbell Romanian deadlift." : equipGuide.includes("MACHINE") ? "Use leg curl machine or cable pull-through." : "Use dumbbell RDL or single-leg RDL."} This slot is NON-NEGOTIABLE.
+Slot 3 (HORIZONTAL PUSH): A chest/shoulder pushing exercise. ${equipGuide.includes("BARBELL") ? "Use barbell bench press or incline bench press." : "Use dumbbell press or push-up variation."}
+Slot 4 (HORIZONTAL PULL): A back pulling exercise. ${equipGuide.includes("BARBELL") ? "Use barbell bent over row." : "Use dumbbell row or cable row."}
+Slot 5 (ACCESSORY): One additional exercise that supports the member's goal. ${goal === "build_muscle" ? "Choose a vertical push or vertical pull — overhead press or lat pulldown." : goal === "lose_fat" ? "Choose a metabolic compound — kettlebell swing, dumbbell thruster, or step-up." : "Choose based on weakest muscle group or member preference."}`;
+      } else if (daysPerWeek === 4) {
+        // Upper/lower — 2 upper days + 2 lower days per week
+        exerciseSlots = `UPPER/LOWER SPLIT. Generate exercises for BOTH an upper day AND a lower day.
+UPPER DAY slots (4 exercises):
+Slot U1 (HORIZONTAL PUSH): ${equipGuide.includes("BARBELL") ? "Barbell bench press or incline bench press." : "Dumbbell press variation."}
+Slot U2 (HORIZONTAL PULL): ${equipGuide.includes("BARBELL") ? "Barbell bent over row." : "Dumbbell or cable row."}
+Slot U3 (VERTICAL PUSH): ${equipGuide.includes("BARBELL") ? "Barbell overhead press." : "Dumbbell shoulder press."}
+Slot U4 (VERTICAL PULL or BICEP): Lat pulldown, pull-up, or barbell/dumbbell curl.
+LOWER DAY slots (4 exercises):
+Slot L1 (SQUAT): ${equipGuide.includes("BARBELL") ? "Barbell back squat." : equipGuide.includes("MACHINE") ? "Leg press." : "Goblet squat or split squat."}
+Slot L2 (HINGE): ${equipGuide.includes("BARBELL") ? "Romanian deadlift or conventional deadlift." : "Dumbbell Romanian deadlift."} NON-NEGOTIABLE for hamstring development.
+Slot L3 (UNILATERAL LEG): Bulgarian split squat, walking lunge, or step-up.
+Slot L4 (LEG CURL or GLUTE): Leg curl machine, glute bridge, or cable pull-through.
+Return all 8 exercises in the exercises array. Label muscle field clearly.`;
+      } else {
+        // Push/pull/legs
+        exerciseSlots = `PUSH/PULL/LEGS SPLIT. Generate exercises covering all three days.
+PUSH day (2 exercises): horizontal push + vertical push.
+PULL day (2 exercises): horizontal pull + vertical pull or bicep curl.
+LEGS day (3 exercises): Slot 1 SQUAT pattern, Slot 2 HINGE pattern (${equipGuide.includes("BARBELL") ? "Romanian or conventional deadlift" : "dumbbell RDL"} — NON-NEGOTIABLE), Slot 3 unilateral leg or leg curl.
+Return all 7 exercises in the exercises array.`;
+      }
 
       const prompt = `Generate a week 1 fitness plan as JSON only. No markdown, no explanation.
 Member: goal=${goal}, sex=${sex}, ${heightFt}ft${heightIn||0}in, ${weight}lbs, age ${age}, ${daysPerWeek} days/week.
 Equipment: ${equipGuide}. Experience: ${expLevel}.
 ${injuryNote}
-SPLIT RULE: ${splitRule}
+${exerciseSlots}
 Nutrition (already calculated — use exactly): calories=${targetCals}, protein=${targetProtein}g, carbs=${targetCarbs}g, fat=${targetFat}g.
-Return this exact JSON (${exerciseCount} exercises, all numbers as numbers not strings):
+Return this exact JSON (all numbers as numbers not strings):
 {"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}`;
 
       try {
