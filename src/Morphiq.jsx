@@ -708,7 +708,8 @@ EQUIPMENT: ${equipGuide}
 SLOT RULE: ${week2SlotRule}
 ${injuryGuide ? "INJURIES: " + injuryGuide : ""}
 RPE: ${rpeGuide}
-Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}
+PATTERN FIELD: Set the "pattern" field on every exercise to exactly one of: squat, hinge, push, pull, accessory. Hip-hinge movements (RDL, deadlift, good morning) must be "hinge". Squat-pattern movements must be "squat". Press movements are "push". Row/pull movements are "pull". Isolations are "accessory".
+Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","pattern":"squat|hinge|push|pull|accessory","rpe":number,"alternative":"string","restSeconds":number}]}
 Include exactly ${exerciseCount} exercises. All numeric values must be plain numbers.`;
 
       const res = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
@@ -1247,9 +1248,10 @@ Member: goal=${goal}, sex=${sex}, ${heightFt}ft${heightIn||0}in, ${weight}lbs, a
 Equipment: ${equipGuide}. Experience: ${expLevel}.
 ${injuryNote}
 ${exerciseSlots}
+PATTERN FIELD: For every exercise in the exercises array, set the "pattern" field to exactly one of: squat, hinge, push, pull, accessory. Squat-pattern exercises get "squat". Hip-hinge exercises (RDL, deadlift, good morning) get "hinge". Any pressing movement gets "push". Any rowing or pulling movement gets "pull". Isolation accessories (curls, lateral raises, tricep work) get "accessory".
 Nutrition (already calculated — use exactly): calories=${targetCals}, protein=${targetProtein}g, carbs=${targetCarbs}g, fat=${targetFat}g.
 Return this exact JSON (all numbers as numbers not strings):
-{"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","rpe":number,"alternative":"string","restSeconds":number}]}`;
+{"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","pattern":"squat|hinge|push|pull|accessory","rpe":number,"alternative":"string","restSeconds":number}]}`;
 
       try {
         const res = await fetch("/api/plan", {
