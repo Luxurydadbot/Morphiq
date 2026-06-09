@@ -67,7 +67,7 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
       {/* AI adjustment tap hint — shown when dinner was recalculated */}
       {meal.originalSuggested && meal.status === "upcoming" && (
         <button onClick={onOpenDetail} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "0 12px 8px", background: "#0A1A14", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", width: "calc(100% - 24px)", fontFamily: "inherit" }}>
-          <span style={{ fontSize: 10, color: "#00D4B1" }}>✦ Morphiq adjusted this meal — tap to see why</span>
+          <span style={{ fontSize: 10, color: "#00D4B1" }}>✦ Hypergentiq adjusted this meal — tap to see why</span>
           <span style={{ fontSize: 12, color: "#00D4B1" }}>→</span>
         </button>
       )}
