@@ -1248,36 +1248,52 @@ function OnboardingScreen() {
       // Build named exercise slots based on split — this guarantees the right
       // movement patterns are always present regardless of what Claude prefers.
       // A real trainer programs by pattern first, exercise second.
+      // Hardcode exact exercise names per equipment type.
+      // Never give Claude a choice — it will always pick the wrong one.
+      const isBarbell = equipGuide.includes("BARBELL");
+      const isMachine = equipGuide.includes("MACHINE");
+
+      const ex = {
+        squat:   isBarbell ? "Barbell back squat"        : isMachine ? "Leg press"              : "Goblet squat",
+        hinge:   isBarbell ? "Barbell Romanian deadlift" : isMachine ? "Leg curl machine"       : "Dumbbell Romanian deadlift",
+        hPush:   isBarbell ? "Barbell bench press"       : isMachine ? "Chest press machine"    : "Dumbbell bench press",
+        hPull:   isBarbell ? "Barbell bent over row"     : isMachine ? "Seated cable row"       : "Single-arm dumbbell row",
+        vPush:   isBarbell ? "Barbell overhead press"    : isMachine ? "Shoulder press machine" : "Dumbbell shoulder press",
+        vPull:   "Lat pulldown",
+        unilat:  isBarbell ? "Barbell lunge"             : "Dumbbell split squat",
+        legCurl: isMachine ? "Leg curl machine"          : "Glute bridge",
+      };
+
       let exerciseSlots = "";
       if (daysPerWeek <= 3) {
-        // Full body — all 4 patterns every session
-        exerciseSlots = `EXERCISE SLOTS — fill each exactly as described, in this order:
-Slot 1 (SQUAT): A squat-pattern lower body exercise. ${equipGuide.includes("BARBELL") ? "Use barbell back squat." : equipGuide.includes("DUMBBELL") ? "Use goblet squat or Bulgarian split squat." : equipGuide.includes("MACHINE") ? "Use leg press or hack squat machine." : "Use goblet squat."}
-Slot 2 (HINGE): A hip-hinge lower body exercise targeting hamstrings and glutes. ${equipGuide.includes("BARBELL") ? "Use Romanian deadlift or conventional deadlift." : equipGuide.includes("DUMBBELL") ? "Use dumbbell Romanian deadlift." : equipGuide.includes("MACHINE") ? "Use leg curl machine or cable pull-through." : "Use dumbbell RDL or single-leg RDL."} This slot is NON-NEGOTIABLE.
-Slot 3 (HORIZONTAL PUSH): A chest/shoulder pushing exercise. ${equipGuide.includes("BARBELL") ? "Use barbell bench press or incline bench press." : "Use dumbbell press or push-up variation."}
-Slot 4 (HORIZONTAL PULL): A back pulling exercise. ${equipGuide.includes("BARBELL") ? "Use barbell bent over row." : "Use dumbbell row or cable row."}
-Slot 5 (ACCESSORY): One additional exercise that supports the member's goal. ${goal === "build_muscle" ? "Choose a vertical push or vertical pull — overhead press or lat pulldown." : goal === "lose_fat" ? "Choose a metabolic compound — kettlebell swing, dumbbell thruster, or step-up." : "Choose based on weakest muscle group or member preference."}`;
+        exerciseSlots = "The exercises array MUST contain exactly these 5 exercises in this exact order. Use these exact strings in the name field. Do not substitute, skip, or reorder:\n"
+          + "1. \"" + ex.squat + "\" — pattern: squat\n"
+          + "2. \"" + ex.hinge + "\" — pattern: hinge — MANDATORY hamstring exercise, do not replace with any upper body movement\n"
+          + "3. \"" + ex.hPush + "\" — pattern: push\n"
+          + "4. \"" + ex.hPull + "\" — pattern: pull\n"
+          + "5. \"" + ex.vPush + "\" — pattern: accessory\n"
+          + "Set realistic working-set weights for " + expLevel + ".";
       } else if (daysPerWeek === 4) {
-        // Upper/lower — 2 upper days + 2 lower days per week
-        exerciseSlots = `UPPER/LOWER SPLIT. Generate exercises for BOTH an upper day AND a lower day.
-UPPER DAY slots (4 exercises):
-Slot U1 (HORIZONTAL PUSH): ${equipGuide.includes("BARBELL") ? "Barbell bench press or incline bench press." : "Dumbbell press variation."}
-Slot U2 (HORIZONTAL PULL): ${equipGuide.includes("BARBELL") ? "Barbell bent over row." : "Dumbbell or cable row."}
-Slot U3 (VERTICAL PUSH): ${equipGuide.includes("BARBELL") ? "Barbell overhead press." : "Dumbbell shoulder press."}
-Slot U4 (VERTICAL PULL or BICEP): Lat pulldown, pull-up, or barbell/dumbbell curl.
-LOWER DAY slots (4 exercises):
-Slot L1 (SQUAT): ${equipGuide.includes("BARBELL") ? "Barbell back squat." : equipGuide.includes("MACHINE") ? "Leg press." : "Goblet squat or split squat."}
-Slot L2 (HINGE): ${equipGuide.includes("BARBELL") ? "Romanian deadlift or conventional deadlift." : "Dumbbell Romanian deadlift."} NON-NEGOTIABLE for hamstring development.
-Slot L3 (UNILATERAL LEG): Bulgarian split squat, walking lunge, or step-up.
-Slot L4 (LEG CURL or GLUTE): Leg curl machine, glute bridge, or cable pull-through.
-Return all 8 exercises in the exercises array. Label muscle field clearly.`;
+        exerciseSlots = "UPPER/LOWER SPLIT. The exercises array MUST contain exactly these 8 exercises in this exact order:\n"
+          + "1. \"" + ex.hPush + "\" — pattern: push\n"
+          + "2. \"" + ex.hPull + "\" — pattern: pull\n"
+          + "3. \"" + ex.vPush + "\" — pattern: push\n"
+          + "4. \"" + ex.vPull + "\" — pattern: pull\n"
+          + "5. \"" + ex.squat + "\" — pattern: squat\n"
+          + "6. \"" + ex.hinge + "\" — pattern: hinge — MANDATORY\n"
+          + "7. \"" + ex.unilat + "\" — pattern: squat\n"
+          + "8. \"" + ex.legCurl + "\" — pattern: accessory\n"
+          + "Set realistic working-set weights for " + expLevel + ".";
       } else {
-        // Push/pull/legs
-        exerciseSlots = `PUSH/PULL/LEGS SPLIT. Generate exercises covering all three days.
-PUSH day (2 exercises): horizontal push + vertical push.
-PULL day (2 exercises): horizontal pull + vertical pull or bicep curl.
-LEGS day (3 exercises): Slot 1 SQUAT pattern, Slot 2 HINGE pattern (${equipGuide.includes("BARBELL") ? "Romanian or conventional deadlift" : "dumbbell RDL"} — NON-NEGOTIABLE), Slot 3 unilateral leg or leg curl.
-Return all 7 exercises in the exercises array.`;
+        exerciseSlots = "PUSH/PULL/LEGS SPLIT. The exercises array MUST contain exactly these 7 exercises in this exact order:\n"
+          + "1. \"" + ex.hPush + "\" — pattern: push\n"
+          + "2. \"" + ex.vPush + "\" — pattern: push\n"
+          + "3. \"" + ex.hPull + "\" — pattern: pull\n"
+          + "4. \"" + ex.vPull + "\" — pattern: pull\n"
+          + "5. \"" + ex.squat + "\" — pattern: squat\n"
+          + "6. \"" + ex.hinge + "\" — pattern: hinge — MANDATORY\n"
+          + "7. \"" + ex.unilat + "\" — pattern: squat\n"
+          + "Set realistic working-set weights for " + expLevel + ".";
       }
 
       const prompt = `Generate a week 1 fitness plan as JSON only. No markdown, no explanation.
