@@ -37,7 +37,7 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
     <div className="mq-fade" style={{ background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, color: a }}>✓</div>
-        <div style={{ fontSize: 15, color: a, fontWeight: 700 }}>Morphiq noticed something</div>
+        <div style={{ fontSize: 15, color: a, fontWeight: 700 }}>Hypergentiq noticed something</div>
       </div>
       <div style={{ fontSize: 14, color: "#9BB3C8", lineHeight: 1.6, marginBottom: 12 }}>
         You exceeded target reps both sets. Nudging weight to{" "}
@@ -726,7 +726,7 @@ function WorkoutScreen() {
               <div style={{ fontSize: 20 }}>⚡</div>
               <div style={{ textAlign: "left" }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#F59E0B" }}>Progressive overload applied</div>
-                <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>Morphiq nudged your weight up this session — you're getting stronger.</div>
+                <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>Hypergentiq nudged your weight up this session — you're getting stronger.</div>
               </div>
             </div>
           )}
