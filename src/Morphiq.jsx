@@ -727,11 +727,10 @@ function AppProvider({ children }) {
 
       // Week 2+ keeps the same movement pattern slots as week 1.
       // Progression means heavier weight or more reps — not swapping patterns.
-      const week2SlotRule = daysPerWeek <= 3
-        ? `KEEP SAME MOVEMENT PATTERNS as last week: Slot 1=squat, Slot 2=hinge (${equipGuide.includes("BARBELL") ? "Romanian or conventional deadlift" : "dumbbell RDL"} — NON-NEGOTIABLE), Slot 3=horizontal push, Slot 4=horizontal pull, Slot 5=accessory. Only change exercise if a progression upgrade requires it.`
-        : daysPerWeek === 4
-        ? `UPPER/LOWER — keep same exercises as last week. Upper days: push + pull. Lower days MUST keep Slot L1=squat AND Slot L2=hinge (${equipGuide.includes("BARBELL") ? "Romanian or conventional deadlift" : "dumbbell RDL"}) — do not remove or replace these with upper body work.`
-        : `PUSH/PULL/LEGS — keep same exercises as last week. Legs day must keep both squat AND hinge pattern. Do not replace hinge with an upper body exercise.`;
+      // Pull exact exercise names from the previous week — Claude must reuse them.
+      // This is the same approach as week 1: no choices, just named exercises.
+      const prevNames = (currentPlan.exercises || []).map(e => `"${e.name}"`).join(", ");
+      const week2SlotRule = `Use exactly these exercise names from last week, in the same order: ${prevNames}. Do not substitute any exercise. Only change sets, reps, and weight according to the progression rule above.`;
 
       const prompt = `Generate Week ${nextWeekNum} fitness plan. Return ONLY valid JSON, no markdown.
 Member: goal=${goal}, equipment=${equipment}, injuries=${injuries}, trainingHistory=${trainingHistory}, daysPerWeek=${daysPerWeek}.
