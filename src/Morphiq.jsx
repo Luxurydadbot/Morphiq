@@ -1202,11 +1202,15 @@ function OnboardingScreen() {
 
       // Program structure — evidence-based splits by goal and training frequency
       // Equipment constraint — one line, Claude knows what to do with it
-      const equipGuide = equipment === "barbell" ? "barbell gym — use barbell for all primary lifts"
-        : equipment === "dumbbell" ? "dumbbells and cables only — no barbell"
-        : equipment === "kettlebell" ? "kettlebells and bodyweight only"
-        : equipment === "machine" ? "machines and cables only — no free barbell"
-        : "dumbbells only";
+      const equipGuide = equipment === "barbell"
+        ? "BARBELL GYM. All primary compounds must use barbell. squat=barbell back squat, hinge=barbell Romanian deadlift or conventional deadlift, horizontal push=barbell bench press, horizontal pull=barbell bent over row. Dumbbells only for accessories. No push-up variations. No goblet squat as a primary."
+        : equipment === "dumbbell"
+        ? "DUMBBELLS AND CABLES. No barbell. squat=goblet squat or Bulgarian split squat, hinge=dumbbell Romanian deadlift, push=dumbbell bench press or incline press, pull=single-arm dumbbell row or cable row."
+        : equipment === "kettlebell"
+        ? "KETTLEBELLS AND BODYWEIGHT ONLY. squat=kettlebell goblet squat, hinge=kettlebell deadlift or single-leg RDL, push=push-up or kettlebell press, pull=inverted row or TRX row."
+        : equipment === "machine"
+        ? "MACHINES AND CABLES. No free barbell. squat=leg press or hack squat machine, hinge=RDL machine or cable pull-through, push=chest press machine, pull=seated cable row."
+        : "DUMBBELLS ONLY. squat=goblet squat, hinge=dumbbell RDL, push=dumbbell floor press, pull=single-arm dumbbell row.";
 
       // Injury note — only sent if relevant
       const injuryNote = (!injuries || injuries === "none") ? ""
