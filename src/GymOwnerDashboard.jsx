@@ -421,7 +421,7 @@ function OwnerBrandingTab() {
           <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `2px solid ${brandColor}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: brandColor }}>M</div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{gymName}</div>
-            <div style={{ fontSize: 10, color: "#6B7A8D" }}>Powered by Morphiq</div>
+            <div style={{ fontSize: 10, color: "#6B7A8D" }}>Powered by Hypergentiq</div>
           </div>
         </div>
         <div style={{ padding: "14px" }}>
@@ -487,7 +487,7 @@ function OwnerInviteTab() {
           ["1", "Copy the link above and share it via text, email, or your gym's social media."],
           ["2", "Member opens the link → sees your gym name and branding on the sign-in screen."],
           ["3", "They sign up with their email → get a 6-digit code → complete the quiz."],
-          ["4", "Their plan is built by Morphiq AI and appears in the Members tab of your dashboard."],
+          ["4", "Their plan is built by Hypergentiq AI and appears in the Members tab of your dashboard."],
         ].map(([num, text]) => (
           <div key={num} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
             <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: "1px solid rgba(0,212,177,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#00D4B1", flexShrink: 0 }}>{num}</div>
@@ -661,7 +661,7 @@ function PricingScreen() {
           <div style={{ fontSize: 12, color: "#9BB3C8", marginBottom: 10, lineHeight: 1.6 }}>
             Enterprise plans available for gym chains, franchises, and large studios. Let's talk.
           </div>
-          <div style={{ fontSize: 12, color: "#00D4B1" }}>hello@morphiq.app</div>
+          <div style={{ fontSize: 12, color: "#00D4B1" }}>hello@hypergentiq.com</div>
         </div>
       </div>
 
