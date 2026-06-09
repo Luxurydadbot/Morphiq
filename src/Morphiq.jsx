@@ -874,7 +874,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
         <button onClick={() => navigate("profile")} style={{ width: 34, height: 34, borderRadius: "50%", background: theme.accentDim, border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 500, color: a, cursor: "pointer" }}>{user.name ? user.name[0].toUpperCase() : "?"}</button>
       </div>
       {children}
-      <div style={{ textAlign: "center", fontSize: 11, color: theme.textFaint, padding: ".6rem", marginBottom: "3.5rem" }}>Powered by Morphiq</div>
+      <div style={{ textAlign: "center", fontSize: 11, color: theme.textFaint, padding: ".6rem", marginBottom: "3.5rem" }}>Powered by Hypergentiq</div>
       <div className="mq-pulse-ring" style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: "rgba(0,212,177,0.18)" }} />
       <button onClick={() => navigate(chatTarget)} style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: a, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2C6.03 2 2 5.8 2 10.5c0 1.8.55 3.5 1.5 4.9L2 20l4.8-1.4A9.2 9.2 0 0011 19c4.97 0 9-3.8 9-8.5S15.97 2 11 2z" fill="#0A1F1D" /><circle cx="7.5" cy="10.5" r="1.2" fill={a} /><circle cx="11" cy="10.5" r="1.2" fill={a} /><circle cx="14.5" cy="10.5" r="1.2" fill={a} /></svg>
@@ -972,7 +972,7 @@ function AuthScreen() {
       <div style={{ padding: "36px 20px 24px", textAlign: "center" }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: 24, fontWeight: 700, color: a }}>M</div>
         <div style={{ fontSize: 20, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
-        <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Morphiq</div>
+        <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Hypergentiq</div>
       </div>
 
       {/* Member / Owner toggle — only shown on idle step */}
@@ -1338,7 +1338,7 @@ Return this exact JSON (all numbers as numbers not strings):
           <div style={{ width: 20, height: 20, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: a }}>M</div>
           <span style={{ fontSize: 13, fontWeight: 600, color: a }}>{gymBranding.name}</span>
         </div>
-        <span style={{ fontSize: 9, color: ob.muted }}>Powered by Morphiq</span>
+        <span style={{ fontSize: 9, color: ob.muted }}>Powered by Hypergentiq</span>
       </div>
       {step < 10 && (
         <div style={{ padding: "8px 14px 0", flexShrink: 0 }}>
@@ -1354,7 +1354,7 @@ Return this exact JSON (all numbers as numbers not strings):
               {gymBranding.name?.[0]?.toUpperCase() || "M"}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
-            <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>Powered by Morphiq</div>
+            <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>Powered by Hypergentiq</div>
           </div>
           <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "12px 14px", fontSize: 13, lineHeight: 1.6, color: ob.body, marginBottom: 20 }}>
             I'll build a training plan personal to you in about 2 minutes. Let's start with your name.
@@ -1597,7 +1597,7 @@ Return this exact JSON (all numbers as numbers not strings):
           <div style={{ background: ob.card, borderRadius: 12, padding: "12px 14px", marginBottom: 10, flex: 1, overflowY: "auto" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: ob.white, marginBottom: 6 }}>⚠️ Health & Fitness Disclaimer</div>
             <div style={{ fontSize: 11, color: ob.body, lineHeight: 1.65 }}>
-              The fitness and nutrition plans provided by Morphiq are for <span style={{ color: ob.white, fontWeight: 600 }}>informational and educational purposes only</span> and do not constitute medical advice.<br /><br />
+              The fitness and nutrition plans provided by Hypergentiq are for <span style={{ color: ob.white, fontWeight: 600 }}>informational and educational purposes only</span> and do not constitute medical advice.<br /><br />
               Before starting any new exercise or nutrition program, consult a qualified healthcare provider — especially if you have a medical condition, injury, or concern.<br /><br />
               You agree to exercise within your own limits and accept responsibility for your health and safety during all workouts. Morphiq and its licensees are not liable for any injury, illness, or adverse outcome.<br /><br />
               By tapping "I agree", you confirm you are at least 13 years old and accept these terms.
@@ -1656,7 +1656,7 @@ Return this exact JSON (all numbers as numbers not strings):
                 <span style={{ fontSize: 13 }}>✦</span>
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: ob.white, letterSpacing: "-0.3px" }}>{name}&apos;s {goalLabel} Plan</div>
-              <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>Built by Morphiq AI · Week 1</div>
+              <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>Built by Hypergentiq AI · Week 1</div>
             </div>
           </div>
 
@@ -2255,7 +2255,7 @@ function ChatScreen({ fromScreen = "home" }) {
           <button onClick={() => navigate(fromScreen === "chat" ? "home" : fromScreen)} style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", fontSize: 20, padding: 0, lineHeight: 1, marginRight: 2 }}>←</button>
           <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#003D35", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: a, flexShrink: 0 }}>AI</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Morphiq Trainer</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Hypergentiq Trainer</div>
             <div style={{ fontSize: 11, color: a }}>Knows your full plan</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -2368,7 +2368,7 @@ function ChatScreen({ fromScreen = "home" }) {
       </div>
 
       {/* Bottom text */}
-      <div style={{ textAlign: "center", fontSize: 10, color: theme.textFaint, paddingBottom: 10, background: "#0D1117", flexShrink: 0 }}>Powered by Morphiq</div>
+      <div style={{ textAlign: "center", fontSize: 10, color: theme.textFaint, paddingBottom: 10, background: "#0D1117", flexShrink: 0 }}>Powered by Hypergentiq</div>
     </div>
   );
 }
