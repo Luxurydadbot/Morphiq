@@ -532,28 +532,61 @@ function AppProvider({ children }) {
   useEffect(() => {
     if (!savedSession?.uid) return;
     sb.getProfile(savedSession.uid).then(profile => {
-      if (profile?.plan) {
+      // Helper: try localStorage cache if Supabase returns no plan
+      // This handles the case where upsert created a duplicate row or Supabase is slow.
+      // Fix added: onboarding now writes mq_cached_plan_<uid> so this always finds the plan.
+      const getCachedPlanData = () => {
+        try {
+          const raw = localStorage.getItem("mq_cached_plan_" + savedSession.uid);
+          return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+      };
+
+      const planSource = profile?.plan ? profile : null;
+      const cachedData = !planSource ? getCachedPlanData() : null;
+      const resolvedPlan = planSource?.plan || cachedData?.plan || null;
+      const resolvedUser = planSource
+        ? { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" }
+        : cachedData?.user || null;
+
+      if (resolvedPlan && resolvedUser) {
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
-        setUser({ name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" });
+        setUser(resolvedUser);
         // Patch missing weekStartDate — if the plan was saved without it, fill in today
         // so the 7-day check has something to work from. Save back to Supabase immediately.
-        const patchedPlan = profile.plan?.weekStartDate
-          ? profile.plan
-          : { ...profile.plan, weekStartDate: new Date().toISOString().split("T")[0], weekNumber: profile.plan?.weekNumber || 1 };
-        if (!profile.plan?.weekStartDate) sb.upsertProfile(savedSession.uid, profile, patchedPlan).catch(() => {});
+        const patchedPlan = resolvedPlan?.weekStartDate
+          ? resolvedPlan
+          : { ...resolvedPlan, weekStartDate: new Date().toISOString().split("T")[0], weekNumber: resolvedPlan?.weekNumber || 1 };
+        if (!resolvedPlan?.weekStartDate) sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).catch(() => {});
+        // If we loaded from cache but Supabase had no plan, push it back up now
+        if (!planSource?.plan && cachedData?.plan) {
+          sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).catch(() => {});
+        }
         setPlan(patchedPlan);
         loadHistoricalData(savedSession.uid);
-        checkAndGenerateNextWeek(savedSession.uid, patchedPlan, profile).catch(() => {});
+        checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser).catch(() => {});
         setScreen("home");
       } else {
-        // No plan yet — stay logged in but go to onboarding. Do NOT wipe the session.
+        // No plan in Supabase or local cache — go to onboarding. Do NOT wipe the session.
         // This prevents OTP being required every time when plan is null.
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
         setScreen("onboarding");
       }
     }).catch(() => {
-      // Network error — do NOT wipe the session. The user is still logged in.
-      // Show a gentle retry screen instead of dumping them back to login.
+      // Network error — check local cache before showing error screen.
+      // If we have a cached plan, we can restore the full session without any network at all.
+      try {
+        const raw = localStorage.getItem("mq_cached_plan_" + savedSession.uid);
+        const cached = raw ? JSON.parse(raw) : null;
+        if (cached?.plan && cached?.user) {
+          setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
+          setUser(cached.user);
+          setPlan(cached.plan);
+          setScreen("home");
+          return;
+        }
+      } catch {}
+      // No cache either — show retry screen. Do NOT wipe the session.
       // This prevents testers losing their session on spotty phone connections.
       setScreen("network_error");
     });
@@ -1268,6 +1301,8 @@ Return this exact JSON (all numbers as numbers not strings):
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           setUser(userData);
           setPlan(parsed);
+          // Cache plan locally so session restore works even if Supabase is slow or returns stale data
+          try { localStorage.setItem("mq_cached_plan_" + (supabaseUser?.id || "anon"), JSON.stringify({ plan: parsed, user: userData })); } catch {}
           // Persist to Supabase — upsertProfile MUST finish before insertWeightLog
           // because insertWeightLog does getProfileId() which needs the profile row to exist first.
           // If we fire both at the same time (race condition), weight save silently fails.
