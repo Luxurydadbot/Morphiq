@@ -1526,7 +1526,8 @@ function OnboardingScreen() {
         bmr: bmrCalc, tdee: tdeeCalc, goalAdjustment: goalAdj,
       };
 
-              const parsed = buildPlan(profileForPlan, macrosForPlan);
+      try {
+        const parsed = buildPlan(profileForPlan, macrosForPlan);
         if (!cancelled) {
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           setUser(userData);
