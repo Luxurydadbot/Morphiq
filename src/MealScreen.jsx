@@ -58,7 +58,7 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
         {meal.status === "swapped" && meal.logged && (
           <div>
             <div style={{ fontSize: 10, color: theme.textDim, fontStyle: "italic", textDecoration: "line-through", marginBottom: 4 }}>
-              suggested: {meal.suggested.name}
+              {meal.suggested.name}
             </div>
           </div>
         )}
@@ -90,18 +90,8 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
         <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
           <button onClick={onDone} className="mq-meal-tap"
             style={{ width: "100%", background: a, border: "none", borderRadius: 10, padding: "11px 10px", fontSize: 13, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            ✓ Log what I ate
+            🎤 Log what I ate
           </button>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={onOpenDetail} className="mq-meal-tap"
-              style={{ flex: 1, background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 9, padding: "8px 6px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-              🎤 I had something else
-            </button>
-            <button onClick={onSkip} className="mq-meal-tap"
-              style={{ flex: 0, background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "8px 12px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
-              Skip
-            </button>
-          </div>
         </div>
       )}
     </div>
@@ -212,7 +202,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         {/* Suggested meal summary — shown when no adjustment */}
         {!hasAdjustment && (
           <div style={{ background: "#1A2332", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
-            <div style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6 }}>Suggested</div>
+
             <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2", marginBottom: 4 }}>{meal.suggested.name}</div>
             <div style={{ display: "flex", gap: 10 }}>
               <span style={{ fontSize: 12, color: a }}>{meal.suggested.cal} cal</span>
@@ -510,7 +500,7 @@ function EndOfDaySummary({ meals, macros, calGoal, proteinGoal }) {
   } else if (calPct > 110) {
     note = `You went over by about ${macros.cal - calGoal} calories today — no problem. Just pick up where you left off tomorrow.`;
   } else if (calPct < 75) {
-    note = "You came in under today. Make sure you're eating enough — undereating slows progress just like overeating does.";
+    note = "You came in under today — good to know. Eating enough matters too, undereating can slow progress just like overeating.";
   } else if (proShort > 20) {
     note = `You were ${proShort}g short on protein today. Try to hit that target tomorrow — it makes a real difference for your goal.`;
   } else if (swapped.length > 0 && calPct <= 110) {
