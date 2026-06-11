@@ -416,82 +416,465 @@ const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 
 const DEFAULT_USER = { name: "", goal: null, sex: null, height: "", weight: "", age: "", unit: "imperial" };
-const MOCK_RETURNING_PLAN = {
-  // ── Macros ───────────────────────────────────────────────────────────────
-  calories: 1800, protein: 140, carbs: 160, fat: 55,
-  bmr: 1820, tdee: 2503, goalAdjustment: -400,
-
-  // ── Schedule ─────────────────────────────────────────────────────────────
-  workoutDays: ["Monday","Wednesday","Friday"],
-  daysPerWeek: 3,
-  workoutType: "Full Body",
-  workoutDuration: 40,
-  weekNumber: 2,
-  weekStartDate: new Date((() => { const d = new Date(); const day = d.getDay(); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); return d; })()).toISOString().slice(0,10),
-
-  // ── Focus & tip ──────────────────────────────────────────────────────────
-  weeklyFocus: "Increase load or reps on at least one exercise versus last week.",
-  tip: "Consistency over perfection — show up, even on hard days.",
-
-  // ── Progression rule ─────────────────────────────────────────────────────
-  // If member hits or exceeds target reps for 2+ sets, bump weight by 5 lbs next session
-  progressionRule: { triggerSets: 2, weightIncrementLbs: 5 },
-
-  // ── Rest between sets ────────────────────────────────────────────────────
-  restSeconds: 90,
-
-  // ── Warm-up (5 moves, ~5 min) ────────────────────────────────────────────
-  warmup: [
-    { name: "Jumping Jacks",      durationSec: 45, notes: "Full range of motion, keep breathing" },
-    { name: "Hip Circles",         durationSec: 30, notes: "10 each direction, hands on hips" },
-    { name: "Arm Crosses",         durationSec: 30, notes: "Cross at chest height, keep arms straight" },
-    { name: "Bodyweight Squat",    durationSec: 40, notes: "Slow and controlled, 8–10 reps" },
-    { name: "Shoulder Roll",       durationSec: 30, notes: "Forward 10×, backward 10×" },
-  ],
-
-  // ── Main exercises ───────────────────────────────────────────────────────
-  exercises: [
-    {
-      name: "Goblet Squat", sets: 3, reps: 12, weight: 30, muscle: "Quads / Glutes",
-      rpe: 7,
-      restSeconds: 90,
-      alternative: "Bodyweight Squat",
-    },
-    {
-      name: "Dumbbell Row", sets: 3, reps: 10, weight: 35, muscle: "Back / Biceps",
-      rpe: 7,
-      restSeconds: 90,
-      alternative: "Resistance Band Row",
-    },
-    {
-      name: "Incline Press", sets: 3, reps: 10, weight: 40, muscle: "Chest / Shoulders",
-      rpe: 8,
-      restSeconds: 90,
-      alternative: "Push-Up",
-    },
-    {
-      name: "Romanian Deadlift", sets: 3, reps: 10, weight: 70, muscle: "Hamstrings",
-      rpe: 8,
-      restSeconds: 90,
-      alternative: "Glute Bridge",
-    },
-    {
-      name: "Shoulder Press", sets: 3, reps: 10, weight: 30, muscle: "Shoulders",
-      rpe: 7,
-      restSeconds: 90,
-      alternative: "Lateral Raise",
-    },
-  ],
-
-  // ── Cool-down (5 moves, ~5 min) ──────────────────────────────────────────
-  cooldown: [
-    { name: "Standing Quad Stretch",   durationSec: 40, notes: "Hold each leg 20 s, use wall for balance" },
-    { name: "Doorway Chest Stretch",   durationSec: 40, notes: "Arm at 90°, lean gently into doorframe" },
-    { name: "Seated Hamstring Stretch",durationSec: 40, notes: "Reach toward toes, keep back straight" },
-    { name: "Child's Pose",            durationSec: 45, notes: "Arms extended, breathe into lower back" },
-    { name: "Neck Side Stretch",       durationSec: 30, notes: "Ear to shoulder, hold 15 s each side" },
-  ],
+// ═══════════════════════════════════════════════════════════════════
+// EXERCISE LIBRARY — every exercise the app will ever assign.
+// Claude never invents exercises. All workout generation is code-only.
+// ═══════════════════════════════════════════════════════════════════
+const EXERCISE_LIBRARY = {
+  barbell: {
+    squat:     { name: "Barbell back squat",        muscle: "Quads / Glutes",       pattern: "squat" },
+    hinge:     { name: "Barbell Romanian deadlift", muscle: "Hamstrings / Glutes",  pattern: "hinge" },
+    push:      { name: "Barbell bench press",       muscle: "Chest / Shoulders",    pattern: "push"  },
+    pull:      { name: "Barbell bent over row",     muscle: "Back / Biceps",        pattern: "pull"  },
+    accessory: { name: "Barbell overhead press",    muscle: "Shoulders",            pattern: "accessory" },
+    finisher:  { name: "Barbell complex",           muscle: "Full body",            pattern: "accessory" },
+    core:      { name: "Farmers carry",             muscle: "Core / Grip",          pattern: "accessory" },
+    // Injury swaps
+    squat_knee:     { name: "Goblet squat",              muscle: "Quads / Glutes",    pattern: "squat" },
+    squat_back:     { name: "Box squat",                 muscle: "Quads / Glutes",    pattern: "squat" },
+    hinge_knee:     { name: "Hip thrust",                muscle: "Glutes",            pattern: "hinge" },
+    hinge_back:     { name: "Trap bar deadlift",         muscle: "Hamstrings / Glutes", pattern: "hinge" },
+    push_shoulder:  { name: "Landmine press",            muscle: "Shoulders / Chest", pattern: "push"  },
+    pull_back:      { name: "Chest-supported DB row",    muscle: "Back / Biceps",     pattern: "pull"  },
+    accessory_shoulder: { name: "Landmine press",        muscle: "Shoulders",         pattern: "accessory" },
+    finisher_back:  { name: "Kettlebell swings",         muscle: "Full body",         pattern: "accessory" },
+  },
+  dumbbell: {
+    squat:     { name: "Goblet squat",              muscle: "Quads / Glutes",       pattern: "squat" },
+    hinge:     { name: "Dumbbell Romanian deadlift",muscle: "Hamstrings / Glutes",  pattern: "hinge" },
+    push:      { name: "Dumbbell bench press",      muscle: "Chest / Shoulders",    pattern: "push"  },
+    pull:      { name: "Single-arm dumbbell row",   muscle: "Back / Biceps",        pattern: "pull"  },
+    accessory: { name: "Dumbbell curl to press",    muscle: "Biceps / Shoulders",   pattern: "accessory" },
+    finisher_beginner: { name: "Dumbbell squat to curl", muscle: "Full body",       pattern: "accessory" },
+    finisher:  { name: "Dumbbell thrusters",        muscle: "Full body",            pattern: "accessory" },
+    core:      { name: "Suitcase carry",            muscle: "Core / Grip",          pattern: "accessory" },
+    // Injury swaps
+    squat_knee:     { name: "Hip thrust",                muscle: "Glutes",            pattern: "squat" },
+    hinge_back:     { name: "Hip thrust",                muscle: "Glutes",            pattern: "hinge" },
+    push_shoulder:  { name: "Neutral-grip incline press",muscle: "Chest",            pattern: "push"  },
+    pull_back:      { name: "Chest-supported DB row",    muscle: "Back / Biceps",     pattern: "pull"  },
+    accessory_shoulder: { name: "Hammer curl",           muscle: "Biceps",            pattern: "accessory" },
+    finisher_shoulder:  { name: "Dumbbell swing",        muscle: "Full body",         pattern: "accessory" },
+  },
+  machine: {
+    squat:     { name: "Leg press",                 muscle: "Quads / Glutes",       pattern: "squat" },
+    hinge:     { name: "Lying leg curl",            muscle: "Hamstrings",           pattern: "hinge" },
+    push:      { name: "Chest press machine",       muscle: "Chest / Shoulders",    pattern: "push"  },
+    pull:      { name: "Seated cable row",          muscle: "Back / Biceps",        pattern: "pull"  },
+    accessory: { name: "Lat pulldown",              muscle: "Back / Biceps",        pattern: "accessory" },
+    accessory_exp: { name: "Lat pulldown + cable curl", muscle: "Back / Biceps",    pattern: "accessory" },
+    finisher_beginner: { name: "Rowing machine 3 min",   muscle: "Full body",       pattern: "accessory" },
+    finisher:  { name: "Rowing machine 5 min",      muscle: "Full body",            pattern: "accessory" },
+    core:      { name: "Cable Pallof press",        muscle: "Core",                 pattern: "accessory" },
+    // Injury swaps
+    squat_knee: { name: "Seated leg extension (light)", muscle: "Quads",            pattern: "squat" },
+    push_shoulder: { name: "Cable chest fly",       muscle: "Chest",                pattern: "push"  },
+    pull_back:  { name: "Lat pulldown",             muscle: "Back",                 pattern: "pull"  },
+  },
+  kettlebell: {
+    squat:     { name: "Kettlebell goblet squat",   muscle: "Quads / Glutes",       pattern: "squat" },
+    hinge:     { name: "Kettlebell deadlift",       muscle: "Hamstrings / Glutes",  pattern: "hinge" },
+    push:      { name: "Kettlebell floor press",    muscle: "Chest / Shoulders",    pattern: "push"  },
+    push_exp:  { name: "Kettlebell push press",     muscle: "Shoulders",            pattern: "push"  },
+    pull:      { name: "Kettlebell single-arm row", muscle: "Back / Biceps",        pattern: "pull"  },
+    accessory: { name: "Kettlebell single-leg deadlift", muscle: "Hamstrings / Balance", pattern: "accessory" },
+    accessory_exp: { name: "Kettlebell Turkish get-up", muscle: "Full body / Core", pattern: "accessory" },
+    finisher_beginner: { name: "Kettlebell swings x30", muscle: "Full body",        pattern: "accessory" },
+    finisher:  { name: "Kettlebell swings x50",     muscle: "Full body",            pattern: "accessory" },
+    core:      { name: "Kettlebell farmers carry",  muscle: "Core / Grip",          pattern: "accessory" },
+    // Injury swaps
+    squat_knee:     { name: "Kettlebell deadlift",       muscle: "Hamstrings / Glutes", pattern: "squat" },
+    hinge_back:     { name: "Hip thrust",                muscle: "Glutes",            pattern: "hinge" },
+    push_shoulder:  { name: "Kettlebell halo",           muscle: "Shoulders / Core",  pattern: "push"  },
+    pull_back:      { name: "Kettlebell drag curl",      muscle: "Biceps",            pattern: "pull"  },
+    accessory_wrist:{ name: "Kettlebell halo",           muscle: "Shoulders / Core",  pattern: "accessory" },
+    finisher_back:  { name: "Jump rope 3 min",           muscle: "Full body",         pattern: "accessory" },
+  },
 };
+
+// ═══════════════════════════════════════════════════════════════════
+// STARTING WEIGHTS — conservative defaults, self-correcting in 1-2 sessions
+// ═══════════════════════════════════════════════════════════════════
+const STARTING_WEIGHTS = {
+  "Barbell back squat":           { beginner: 45,  some: 65,  returning: 95,  experienced: 135 },
+  "Barbell Romanian deadlift":    { beginner: 45,  some: 65,  returning: 85,  experienced: 115 },
+  "Barbell bench press":          { beginner: 45,  some: 65,  returning: 85,  experienced: 115 },
+  "Barbell bent over row":        { beginner: 45,  some: 55,  returning: 75,  experienced: 95  },
+  "Barbell overhead press":       { beginner: 35,  some: 45,  returning: 65,  experienced: 85  },
+  "Trap bar deadlift":            { beginner: 65,  some: 85,  returning: 115, experienced: 155 },
+  "Box squat":                    { beginner: 45,  some: 65,  returning: 85,  experienced: 115 },
+  "Goblet squat":                 { beginner: 15,  some: 25,  returning: 35,  experienced: 45  },
+  "Dumbbell Romanian deadlift":   { beginner: 15,  some: 25,  returning: 35,  experienced: 50  },
+  "Dumbbell bench press":         { beginner: 15,  some: 25,  returning: 40,  experienced: 55  },
+  "Single-arm dumbbell row":      { beginner: 15,  some: 25,  returning: 35,  experienced: 50  },
+  "Dumbbell shoulder press":      { beginner: 10,  some: 15,  returning: 25,  experienced: 35  },
+  "Dumbbell curl to press":       { beginner: 10,  some: 15,  returning: 20,  experienced: 30  },
+  "Neutral-grip incline press":   { beginner: 15,  some: 20,  returning: 30,  experienced: 45  },
+  "Chest-supported DB row":       { beginner: 15,  some: 20,  returning: 30,  experienced: 45  },
+  "Leg press":                    { beginner: 90,  some: 130, returning: 180, experienced: 230 },
+  "Lying leg curl":               { beginner: 40,  some: 60,  returning: 80,  experienced: 100 },
+  "Chest press machine":          { beginner: 40,  some: 60,  returning: 80,  experienced: 110 },
+  "Seated cable row":             { beginner: 40,  some: 60,  returning: 80,  experienced: 110 },
+  "Lat pulldown":                 { beginner: 40,  some: 60,  returning: 80,  experienced: 100 },
+  "Kettlebell goblet squat":      { beginner: 15,  some: 25,  returning: 35,  experienced: 44  },
+  "Kettlebell deadlift":          { beginner: 25,  some: 35,  returning: 44,  experienced: 53  },
+  "Kettlebell floor press":       { beginner: 15,  some: 25,  returning: 35,  experienced: 44  },
+  "Kettlebell push press":        { beginner: 15,  some: 25,  returning: 35,  experienced: 44  },
+  "Kettlebell single-arm row":    { beginner: 15,  some: 25,  returning: 35,  experienced: 44  },
+  "Kettlebell swings x30":        { beginner: 15,  some: 25,  returning: 35,  experienced: 44  },
+  "Kettlebell swings x50":        { beginner: 25,  some: 35,  returning: 44,  experienced: 53  },
+  "Hip thrust":                   { beginner: 0,   some: 25,  returning: 45,  experienced: 65  },
+  "Landmine press":               { beginner: 25,  some: 35,  returning: 45,  experienced: 65  },
+  "Barbell complex":              { beginner: 35,  some: 45,  returning: 55,  experienced: 65  },
+};
+const DEFAULT_WEIGHT = 20; // fallback if exercise not in table
+
+// ═══════════════════════════════════════════════════════════════════
+// buildPlan — takes onboarding profile, returns complete week 1 plan
+// No API call. Deterministic. Fast.
+// ═══════════════════════════════════════════════════════════════════
+function buildPlan(userProfile, existingMacros) {
+  const {
+    goal = "get_fit",
+    sex = "male",
+    age = 30,
+    trainingHistory = "some",
+    recentActivity = "consistent",
+    daysPerWeek = 3,
+    equipment = "dumbbell",
+    injuries = "none",
+  } = userProfile;
+
+  // Resolve experience tier
+  const expTier = trainingHistory === "new" ? "beginner"
+    : trainingHistory === "some" ? "some"
+    : recentActivity === "returning" ? "returning"
+    : "experienced";
+
+  const ageNum = parseInt(age) || 30;
+  const isOver40 = ageNum >= 40;
+  const isFemale = sex === "female";
+  const injuryLower = (injuries || "none").toLowerCase();
+  const hasKnee = injuryLower.includes("knee");
+  const hasBack = injuryLower.includes("back");
+  const hasShoulder = injuryLower.includes("shoulder");
+  const hasWrist = injuryLower.includes("wrist");
+
+  const lib = EXERCISE_LIBRARY[equipment] || EXERCISE_LIBRARY.dumbbell;
+  const isExperienced = expTier === "experienced";
+  const isBeginner = expTier === "beginner";
+
+  // ── Sets ──────────────────────────────────────────────────────────
+  const baseSets = isBeginner ? 2 : (expTier === "some" || expTier === "returning") ? 3 : 4;
+  const sets = isOver40 ? Math.min(baseSets, 3) : baseSets;
+
+  // ── Rep ranges ────────────────────────────────────────────────────
+  // [min, max] — upper body uses +2.5lb increments, lower body +5lb
+  let repMin, repMax;
+  if (goal === "build_muscle") {
+    repMin = isFemale ? 10 : (isBeginner ? 10 : 8);
+    repMax = isFemale ? 14 : (isBeginner ? 12 : 10);
+  } else if (goal === "lose_fat") {
+    repMin = 10; repMax = isBeginner ? 15 : 12;
+  } else {
+    repMin = 10; repMax = isBeginner ? 15 : 12;
+  }
+
+  // ── Rest periods ──────────────────────────────────────────────────
+  const restCompound = isOver40
+    ? (goal === "lose_fat" ? 90 : goal === "build_muscle" ? 150 : 105)
+    : (goal === "lose_fat" ? 60 : goal === "build_muscle" ? 120 : 75);
+  const restAccessory = isOver40
+    ? (goal === "lose_fat" ? 75 : 90)
+    : (goal === "lose_fat" ? 45 : 60);
+
+  // ── RPE ───────────────────────────────────────────────────────────
+  const rpeMax = isOver40 ? 8 : 9;
+  const rpe = isBeginner ? 6
+    : expTier === "some" ? 7
+    : expTier === "returning" ? 7
+    : Math.min(8, rpeMax);
+
+  // ── Set structure ─────────────────────────────────────────────────
+  const usePyramid = isExperienced && !isOver40;
+
+  // ── Exercise selection with injury substitutions ──────────────────
+  const pick = (slot, injurySlot) => {
+    const injuryKey = injurySlot ? `${slot}_${injurySlot}` : null;
+    const injuryEx = injuryKey && lib[injuryKey] ? lib[injuryKey] : null;
+    const baseEx = lib[slot] || null;
+    return injuryEx || baseEx;
+  };
+
+  const squatEx   = hasKnee     ? pick("squat", "knee")
+                  : hasBack     ? pick("squat", "back")
+                  : pick("squat");
+  const hingeEx   = hasKnee     ? pick("hinge", "knee")
+                  : hasBack     ? pick("hinge", "back")
+                  : pick("hinge");
+  const pushEx    = hasShoulder ? pick("push", "shoulder")  : pick("push");
+  const pullEx    = hasBack     ? pick("pull", "back")       : pick("pull");
+
+  // Slot 5: accessory vs finisher based on goal
+  let slot5Ex;
+  if (goal === "lose_fat") {
+    slot5Ex = isBeginner
+      ? (lib.finisher_beginner || lib.finisher || lib.accessory)
+      : (lib.finisher || lib.accessory);
+    if (hasShoulder && lib.finisher_shoulder) slot5Ex = lib.finisher_shoulder;
+    if (hasBack && lib.finisher_back) slot5Ex = lib.finisher_back;
+  } else {
+    if (hasShoulder && lib.accessory_shoulder) {
+      slot5Ex = lib.accessory_shoulder;
+    } else if (hasWrist && lib.accessory_wrist) {
+      slot5Ex = lib.accessory_wrist;
+    } else {
+      slot5Ex = isExperienced ? (lib.accessory_exp || lib.accessory) : lib.accessory;
+    }
+  }
+
+  // Experienced members on push slot: kettlebell gets push_exp
+  if (equipment === "kettlebell" && isExperienced && !hasShoulder) {
+    const kbPushExp = lib.push_exp;
+    if (kbPushExp) pushEx.name = kbPushExp.name; // in-place upgrade
+  }
+
+  // ── Starting weight lookup ────────────────────────────────────────
+  const getWeight = (exName) => {
+    const row = STARTING_WEIGHTS[exName];
+    if (!row) return DEFAULT_WEIGHT;
+    return row[expTier] || row.some || DEFAULT_WEIGHT;
+  };
+
+  // ── Build exercise objects ────────────────────────────────────────
+  const makeEx = (exObj, isLower) => {
+    if (!exObj) return null;
+    const w = getWeight(exObj.name);
+    return {
+      name: exObj.name,
+      sets,
+      reps: repMin,
+      repMin,
+      repMax,
+      weight: w,
+      muscle: exObj.muscle,
+      pattern: exObj.pattern,
+      rpe,
+      restSeconds: isLower ? restCompound : (exObj.pattern === "accessory" ? restAccessory : restCompound),
+      alternative: "", // filled by alternative lookup below
+      usePyramid,
+      weightIncrement: isLower ? 5 : 2.5,
+    };
+  };
+
+  const exercises = [
+    makeEx(squatEx, true),
+    makeEx(hingeEx, true),
+    makeEx(pushEx, false),
+    makeEx(pullEx, false),
+    makeEx(slot5Ex, false),
+  ].filter(Boolean);
+
+  // ── Add core slot for experienced members, 3+ days ────────────────
+  if (isExperienced && daysPerWeek >= 3 && lib.core) {
+    exercises.push({
+      name: lib.core.name,
+      sets: 3,
+      reps: 40, // seconds for carries
+      repMin: 30,
+      repMax: 60,
+      weight: getWeight(lib.core.name),
+      muscle: lib.core.muscle,
+      pattern: lib.core.pattern,
+      rpe: Math.min(rpe, 7),
+      restSeconds: restAccessory,
+      alternative: "Pallof press",
+      usePyramid: false,
+      weightIncrement: 5,
+    });
+  }
+
+  // ── Workout structure ─────────────────────────────────────────────
+  const workoutType = daysPerWeek <= 3 ? "Full Body"
+    : daysPerWeek === 4 ? "Upper / Lower"
+    : "Push / Pull / Legs";
+
+  const workoutDuration = isBeginner ? 35
+    : expTier === "some" ? 40
+    : expTier === "returning" ? 45
+    : 50;
+
+  return {
+    // Macro targets come from onboarding calculation — pass through unchanged
+    ...(existingMacros || {}),
+    weekNumber: 1,
+    weekStartDate: new Date().toISOString().split("T")[0],
+    daysPerWeek,
+    workoutType,
+    workoutDuration,
+    restSeconds: restCompound,
+    weeklyFocus: goal === "lose_fat"
+      ? "Build the habit. Every session counts more than any single weight."
+      : goal === "build_muscle"
+      ? "Focus on feeling the target muscle, not just moving the weight."
+      : "Consistency over intensity — showing up beats the perfect session.",
+    tip: isBeginner
+      ? "Form first, always. Perfect reps at light weight beat sloppy reps at heavy weight."
+      : isOver40
+      ? "Warm up longer than you think you need to. Your joints will thank you."
+      : "Leave 1–2 reps in the tank on every set. Save max effort for the final set.",
+    progressionRule: usePyramid
+      ? "Pyramid: weight climbs each set. Hit your target reps on the final set two sessions in a row → working weight increases."
+      : "Straight sets: hit the top of your rep range two sessions in a row → add weight next session.",
+    warmup: [
+      { name: "Hip circles",       duration: "30 seconds",   description: "Hands on hips, slow circles each direction." },
+      { name: "Leg swings",        duration: "10 each leg",  description: "Hold a wall, swing each leg forward and back." },
+      { name: "Arm circles",       duration: "30 seconds",   description: "Arms out, slow circles forward then backward." },
+      { name: "Bodyweight squat",  duration: "10 slow reps", description: "Full range of motion, slow and controlled." },
+      { name: "Cat-cow stretch",   duration: "10 reps",      description: "Hands and knees — arch up, then dip down slowly." },
+    ],
+    cooldown: [
+      { name: "Quad stretch",       duration: "30s each leg", description: "Stand on one leg, pull heel to glute." },
+      { name: "Hamstring stretch",  duration: "30 seconds",   description: "Sit, legs straight, reach toward toes." },
+      { name: "Chest stretch",      duration: "30 seconds",   description: "Hands clasped behind back, open chest." },
+      { name: "Shoulder stretch",   duration: "30s each",     description: "Pull one arm across chest, hold with other hand." },
+      { name: "Child's pose",       duration: "60 seconds",   description: "Kneel, reach arms forward, breathe deeply." },
+    ],
+    exercises,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// progressPlan — takes current plan + workout logs, returns next week's plan
+// Applies the 2-for-2 NSCA rule: exceed rep target by 2+ for 2 sessions → add weight
+// No API call. Deterministic.
+// ═══════════════════════════════════════════════════════════════════
+function progressPlan(currentPlan, workoutLogs, userProfile) {
+  const nextWeekNum = (currentPlan.weekNumber || 1) + 1;
+  const expTier = userProfile.trainingHistory === "new" ? "beginner"
+    : userProfile.trainingHistory === "some" ? "some"
+    : userProfile.recentActivity === "returning" ? "returning"
+    : "experienced";
+  const isExperienced = expTier === "experienced";
+  const isOver40 = parseInt(userProfile.age || 30) >= 40;
+
+  // ── Deload logic ──────────────────────────────────────────────────
+  // Experienced members: deload every 5 weeks
+  // Beginners/some: no scheduled deload — app detects fatigue via missed reps instead
+  const isDeload = isExperienced && !isOver40 && nextWeekNum % 5 === 0;
+  const isPostDeload = isExperienced && !isOver40 && nextWeekNum % 5 === 1 && nextWeekNum > 1;
+
+  if (isDeload) {
+    // Deload week: same exercises, 60% weight, RPE capped at 6
+    return {
+      ...currentPlan,
+      weekNumber: nextWeekNum,
+      weekStartDate: new Date().toISOString().split("T")[0],
+      weeklyFocus: "Recovery week. Lighter weights, same movements. You'll come back stronger.",
+      tip: "This week is supposed to feel easy. That's the point — let your body consolidate the gains.",
+      progressionRule: "Deload: all weights at 60% of last week. RPE 6 max.",
+      exercises: currentPlan.exercises.map(ex => ({
+        ...ex,
+        weight: Math.round(ex.weight * 0.6 / 5) * 5, // round to nearest 5
+        rpe: Math.min(ex.rpe, 6),
+        weeklyFocus: "deload",
+      })),
+    };
+  }
+
+  // ── Build log lookup: exerciseName → array of recent sessions ─────
+  // workoutLogs is an array of { exercise_name, reps, weight, workout_date }
+  const logMap = {};
+  (workoutLogs || []).forEach(log => {
+    const key = log.exercise_name;
+    if (!logMap[key]) logMap[key] = [];
+    logMap[key].push({ reps: log.reps, weight: log.weight, date: log.workout_date });
+  });
+
+  // Sort each exercise's logs newest first
+  Object.keys(logMap).forEach(k => {
+    logMap[k].sort((a, b) => new Date(b.date) - new Date(a.date));
+  });
+
+  // ── Progress each exercise ────────────────────────────────────────
+  const nextExercises = currentPlan.exercises.map(ex => {
+    const logs = logMap[ex.name] || [];
+
+    // Post-deload: reset to week 1 weight + 10%
+    if (isPostDeload) {
+      return {
+        ...ex,
+        weight: Math.round(ex.weight * 1.1 / 5) * 5,
+        reps: ex.repMin || ex.reps,
+        weekNumber: nextWeekNum,
+      };
+    }
+
+    // Not enough log data — keep current weight, same reps
+    if (logs.length < 2) {
+      return { ...ex, weekNumber: nextWeekNum };
+    }
+
+    const increment = ex.weightIncrement || (ex.pattern === "squat" || ex.pattern === "hinge" ? 5 : 2.5);
+    const repTarget = ex.repMax || (ex.reps + 2);
+
+    if (ex.usePyramid) {
+      // Pyramid: check if final-set reps hit target two sessions in a row
+      // Use the highest reps logged per session as a proxy for the final set
+      const session1 = logs[0] ? Math.max(...logs.slice(0, 3).filter(l => l.weight >= ex.weight * 0.9).map(l => l.reps)) : 0;
+      const session2 = logs[3] ? Math.max(...logs.slice(3, 6).filter(l => l.weight >= ex.weight * 0.9).map(l => l.reps)) : 0;
+      const hitTwoInARow = session1 >= repTarget && session2 >= repTarget;
+
+      if (hitTwoInARow) {
+        const newWorking = ex.weight + increment;
+        return { ...ex, weight: newWorking, weekNumber: nextWeekNum };
+      }
+      // Fatigue detection: if member missed reps two sessions, hold weight
+      return { ...ex, weekNumber: nextWeekNum };
+
+    } else {
+      // Straight sets: 2-for-2 rule — exceed rep target by 2+ reps, two sessions in a row
+      const recentSets = logs.slice(0, 6);
+      const session1MaxReps = Math.max(...recentSets.slice(0, 3).map(l => l.reps));
+      const session2MaxReps = Math.max(...recentSets.slice(3, 6).map(l => l.reps));
+      const twoForTwo = session1MaxReps >= repTarget + 2 && session2MaxReps >= repTarget + 2;
+
+      if (twoForTwo) {
+        return {
+          ...ex,
+          weight: ex.weight + increment,
+          reps: ex.repMin || ex.reps, // reset reps to bottom of range
+          weekNumber: nextWeekNum,
+        };
+      }
+
+      // Fatigue detection: missed target reps two sessions → hold, drop 1 rep
+      const session1MinReps = Math.min(...recentSets.slice(0, 3).map(l => l.reps));
+      const session2MinReps = Math.min(...recentSets.slice(3, 6).map(l => l.reps));
+      const missedTwice = session1MinReps < (ex.repMin || ex.reps) - 1
+                       && session2MinReps < (ex.repMin || ex.reps) - 1;
+      if (missedTwice && ex.reps > (ex.repMin || 6)) {
+        return { ...ex, reps: ex.reps - 1, weekNumber: nextWeekNum };
+      }
+
+      return { ...ex, weekNumber: nextWeekNum };
+    }
+  });
+
+  return {
+    ...currentPlan,
+    weekNumber: nextWeekNum,
+    weekStartDate: new Date().toISOString().split("T")[0],
+    weeklyFocus: nextWeekNum % 5 === 4
+      ? "Last hard week before recovery. Leave everything on the floor."
+      : "Progressive overload in action — a little better than last week is all you need.",
+    tip: isExperienced
+      ? "Track your final-set reps carefully — that's what triggers your weight increase."
+      : "Consistency is the variable that matters most right now. Just show up.",
+    progressionRule: "Auto-calculated from your logged reps.",
+    exercises: nextExercises,
+  };
+}
 
 const SESSION_KEY = "morphiq_session";
 
@@ -656,104 +1039,25 @@ function AppProvider({ children }) {
   // Load historical workout + weight data once we have a real user ID
 
   // Checks if 7+ days have passed since weekStartDate — if so, silently generates next week.
-  // CRITICAL: passes the same full rulebook as week 1 — equipment, injuries, movement patterns,
-  // RPE, and periodization. Every week must be as high quality as week 1. Always.
-  async function checkAndGenerateNextWeek(uid, currentPlan, currentUser) {
+  // Week progression — fully code-driven, no API call
+  // Called when session restores and plan is 7+ days old
+  function checkAndGenerateNextWeek(uid, currentPlan, currentUser) {
     try {
       if (!currentPlan?.weekStartDate) return;
       const daysSince = Math.floor((Date.now() - new Date(currentPlan.weekStartDate)) / 86400000);
       if (daysSince < 7) return;
-
-      const nextWeekNum = (currentPlan.weekNumber || 1) + 1;
-      const equipment = currentUser.equipment || "dumbbell";
-      const injuries = currentUser.injuries || "none";
-      const goal = currentUser.goal || "general_fitness";
-      const trainingHistory = currentUser.trainingHistory || "some";
-      const recentActivity = currentUser.recentActivity || "consistent";
-      const daysPerWeek = currentPlan.daysPerWeek || 3;
-
-      // Previous week details — AI uses these to apply exact progressive overload per exercise
-      const prevEx = (currentPlan.exercises || []).map(e =>
-        `${e.name}: ${e.sets}x${e.reps} @ ${e.weight}lbs RPE${e.rpe || 7}`
-      ).join(" | ");
-
-      // ── PERIODIZATION — week 4/8/12 = deload, all others = progressive overload ──
-      const isDeload = nextWeekNum % 4 === 0;
-      const isPostDeload = nextWeekNum % 4 === 1 && nextWeekNum > 1;
-      const progressionGuide = isDeload
-        ? `WEEK ${nextWeekNum} IS A DELOAD WEEK. Use the exact same exercises as last week. Reduce ALL weights by 40-50%. Keep same sets and reps. RPE target 5-6 — must feel easy. Purpose: full recovery and supercompensation so the member is stronger next week. Do not change exercises.`
-        : isPostDeload
-        ? `WEEK ${nextWeekNum} IS POST-DELOAD — NEW MESOCYCLE. Member is now recovered and stronger. Increase weights 5-10% above pre-deload levels. Reset to the bottom of rep ranges. Same exercises and movement patterns as the mesocycle before the deload.`
-        : `WEEK ${nextWeekNum} — PROGRESSIVE OVERLOAD. Apply double progression to each exercise: if the member hit the top of their rep range on ALL sets last week, add the smallest available weight increment (2.5-5lbs barbell, 2-5lbs dumbbell). If they did not hit the top of the range, keep the same weight and add 1 rep per set. Keep the same exercises — do not swap or add new exercises mid-mesocycle. Consistency is required for strength adaptation.`;
-
-      // ── EQUIPMENT (mirrors week 1 generator exactly) ──────────────────────
-      const equipGuide = equipment === "barbell"
-        ? "BARBELL GYM. All primary compounds must use barbell. squat=barbell back squat, hinge=barbell Romanian deadlift or conventional deadlift, horizontal push=barbell bench press, horizontal pull=barbell bent over row. Dumbbells only for accessories. No push-up variations. No goblet squat as a primary."
-        : equipment === "dumbbell"
-        ? "DUMBBELLS AND CABLES. No barbell. squat=goblet squat or Bulgarian split squat, hinge=dumbbell Romanian deadlift, push=dumbbell bench press or incline press, pull=single-arm dumbbell row or cable row."
-        : equipment === "kettlebell"
-        ? "KETTLEBELLS AND BODYWEIGHT ONLY. squat=kettlebell goblet squat, hinge=kettlebell deadlift or single-leg RDL, push=push-up or kettlebell press, pull=inverted row or TRX row."
-        : equipment === "machine"
-        ? "MACHINES AND CABLES. No free barbell. squat=leg press or hack squat machine, hinge=RDL machine or cable pull-through, push=chest press machine, pull=seated cable row."
-        : "DUMBBELLS ONLY. squat=goblet squat, hinge=dumbbell RDL, push=dumbbell floor press, pull=single-arm dumbbell row.";
-
-      // ── INJURY RULES (mirrors week 1 generator exactly) ───────────────────
-      const injuryGuide = !injuries || injuries === "none" ? ""
-        : injuries.toLowerCase().includes("knee") ? "KNEE INJURY: no squat variations or lunges. Leg press, leg curl, hip thrust only for lower body."
-        : injuries.toLowerCase().includes("back") ? "LOWER BACK: no conventional deadlift or barbell row. Use trap bar, cable pull-through, chest-supported row."
-        : injuries.toLowerCase().includes("shoulder") ? "SHOULDER: no overhead pressing. Landmine press, neutral grip incline press, cable fly only."
-        : injuries.toLowerCase().includes("wrist") ? "WRIST: neutral grip only. No barbell front squat."
-        : `INJURY — ${injuries}: avoid all movements loading this area.`;
-
-      // ── MOVEMENT PATTERN RULES (mirrors week 1 generator exactly) ─────────
-      const patternGuide = goal === "build_muscle"
-        ? "MANDATORY every session: (1) squat pattern, (2) hinge pattern, (3) horizontal push, (4) horizontal pull. These four are non-negotiable every week. Isolation exercises are accessories only — never replace a compound slot."
-        : goal === "lose_fat"
-        ? "MANDATORY every session: (1) squat pattern, (2) hinge pattern, (3) push, (4) pull, (5) metabolic finisher. Heavy compounds preserve muscle during a deficit — never replace them with isolation work."
-        : "MANDATORY every session: squat, hinge, push, pull. All four patterns every week without exception.";
-
-      // ── RPE TARGETS ────────────────────────────────────────────────────────
-      const rpeGuide = isDeload
-        ? "DELOAD: all sets RPE 5-6. Intentionally easy."
-        : trainingHistory === "new"
-        ? "RPE: compound working sets RPE 6-7. Never train to failure — always leave 3 reps in the tank."
-        : trainingHistory === "some"
-        ? "RPE: compound working sets RPE 7-8. Final set RPE 8-9."
-        : recentActivity === "returning"
-        ? "RPE: compound working sets RPE 7-8. Still rebuilding to full intensity."
-        : "RPE: compound working sets RPE 8-9. Push close to failure on final sets. Isolation RPE 8-9.";
-
-      const exerciseCount = (currentPlan.exercises || []).length || 5;
-
-      // Week 2+ keeps the same movement pattern slots as week 1.
-      // Progression means heavier weight or more reps — not swapping patterns.
-      // Pull exact exercise names from the previous week — Claude must reuse them.
-      // This is the same approach as week 1: no choices, just named exercises.
-      const prevNames = (currentPlan.exercises || []).map(e => `"${e.name}"`).join(", ");
-      const week2SlotRule = `Use exactly these exercise names from last week, in the same order: ${prevNames}. Do not substitute any exercise. Only change sets, reps, and weight according to the progression rule above.`;
-
-      const prompt = `Generate Week ${nextWeekNum} fitness plan. Return ONLY valid JSON, no markdown.
-Member: goal=${goal}, equipment=${equipment}, injuries=${injuries}, trainingHistory=${trainingHistory}, daysPerWeek=${daysPerWeek}.
-PREVIOUS WEEK: ${prevEx}
-PROGRESSION: ${progressionGuide}
-EQUIPMENT: ${equipGuide}
-SLOT RULE: ${week2SlotRule}
-${injuryGuide ? "INJURIES: " + injuryGuide : ""}
-RPE: ${rpeGuide}
-PATTERN FIELD: Set the "pattern" field on every exercise to exactly one of: squat, hinge, push, pull, accessory. Hip-hinge movements (RDL, deadlift, good morning) must be "hinge". Squat-pattern movements must be "squat". Press movements are "push". Row/pull movements are "pull". Isolations are "accessory".
-Return exactly: {"calories":${currentPlan.calories||1800},"protein":${currentPlan.protein||140},"carbs":${currentPlan.carbs||160},"fat":${currentPlan.fat||55},"bmr":${currentPlan.bmr||0},"tdee":${currentPlan.tdee||0},"goalAdjustment":${currentPlan.goalAdjustment||0},"workoutType":"${currentPlan.workoutType||"Full Body"}","workoutDuration":${currentPlan.workoutDuration||40},"restSeconds":${currentPlan.restSeconds||90},"weekNumber":${nextWeekNum},"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","pattern":"squat|hinge|push|pull|accessory","rpe":number,"alternative":"string","restSeconds":number}]}
-Include exactly ${exerciseCount} exercises. All numeric values must be plain numbers.`;
-
-      const res = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
-      const data = await res.json();
-      const nextPlan = JSON.parse((data.text || "").replace(/```json|```/g, "").trim());
-      setPlan(nextPlan);
-      if (uid) sb.upsertProfile(uid, currentUser, nextPlan).catch(() => {});
-      console.log("[Morphiq] Auto-generated Week", nextWeekNum, isDeload ? "(DELOAD)" : isPostDeload ? "(POST-DELOAD)" : "(progressive overload)");
-    } catch (e) { console.log("[Morphiq] Next week generation skipped:", e.message); }
+      // Fetch workout logs then run local progression engine
+      if (!uid || uid.startsWith("sim-")) return;
+      sb.getWorkoutLogs(uid, 30).then(logs => {
+        const nextPlan = progressPlan(currentPlan, logs || [], currentUser);
+        setPlan(nextPlan);
+        sb.upsertProfile(uid, currentUser, nextPlan).catch(() => {});
+        console.log("[Morphiq] Week", nextPlan.weekNumber, "generated locally — no API call");
+      }).catch(() => {});
+    } catch (e) { console.log("[Morphiq] Week progression skipped:", e.message); }
   }
 
-  async function loadHistoricalData(uid) {
+    async function loadHistoricalData(uid) {
     if (!uid || uid.startsWith("sim-") || uid === "dev-001") return;
     try {
       const [wLogs, wtLogs] = await Promise.all([
@@ -1199,123 +1503,18 @@ function OnboardingScreen() {
       const targetFat = Math.round(parseFloat(weight) * fatPer);
       const targetCarbs = Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4);
 
-      // Program structure — evidence-based splits by goal and training frequency
-      // Equipment constraint — one line, Claude knows what to do with it
-      const equipGuide = equipment === "barbell"
-        ? "BARBELL GYM. All primary compounds must use barbell. squat=barbell back squat, hinge=barbell Romanian deadlift or conventional deadlift, horizontal push=barbell bench press, horizontal pull=barbell bent over row. Dumbbells only for accessories. No push-up variations. No goblet squat as a primary."
-        : equipment === "dumbbell"
-        ? "DUMBBELLS AND CABLES. No barbell. squat=goblet squat or Bulgarian split squat, hinge=dumbbell Romanian deadlift, push=dumbbell bench press or incline press, pull=single-arm dumbbell row or cable row."
-        : equipment === "kettlebell"
-        ? "KETTLEBELLS AND BODYWEIGHT ONLY. squat=kettlebell goblet squat, hinge=kettlebell deadlift or single-leg RDL, push=push-up or kettlebell press, pull=inverted row or TRX row."
-        : equipment === "machine"
-        ? "MACHINES AND CABLES. No free barbell. squat=leg press or hack squat machine, hinge=RDL machine or cable pull-through, push=chest press machine, pull=seated cable row."
-        : "DUMBBELLS ONLY. squat=goblet squat, hinge=dumbbell RDL, push=dumbbell floor press, pull=single-arm dumbbell row.";
-
-      // Injury note — only sent if relevant
-      const injuryNote = (!injuries || injuries === "none") ? ""
-        : `Injury/limitation: ${injuries} — avoid movements that load this area.`;
-
-      // Experience level for weight selection
-      const expLevel = trainingHistory === "new" ? "beginner (week 1, conservative weights, form first)"
-        : trainingHistory === "some" ? "intermediate (6mo-2yr experience)"
-        : recentActivity === "returning" ? "returning lifter (rebuild at ~70% of previous)"
-        : "experienced (currently training, use real working weights)";
-
-      // Split type — just the name, Claude picks the right exercises
-      const splitType = goal === "build_muscle"
-        ? (daysPerWeek <= 2 ? "full body" : daysPerWeek === 3 ? "full body A/B alternating" : daysPerWeek === 4 ? "upper/lower split" : "push/pull/legs")
-        : goal === "lose_fat"
-        ? (daysPerWeek <= 2 ? "full body with finisher" : daysPerWeek === 3 ? "full body with metabolic finisher" : daysPerWeek === 4 ? "upper/lower with finisher" : "high frequency full body with finisher")
-        : (daysPerWeek <= 2 ? "full body" : daysPerWeek === 3 ? "full body" : daysPerWeek === 4 ? "upper/lower" : "full body alternating");
-
-      // Hardcoded warmup and cooldown — no need for Claude to generate these
-      const hardcodedWarmup = [
-        { name: "Hip circles", duration: "30 seconds", description: "Hands on hips, make slow big circles each direction to loosen your lower back and hips." },
-        { name: "Leg swings", duration: "10 each leg", description: "Hold a wall for balance and swing each leg forward and back to open up your hips." },
-        { name: "Arm circles", duration: "30 seconds", description: "Extend arms out and make slow circles forward then backward to warm up your shoulders." },
-        { name: "Bodyweight squat", duration: "10 slow reps", description: "Slow controlled squats through full range of motion to activate your hips, knees, and glutes." },
-        { name: "Cat-cow stretch", duration: "10 reps", description: "On hands and knees, arch your back up then dip it down slowly. Warms up your spine before loading it." }
-      ];
-      const hardcodedCooldown = [
-        { name: "Quad stretch", duration: "30 seconds each leg", description: "Stand on one leg, pull the other heel to your glute. Hold a wall for balance." },
-        { name: "Hamstring stretch", duration: "30 seconds", description: "Sit on the floor with legs straight, reach toward your toes." },
-        { name: "Chest stretch", duration: "30 seconds", description: "Clasp hands behind your back, open your chest, look up slightly." },
-        { name: "Shoulder stretch", duration: "30 seconds each", description: "Pull one arm across your chest, hold with the other hand." },
-        { name: "Child's pose", duration: "60 seconds", description: "Kneel and reach arms forward on the floor. Breathe deeply and relax." }
-      ];
-
-      // Build named exercise slots based on split — this guarantees the right
-      // movement patterns are always present regardless of what Claude prefers.
-      // A real trainer programs by pattern first, exercise second.
-      // Hardcode exact exercise names per equipment type.
-      // Never give Claude a choice — it will always pick the wrong one.
-      const isBarbell = equipGuide.includes("BARBELL");
-      const isMachine = equipGuide.includes("MACHINE");
-
-      const ex = {
-        squat:   isBarbell ? "Barbell back squat"        : isMachine ? "Leg press"              : "Goblet squat",
-        hinge:   isBarbell ? "Barbell Romanian deadlift" : isMachine ? "Leg curl machine"       : "Dumbbell Romanian deadlift",
-        hPush:   isBarbell ? "Barbell bench press"       : isMachine ? "Chest press machine"    : "Dumbbell bench press",
-        hPull:   isBarbell ? "Barbell bent over row"     : isMachine ? "Seated cable row"       : "Single-arm dumbbell row",
-        vPush:   isBarbell ? "Barbell overhead press"    : isMachine ? "Shoulder press machine" : "Dumbbell shoulder press",
-        vPull:   "Lat pulldown",
-        unilat:  isBarbell ? "Barbell lunge"             : "Dumbbell split squat",
-        legCurl: isMachine ? "Leg curl machine"          : "Glute bridge",
+      // Build plan locally — deterministic, code-driven, no prompt engineering needed
+      const profileForPlan = {
+        goal, sex, age, trainingHistory, recentActivity,
+        daysPerWeek, equipment, injuries,
+      };
+      const macrosForPlan = {
+        calories: targetCals, protein: targetProtein,
+        carbs: targetCarbs, fat: targetFat,
+        bmr: bmrCalc, tdee: tdeeCalc, goalAdjustment: goalAdj,
       };
 
-      let exerciseSlots = "";
-      if (daysPerWeek <= 3) {
-        exerciseSlots = "The exercises array MUST contain exactly these 5 exercises in this exact order. Use these exact strings in the name field. Do not substitute, skip, or reorder:\n"
-          + "1. \"" + ex.squat + "\" — pattern: squat\n"
-          + "2. \"" + ex.hinge + "\" — pattern: hinge — MANDATORY hamstring exercise, do not replace with any upper body movement\n"
-          + "3. \"" + ex.hPush + "\" — pattern: push\n"
-          + "4. \"" + ex.hPull + "\" — pattern: pull\n"
-          + "5. \"" + ex.vPush + "\" — pattern: accessory\n"
-          + "Set realistic working-set weights for " + expLevel + ".";
-      } else if (daysPerWeek === 4) {
-        exerciseSlots = "UPPER/LOWER SPLIT. The exercises array MUST contain exactly these 8 exercises in this exact order:\n"
-          + "1. \"" + ex.hPush + "\" — pattern: push\n"
-          + "2. \"" + ex.hPull + "\" — pattern: pull\n"
-          + "3. \"" + ex.vPush + "\" — pattern: push\n"
-          + "4. \"" + ex.vPull + "\" — pattern: pull\n"
-          + "5. \"" + ex.squat + "\" — pattern: squat\n"
-          + "6. \"" + ex.hinge + "\" — pattern: hinge — MANDATORY\n"
-          + "7. \"" + ex.unilat + "\" — pattern: squat\n"
-          + "8. \"" + ex.legCurl + "\" — pattern: accessory\n"
-          + "Set realistic working-set weights for " + expLevel + ".";
-      } else {
-        exerciseSlots = "PUSH/PULL/LEGS SPLIT. The exercises array MUST contain exactly these 7 exercises in this exact order:\n"
-          + "1. \"" + ex.hPush + "\" — pattern: push\n"
-          + "2. \"" + ex.vPush + "\" — pattern: push\n"
-          + "3. \"" + ex.hPull + "\" — pattern: pull\n"
-          + "4. \"" + ex.vPull + "\" — pattern: pull\n"
-          + "5. \"" + ex.squat + "\" — pattern: squat\n"
-          + "6. \"" + ex.hinge + "\" — pattern: hinge — MANDATORY\n"
-          + "7. \"" + ex.unilat + "\" — pattern: squat\n"
-          + "Set realistic working-set weights for " + expLevel + ".";
-      }
-
-      const prompt = `Generate a week 1 fitness plan as JSON only. No markdown, no explanation.
-Member: goal=${goal}, sex=${sex}, ${heightFt}ft${heightIn||0}in, ${weight}lbs, age ${age}, ${daysPerWeek} days/week.
-Equipment: ${equipGuide}. Experience: ${expLevel}.
-${injuryNote}
-${exerciseSlots}
-PATTERN FIELD: For every exercise in the exercises array, set the "pattern" field to exactly one of: squat, hinge, push, pull, accessory. Squat-pattern exercises get "squat". Hip-hinge exercises (RDL, deadlift, good morning) get "hinge". Any pressing movement gets "push". Any rowing or pulling movement gets "pull". Isolation accessories (curls, lateral raises, tricep work) get "accessory".
-Nutrition (already calculated — use exactly): calories=${targetCals}, protein=${targetProtein}g, carbs=${targetCarbs}g, fat=${targetFat}g.
-Return this exact JSON (all numbers as numbers not strings):
-{"calories":${targetCals},"protein":${targetProtein},"carbs":${targetCarbs},"fat":${targetFat},"bmr":${bmrCalc},"tdee":${tdeeCalc},"goalAdjustment":${goalAdj},"workoutType":"string","workoutDuration":number,"restSeconds":number,"weekNumber":1,"weekStartDate":"${new Date().toISOString().split("T")[0]}","daysPerWeek":${daysPerWeek},"weeklyFocus":"string","tip":"string","progressionRule":"string","warmup":[],"cooldown":[],"exercises":[{"name":"string","sets":number,"reps":number,"weight":number,"muscle":"string","pattern":"squat|hinge|push|pull|accessory","rpe":number,"alternative":"string","restSeconds":number}]}`;
-
-      try {
-        const res = await fetch("/api/plan", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt }),
-        });
-        const data = await res.json();
-        const raw = (data.text || "").replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(raw);
-        // Always use hardcoded warmup/cooldown — reliable and saves tokens
-        parsed.warmup = hardcodedWarmup;
-        parsed.cooldown = hardcodedCooldown;
+              const parsed = buildPlan(profileForPlan, macrosForPlan);
         if (!cancelled) {
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           setUser(userData);
@@ -1339,7 +1538,7 @@ Return this exact JSON (all numbers as numbers not strings):
           setTimeout(() => { if (!cancelled) setStep(13); }, 400);
         }
       } catch (planErr) {
-        console.error("[Morphiq] /api/plan failed:", planErr.message);
+        console.error("[Morphiq] Plan build failed:", planErr.message);
         if (!cancelled) {
           setPlanError("Plan generation failed — " + (planErr.message || "unknown error") + ". Tap to try again.");
         }
