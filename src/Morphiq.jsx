@@ -422,13 +422,13 @@ const DEFAULT_USER = { name: "", goal: null, sex: null, height: "", weight: "", 
 // ═══════════════════════════════════════════════════════════════════
 const EXERCISE_LIBRARY = {
   barbell: {
-    squat:     { name: "Barbell back squat",        muscle: "Quads / Glutes",       pattern: "squat" },
-    hinge:     { name: "Barbell Romanian deadlift", muscle: "Hamstrings / Glutes",  pattern: "hinge" },
-    push:      { name: "Barbell bench press",       muscle: "Chest / Shoulders",    pattern: "push"  },
-    pull:      { name: "Barbell bent over row",     muscle: "Back / Biceps",        pattern: "pull"  },
-    accessory: { name: "Barbell overhead press",    muscle: "Shoulders",            pattern: "accessory" },
-    finisher:  { name: "Barbell complex",           muscle: "Full body",            pattern: "accessory" },
-    core:      { name: "Farmers carry",             muscle: "Core / Grip",          pattern: "accessory" },
+    squat:     { name: "Barbell back squat",        variation: "Barbell front squat",          muscle: "Quads / Glutes",       pattern: "squat" },
+    hinge:     { name: "Barbell Romanian deadlift", variation: "Trap bar deadlift",            muscle: "Hamstrings / Glutes",  pattern: "hinge" },
+    push:      { name: "Barbell bench press",       variation: "Barbell incline bench press",  muscle: "Chest / Shoulders",    pattern: "push"  },
+    pull:      { name: "Barbell bent over row",     variation: "Chest-supported DB row",       muscle: "Back / Biceps",        pattern: "pull"  },
+    accessory: { name: "Barbell overhead press",    variation: "Landmine press",               muscle: "Shoulders",            pattern: "accessory" },
+    finisher:  { name: "Barbell complex",           variation: "Kettlebell swings x30",        muscle: "Full body",            pattern: "accessory" },
+    core:      { name: "Farmers carry",             variation: "Pallof press",                 muscle: "Core / Grip",          pattern: "accessory" },
     // Injury swaps
     squat_knee:     { name: "Goblet squat",              muscle: "Quads / Glutes",    pattern: "squat" },
     squat_back:     { name: "Box squat",                 muscle: "Quads / Glutes",    pattern: "squat" },
@@ -440,14 +440,14 @@ const EXERCISE_LIBRARY = {
     finisher_back:  { name: "Kettlebell swings",         muscle: "Full body",         pattern: "accessory" },
   },
   dumbbell: {
-    squat:     { name: "Goblet squat",              muscle: "Quads / Glutes",       pattern: "squat" },
-    hinge:     { name: "Dumbbell Romanian deadlift",muscle: "Hamstrings / Glutes",  pattern: "hinge" },
-    push:      { name: "Dumbbell bench press",      muscle: "Chest / Shoulders",    pattern: "push"  },
-    pull:      { name: "Single-arm dumbbell row",   muscle: "Back / Biceps",        pattern: "pull"  },
-    accessory: { name: "Dumbbell curl to press",    muscle: "Biceps / Shoulders",   pattern: "accessory" },
-    finisher_beginner: { name: "Dumbbell squat to curl", muscle: "Full body",       pattern: "accessory" },
-    finisher:  { name: "Dumbbell thrusters",        muscle: "Full body",            pattern: "accessory" },
-    core:      { name: "Suitcase carry",            muscle: "Core / Grip",          pattern: "accessory" },
+    squat:     { name: "Goblet squat",              variation: "Dumbbell split squat",         muscle: "Quads / Glutes",       pattern: "squat" },
+    hinge:     { name: "Dumbbell Romanian deadlift",variation: "Hip thrust",                   muscle: "Hamstrings / Glutes",  pattern: "hinge" },
+    push:      { name: "Dumbbell bench press",      variation: "Neutral-grip incline press",   muscle: "Chest / Shoulders",    pattern: "push"  },
+    pull:      { name: "Single-arm dumbbell row",   variation: "Chest-supported DB row",       muscle: "Back / Biceps",        pattern: "pull"  },
+    accessory: { name: "Dumbbell curl to press",    variation: "Lateral raise + shrug",        muscle: "Biceps / Shoulders",   pattern: "accessory" },
+    finisher_beginner: { name: "Dumbbell squat to curl", variation: "Jump rope 2 min",         muscle: "Full body",            pattern: "accessory" },
+    finisher:  { name: "Dumbbell thrusters",        variation: "Dumbbell swing",               muscle: "Full body",            pattern: "accessory" },
+    core:      { name: "Suitcase carry",            variation: "Pallof press",                 muscle: "Core / Grip",          pattern: "accessory" },
     // Injury swaps
     squat_knee:     { name: "Hip thrust",                muscle: "Glutes",            pattern: "squat" },
     hinge_back:     { name: "Hip thrust",                muscle: "Glutes",            pattern: "hinge" },
@@ -457,31 +457,31 @@ const EXERCISE_LIBRARY = {
     finisher_shoulder:  { name: "Dumbbell swing",        muscle: "Full body",         pattern: "accessory" },
   },
   machine: {
-    squat:     { name: "Leg press",                 muscle: "Quads / Glutes",       pattern: "squat" },
-    hinge:     { name: "Lying leg curl",            muscle: "Hamstrings",           pattern: "hinge" },
-    push:      { name: "Chest press machine",       muscle: "Chest / Shoulders",    pattern: "push"  },
-    pull:      { name: "Seated cable row",          muscle: "Back / Biceps",        pattern: "pull"  },
-    accessory: { name: "Lat pulldown",              muscle: "Back / Biceps",        pattern: "accessory" },
-    accessory_exp: { name: "Lat pulldown + cable curl", muscle: "Back / Biceps",    pattern: "accessory" },
-    finisher_beginner: { name: "Rowing machine 3 min",   muscle: "Full body",       pattern: "accessory" },
-    finisher:  { name: "Rowing machine 5 min",      muscle: "Full body",            pattern: "accessory" },
-    core:      { name: "Cable Pallof press",        muscle: "Core",                 pattern: "accessory" },
+    squat:     { name: "Leg press",                 variation: "Hack squat machine",           muscle: "Quads / Glutes",       pattern: "squat" },
+    hinge:     { name: "Lying leg curl",            variation: "Seated leg curl",              muscle: "Hamstrings",           pattern: "hinge" },
+    push:      { name: "Chest press machine",       variation: "Cable chest fly",              muscle: "Chest / Shoulders",    pattern: "push"  },
+    pull:      { name: "Seated cable row",          variation: "Lat pulldown",                 muscle: "Back / Biceps",        pattern: "pull"  },
+    accessory: { name: "Lat pulldown",              variation: "Cable bicep curl",             muscle: "Back / Biceps",        pattern: "accessory" },
+    accessory_exp: { name: "Lat pulldown + cable curl", variation: "Cable fly + curl superset",muscle: "Back / Biceps",        pattern: "accessory" },
+    finisher_beginner: { name: "Rowing machine 3 min",   variation: "Bike 5 min",             muscle: "Full body",            pattern: "accessory" },
+    finisher:  { name: "Rowing machine 5 min",      variation: "Stairmaster 5 min",            muscle: "Full body",            pattern: "accessory" },
+    core:      { name: "Cable Pallof press",        variation: "Ab wheel rollout",             muscle: "Core",                 pattern: "accessory" },
     // Injury swaps
     squat_knee: { name: "Seated leg extension (light)", muscle: "Quads",            pattern: "squat" },
     push_shoulder: { name: "Cable chest fly",       muscle: "Chest",                pattern: "push"  },
     pull_back:  { name: "Lat pulldown",             muscle: "Back",                 pattern: "pull"  },
   },
   kettlebell: {
-    squat:     { name: "Kettlebell goblet squat",   muscle: "Quads / Glutes",       pattern: "squat" },
-    hinge:     { name: "Kettlebell deadlift",       muscle: "Hamstrings / Glutes",  pattern: "hinge" },
-    push:      { name: "Kettlebell floor press",    muscle: "Chest / Shoulders",    pattern: "push"  },
-    push_exp:  { name: "Kettlebell push press",     muscle: "Shoulders",            pattern: "push"  },
-    pull:      { name: "Kettlebell single-arm row", muscle: "Back / Biceps",        pattern: "pull"  },
-    accessory: { name: "Kettlebell single-leg deadlift", muscle: "Hamstrings / Balance", pattern: "accessory" },
-    accessory_exp: { name: "Kettlebell Turkish get-up", muscle: "Full body / Core", pattern: "accessory" },
-    finisher_beginner: { name: "Kettlebell swings x30", muscle: "Full body",        pattern: "accessory" },
-    finisher:  { name: "Kettlebell swings x50",     muscle: "Full body",            pattern: "accessory" },
-    core:      { name: "Kettlebell farmers carry",  muscle: "Core / Grip",          pattern: "accessory" },
+    squat:     { name: "Kettlebell goblet squat",   variation: "Kettlebell sumo squat",        muscle: "Quads / Glutes",       pattern: "squat" },
+    hinge:     { name: "Kettlebell deadlift",       variation: "Kettlebell single-leg RDL",    muscle: "Hamstrings / Glutes",  pattern: "hinge" },
+    push:      { name: "Kettlebell floor press",    variation: "Kettlebell push press",        muscle: "Chest / Shoulders",    pattern: "push"  },
+    push_exp:  { name: "Kettlebell push press",     variation: "Kettlebell floor press",       muscle: "Shoulders",            pattern: "push"  },
+    pull:      { name: "Kettlebell single-arm row", variation: "Kettlebell high pull",         muscle: "Back / Biceps",        pattern: "pull"  },
+    accessory: { name: "Kettlebell single-leg deadlift", variation: "Kettlebell Romanian deadlift", muscle: "Hamstrings / Balance", pattern: "accessory" },
+    accessory_exp: { name: "Kettlebell Turkish get-up", variation: "Kettlebell windmill",      muscle: "Full body / Core",     pattern: "accessory" },
+    finisher_beginner: { name: "Kettlebell swings x30", variation: "Jump rope 2 min",          muscle: "Full body",            pattern: "accessory" },
+    finisher:  { name: "Kettlebell swings x50",     variation: "Kettlebell snatch x20",        muscle: "Full body",            pattern: "accessory" },
+    core:      { name: "Kettlebell farmers carry",  variation: "Kettlebell halo",              muscle: "Core / Grip",          pattern: "accessory" },
     // Injury swaps
     squat_knee:     { name: "Kettlebell deadlift",       muscle: "Hamstrings / Glutes", pattern: "squat" },
     hinge_back:     { name: "Hip thrust",                muscle: "Glutes",            pattern: "hinge" },
@@ -800,10 +800,22 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
   const nextExercises = currentPlan.exercises.map(ex => {
     const logs = logMap[ex.name] || [];
 
-    // Post-deload: reset to week 1 weight + 10%
+    // Post-deload: reset to week 1 weight + 10%, swap to variation exercise
     if (isPostDeload) {
+      // Mesocycle number: 1 = weeks 1-5, 2 = weeks 6-10, 3 = weeks 11-15...
+      // Even mesocycles use variation, odd mesocycles use primary
+      const mesocycle = Math.floor((nextWeekNum - 1) / 5);
+      const useVariation = mesocycle % 2 === 1;
+      // Find this exercise's variation from the library
+      const lib = EXERCISE_LIBRARY[userProfile.equipment] || EXERCISE_LIBRARY.dumbbell;
+      let variationName = ex.name; // default: keep same
+      Object.values(lib).forEach(slot => {
+        if (slot.name === ex.name && slot.variation) variationName = useVariation ? slot.variation : slot.name;
+        if (slot.variation === ex.name && slot.name) variationName = useVariation ? slot.variation : slot.name;
+      });
       return {
         ...ex,
+        name: variationName,
         weight: Math.round(ex.weight * 1.1 / 5) * 5,
         reps: ex.repMin || ex.reps,
         weekNumber: nextWeekNum,
