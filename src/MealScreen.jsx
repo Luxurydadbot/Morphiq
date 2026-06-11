@@ -698,6 +698,30 @@ function MealPlanScreen() {
     } catch { return GROCERY_DATA; }
   });
   const [detailMeal, setDetailMeal] = useState(null);
+  const [extraMeals, setExtraMeals] = useState([]);
+
+  // Add a new blank extra meal slot
+  const addExtraMeal = () => {
+    const id = `extra_${Date.now()}`;
+    setExtraMeals(prev => [...prev, {
+      id,
+      label: `Extra meal`,
+      time: "",
+      status: "upcoming",
+      suggested: { name: "", cal: 0, protein: 0 },
+      logged: null,
+    }]);
+  };
+
+  // Log an extra meal slot (called from MealSlot onDone)
+  const markExtraDone = (id) => {
+    setExtraMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done", logged: m.suggested } : m));
+  };
+
+  // Skip an extra meal slot
+  const skipExtra = (id) => {
+    setExtraMeals(prev => prev.filter(m => m.id !== id));
+  };
 
   // Persist meals to localStorage whenever they change
   useEffect(() => {
@@ -795,7 +819,7 @@ function MealPlanScreen() {
     return { cal: acc.cal + src.cal, protein: acc.protein + src.protein, carbs: acc.carbs + (src.carbs || 0), fat: acc.fat + (src.fat || 0) };
   }, { cal: 0, protein: 0, carbs: 0, fat: 0 });
 
-  const macros = calcMacros(meals);
+  const macros = calcMacros([...meals, ...extraMeals]);
 
   function markDone(id) {
     const meal = meals.find(m => m.id === id);
@@ -901,7 +925,29 @@ function MealPlanScreen() {
                 onOpenDetail={() => setDetailMeal(meal)}
               />
             ))}
-            <EndOfDaySummary meals={meals} macros={macros} calGoal={CAL_GOAL} proteinGoal={PROTEIN_GOAL} />
+            {extraMeals.map(meal => (
+              <MealSlot
+                key={meal.id}
+                meal={meal}
+                onDone={() => markExtraDone(meal.id)}
+                onSkip={() => skipExtra(meal.id)}
+                onOpenDetail={() => setDetailMeal(meal)}
+              />
+            ))}
+            <button
+              onClick={addExtraMeal}
+              style={{
+                width: "100%", background: "transparent",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 10, padding: "10px",
+                fontSize: 12, color: "#6B7A8D",
+                cursor: "pointer", fontFamily: "inherit",
+                marginBottom: 8, display: "flex",
+                alignItems: "center", justifyContent: "center", gap: 6
+              }}>
+              <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add meal
+            </button>
+            <EndOfDaySummary meals={[...meals, ...extraMeals]} macros={macros} calGoal={CAL_GOAL} proteinGoal={PROTEIN_GOAL} />
             <HungryButton calsLeft={CAL_GOAL - macros.cal} proteinLeft={Math.max(0, PROTEIN_GOAL - macros.protein)} goal={plan?.goal} />
           </div>
         )}
