@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         MEAL_DATA, GROCERY_DATA } from "./Morphiq.jsx";
+         MEAL_DATA, GROCERY_DATA, localDateStr } from "./Morphiq.jsx";
 
 function MacroBar({ label, current, goal, color }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));
@@ -490,7 +490,7 @@ function buildMealsFromPlan(plan) {
 
 // Returns a localStorage key scoped to today's date so logs reset each day.
 function todayMealKey(userId) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   return `morphiq_meals_${userId || "anon"}_${today}`;
 }
 
