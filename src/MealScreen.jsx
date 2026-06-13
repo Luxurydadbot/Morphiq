@@ -88,7 +88,7 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
       {/* Action buttons — these are the focal point */}
       {meal.status === "upcoming" && (
         <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
-          <button onClick={onDone} className="mq-meal-tap"
+          <button onClick={onOpenDetail} className="mq-meal-tap"
             style={{ width: "100%", background: a, border: "none", borderRadius: 10, padding: "11px 10px", fontSize: 13, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
             🎤 Log what I ate
           </button>
@@ -170,7 +170,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         {/* Back + title */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", fontSize: 18, padding: 0, lineHeight: 1 }}>←</button>
-          <div style={{ fontSize: 16, fontWeight: 700, color: theme.text }}>{meal.label} — Up Next</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: theme.text }}>{meal.label}</div>
         </div>
 
         {/* AI note — only shown when meal was adjusted */}
