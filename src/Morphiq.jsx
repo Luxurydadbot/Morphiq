@@ -8,6 +8,17 @@ const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const SB_HEADERS = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`, "Content-Type": "application/json" };
 const SB_GET = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` };
 
+// Returns today's date as YYYY-MM-DD in the USER'S LOCAL timezone (not UTC).
+// Using toISOString() here was a bug: it returns the UTC date, so the meal
+// "day" rolled over in the early evening (UTC midnight) instead of local
+// midnight. This helper makes the day turn over at the member's real midnight.
+function localDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const sb = {
   // ── AUTH ──────────────────────────────────────────────────────────────────
   // Sends a 6-digit OTP to email (works inside the PWA — no browser redirect)
@@ -172,7 +183,7 @@ const sb = {
         body: JSON.stringify({
           user_id: profileId,
           meal_id: mealId,
-          date: new Date().toISOString().slice(0, 10),
+          date: localDateStr(),
           status,
           logged_name: loggedName,
           logged_cal: loggedCal,
@@ -193,7 +204,7 @@ const sb = {
     try {
       const profileId = await this.getProfileId(supabaseUserId);
       if (!profileId) return {};
-      const targetDate = date || new Date().toISOString().slice(0, 10);
+      const targetDate = date || localDateStr();
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/meal_logs?user_id=eq.${profileId}&date=eq.${targetDate}&order=id.desc`,
         { headers: SB_GET }
@@ -1268,7 +1279,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 // ── Shared exports for child screen files ───────────────────────────────────
 export { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         MEAL_DATA, GROCERY_DATA, WORKOUT_EXERCISES };
+         MEAL_DATA, GROCERY_DATA, WORKOUT_EXERCISES, localDateStr };
 
 function AuthScreen() {
   const { signIn, gymBranding } = useApp();
@@ -2102,7 +2113,7 @@ function HomeDashboardScreen() {
   const a = gymBranding.accent;
   // Read today's logged calories from MealScreen's localStorage (same key, same format)
   const calGoal = plan?.calories || 1800;
-  const todayNutritionKey = `morphiq_meals_${supabaseUser?.id || user?.id || "anon"}_${new Date().toISOString().slice(0,10)}`;
+  const todayNutritionKey = `morphiq_meals_${supabaseUser?.id || user?.id || "anon"}_${localDateStr()}`;
   const todayNutritionCals = (() => {
     try {
       const saved = JSON.parse(localStorage.getItem(todayNutritionKey) || "[]");
