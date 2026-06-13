@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         WORKOUT_EXERCISES } from "./Morphiq.jsx";
+         WORKOUT_EXERCISES, localDateStr } from "./Morphiq.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -266,16 +266,36 @@ function WorkoutScreen() {
     }))
   );
 
+  // ── Mid-workout progress persistence ──────────────────────────────
+  // Saves where the member is (phase, exercise, set, logged sets) to local
+  // storage so closing/reopening the app resumes exactly where they left off.
+  // Keyed by local date so a stale workout from a previous day is ignored and
+  // they start fresh — matches what top-tier lifting apps do (silent same-day
+  // auto-resume, no "resume?" modal in the common case).
+  const progressKey = `morphiq_workout_progress_${supabaseUser?.id || "anon"}`;
+  const savedProgress = (() => {
+    try {
+      const raw = localStorage.getItem(progressKey);
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      // Only restore if it was saved TODAY (local date). Otherwise discard.
+      if (p && p.date === localDateStr()) return p;
+      // Stale (previous day) — clear it so it never silently reappears.
+      localStorage.removeItem(progressKey);
+      return null;
+    } catch { return null; }
+  })();
+
   // Workout phase: "warmup" | "active" | "cooldown"
   const warmupExercises = plan?.warmup || [];
   const cooldownExercises = plan?.cooldown || [];
-  const [phase, setPhase] = useState(warmupExercises.length > 0 ? "warmup" : "active");
-  const [warmupStep, setWarmupStep] = useState(0);
-  const [cooldownStep, setCooldownStep] = useState(0);
+  const [phase, setPhase] = useState(savedProgress?.phase ?? (warmupExercises.length > 0 ? "warmup" : "active"));
+  const [warmupStep, setWarmupStep] = useState(savedProgress?.warmupStep ?? 0);
+  const [cooldownStep, setCooldownStep] = useState(savedProgress?.cooldownStep ?? 0);
 
-  const [exIdx, setExIdx] = useState(0);
-  const [setIdx, setSetIdx] = useState(0);
-  const [loggedSets, setLoggedSets] = useState([]);
+  const [exIdx, setExIdx] = useState(savedProgress?.exIdx ?? 0);
+  const [setIdx, setSetIdx] = useState(savedProgress?.setIdx ?? 0);
+  const [loggedSets, setLoggedSets] = useState(savedProgress?.loggedSets ?? []);
   const [state, setState] = useState("active");
 
   const [listening, setListening] = useState(false);
@@ -300,6 +320,35 @@ function WorkoutScreen() {
   const ex = exercises[exIdx];
   const currentWeight = nudgedWeight ?? ex.weight;
   const nextEx = exercises[exIdx + 1];
+
+  // Persist progress whenever position changes, so reopening resumes here.
+  // Fire-and-forget — a storage failure must never crash the workout.
+  useEffect(() => {
+    try {
+      localStorage.setItem(progressKey, JSON.stringify({
+        date: localDateStr(),
+        phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets,
+      }));
+    } catch {}
+  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, progressKey]);
+
+  // Clears saved progress — used when the workout finishes or the member
+  // chooses to restart. Without this, a completed workout would try to resume.
+  const clearProgress = () => { try { localStorage.removeItem(progressKey); } catch {} };
+
+  // Restart: wipe saved progress and reset back to the very beginning.
+  const restartWorkout = () => {
+    clearProgress();
+    setLoggedSets([]);
+    setExIdx(0);
+    setSetIdx(0);
+    setWarmupStep(0);
+    setCooldownStep(0);
+    setNudgedWeight(null);
+    nudgeAcceptedRef.current = false;
+    setPhase(warmupExercises.length > 0 ? "warmup" : "active");
+    setState("active");
+  };
 
   // Fallback: older saved plans don't have warmupSets on each exercise.
   // Compute a ramp on the fly so existing members see warm-ups immediately,
@@ -455,6 +504,8 @@ function WorkoutScreen() {
     } catch {
       // localStorage unavailable — not a fatal error, streak just won't update
     }
+    // Workout is finished — clear the in-progress save so it won't resume.
+    clearProgress();
   }
 
   // Called when member picks an alternative from the swap sheet.
@@ -1027,6 +1078,21 @@ function WorkoutScreen() {
             <span style={{ color: theme.text, fontWeight: 700 }}>{totalCompleted}</span> sets logged
           </div>
         </div>
+
+        {/* Restart — escape hatch. Only appears once the member has made some
+            progress, so a fresh workout stays uncluttered. Confirms first so
+            nobody wipes a session by accident. */}
+        {(exIdx > 0 || setIdx > 0 || loggedSets.length > 0) && (
+          <div style={{ textAlign: "center", marginTop: 10 }}>
+            <button onClick={() => {
+              if (window.confirm("Restart this workout from the beginning? Your logged sets for this session will be cleared.")) {
+                restartWorkout();
+              }
+            }} style={{ background: "transparent", border: "none", fontSize: 11, color: theme.textFaint, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+              Restart workout
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Swap confirmation banner ── */}
