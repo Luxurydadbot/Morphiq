@@ -683,6 +683,27 @@ function buildPlan(userProfile, existingMacros) {
     return row[expTier] || row.some || DEFAULT_WEIGHT;
   };
 
+  // ── Warm-up ramp generator ────────────────────────────────────────
+  // Best-practice hypertrophy setup: working sets stay at one weight (equal
+  // volume drives growth), but the lifter ramps UP to it with non-fatiguing
+  // warm-up sets first. These do NOT count as working sets and aren't logged.
+  // Returns [] for light/bodyweight lifts that don't need a ramp.
+  const buildWarmups = (workingWeight, isLower) => {
+    // Skip ramp for bodyweight or light accessory loads — not needed.
+    if (!workingWeight || workingWeight < 65) return [];
+    const roundTo = isLower ? 5 : 2.5; // barbell/lower rounds to 5s, upper to 2.5s
+    const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
+    // Ramp percentages of the working weight: ~50%, ~70%, ~85%
+    const pcts = [0.5, 0.7, 0.85];
+    return pcts
+      .map((p, i) => ({
+        weight: round(workingWeight * p),
+        reps: i === 0 ? 8 : i === 1 ? 5 : 3, // fewer reps as it gets heavier
+      }))
+      // Drop any warm-up that lands at/above the working weight (very light lifts)
+      .filter((s) => s.weight < workingWeight);
+  };
+
   // ── Build exercise objects ────────────────────────────────────────
   const makeEx = (exObj, isLower) => {
     if (!exObj) return null;
@@ -694,6 +715,7 @@ function buildPlan(userProfile, existingMacros) {
       repMin,
       repMax,
       weight: w,
+      warmupSets: buildWarmups(w, isLower), // ramp-up sets shown before working sets
       muscle: exObj.muscle,
       pattern: exObj.pattern,
       rpe,
@@ -721,6 +743,7 @@ function buildPlan(userProfile, existingMacros) {
       repMin: 30,
       repMax: 60,
       weight: getWeight(lib.core.name),
+      warmupSets: [], // core/carry slot doesn't use a loaded warm-up ramp
       muscle: lib.core.muscle,
       pattern: lib.core.pattern,
       rpe: Math.min(rpe, 7),
@@ -760,9 +783,7 @@ function buildPlan(userProfile, existingMacros) {
       : isOver40
       ? "Warm up longer than you think you need to. Your joints will thank you."
       : "Leave 1–2 reps in the tank on every set. Save max effort for the final set.",
-    progressionRule: usePyramid
-      ? "Pyramid: weight climbs each set. Hit your target reps on the final set two sessions in a row → working weight increases."
-      : "Straight sets: hit the top of your rep range two sessions in a row → add weight next session.",
+    progressionRule: "Straight sets: ramp up with warm-ups, then keep the same weight across all working sets. Hit the top of your rep range two sessions in a row → add weight next session.",
     warmup: [
       { name: "Hip circles",       duration: "30 seconds",   description: "Hands on hips, slow circles each direction." },
       { name: "Leg swings",        duration: "10 each leg",  description: "Hold a wall, swing each leg forward and back." },
