@@ -1141,14 +1141,16 @@ function AppProvider({ children }) {
       const dates = [...new Set(workoutLogs.map(r => r.workout_date))].sort((a,b) => b.localeCompare(a));
       const totalWorkouts = dates.length;
 
-      // Streak — count consecutive days ending today or yesterday
+      // Streak — count consecutive days ending today or yesterday.
+      // Uses localDateStr (local time) — NOT UTC — so the day doesn't roll
+      // over early for members west of UTC. (Same fix as the meal-day bug.)
       let streak = 0;
-      const today = new Date().toISOString().slice(0,10);
+      const today = localDateStr();
       const dateSet = new Set(dates);
-      let cursor = new Date(today);
+      let cursor = new Date(); // local "now", walked back one day at a time
       // allow today or yesterday as streak start
       if (!dateSet.has(today)) cursor.setDate(cursor.getDate() - 1);
-      while (dateSet.has(cursor.toISOString().slice(0,10))) {
+      while (dateSet.has(localDateStr(cursor))) {
         streak++;
         cursor.setDate(cursor.getDate() - 1);
       }
@@ -2698,7 +2700,8 @@ function ChatScreen({ fromScreen = "home" }) {
 }
 
 const WEIGHT_DATA_MOCK = [{week:"W1",weight:187.0},{week:"W2",weight:185.5},{week:"W3",weight:184.2},{week:"W4",weight:183.0},{week:"W5",weight:182.1},{week:"W6",weight:181.4}];
-const WORKOUT_LOG = [{date:"Mon May 5",name:"Full body A",sets:15,vol:"4,820 lbs",pbs:2},{date:"Wed May 7",name:"Full body B",sets:14,vol:"4,540 lbs",pbs:1},{date:"Fri May 9",name:"Full body A",sets:15,vol:"5,010 lbs",pbs:2},{date:"Mon May 12",name:"Full body B",sets:14,vol:"4,760 lbs",pbs:0},{date:"Wed May 14",name:"Full body A",sets:15,vol:"5,200 lbs",pbs:1}];
+
+
 const PERSONAL_BESTS = [{exercise:"Goblet Squat",weight:"35 lbs",reps:13,date:"May 14"},{exercise:"Dumbbell Bench Press",weight:"35 lbs",reps:11,date:"May 12"},{exercise:"Seated Cable Row",weight:"95 lbs",reps:12,date:"May 14"},{exercise:"Romanian Deadlift",weight:"75 lbs",reps:10,date:"May 9"}];
 
 function WeightChart({ data, accent }) {
@@ -2827,9 +2830,9 @@ function ProgressScreen() {
       name: "Full body", sets: s.sets,
       vol: s.totalVol > 0 ? s.totalVol.toLocaleString() + " lbs" : "—", pbs: 0,
     }));
-  })() : WORKOUT_LOG;
+  })() : [];
 
-  const totalWorkouts = useRealWorkoutData ? realSessions.length : 14;
+  const totalWorkouts = useRealWorkoutData ? realSessions.length : 0;
 
   const realPBs = useRealWorkoutData ? (() => {
     const best = {};
@@ -3055,7 +3058,12 @@ function ProgressScreen() {
             </div>
             <div style={sL}>Recent sessions</div>
             <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden" }}>
-              {realSessions.map((w, i) => (
+              {realSessions.length === 0 ? (
+                <div style={{ padding:"18px 14px", textAlign:"center" }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>No sessions logged yet</div>
+                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:4 }}>Finish a workout and it'll show up here.</div>
+                </div>
+              ) : realSessions.map((w, i) => (
                 <div key={w.date} style={{ padding:"10px 14px", borderBottom: i < realSessions.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                     <div>
@@ -3095,7 +3103,7 @@ function ProgressScreen() {
             }));
           })() : null;
 
-          const pbCount = useRealWorkoutData ? realPBs.length : 8;
+          const pbCount = useRealWorkoutData ? realPBs.length : 0;
           const pbMsg = useRealWorkoutData
             ? (realPBs.length > 0
                 ? `You have ${pbCount} exercise best${pbCount !== 1 ? "s" : ""} on record. Keep adding weight to keep growing.`
