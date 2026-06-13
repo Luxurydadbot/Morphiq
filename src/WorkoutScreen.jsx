@@ -301,6 +301,20 @@ function WorkoutScreen() {
   const currentWeight = nudgedWeight ?? ex.weight;
   const nextEx = exercises[exIdx + 1];
 
+  // Fallback: older saved plans don't have warmupSets on each exercise.
+  // Compute a ramp on the fly so existing members see warm-ups immediately,
+  // without needing to regenerate their plan. Mirrors buildWarmups() in Morphiq.jsx.
+  const exWarmups = (Array.isArray(ex.warmupSets) ? ex.warmupSets : null) ?? (() => {
+    const w = ex.weight;
+    if (!w || w < 65) return [];
+    const lower = /squat|deadlift|lunge|hip thrust|leg press|rdl|good morning/i.test(ex.name || "");
+    const roundTo = lower ? 5 : 2.5;
+    const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
+    return [0.5, 0.7, 0.85]
+      .map((p, i) => ({ weight: round(w * p), reps: i === 0 ? 8 : i === 1 ? 5 : 3 }))
+      .filter((s) => s.weight < w);
+  })();
+
   // Keep shared context updated so ChatScreen always knows exactly where we are
   useEffect(() => {
     setWorkoutContext({
@@ -911,6 +925,27 @@ function WorkoutScreen() {
             <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === ex.weight ? "Today's target" : `+${currentWeight - ex.weight} lbs from plan`}</div>
           )}
         </div>
+
+        {/* Warm-up ramp — shown only before the first working set. Informational
+            guide so the lifter ramps up to the working weight; not logged. */}
+        {setIdx === 0 && Array.isArray(exWarmups) && exWarmups.length > 0 && (
+          <div style={{ background: "#0D1623", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}>
+            <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>
+              Warm-up first — ramp up to {ex.weight} lbs
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {exWarmups.map((ws, i) => (
+                <div key={i} style={{ background: "#1A2332", borderRadius: 8, padding: "5px 9px", textAlign: "center", flex: 1, minWidth: 56 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: theme.text }}>{ws.weight} lbs</div>
+                  <div style={{ fontSize: 9, color: theme.textDim, marginTop: 1 }}>{ws.reps} reps</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 9, color: theme.textDim, marginTop: 6 }}>
+              These don't count — they prime you for hard working sets.
+            </div>
+          </div>
+        )}
 
         {/* Sets logged this exercise — shows after first set is done */}
         {loggedSets.filter(l => l.exerciseName === ex.name).length > 0 && (
