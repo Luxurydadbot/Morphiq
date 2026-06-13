@@ -183,6 +183,30 @@ const sb = {
     } catch { return false; }
   },
 
+  // Fetch today's meal logs so the Meals screen can restore status across
+  // devices/sessions, not just from localStorage on the same browser.
+  // Returns a map of meal_id -> { status, logged_name, logged_cal, logged_protein, logged_at }
+  // using only the most recent row per meal_id (handles edits creating multiple rows).
+  async getMealLogsForDate(supabaseUserId, date) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return {};
+      const targetDate = date || new Date().toISOString().slice(0, 10);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/meal_logs?user_id=eq.${profileId}&date=eq.${targetDate}&order=id.desc`,
+        { headers: SB_GET }
+      );
+      if (!res.ok) return {};
+      const rows = await res.json();
+      const byMeal = {};
+      for (const row of rows) {
+        // rows are newest-first (order=id.desc) — keep only the first (latest) per meal_id
+        if (!byMeal[row.meal_id]) byMeal[row.meal_id] = row;
+      }
+      return byMeal;
+    } catch { return {}; }
+  },
+
   // ── GYM OWNER LOOKUP ─────────────────────────────────────────────────────
   async getGymByOwnerEmail(email) {
     try {
