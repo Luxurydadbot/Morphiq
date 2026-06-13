@@ -46,14 +46,15 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
           </div>
         )}
         {meal.status === "done" && (
-          <div>
+          <button onClick={onOpenDetail} style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#D8E4E0" }}>{meal.suggested.name}</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 3 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 3, alignItems: "center" }}>
               <span style={{ fontSize: 10, color: theme.textDim }}>{meal.suggested.cal} cal</span>
               <span style={{ fontSize: 10, color: theme.textDim }}>·</span>
               <span style={{ fontSize: 10, color: theme.textDim }}>{meal.suggested.protein}g protein</span>
+              <span style={{ fontSize: 9, color: "#00D4B1", marginLeft: "auto" }}>Edit ✎</span>
             </div>
-          </div>
+          </button>
         )}
         {meal.status === "swapped" && meal.logged && (
           <div>
@@ -74,15 +75,16 @@ function MealSlot({ meal, onDone, onSkip, onOpenDetail }) {
 
       {/* Swapped actual */}
       {meal.status === "swapped" && meal.logged && (
-        <div style={{ margin: "0 12px 8px", background: "#1E1A0A", border: "1px solid rgba(245,158,11,0.15)", borderRadius: 8, padding: "6px 10px" }}>
+        <button onClick={onOpenDetail} style={{ display: "block", width: "calc(100% - 24px)", textAlign: "left", margin: "0 12px 8px", background: "#1E1A0A", border: "1px solid rgba(245,158,11,0.15)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>
           <div style={{ fontSize: 9, color: theme.amber, marginBottom: 2 }}>Actually ate</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#EDD08A" }}>{meal.logged.name}</div>
-          <div style={{ display: "flex", gap: 8, marginTop: 3 }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 3, alignItems: "center" }}>
             <span style={{ fontSize: 10, color: "#c08040" }}>{meal.logged.cal} cal</span>
             <span style={{ fontSize: 10, color: theme.textDim }}>·</span>
             <span style={{ fontSize: 10, color: theme.textDim }}>{meal.logged.protein}g protein</span>
+            <span style={{ fontSize: 9, color: "#00D4B1", marginLeft: "auto" }}>Edit ✎</span>
           </div>
-        </div>
+        </button>
       )}
 
       {/* Action buttons — these are the focal point */}
@@ -163,6 +165,10 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
   const originalMeal = meal.originalSuggested || meal.suggested;
   const confirmLabel = `✓ I'll have the ${meal.suggested.name.split(" ")[0].toLowerCase()}`;
 
+  // Edit mode: meal was already logged (done or swapped) — member is correcting it
+  const isEdit = meal.status === "done" || meal.status === "swapped";
+  const alreadyLogged = isEdit ? (meal.logged || meal.suggested) : null;
+
   return (
     <Layout activeNav="meals" chatTarget="chat_meals">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column" }}>
@@ -170,7 +176,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         {/* Back + title */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", fontSize: 18, padding: 0, lineHeight: 1 }}>←</button>
-          <div style={{ fontSize: 16, fontWeight: 700, color: theme.text }}>{meal.label}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: theme.text }}>{isEdit ? `Change ${meal.label.toLowerCase()}` : meal.label}</div>
         </div>
 
         {/* AI note — only shown when meal was adjusted */}
@@ -199,15 +205,15 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
           </div>
         )}
 
-        {/* Suggested meal summary — shown when no adjustment */}
+        {/* Suggested meal summary — shown when no adjustment. In edit mode, shows what was logged instead. */}
         {!hasAdjustment && (
           <div style={{ background: "#1A2332", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
-
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2", marginBottom: 4 }}>{meal.suggested.name}</div>
+            {isEdit && <div style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 4 }}>Currently logged</div>}
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2", marginBottom: 4 }}>{isEdit ? alreadyLogged.name : meal.suggested.name}</div>
             <div style={{ display: "flex", gap: 10 }}>
-              <span style={{ fontSize: 12, color: a }}>{meal.suggested.cal} cal</span>
+              <span style={{ fontSize: 12, color: a }}>{isEdit ? alreadyLogged.cal : meal.suggested.cal} cal</span>
               <span style={{ fontSize: 12, color: theme.textDim }}>·</span>
-              <span style={{ fontSize: 12, color: theme.textDim }}>{meal.suggested.protein}g protein</span>
+              <span style={{ fontSize: 12, color: theme.textDim }}>{isEdit ? alreadyLogged.protein : meal.suggested.protein}g protein</span>
             </div>
           </div>
         )}
@@ -216,7 +222,7 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
         <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 14, padding: "14px 14px 12px", marginBottom: 14, textAlign: "center" }}>
           {voicePhase === "idle" && (
             <>
-              <div style={{ fontSize: 13, color: theme.textDim, marginBottom: 12 }}>Did you eat something different?</div>
+              <div style={{ fontSize: 13, color: theme.textDim, marginBottom: 12 }}>{isEdit ? "What did you actually have?" : "Did you eat something different?"}</div>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
                 <VoiceBtn onPress={startVoice} size={54} />
               </div>
@@ -303,12 +309,20 @@ function MealDetailScreen({ meal, onBack, onConfirm, onSwap }) {
 
         {/* Bottom CTAs */}
         <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
-          <button onClick={startVoice} style={{ flex: 1, background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "11px 8px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-            🎤 Something else
-          </button>
-          <button onClick={onConfirm} style={{ flex: 2, background: a, border: "none", borderRadius: 12, padding: "11px 8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            {confirmLabel}
-          </button>
+          {isEdit ? (
+            <button onClick={() => onConfirm()} style={{ flex: 1, background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "11px 8px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+              {meal._isExtra ? "Remove this meal" : `Reset to suggested: ${meal.suggested.name.split(" ")[0]}`}
+            </button>
+          ) : (
+            <>
+              <button onClick={startVoice} style={{ flex: 1, background: "transparent", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "11px 8px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+                🎤 Something else
+              </button>
+              <button onClick={onConfirm} style={{ flex: 2, background: a, border: "none", borderRadius: 12, padding: "11px 8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                {confirmLabel}
+              </button>
+            </>
+          )}
         </div>
 
       </div>
@@ -723,6 +737,13 @@ function MealPlanScreen() {
     setExtraMeals(prev => prev.filter(m => m.id !== id));
   };
 
+  // Log or edit an extra meal slot via voice/text (called from detail screen)
+  const logSwapExtra = (id, parsedMeal) => {
+    const logged = parsedMeal || { name: "Something else", cal: 500, protein: 25, carbs: 50, fat: 20 };
+    setExtraMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done", logged, suggested: logged } : m));
+    setDetailMeal(null);
+  };
+
   // Persist meals to localStorage whenever they change
   useEffect(() => {
     try {
@@ -839,7 +860,7 @@ function MealPlanScreen() {
   }
   function confirmSalad(id) {
     const meal = meals.find(m => m.id === id);
-    setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done" } : m));
+    setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "done", logged: null } : m));
     setDetailMeal(null);
     if (supabaseUser?.id && meal) {
       sb.insertMealLog(supabaseUser.id, {
@@ -872,14 +893,14 @@ function MealPlanScreen() {
     }));
   }
 
-  // Show dinner detail screen
+  // Show meal detail / voice logging screen
   if (detailMeal) {
     return (
       <MealDetailScreen
         meal={detailMeal}
         onBack={() => setDetailMeal(null)}
-        onConfirm={() => confirmSalad(detailMeal.id)}
-        onSwap={(parsedMeal) => logSwap(detailMeal.id, parsedMeal)}
+        onConfirm={() => detailMeal._isExtra ? skipExtra(detailMeal.id) : confirmSalad(detailMeal.id)}
+        onSwap={(parsedMeal) => detailMeal._isExtra ? logSwapExtra(detailMeal.id, parsedMeal) : logSwap(detailMeal.id, parsedMeal)}
       />
     );
   }
@@ -931,7 +952,7 @@ function MealPlanScreen() {
                 meal={meal}
                 onDone={() => markExtraDone(meal.id)}
                 onSkip={() => skipExtra(meal.id)}
-                onOpenDetail={() => setDetailMeal(meal)}
+                onOpenDetail={() => setDetailMeal({ ...meal, _isExtra: true })}
               />
             ))}
             <button
