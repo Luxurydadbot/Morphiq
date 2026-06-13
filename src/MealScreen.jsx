@@ -752,6 +752,34 @@ function MealPlanScreen() {
     } catch {}
   }, [meals, supabaseUser?.id]);
 
+  // On load, fetch today's meal logs from the database — this is the source of
+  // truth across devices/sessions. localStorage (above) is only an instant-load
+  // fallback for the same browser. Database wins if it has logs for today.
+  useEffect(() => {
+    if (!supabaseUser?.id) return;
+    let cancelled = false;
+    (async () => {
+      const logs = await sb.getMealLogsForDate(supabaseUser.id);
+      if (cancelled || !logs || Object.keys(logs).length === 0) return;
+      setMeals(prev => prev.map(m => {
+        const row = logs[m.id];
+        if (!row) return m;
+        if (row.status === "skipped") return { ...m, status: "skipped" };
+        if (row.status === "swapped") {
+          return { ...m, status: "swapped", logged: { name: row.logged_name, cal: row.logged_cal, protein: row.logged_protein, carbs: 0, fat: 0 } };
+        }
+        if (row.status === "done") {
+          // "done" means they confirmed the suggestion as-is, or reset back to it —
+          // keep the existing suggested values, just mark it done.
+          return { ...m, status: "done", logged: null };
+        }
+        return m;
+      }));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseUser?.id]);
+
   // When ANY meal is swapped for something higher-calorie, recalculate
   // all remaining upcoming meals to fit the remaining daily budget.
   // This is the core AI adjustment behavior from the blueprint.
