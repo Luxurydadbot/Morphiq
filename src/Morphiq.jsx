@@ -162,7 +162,7 @@ const sb = {
   },
 
   // ── MEAL LOGS ─────────────────────────────────────────────────────────────
-  async insertMealLog(supabaseUserId, { mealId, status, loggedName, loggedCal, loggedProtein }) {
+  async insertMealLog(supabaseUserId, { mealId, status, loggedName, loggedCal, loggedProtein, loggedCarbs, loggedFat }) {
     try {
       const profileId = await this.getProfileId(supabaseUserId);
       if (!profileId) return false;
@@ -177,6 +177,8 @@ const sb = {
           logged_name: loggedName,
           logged_cal: loggedCal,
           logged_protein: loggedProtein,
+          logged_carbs: loggedCarbs ?? 0,
+          logged_fat: loggedFat ?? 0,
         }),
       });
       return res.ok;
