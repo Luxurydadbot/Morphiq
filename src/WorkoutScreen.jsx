@@ -298,6 +298,19 @@ function WorkoutScreen() {
   const [loggedSets, setLoggedSets] = useState(savedProgress?.loggedSets ?? []);
   const [state, setState] = useState("active");
 
+  // Show a brief "picked up where you left off" banner ONLY when we actually
+  // restored meaningful progress (not a saved-but-untouched start). This makes
+  // resuming visible and intentional, so the "Start over" button can only be
+  // read as its opposite. The banner fades on its own — no permanent clutter.
+  const [showResumeBanner, setShowResumeBanner] = useState(
+    !!(savedProgress && (savedProgress.exIdx > 0 || savedProgress.setIdx > 0 || (savedProgress.loggedSets || []).length > 0))
+  );
+  useEffect(() => {
+    if (!showResumeBanner) return;
+    const t = setTimeout(() => setShowResumeBanner(false), 4500);
+    return () => clearTimeout(t);
+  }, [showResumeBanner]);
+
   const [listening, setListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [repCount, setRepCount] = useState(null); // null = not set yet, number = user typed/adjusted
@@ -339,6 +352,7 @@ function WorkoutScreen() {
   // Restart: wipe saved progress and reset back to the very beginning.
   const restartWorkout = () => {
     clearProgress();
+    setShowResumeBanner(false);
     setLoggedSets([]);
     setExIdx(0);
     setSetIdx(0);
@@ -943,6 +957,18 @@ function WorkoutScreen() {
     <Layout activeNav="workout" chatTarget="chat_workout">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
 
+        {/* Resume banner — appears briefly when we restored an in-progress
+            workout, then fades. Makes auto-resume visible and intentional. */}
+        {showResumeBanner && (
+          <div className="mq-fade" style={{ background: "#0A1A14", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0, color: a }}>↻</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: a }}>Picked up where you left off</div>
+              <div style={{ fontSize: 11, color: "#9BB3C8" }}>Exercise {exIdx + 1}, Set {setIdx + 1} · your logged sets are saved</div>
+            </div>
+          </div>
+        )}
+
         {/* Header — exercise name front and center */}
         <div style={{ textAlign: "center", marginBottom: 10 }}>
           <div style={{ fontSize: 10, color: theme.textDim, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>Set {setIdx + 1} of {ex.sets}</div>
@@ -1085,11 +1111,11 @@ function WorkoutScreen() {
         {(exIdx > 0 || setIdx > 0 || loggedSets.length > 0) && (
           <div style={{ textAlign: "center", marginTop: 10 }}>
             <button onClick={() => {
-              if (window.confirm("Restart this workout from the beginning? Your logged sets for this session will be cleared.")) {
+              if (window.confirm("Start over from the beginning? This clears every set you've logged in this session and sends you back to the first exercise. (This is NOT resume — you'll lose this session's progress.)")) {
                 restartWorkout();
               }
             }} style={{ background: "transparent", border: "none", fontSize: 11, color: theme.textFaint, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
-              Restart workout
+              Start over from set 1
             </button>
           </div>
         )}
