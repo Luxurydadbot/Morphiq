@@ -263,6 +263,7 @@ function WorkoutScreen() {
       targetReps: e.reps || e.targetReps, weight: e.weight,
       rpe: e.rpe || 8, alternative: e.alternative || null,
       restSeconds: e.restSeconds || null,
+      warmupSets: Array.isArray(e.warmupSets) ? e.warmupSets : null, // keep ramp data; null lets the fallback compute it
     }))
   );
 
@@ -367,7 +368,11 @@ function WorkoutScreen() {
   // Fallback: older saved plans don't have warmupSets on each exercise.
   // Compute a ramp on the fly so existing members see warm-ups immediately,
   // without needing to regenerate their plan. Mirrors buildWarmups() in Morphiq.jsx.
-  const exWarmups = (Array.isArray(ex.warmupSets) ? ex.warmupSets : null) ?? (() => {
+  // Use stored warm-ups only if they're a non-empty array; otherwise compute
+  // them on the fly (covers older saved plans and any that lost the field).
+  const exWarmups = (Array.isArray(ex.warmupSets) && ex.warmupSets.length > 0)
+    ? ex.warmupSets
+    : (() => {
     const w = ex.weight;
     if (!w || w < 65) return [];
     const lower = /squat|deadlift|lunge|hip thrust|leg press|rdl|good morning/i.test(ex.name || "");
