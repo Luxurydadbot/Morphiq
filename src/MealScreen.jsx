@@ -766,7 +766,7 @@ function MealPlanScreen() {
         if (!row) return m;
         if (row.status === "skipped") return { ...m, status: "skipped" };
         if (row.status === "swapped") {
-          return { ...m, status: "swapped", logged: { name: row.logged_name, cal: row.logged_cal, protein: row.logged_protein, carbs: 0, fat: 0 } };
+          return { ...m, status: "swapped", logged: { name: row.logged_name, cal: row.logged_cal, protein: row.logged_protein, carbs: row.logged_carbs || 0, fat: row.logged_fat || 0 } };
         }
         if (row.status === "done") {
           // "done" means they confirmed the suggestion as-is, or reset back to it —
@@ -877,13 +877,14 @@ function MealPlanScreen() {
       sb.insertMealLog(supabaseUser.id, {
         mealId: id, status: "done",
         loggedName: meal.suggested.name, loggedCal: meal.suggested.cal, loggedProtein: meal.suggested.protein,
+        loggedCarbs: meal.suggested.carbs || 0, loggedFat: meal.suggested.fat || 0,
       }).catch(() => {});
     }
   }
   function skipMeal(id) {
     setMeals(prev => prev.map(m => m.id === id ? { ...m, status: "skipped" } : m));
     if (supabaseUser?.id) {
-      sb.insertMealLog(supabaseUser.id, { mealId: id, status: "skipped", loggedName: null, loggedCal: 0, loggedProtein: 0 }).catch(() => {});
+      sb.insertMealLog(supabaseUser.id, { mealId: id, status: "skipped", loggedName: null, loggedCal: 0, loggedProtein: 0, loggedCarbs: 0, loggedFat: 0 }).catch(() => {});
     }
   }
   function confirmSalad(id) {
@@ -894,6 +895,7 @@ function MealPlanScreen() {
       sb.insertMealLog(supabaseUser.id, {
         mealId: id, status: "done",
         loggedName: meal.suggested.name, loggedCal: meal.suggested.cal, loggedProtein: meal.suggested.protein,
+        loggedCarbs: meal.suggested.carbs || 0, loggedFat: meal.suggested.fat || 0,
       }).catch(() => {});
     }
   }
@@ -905,6 +907,7 @@ function MealPlanScreen() {
       sb.insertMealLog(supabaseUser.id, {
         mealId: id, status: "swapped",
         loggedName: swapped.name, loggedCal: swapped.cal, loggedProtein: swapped.protein,
+        loggedCarbs: swapped.carbs || 0, loggedFat: swapped.fat || 0,
       }).catch(() => {});
     }
   }
