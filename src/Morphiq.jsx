@@ -3057,25 +3057,32 @@ function ProgressScreen() {
 
         {tab === "workouts" && (
           <div className="mq-fade">
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
-              {[
-                { val: String(totalWorkouts), lbl:"Total workouts", color:a },
-                { val:"98%",     lbl:"Completion rate",      color:a },
-                { val:"67,330",  lbl:"Total volume (lbs)",   color:"#F59E0B" },
-                { val:"40 min",  lbl:"Avg duration",         color:"#818cf8" },
-              ].map(({ val, lbl, color }) => (
-                <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 12px" }}>
-                  <div style={{ fontSize:20, fontWeight:700, color }}>{val}</div>
-                  <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2 }}>{lbl}</div>
+            {(() => {
+              // Total volume = sum of weight × reps across all working sets (exclude warm-ups: set_number > 0)
+              const totalVol = useRealWorkoutData
+                ? realLogs.filter(r => r.set_number > 0).reduce((acc, r) => acc + (r.weight || 0) * (r.reps || 0), 0)
+                : null;
+              const volDisplay = totalVol !== null ? totalVol.toLocaleString() + " lbs" : "—";
+              const workoutsDisplay = totalWorkouts > 0 ? String(totalWorkouts) : "—";
+              return (
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
+                  <div style={{ background:"#1A2332", borderRadius:12, padding:"10px 12px" }}>
+                    <div style={{ fontSize:20, fontWeight:700, color:a }}>{workoutsDisplay}</div>
+                    <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2 }}>Sessions logged</div>
+                  </div>
+                  <div style={{ background:"#1A2332", borderRadius:12, padding:"10px 12px" }}>
+                    <div style={{ fontSize:20, fontWeight:700, color:"#F59E0B" }}>{volDisplay}</div>
+                    <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2 }}>Total volume lifted</div>
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })()}
             <div style={sL}>Recent sessions</div>
             <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden" }}>
               {realSessions.length === 0 ? (
                 <div style={{ padding:"18px 14px", textAlign:"center" }}>
                   <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>No sessions logged yet</div>
-                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:4 }}>Finish a workout and it'll show up here.</div>
+                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:4 }}>Log your first set and it'll appear here.</div>
                 </div>
               ) : realSessions.map((w, i) => (
                 <div key={w.date} style={{ padding:"10px 14px", borderBottom: i < realSessions.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
