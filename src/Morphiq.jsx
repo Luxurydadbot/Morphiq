@@ -2819,16 +2819,20 @@ function ProgressScreen() {
   const [tab, setTab] = useState("body");
   const sL = { ...theme.sL, fontSize: 10, letterSpacing: "1.2px", marginBottom: 10, fontWeight: 500 };
 
-  // Refresh workout/weight data every time the Progress screen is opened.
-  // Without this, the count stays at zero until sign-out even if sets saved fine.
+  // Fetch fresh workout + weight data every time Progress screen opens.
+  // Track loading so we show "..." instead of "—" while waiting.
+  const [logsLoading, setLogsLoading] = useState(!historicalData);
   useEffect(() => {
-    if (supabaseUser?.id) loadHistoricalData(supabaseUser.id);
+    if (!supabaseUser?.id) return;
+    setLogsLoading(true);
+    loadHistoricalData(supabaseUser.id).finally(() => setLogsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pull workout logs from historicalData (loaded at sign-in) — no extra fetch needed
-  const realLogs = historicalData?.workoutLogs || null;
-  const useRealWorkoutData = realLogs !== null && realLogs.length > 0;
+  // realLogs: use whatever historicalData has — even an empty array means "loaded, just no data yet"
+  const realLogs = historicalData?.workoutLogs ?? null;
+  // hasData = logs loaded AND at least one row exists
+  const useRealWorkoutData = Array.isArray(realLogs) && realLogs.length > 0;
 
   const realSessions = useRealWorkoutData ? (() => {
     const byDate = {};
@@ -3062,8 +3066,8 @@ function ProgressScreen() {
               const totalVol = useRealWorkoutData
                 ? realLogs.filter(r => r.set_number > 0).reduce((acc, r) => acc + (r.weight || 0) * (r.reps || 0), 0)
                 : null;
-              const volDisplay = totalVol !== null ? totalVol.toLocaleString() + " lbs" : "—";
-              const workoutsDisplay = totalWorkouts > 0 ? String(totalWorkouts) : "—";
+              const volDisplay = logsLoading ? "..." : totalVol !== null ? totalVol.toLocaleString() + " lbs" : "—";
+              const workoutsDisplay = logsLoading ? "..." : totalWorkouts > 0 ? String(totalWorkouts) : "0";
               return (
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
                   <div style={{ background:"#1A2332", borderRadius:12, padding:"10px 12px" }}>
@@ -3081,8 +3085,8 @@ function ProgressScreen() {
             <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden" }}>
               {realSessions.length === 0 ? (
                 <div style={{ padding:"18px 14px", textAlign:"center" }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>No sessions logged yet</div>
-                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:4 }}>Log your first set and it'll appear here.</div>
+                  <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{logsLoading ? "Loading..." : "No sessions yet"}</div>
+                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:4 }}>{logsLoading ? "Fetching your workout history." : "Log a set in the workout screen and it'll appear here."}</div>
                 </div>
               ) : realSessions.map((w, i) => (
                 <div key={w.date} style={{ padding:"10px 14px", borderBottom: i < realSessions.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
