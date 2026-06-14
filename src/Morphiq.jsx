@@ -135,34 +135,34 @@ const sb = {
   // ── WORKOUT LOGS ──────────────────────────────────────────────────────────
   async insertWorkoutLog(supabaseUserId, { exerciseName, setNumber, reps, weight }) {
     try {
+      console.log("[DB] insertWorkoutLog start — authId:", supabaseUserId?.slice(0,8));
       // Resolve to profiles.id so the FK constraint is satisfied
       let profileId = await this.getProfileId(supabaseUserId);
+      console.log("[DB] getProfileId result:", profileId ? profileId.slice(0,8) : "NULL");
       // If dev bypass profile doesn't exist yet, create it now and retry
       if (!profileId && supabaseUserId === "dev-bypass-001") {
         await this.ensureDevProfile();
         profileId = await this.getProfileId(supabaseUserId);
       }
       // Retry once after 1s — handles transient network blip at sign-in
-      // This is the most common cause of workouts silently not saving.
       if (!profileId) {
+        console.log("[DB] profileId null — retrying in 1s...");
         await new Promise(r => setTimeout(r, 1000));
         profileId = await this.getProfileId(supabaseUserId);
+        console.log("[DB] retry result:", profileId ? profileId.slice(0,8) : "STILL NULL — save aborted");
       }
       if (!profileId) return false;
+      const body = { user_id: profileId, exercise_name: exerciseName, set_number: setNumber, reps, weight, workout_date: localDateStr() };
+      console.log("[DB] POSTing to workout_logs:", JSON.stringify(body));
       const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
         method: "POST",
         headers: SB_HEADERS,
-        body: JSON.stringify({
-          user_id: profileId,
-          exercise_name: exerciseName,
-          set_number: setNumber,
-          reps,
-          weight,
-          workout_date: localDateStr(), // use local date, not UTC (avoids day rollover after 6pm CT)
-        }),
+        body: JSON.stringify(body),
       });
+      const responseText = await res.text();
+      console.log("[DB] Supabase response:", res.status, responseText || "(empty)");
       return res.ok;
-    } catch { return false; }
+    } catch (e) { console.log("[DB] insertWorkoutLog threw:", e.message); return false; }
   },
 
   // Fetch recent workout logs for the progress screen
