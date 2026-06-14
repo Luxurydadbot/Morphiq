@@ -508,16 +508,23 @@ function WorkoutScreen() {
     if (supabaseUser?.id) {
       setSavingToCloud(true);
       setSavedToCloud(false);
+      console.log("[Morphiq] Saving set — user:", supabaseUser.id, "exercise:", ex.name, "reps:", reps, "weight:", currentWeight);
       sb.insertWorkoutLog(supabaseUser.id, {
         exerciseName: ex.name,
         setNumber: currentSpec.kind === "warmup" ? 0 : workingIdx,
         reps,
         weight: currentWeight,
       }).then(ok => {
+        console.log("[Morphiq] Save result:", ok ? "✓ SUCCESS" : "✗ FAILED");
         setSavingToCloud(false);
         setSavedToCloud(ok);
         if (ok) setTimeout(() => setSavedToCloud(false), 3000);
-      }).catch(() => { setSavingToCloud(false); });
+      }).catch((err) => { 
+        console.log("[Morphiq] Save error:", err);
+        setSavingToCloud(false); 
+      });
+    } else {
+      console.log("[Morphiq] NOT saving — supabaseUser.id is:", supabaseUser?.id);
     }
 
     // Show 3-second confirmation window before starting rest timer
