@@ -332,7 +332,6 @@ function WorkoutScreen() {
   const [savedToCloud, setSavedToCloud] = useState(false);
 
   const ex = exercises[exIdx];
-  const currentWeight = nudgedWeight ?? ex.weight;
   const nextEx = exercises[exIdx + 1];
 
   // Persist progress whenever position changes, so reopening resumes here.
@@ -383,19 +382,55 @@ function WorkoutScreen() {
       .filter((s) => s.weight < w);
   })();
 
+  // ── Combined set plan: warm-ups THEN working sets ─────────────────
+  // setIdx now walks this whole list. Each entry is tagged kind:"warmup" or
+  // "working" so logging, analytics, the rest timer and the UI can treat them
+  // differently even though the member taps through them the same way.
+  // Warm-ups are logged (so the flow is seamless) but tagged so progressive
+  // overload, PBs and volume totals can exclude them.
+  const workingCount = ex.sets;
+  const setPlan = [
+    ...exWarmups.map((ws, i) => ({
+      kind: "warmup",
+      weight: ws.weight,
+      targetReps: ws.reps,
+      label: `Warm-up ${i + 1}`,
+    })),
+    ...Array.from({ length: workingCount }).map((_, i) => ({
+      kind: "working",
+      weight: ex.weight,
+      targetReps: ex.targetReps,
+      label: `Working set ${i + 1}`,
+    })),
+  ];
+  const totalSetsInPlan = setPlan.length;
+  // Guard setIdx within range (older saved progress may exceed new plan length)
+  const safeSetIdx = Math.min(setIdx, totalSetsInPlan - 1);
+  const currentSpec = setPlan[safeSetIdx] || setPlan[setPlan.length - 1];
+  const isWarmupSet = currentSpec?.kind === "warmup";
+  // Working-set numbering for display (e.g. "Working set 2 of 4")
+  const workingIdx = setPlan.slice(0, safeSetIdx + 1).filter(s => s.kind === "working").length;
+
+  // Weight for the current set: warm-ups use their own weight; working sets use
+  // the working weight, with any progressive-overload nudge applied.
+  const currentWeight = isWarmupSet ? currentSpec.weight : (nudgedWeight ?? ex.weight);
+  // Target reps for the current set (warm-up reps differ from working reps).
+  const currentTargetReps = currentSpec?.targetReps ?? ex.targetReps;
+
   // Keep shared context updated so ChatScreen always knows exactly where we are
   useEffect(() => {
     setWorkoutContext({
       exercise: ex?.name || "Unknown exercise",
-      setNumber: setIdx + 1,
-      totalSets: ex?.sets || 3,
-      targetReps: ex?.targetReps || 10,
+      setNumber: isWarmupSet ? `warm-up ${safeSetIdx + 1}` : workingIdx,
+      totalSets: workingCount,
+      targetReps: currentTargetReps,
       weight: currentWeight,
+      isWarmup: isWarmupSet,
     });
     // Clear context when workout screen unmounts
     return () => setWorkoutContext(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exIdx, setIdx, currentWeight]);
+  }, [exIdx, setIdx, currentWeight, isWarmupSet]);
 
   const restStartRef = useRef(null);
   const activeRestSecsRef = useRef(activeRestSecs);
@@ -404,7 +439,9 @@ function WorkoutScreen() {
     if (state === "rest") {
       // Record the exact wall-clock time rest started
       restStartRef.current = Date.now();
-      const newRestSecs = plan?.restSeconds || 120;
+      // Warm-up sets get a short rest (they're not fatiguing); working sets use
+      // the plan's full rest. isWarmupSet reflects the set just completed here.
+      const newRestSecs = isWarmupSet ? 30 : (plan?.restSeconds || 120);
       setActiveRestSecs(newRestSecs);
       activeRestSecsRef.current = newRestSecs;
       setRestSecs(newRestSecs);
@@ -436,14 +473,14 @@ function WorkoutScreen() {
 
   function goToRestOrNudge() {
     const allLogs = loggedSetsRef.current;
-    // All sets logged for this exercise so far (includes the one just logged)
-    const setsForThisEx = allLogs.filter(l => l.exIdx === exIdx);
-    // How many sets beat the target rep count
-    const exceededCount = setsForThisEx.filter(l => l.reps > (ex.targetReps || 10)).length;
-    const isLastSet = setIdx >= ex.sets - 1;
+    // Only WORKING sets count toward progressive overload — warm-ups are excluded.
+    const workingSetsForEx = allLogs.filter(l => l.exIdx === exIdx && l.kind === "working");
+    const exceededCount = workingSetsForEx.filter(l => l.reps > (ex.targetReps || 10)).length;
+    // "Last set" = last entry in the whole plan (warm-ups + working)
+    const isLastSet = safeSetIdx >= totalSetsInPlan - 1;
     const increment = plan?.progressionRule?.weightIncrementLbs || 5;
-    // Trigger nudge: 2+ sets beat target, not on last set, and haven't nudged yet this exercise
-    if (exceededCount >= 2 && !isLastSet && !nudgeAcceptedRef.current) {
+    // Never nudge on a warm-up. Trigger only when 2+ working sets beat target.
+    if (!isWarmupSet && exceededCount >= 2 && !isLastSet && !nudgeAcceptedRef.current) {
       setNudgedWeight((nudgedWeight ?? ex.weight) + increment);
       setState("nudge");
     } else {
@@ -456,8 +493,8 @@ function WorkoutScreen() {
   // Tracks whether the overload nudge was accepted for this exercise — prevents double-nudging
   const nudgeAcceptedRef = useRef(false);
 
-  function logSet(reps = ex.targetReps + 1) {
-    const entry = { exIdx, setIdx, reps, weight: currentWeight };
+  function logSet(reps = currentTargetReps + 1) {
+    const entry = { exIdx, setIdx: safeSetIdx, reps, weight: currentWeight, kind: currentSpec.kind };
     const newLogs = [...loggedSets, entry];
     setLoggedSets(newLogs);
     loggedSetsRef.current = newLogs;
@@ -465,13 +502,15 @@ function WorkoutScreen() {
     setVoiceTranscript("");
     setListening(false);
 
-    // Persist to Supabase workout_logs (fire-and-forget)
+    // Persist to Supabase workout_logs (fire-and-forget).
+    // Warm-ups are tagged in set_number as a negative-style marker so analytics
+    // can exclude them: working sets keep their 1..N number, warm-ups send 0.
     if (supabaseUser?.id) {
       setSavingToCloud(true);
       setSavedToCloud(false);
       sb.insertWorkoutLog(supabaseUser.id, {
         exerciseName: ex.name,
-        setNumber: setIdx + 1,
+        setNumber: currentSpec.kind === "warmup" ? 0 : workingIdx,
         reps,
         weight: currentWeight,
       }).then(ok => {
@@ -487,12 +526,12 @@ function WorkoutScreen() {
 
   function advanceSet() {
     setRepCount(null);
-    if (setIdx < ex.sets - 1) {
-      // Same exercise, next set — keep nudged weight so it persists
-      setSetIdx(s => s + 1);
+    if (safeSetIdx < totalSetsInPlan - 1) {
+      // Same exercise, next set in the plan (warm-up or working) — keep nudge
+      setSetIdx(safeSetIdx + 1);
       setState("active");
     } else if (exIdx < exercises.length - 1) {
-      // New exercise — clear nudge state
+      // New exercise — clear nudge state, restart the plan at set 0
       setNudgedWeight(null);
       nudgeAcceptedRef.current = false;
       setExIdx(i => i + 1);
@@ -647,7 +686,7 @@ function WorkoutScreen() {
   }
 
   const card = { background: "#1A2332", borderRadius: 12, padding: "10px 12px", marginBottom: 8 };
-  const totalCompleted = loggedSets.filter(l => l.exIdx === exIdx).length;
+  const totalCompleted = loggedSets.filter(l => l.exIdx === exIdx && l.kind !== "warmup").length;
 
   // ── WARM-UP PHASE ──────────────────────────────────────────────────────────
   if (phase === "warmup") {
@@ -917,7 +956,12 @@ function WorkoutScreen() {
             <div>
               <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Up next</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, lineHeight: 1.1 }}>{ex.name}</div>
-              <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>Set {setIdx + 2} · {currentWeight} lbs · {ex.targetReps} reps</div>
+              {(() => {
+                const next = setPlan[safeSetIdx + 1];
+                if (!next) return <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>Last set done — nice work</div>;
+                const w = next.kind === "warmup" ? next.weight : (nudgedWeight ?? ex.weight);
+                return <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{next.label} · {w} lbs · {next.targetReps} reps</div>;
+              })()}
             </div>
           </div>
 
@@ -955,8 +999,8 @@ function WorkoutScreen() {
     );
   }
 
-  const isLastSet = setIdx === ex.sets - 1;
-  const displayReps = repCount !== null ? repCount : ex.targetReps;
+  const isLastSet = safeSetIdx === totalSetsInPlan - 1;
+  const displayReps = repCount !== null ? repCount : currentTargetReps;
 
   return (
     <Layout activeNav="workout" chatTarget="chat_workout">
@@ -969,23 +1013,29 @@ function WorkoutScreen() {
             <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0, color: a }}>↻</div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: a }}>Picked up where you left off</div>
-              <div style={{ fontSize: 11, color: "#9BB3C8" }}>Exercise {exIdx + 1}, Set {setIdx + 1} · your logged sets are saved</div>
+              <div style={{ fontSize: 11, color: "#9BB3C8" }}>Exercise {exIdx + 1}, {currentSpec?.label || `Set ${safeSetIdx + 1}`} · your logged sets are saved</div>
             </div>
           </div>
         )}
 
         {/* Header — exercise name front and center */}
         <div style={{ textAlign: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 10, color: theme.textDim, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>Set {setIdx + 1} of {ex.sets}</div>
+          <div style={{ fontSize: 10, color: isWarmupSet ? "#F59E0B" : theme.textDim, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>
+            {isWarmupSet ? `${currentSpec.label} · not a working set` : `Working set ${workingIdx} of ${workingCount}`}
+          </div>
           <div style={{ fontSize: 42, fontWeight: 700, color: theme.text, lineHeight: 1.1, marginBottom: 6 }}>{ex.name}</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ fontSize: 13, color: theme.textDim }}>{ex.muscle}</div>
-            <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${ex.targetReps} reps`}</Pill>
-            {ex.rpe && <div style={{ background: "#1A2332", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 20, padding: "2px 8px", fontSize: 10, color: "#A78BFA" }}>RPE {ex.rpe}</div>}
+            {isWarmupSet ? (
+              <Pill variant="amber">Warm-up · {currentTargetReps} reps</Pill>
+            ) : (
+              <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${currentTargetReps} reps`}</Pill>
+            )}
+            {!isWarmupSet && ex.rpe && <div style={{ background: "#1A2332", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 20, padding: "2px 8px", fontSize: 10, color: "#A78BFA" }}>RPE {ex.rpe}</div>}
           </div>
         </div>
 
-        <SetDots total={ex.sets} current={setIdx} />
+        <SetDots total={totalSetsInPlan} current={safeSetIdx} />
 
         {state === "nudge" && nudgedWeight && (
           <AINudgeCard
@@ -1000,31 +1050,26 @@ function WorkoutScreen() {
         {/* Weight display */}
         <div style={{ background: "#1A2332", borderRadius: 12, padding: "10px 12px", marginBottom: 10, textAlign: "center" }}>
           <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
-          <div style={{ fontSize: 52, fontWeight: 700, color: a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 18, color: theme.textDim }}>lbs</span></div>
-          {nudgeAcceptedRef.current ? (
+          <div style={{ fontSize: 52, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 18, color: theme.textDim }}>lbs</span></div>
+          {isWarmupSet ? (
+            <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
+          ) : nudgeAcceptedRef.current ? (
             <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>⚡ Progressive overload applied</div>
           ) : (
             <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === ex.weight ? "Today's target" : `+${currentWeight - ex.weight} lbs from plan`}</div>
           )}
         </div>
 
-        {/* Warm-up ramp — shown only before the first working set. Informational
-            guide so the lifter ramps up to the working weight; not logged. */}
-        {setIdx === 0 && Array.isArray(exWarmups) && exWarmups.length > 0 && (
-          <div style={{ background: "#0D1623", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}>
-            <div style={{ fontSize: 9, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>
-              Warm-up first — ramp up to {ex.weight} lbs
-            </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {exWarmups.map((ws, i) => (
-                <div key={i} style={{ background: "#1A2332", borderRadius: 8, padding: "5px 9px", textAlign: "center", flex: 1, minWidth: 56 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: theme.text }}>{ws.weight} lbs</div>
-                  <div style={{ fontSize: 9, color: theme.textDim, marginTop: 1 }}>{ws.reps} reps</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: 9, color: theme.textDim, marginTop: 6 }}>
-              These don't count — they prime you for hard working sets.
+        {/* Warm-up callout — shown on every warm-up set so it's unmistakable
+            this is NOT a working set and shouldn't be taken hard. */}
+        {isWarmupSet && (
+          <div style={{ background: "#1A1206", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 10, padding: "10px 12px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>🔥</div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#F59E0B", marginBottom: 2 }}>This is a warm-up set — take it easy</div>
+              <div style={{ fontSize: 11, color: "#9BB3C8", lineHeight: 1.45 }}>
+                Move smooth and controlled to prime your muscles. Don't push hard or chase reps — save your energy for the working sets at {ex.weight} lbs.
+              </div>
             </div>
           </div>
         )}
