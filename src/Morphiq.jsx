@@ -1054,6 +1054,7 @@ function AppProvider({ children }) {
   // Called after successful auth. role = "member" | "owner".
   async function signIn(email, role, realAuthUserId = null) {
     const uid = realAuthUserId || ("sim-" + Date.now());
+    console.log("[SignIn] email:", email, "| role:", role, "| authId:", uid?.slice(0,12), "| realId passed?", !!realAuthUserId);
     setSupabaseUser({ email, id: uid });
     if (role === "owner") {
       // Look up the owner's gym and store the real gym_id in branding context
@@ -1070,6 +1071,7 @@ function AppProvider({ children }) {
     setScreen("loading");
     try {
       const profile = await sb.getProfile(uid);
+      console.log("[SignIn] profile found?", !!profile, "| has plan?", !!profile?.plan, "| name:", profile?.name);
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
