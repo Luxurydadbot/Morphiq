@@ -2819,6 +2819,13 @@ function ProgressScreen() {
   const [tab, setTab] = useState("body");
   const sL = { ...theme.sL, fontSize: 10, letterSpacing: "1.2px", marginBottom: 10, fontWeight: 500 };
 
+  // Refresh workout/weight data every time the Progress screen is opened.
+  // Without this, the count stays at zero until sign-out even if sets saved fine.
+  useEffect(() => {
+    if (supabaseUser?.id) loadHistoricalData(supabaseUser.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Pull workout logs from historicalData (loaded at sign-in) — no extra fetch needed
   const realLogs = historicalData?.workoutLogs || null;
   const useRealWorkoutData = realLogs !== null && realLogs.length > 0;
@@ -2838,7 +2845,8 @@ function ProgressScreen() {
     }));
   })() : [];
 
-  const totalWorkouts = useRealWorkoutData ? realSessions.length : 0;
+  // Count ALL unique workout dates, not just the 5 shown in the recent list
+  const totalWorkouts = useRealWorkoutData ? new Set(realLogs.map(r => r.workout_date)).size : 0;
 
   const realPBs = useRealWorkoutData ? (() => {
     const best = {};
