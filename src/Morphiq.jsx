@@ -142,6 +142,12 @@ const sb = {
         await this.ensureDevProfile();
         profileId = await this.getProfileId(supabaseUserId);
       }
+      // Retry once after 1s — handles transient network blip at sign-in
+      // This is the most common cause of workouts silently not saving.
+      if (!profileId) {
+        await new Promise(r => setTimeout(r, 1000));
+        profileId = await this.getProfileId(supabaseUserId);
+      }
       if (!profileId) return false;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
         method: "POST",
@@ -152,7 +158,7 @@ const sb = {
           set_number: setNumber,
           reps,
           weight,
-          workout_date: new Date().toISOString().slice(0, 10),
+          workout_date: localDateStr(), // use local date, not UTC (avoids day rollover after 6pm CT)
         }),
       });
       return res.ok;
