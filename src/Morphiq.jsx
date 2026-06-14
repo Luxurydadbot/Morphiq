@@ -1369,7 +1369,7 @@ function AuthScreen() {
       // Check if this email is a gym owner
       const gymRow = await sb.getGymByOwnerEmail(email);
       const role = gymRow ? "owner" : "member";
-      signIn(result.email, role, null, result.uid);
+      signIn(result.email, role, result.uid);
     } else {
       setStep("code");
       setCode(["","","","","",""]);
