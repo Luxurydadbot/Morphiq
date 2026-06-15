@@ -1605,16 +1605,20 @@ function OnboardingScreen() {
           // Persist to Supabase — upsertProfile MUST finish before insertWeightLog
           // because insertWeightLog does getProfileId() which needs the profile row to exist first.
           // If we fire both at the same time (race condition), weight save silently fails.
+          console.log("[OB] supabaseUser at save:", supabaseUser?.id || "NULL — no user ID!");
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, parsed)
-              .then(() => {
+              .then((ok) => {
+                console.log("[OB] upsertProfile result:", ok ? "✓ SAVED" : "✗ FAILED (returned false)");
                 // Profile row now exists — safe to write the starting weight
                 const startingWeight = parseFloat(weight);
                 if (startingWeight > 0) {
                   sb.insertWeightLog(supabaseUser.id, startingWeight).catch(() => {});
                 }
               })
-              .catch(() => {});
+              .catch((err) => { console.error("[OB] upsertProfile error:", err); });
+          } else {
+            console.error("[OB] SAVE SKIPPED — supabaseUser is null. User will loop back to onboarding.");
           }
           setTimeout(() => { if (!cancelled) setStep(13); }, 400);
         }
@@ -3372,6 +3376,7 @@ export default function Morphiq() {
     </>
   );
 }
+
 
 
 
