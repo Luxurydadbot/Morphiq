@@ -508,23 +508,16 @@ function WorkoutScreen() {
     if (supabaseUser?.id) {
       setSavingToCloud(true);
       setSavedToCloud(false);
-      console.log("[Morphiq] Saving set — user:", supabaseUser.id, "exercise:", ex.name, "reps:", reps, "weight:", currentWeight);
       sb.insertWorkoutLog(supabaseUser.id, {
         exerciseName: ex.name,
         setNumber: currentSpec.kind === "warmup" ? 0 : workingIdx,
         reps,
         weight: currentWeight,
       }).then(ok => {
-        console.log("[Morphiq] Save result:", ok ? "✓ SUCCESS" : "✗ FAILED");
         setSavingToCloud(false);
         setSavedToCloud(ok);
         if (ok) setTimeout(() => setSavedToCloud(false), 3000);
-      }).catch((err) => { 
-        console.log("[Morphiq] Save error:", err);
-        setSavingToCloud(false); 
-      });
-    } else {
-      console.log("[Morphiq] NOT saving — supabaseUser.id is:", supabaseUser?.id);
+      }).catch(() => { setSavingToCloud(false); });
     }
 
     // Show 3-second confirmation window before starting rest timer
@@ -1298,4 +1291,5 @@ const EXERCISES_DISPLAY = [{name:"Goblet squat",weight:"35 lbs",reps:"10 reps",s
 const WEEK = [{name:"Mon",type:"Full body",isWorkout:true},{name:"Tue",type:"Rest",isWorkout:false},{name:"Wed",type:"Full body",isWorkout:true},{name:"Thu",type:"Rest",isWorkout:false},{name:"Fri",type:"Full body",isWorkout:true},{name:"Sat",type:"Rest",isWorkout:false},{name:"Sun",type:"Rest",isWorkout:false}];
 
 export { WorkoutScreen };
+
 
