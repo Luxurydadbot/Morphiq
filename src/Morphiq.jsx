@@ -142,10 +142,8 @@ const sb = {
   // ── WORKOUT LOGS ──────────────────────────────────────────────────────────
   async insertWorkoutLog(supabaseUserId, { exerciseName, setNumber, reps, weight }) {
     try {
-      console.log("[DB] insertWorkoutLog start — authId:", supabaseUserId?.slice(0,8));
       // Resolve to profiles.id so the FK constraint is satisfied
       let profileId = await this.getProfileId(supabaseUserId);
-      console.log("[DB] getProfileId result:", profileId ? profileId.slice(0,8) : "NULL");
       // If dev bypass profile doesn't exist yet, create it now and retry
       if (!profileId && supabaseUserId === "dev-bypass-001") {
         await this.ensureDevProfile();
@@ -153,23 +151,18 @@ const sb = {
       }
       // Retry once after 1s — handles transient network blip at sign-in
       if (!profileId) {
-        console.log("[DB] profileId null — retrying in 1s...");
         await new Promise(r => setTimeout(r, 1000));
         profileId = await this.getProfileId(supabaseUserId);
-        console.log("[DB] retry result:", profileId ? profileId.slice(0,8) : "STILL NULL — save aborted");
       }
       if (!profileId) return false;
       const body = { user_id: profileId, exercise_name: exerciseName, set_number: setNumber, reps, weight, workout_date: localDateStr() };
-      console.log("[DB] POSTing to workout_logs:", JSON.stringify(body));
       const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
         method: "POST",
         headers: SB_HEADERS(),
         body: JSON.stringify(body),
       });
-      const responseText = await res.text();
-      console.log("[DB] Supabase response:", res.status, responseText || "(empty)");
       return res.ok;
-    } catch (e) { console.log("[DB] insertWorkoutLog threw:", e.message); return false; }
+    } catch { return false; }
   },
 
   // Fetch recent workout logs for the progress screen
@@ -1061,7 +1054,6 @@ function AppProvider({ children }) {
   // Called after successful auth. role = "member" | "owner".
   async function signIn(email, role, realAuthUserId = null) {
     const uid = realAuthUserId || ("sim-" + Date.now());
-    console.log("[SignIn] email:", email, "| role:", role, "| authId:", uid?.slice(0,12), "| realId passed?", !!realAuthUserId);
     setSupabaseUser({ email, id: uid });
     if (role === "owner") {
       // Look up the owner's gym and store the real gym_id in branding context
@@ -1078,7 +1070,6 @@ function AppProvider({ children }) {
     setScreen("loading");
     try {
       const profile = await sb.getProfile(uid);
-      console.log("[SignIn] profile found?", !!profile, "| has plan?", !!profile?.plan, "| name:", profile?.name);
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
@@ -1612,20 +1603,16 @@ function OnboardingScreen() {
           // Persist to Supabase — upsertProfile MUST finish before insertWeightLog
           // because insertWeightLog does getProfileId() which needs the profile row to exist first.
           // If we fire both at the same time (race condition), weight save silently fails.
-          console.log("[OB] supabaseUser at save:", supabaseUser?.id || "NULL — no user ID!");
           if (supabaseUser?.id) {
             sb.upsertProfile(supabaseUser.id, userData, parsed)
-              .then((ok) => {
-                console.log("[OB] upsertProfile result:", ok ? "✓ SAVED" : "✗ FAILED (returned false)");
+              .then(() => {
                 // Profile row now exists — safe to write the starting weight
                 const startingWeight = parseFloat(weight);
                 if (startingWeight > 0) {
                   sb.insertWeightLog(supabaseUser.id, startingWeight).catch(() => {});
                 }
               })
-              .catch((err) => { console.error("[OB] upsertProfile error:", err); });
-          } else {
-            console.error("[OB] SAVE SKIPPED — supabaseUser is null. User will loop back to onboarding.");
+              .catch(() => {});
           }
           setTimeout(() => { if (!cancelled) setStep(13); }, 400);
         }
@@ -3383,6 +3370,7 @@ export default function Morphiq() {
     </>
   );
 }
+
 
 
 
