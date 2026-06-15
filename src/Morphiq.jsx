@@ -5,8 +5,13 @@ import { GymOwnerDashboard, PricingScreen } from "./GymOwnerDashboard.jsx";
 
 const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04";
-const SB_HEADERS = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}`, "Content-Type": "application/json" };
-const SB_GET = { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` };
+// Returns auth headers — uses the user's real access token if available, falls back to anon key.
+// This fixes 401 errors on profile/workout writes caused by RLS policies requiring a real user session.
+function getAuthToken() {
+  try { return localStorage.getItem("mq_access_token") || SUPABASE_ANON; } catch { return SUPABASE_ANON; }
+}
+function SB_HEADERS() { const t = getAuthToken(); return { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${t}`, "Content-Type": "application/json" }; }
+function SB_GET() { const t = getAuthToken(); return { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${t}` }; }
 
 // Returns today's date as YYYY-MM-DD in the USER'S LOCAL timezone (not UTC).
 // Using toISOString() here was a bug: it returns the UTC date, so the meal
@@ -49,6 +54,8 @@ const sb = {
       const accessToken = data?.access_token;
       if (!accessToken) return null;
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
+      // Store the access token so authenticated DB writes work (fixes 401 on profile/workout saves)
+      try { localStorage.setItem("mq_access_token", accessToken); } catch {}
       return { uid: payload.sub, email: payload.email || email };
     } catch { return null; }
   },
@@ -58,7 +65,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&limit=1`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       return rows?.[0] || null;
@@ -87,7 +94,7 @@ const sb = {
       };
       const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
         method: "POST",
-        headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" },
+        headers: { ...SB_HEADERS(), "Prefer": "resolution=merge-duplicates" },
         body: JSON.stringify(body),
       });
       return res.ok;
@@ -100,7 +107,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&select=id&limit=1`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       return rows?.[0]?.id || null;
@@ -126,7 +133,7 @@ const sb = {
       };
       await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
         method: "POST",
-        headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" },
+        headers: { ...SB_HEADERS(), "Prefer": "resolution=merge-duplicates" },
         body: JSON.stringify(body),
       });
     } catch { /* silent — dev only */ }
@@ -156,7 +163,7 @@ const sb = {
       console.log("[DB] POSTing to workout_logs:", JSON.stringify(body));
       const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
         method: "POST",
-        headers: SB_HEADERS,
+        headers: SB_HEADERS(),
         body: JSON.stringify(body),
       });
       const responseText = await res.text();
@@ -172,7 +179,7 @@ const sb = {
       if (!profileId) return [];
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&order=logged_at.desc&limit=${limit}`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       return await res.json();
     } catch { return []; }
@@ -185,7 +192,7 @@ const sb = {
       if (!profileId) return false;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/meal_logs`, {
         method: "POST",
-        headers: SB_HEADERS,
+        headers: SB_HEADERS(),
         body: JSON.stringify({
           user_id: profileId,
           meal_id: mealId,
@@ -213,7 +220,7 @@ const sb = {
       const targetDate = date || localDateStr();
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/meal_logs?user_id=eq.${profileId}&date=eq.${targetDate}&order=id.desc`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       if (!res.ok) return {};
       const rows = await res.json();
@@ -231,7 +238,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/gyms?owner_email=eq.${encodeURIComponent(email.toLowerCase())}&limit=1`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       return rows?.[0] || null;
@@ -243,7 +250,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       return rows?.[0] || null;
@@ -255,7 +262,7 @@ const sb = {
       // PATCH targets the specific existing row by gym_id — correct way to update
       const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}`, {
         method: "PATCH",
-        headers: { ...SB_HEADERS, "Prefer": "return=representation" },
+        headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
         body: JSON.stringify({ name, accent, welcome, updated_at: new Date().toISOString() }),
       });
       if (!res.ok) {
@@ -273,7 +280,7 @@ const sb = {
       if (!profileId) return false;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/weight_logs`, {
         method: "POST",
-        headers: SB_HEADERS,
+        headers: SB_HEADERS(),
         body: JSON.stringify({
           user_id: profileId,
           weight_lbs: weightLbs,
@@ -291,7 +298,7 @@ const sb = {
       if (!profileId) return [];
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/weight_logs?user_id=eq.${profileId}&order=logged_date.asc&limit=${limit}`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       return await res.json();
     } catch { return []; }
@@ -303,7 +310,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?gym_id=eq.${encodeURIComponent(gymId)}&select=id,name,goal,weight,updated_at&order=updated_at.desc`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       return Array.isArray(rows) ? rows : [];
@@ -320,7 +327,7 @@ const sb = {
       const ids = profileIds.map(id => `"${id}"`).join(",");
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/workout_logs?user_id=in.(${ids})&workout_date=gte.${startStr}&select=user_id,workout_date`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       if (!Array.isArray(rows)) return {};
@@ -343,7 +350,7 @@ const sb = {
       const ids = profileIds.map(id => `"${id}"`).join(",");
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/workout_logs?user_id=in.(${ids})&select=user_id,workout_date&order=workout_date.desc`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       if (!Array.isArray(rows)) return {};
@@ -360,7 +367,7 @@ const sb = {
       const ids = profileIds.map(id => `"${id}"`).join(",");
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/weight_logs?user_id=in.(${ids})&select=user_id,weight_lbs,logged_date&order=logged_date.asc`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       if (!Array.isArray(rows)) return {};
@@ -383,7 +390,7 @@ const sb = {
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/gym_messages`, {
         method: "POST",
-        headers: SB_HEADERS,
+        headers: SB_HEADERS(),
         body: JSON.stringify({
           gym_id: gymId,
           profile_id: profileId,
@@ -404,7 +411,7 @@ const sb = {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/gym_messages?profile_id=eq.${encodeURIComponent(profileId)}&order=sent_at.desc&limit=10`,
-        { headers: SB_GET }
+        { headers: SB_GET() }
       );
       const rows = await res.json();
       return Array.isArray(rows) ? rows : [];
@@ -415,7 +422,7 @@ const sb = {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/gym_messages?id=eq.${messageId}`, {
         method: "PATCH",
-        headers: SB_HEADERS,
+        headers: SB_HEADERS(),
         body: JSON.stringify({ read: true }),
       });
     } catch { /* fire and forget */ }
@@ -429,7 +436,7 @@ const sb = {
       profileIds.map(profileId =>
         fetch(`${SUPABASE_URL}/rest/v1/gym_messages`, {
           method: "POST",
-          headers: SB_HEADERS,
+          headers: SB_HEADERS(),
           body: JSON.stringify({ gym_id: gymId, profile_id: profileId, message: text, read: false, sent_at: sentAt }),
         }).then(r => r.ok ? "ok" : "fail")
       )
@@ -1309,7 +1316,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 
 // ── Shared exports for child screen files ───────────────────────────────────
 export { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
-         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
+         SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, getAuthToken, theme,
          MEAL_DATA, GROCERY_DATA, WORKOUT_EXERCISES, localDateStr };
 
 function AuthScreen() {
@@ -3376,6 +3383,7 @@ export default function Morphiq() {
     </>
   );
 }
+
 
 
 
