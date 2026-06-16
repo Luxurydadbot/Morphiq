@@ -92,9 +92,25 @@ const sb = {
         training_history: userData.trainingHistory || "",
         updated_at: new Date().toISOString(),
       };
+      // Update-in-place if a profile already exists for this account.
+      // Why this fix is here: a plain POST always inserted a NEW row with a fresh
+      // auto-generated id, creating duplicate profiles and ORPHANING the user's
+      // workout/meal/weight logs that still pointed at the old profile id (this is
+      // what caused the "no sessions on Progress" bug). We now look up the existing
+      // row by supabase_user_id and PATCH it by id, so the id stays stable and all
+      // child data stays linked. Do NOT revert this to a plain insert-only POST.
+      const existingId = await this.getProfileId(supabaseUserId);
+      if (existingId) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${existingId}`, {
+          method: "PATCH",
+          headers: SB_HEADERS(),
+          body: JSON.stringify(body),
+        });
+        return res.ok;
+      }
       const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
         method: "POST",
-        headers: { ...SB_HEADERS(), "Prefer": "resolution=merge-duplicates" },
+        headers: SB_HEADERS(),
         body: JSON.stringify(body),
       });
       return res.ok;
@@ -1103,6 +1119,10 @@ function AppProvider({ children }) {
     const params = new URLSearchParams(hash.replace("#", "?"));
     const accessToken = params.get("access_token");
     if (!accessToken) return;
+    // Save the token so authenticated DB writes work when the user arrives via the
+    // magic LINK (not just the typed OTP-code path). Without this, getAuthToken()
+    // falls back to the anon key and profile/plan saves can be silently rejected.
+    try { localStorage.setItem("mq_access_token", accessToken); } catch {}
     // Decode the JWT to get the user's Supabase UUID (sub claim)
     try {
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
