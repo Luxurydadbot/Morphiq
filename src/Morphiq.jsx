@@ -56,8 +56,35 @@ const sb = {
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
       // Store the access token so authenticated DB writes work (fixes 401 on profile/workout saves)
       try { localStorage.setItem("mq_access_token", accessToken); } catch {}
+      // Store the refresh token so the session can be renewed on reopen (access tokens expire ~1hr).
+      try { if (data.refresh_token) localStorage.setItem("mq_refresh_token", data.refresh_token); } catch {}
       return { uid: payload.sub, email: payload.email || email };
     } catch { return null; }
+  },
+
+  // Exchanges the stored refresh token for a fresh access token. Supabase access
+  // tokens expire after ~1 hour; we call this on app open so authenticated reads
+  // (workouts, weight, etc.) don't fail with an expired token after the app has
+  // been closed overnight. Returns true if a new token was obtained. (Fix: "stats
+  // reset to zero on reopen" — expired token was rejected by RLS on reads.)
+  async refreshSession() {
+    try {
+      const rt = localStorage.getItem("mq_refresh_token");
+      if (!rt) return false;
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data?.access_token) {
+        try { localStorage.setItem("mq_access_token", data.access_token); } catch {}
+        if (data.refresh_token) { try { localStorage.setItem("mq_refresh_token", data.refresh_token); } catch {} }
+        return true;
+      }
+      return false;
+    } catch { return false; }
   },
 
   // ── PROFILES ──────────────────────────────────────────────────────────────
@@ -1006,7 +1033,10 @@ function AppProvider({ children }) {
   // ── On mount: if we have a saved session, restore it from Supabase ────────
   useEffect(() => {
     if (!savedSession?.uid) return;
-    sb.getProfile(savedSession.uid).then(profile => {
+    // Refresh the auth token before any reads. Supabase access tokens expire after
+    // ~1 hour, so reopening the app the next day was using an expired token: RLS
+    // rejected the workout reads and Progress/home showed zero. Renew first, then load.
+    sb.refreshSession().then(() => sb.getProfile(savedSession.uid)).then(profile => {
       // Helper: try localStorage cache if Supabase returns no plan
       // This handles the case where upsert created a duplicate row or Supabase is slow.
       // Fix added: onboarding now writes mq_cached_plan_<uid> so this always finds the plan.
@@ -1123,6 +1153,8 @@ function AppProvider({ children }) {
     // magic LINK (not just the typed OTP-code path). Without this, getAuthToken()
     // falls back to the anon key and profile/plan saves can be silently rejected.
     try { localStorage.setItem("mq_access_token", accessToken); } catch {}
+    // Also save the refresh token so the session auto-renews on reopen (tokens expire ~1hr).
+    try { const rt = params.get("refresh_token"); if (rt) localStorage.setItem("mq_refresh_token", rt); } catch {}
     // Decode the JWT to get the user's Supabase UUID (sub claim)
     try {
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
