@@ -2881,28 +2881,29 @@ function ProgressScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // TEMP DIAGNOSTIC — remove after orphaned-workout investigation (June 2026).
-  // Reports auth uid, whether a real (non-anon) token is saved, and the raw
-  // profiles-read status/rows, so we can tell an identity mismatch (rows:0 with
-  // status:200) apart from a failed/expired-token read (status:401/403).
+  // TEMP DIAGNOSTIC — remove after token-401 investigation (June 2026).
+  // Decodes the saved access token's expiry/role and runs two test reads of the
+  // same endpoint: one with the user token (what the app uses) and one with the
+  // anon key only. This tells an expired/invalid user token (userRead 401, anonRead OK)
+  // apart from a rejected connection key / key migration (both 401).
   const [dbg, setDbg] = useState("…");
   useEffect(() => {
     if (!supabaseUser?.id) return;
     const uid = supabaseUser.id;
-    let tok = "no";
+    const PROF = `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&select=id`;
+    let exp = "?";
     try {
       const t = localStorage.getItem("mq_access_token");
-      tok = (t && t !== SUPABASE_ANON) ? ("yes(" + t.length + ")") : "no";
-    } catch {}
-    fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&select=id`, { headers: SB_GET() })
-      .then(async res => {
-        let rows = [];
-        try { rows = await res.json(); } catch {}
-        const n = Array.isArray(rows) ? rows.length : -1;
-        const pid = (Array.isArray(rows) && rows[0]?.id) ? String(rows[0].id).slice(0, 8) : "none";
-        setDbg(`uid:${uid.slice(0, 8)} tok:${tok} status:${res.status} rows:${n} pid:${pid}`);
-      })
-      .catch(() => setDbg(`uid:${uid.slice(0, 8)} tok:${tok} FETCH_FAIL`));
+      if (t && t.split(".").length === 3) {
+        const p = JSON.parse(atob(t.split(".")[1]));
+        const now = Math.floor(Date.now() / 1000);
+        exp = (p.exp ? (p.exp - now) + "s" : "noexp") + "/" + (p.role || "?");
+      } else { exp = "missing-or-anon"; }
+    } catch { exp = "decode-fail"; }
+    Promise.all([
+      fetch(PROF, { headers: SB_GET() }).then(r => r.status).catch(() => "x"),
+      fetch(PROF, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }).then(r => r.status).catch(() => "x"),
+    ]).then(([a, b]) => setDbg(`exp:${exp} userRead:${a} anonRead:${b}`));
   }, [supabaseUser?.id]);
 
   // realLogs: use whatever historicalData has — even an empty array means "loaded, just no data yet"
