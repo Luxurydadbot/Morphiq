@@ -2881,6 +2881,15 @@ function ProgressScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // TEMP DIAGNOSTIC — remove after orphaned-workout investigation (June 2026).
+  // Resolves the profile id this login maps to so we can compare it to the id
+  // the workout_logs are actually filed under.
+  const [dbgPid, setDbgPid] = useState("…");
+  useEffect(() => {
+    if (!supabaseUser?.id) return;
+    sb.getProfileId(supabaseUser.id).then(pid => setDbgPid(pid || "none")).catch(() => setDbgPid("error"));
+  }, [supabaseUser?.id]);
+
   // realLogs: use whatever historicalData has — even an empty array means "loaded, just no data yet"
   const realLogs = historicalData?.workoutLogs ?? null;
   // hasData = logs loaded AND at least one row exists
@@ -2977,6 +2986,10 @@ function ProgressScreen() {
   return (
     <Layout activeNav="progress">
       <div style={{ padding:"1.25rem 1.25rem 0" }}>
+        {/* TEMP DIAGNOSTIC — remove after orphaned-workout investigation */}
+        <div style={{ background:"#1F1010", border:"1px solid #F87171", borderRadius:10, padding:"8px 10px", marginBottom:14, fontFamily:"monospace", fontSize:11, color:"#F87171", wordBreak:"break-all" }}>
+          DEBUG · profile id: {dbgPid} · workouts found: {Array.isArray(realLogs) ? realLogs.length : "loading"}
+        </div>
         <div style={{ marginBottom:16 }}>
           <div style={{ fontSize:20, fontWeight:600, color:theme.text }}>Your Progress</div>
           <div style={{ fontSize:12, color:theme.textDim, marginTop:2 }}>
