@@ -2882,12 +2882,27 @@ function ProgressScreen() {
   }, []);
 
   // TEMP DIAGNOSTIC — remove after orphaned-workout investigation (June 2026).
-  // Resolves the profile id this login maps to so we can compare it to the id
-  // the workout_logs are actually filed under.
-  const [dbgPid, setDbgPid] = useState("…");
+  // Reports auth uid, whether a real (non-anon) token is saved, and the raw
+  // profiles-read status/rows, so we can tell an identity mismatch (rows:0 with
+  // status:200) apart from a failed/expired-token read (status:401/403).
+  const [dbg, setDbg] = useState("…");
   useEffect(() => {
     if (!supabaseUser?.id) return;
-    sb.getProfileId(supabaseUser.id).then(pid => setDbgPid(pid || "none")).catch(() => setDbgPid("error"));
+    const uid = supabaseUser.id;
+    let tok = "no";
+    try {
+      const t = localStorage.getItem("mq_access_token");
+      tok = (t && t !== SUPABASE_ANON) ? ("yes(" + t.length + ")") : "no";
+    } catch {}
+    fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&select=id`, { headers: SB_GET() })
+      .then(async res => {
+        let rows = [];
+        try { rows = await res.json(); } catch {}
+        const n = Array.isArray(rows) ? rows.length : -1;
+        const pid = (Array.isArray(rows) && rows[0]?.id) ? String(rows[0].id).slice(0, 8) : "none";
+        setDbg(`uid:${uid.slice(0, 8)} tok:${tok} status:${res.status} rows:${n} pid:${pid}`);
+      })
+      .catch(() => setDbg(`uid:${uid.slice(0, 8)} tok:${tok} FETCH_FAIL`));
   }, [supabaseUser?.id]);
 
   // realLogs: use whatever historicalData has — even an empty array means "loaded, just no data yet"
@@ -2988,7 +3003,7 @@ function ProgressScreen() {
       <div style={{ padding:"1.25rem 1.25rem 0" }}>
         {/* TEMP DIAGNOSTIC — remove after orphaned-workout investigation */}
         <div style={{ background:"#1F1010", border:"1px solid #F87171", borderRadius:10, padding:"8px 10px", marginBottom:14, fontFamily:"monospace", fontSize:11, color:"#F87171", wordBreak:"break-all" }}>
-          DEBUG · profile id: {dbgPid} · workouts found: {Array.isArray(realLogs) ? realLogs.length : "loading"}
+          DEBUG · {dbg}
         </div>
         <div style={{ marginBottom:16 }}>
           <div style={{ fontSize:20, fontWeight:600, color:theme.text }}>Your Progress</div>
