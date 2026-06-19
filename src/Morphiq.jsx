@@ -76,7 +76,15 @@ const sb = {
         headers: { "apikey": SUPABASE_ANON, "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: rt }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        // Distinguish a dead session from a transient hiccup. A 4xx means the server
+        // explicitly rejected the refresh token (expired / already used) — the session
+        // is truly dead, so signal "expired" and the app will force a clean re-login.
+        // A 5xx (or network error in the catch below) is transient — return false so we
+        // keep the session and don't log the user out over a blip.
+        // (Fix: June 2026 stuck-token / "workouts show zero on reopen" bug.)
+        return res.status >= 400 && res.status < 500 ? "expired" : false;
+      }
       const data = await res.json();
       if (data?.access_token) {
         try { localStorage.setItem("mq_access_token", data.access_token); } catch {}
@@ -1036,7 +1044,21 @@ function AppProvider({ children }) {
     // Refresh the auth token before any reads. Supabase access tokens expire after
     // ~1 hour, so reopening the app the next day was using an expired token: RLS
     // rejected the workout reads and Progress/home showed zero. Renew first, then load.
-    sb.refreshSession().then(() => sb.getProfile(savedSession.uid)).then(profile => {
+    sb.refreshSession().then((renewed) => {
+      if (renewed === "expired") {
+        // The login token couldn't be renewed because the session is dead. Do NOT fall
+        // through to showing stale cached data with an expired token (that made workouts
+        // look like they had vanished) — clear everything and force a clean re-login.
+        // (Fix: June 2026 stuck-token / "stats show zero on reopen" bug.)
+        try { localStorage.removeItem("mq_access_token"); } catch {}
+        try { localStorage.removeItem("mq_refresh_token"); } catch {}
+        try { localStorage.removeItem(SESSION_KEY); } catch {}
+        setScreen("auth");
+        return "AUTH_REQUIRED";
+      }
+      return sb.getProfile(savedSession.uid);
+    }).then(profile => {
+      if (profile === "AUTH_REQUIRED") return;
       // Helper: try localStorage cache if Supabase returns no plan
       // This handles the case where upsert created a duplicate row or Supabase is slow.
       // Fix added: onboarding now writes mq_cached_plan_<uid> so this always finds the plan.
@@ -1230,6 +1252,11 @@ function AppProvider({ children }) {
 
   function signOut() {
     try { localStorage.removeItem(SESSION_KEY); } catch {}
+    // Also clear the Supabase auth tokens. Without this, "Log Out" left the old
+    // (often expired) access/refresh tokens behind, so the next login kept tripping
+    // over a dead token and reads returned 401. (Fix: June 2026 stuck-token bug.)
+    try { localStorage.removeItem("mq_access_token"); } catch {}
+    try { localStorage.removeItem("mq_refresh_token"); } catch {}
     setSupabaseUser(null);
     setUser(DEFAULT_USER);
     setPlan(null);
