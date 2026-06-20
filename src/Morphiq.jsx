@@ -1171,6 +1171,17 @@ function AppProvider({ children }) {
     setScreen("loading");
     try {
       const profile = await sb.getProfile(uid);
+      // TEMP DIAGNOSTIC (June 2026) — existing member lands on onboarding instead of
+      // home. Reports the login uid, the raw profile-read HTTP status (401 = the DB
+      // rejected the login token = signing-key/RLS issue; 200 = token fine), how many
+      // profile rows matched this uid, and whether a plan is attached. Remove once fixed.
+      try {
+        const _r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&select=id,plan`, { headers: SB_GET() });
+        const _rows = await _r.json().catch(() => null);
+        const _n = Array.isArray(_rows) ? _rows.length : "n/a";
+        const _hasPlan = (Array.isArray(_rows) && _rows[0]) ? (_rows[0].plan ? "yes" : "no") : "n/a";
+        alert("DIAG\nlogin uid: " + uid + "\nread status: " + _r.status + "\nrows found: " + _n + "\nplan in row: " + _hasPlan + "\nrouting sees plan: " + (profile?.plan ? "yes" : "no"));
+      } catch (_e) { alert("DIAG read error: " + (_e?.message || _e)); }
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
