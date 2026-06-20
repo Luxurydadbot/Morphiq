@@ -13,6 +13,21 @@ function getAuthToken() {
 function SB_HEADERS() { const t = getAuthToken(); return { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${t}`, "Content-Type": "application/json" }; }
 function SB_GET() { const t = getAuthToken(); return { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${t}` }; }
 
+// Performs a Supabase REST request and, if the user's access token has gone
+// stale (HTTP 401/403), renews the session ONCE and retries the same request
+// with fresh headers, then gives up. buildOpts() must rebuild its headers via
+// SB_HEADERS() each call so the retry picks up the freshly renewed token.
+// Prevents silent save failures (lost workouts/meals/weights/profile) when an
+// access token expires mid-session. (Thing 2 — June 2026 token-refresh hardening.)
+async function sbFetchRetry(url, buildOpts) {
+  let res = await fetch(url, buildOpts());
+  if (res.status === 401 || res.status === 403) {
+    const renewed = await sb.refreshSession();
+    if (renewed === true) res = await fetch(url, buildOpts());
+  }
+  return res;
+}
+
 // Returns today's date as YYYY-MM-DD in the USER'S LOCAL timezone (not UTC).
 // Using toISOString() here was a bug: it returns the UTC date, so the meal
 // "day" rolled over in the early evening (UTC midnight) instead of local
@@ -136,18 +151,18 @@ const sb = {
       // child data stays linked. Do NOT revert this to a plain insert-only POST.
       const existingId = await this.getProfileId(supabaseUserId);
       if (existingId) {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${existingId}`, {
+        const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${existingId}`, () => ({
           method: "PATCH",
           headers: SB_HEADERS(),
           body: JSON.stringify(body),
-        });
+        }));
         return res.ok;
       }
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/profiles`, () => ({
         method: "POST",
         headers: SB_HEADERS(),
         body: JSON.stringify(body),
-      });
+      }));
       return res.ok;
     } catch { return false; }
   },
@@ -207,11 +222,11 @@ const sb = {
       }
       if (!profileId) return false;
       const body = { user_id: profileId, exercise_name: exerciseName, set_number: setNumber, reps, weight, workout_date: localDateStr() };
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/workout_logs`, {
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/workout_logs`, () => ({
         method: "POST",
         headers: SB_HEADERS(),
         body: JSON.stringify(body),
-      });
+      }));
       return res.ok;
     } catch { return false; }
   },
@@ -234,7 +249,7 @@ const sb = {
     try {
       const profileId = await this.getProfileId(supabaseUserId);
       if (!profileId) return false;
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/meal_logs`, {
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/meal_logs`, () => ({
         method: "POST",
         headers: SB_HEADERS(),
         body: JSON.stringify({
@@ -248,7 +263,7 @@ const sb = {
           logged_carbs: loggedCarbs ?? 0,
           logged_fat: loggedFat ?? 0,
         }),
-      });
+      }));
       return res.ok;
     } catch { return false; }
   },
@@ -322,7 +337,7 @@ const sb = {
     try {
       const profileId = await this.getProfileId(supabaseUserId);
       if (!profileId) return false;
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/weight_logs`, {
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/weight_logs`, () => ({
         method: "POST",
         headers: SB_HEADERS(),
         body: JSON.stringify({
@@ -331,7 +346,7 @@ const sb = {
           logged_date: new Date().toISOString().slice(0, 10),
           logged_at: new Date().toISOString(),
         }),
-      });
+      }));
       return res.ok;
     } catch { return false; }
   },
@@ -1118,6 +1133,24 @@ function AppProvider({ children }) {
       setScreen("network_error");
     });
   }, []);
+
+  // ── Proactive background token renewal (Thing 2) ──────────────────────────
+  // Access tokens expire after ~1 hour. Refreshing ONLY on app open meant a
+  // member who kept the app open — or left it backgrounded on a phone — could
+  // cross the 1-hour line mid-use and start silently failing authenticated
+  // saves/reads. This renews the token well before it expires: on a 45-minute
+  // timer while the app is open, and again whenever the tab/app regains focus
+  // (the common mobile PWA "resume" case). Fire-and-forget — a failed renewal
+  // never logs the member out mid-session; the retry-on-401 net (sbFetchRetry)
+  // and the on-open re-login handle a genuinely dead session.
+  useEffect(() => {
+    if (!savedSession?.uid) return;
+    const renew = () => { sb.refreshSession().catch(() => {}); };
+    const id = setInterval(renew, 45 * 60 * 1000); // 45 min < ~60 min token life
+    const onVisible = () => { if (document.visibilityState === "visible") renew(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
+  }, [savedSession?.uid]);
 
   // Called after successful auth. role = "member" | "owner".
   async function signIn(email, role, realAuthUserId = null) {
