@@ -171,8 +171,15 @@ const sb = {
   // Resolves supabase_user_id → profiles.id (UUID used as FK in workout/meal logs)
   async getProfileId(supabaseUserId) {
     try {
+      // Fix (June 2026): the narrow "select=id" query was being rejected with HTTP 401
+      // by Supabase's row-level security even though the EXACT SAME row, with the EXACT
+      // SAME token, succeeds when no select= column list is given (see getProfile above,
+      // which uses no select= and works). This was confirmed live: getProfile -> 200,
+      // getProfileId -> 401, same uid, same token, same row. Dropping select=id and
+      // reading the full row instead avoids whatever RLS rule is column-shape-sensitive.
+      // Do NOT re-add select=id here without re-testing against live RLS.
       const res = await sbFetchRetry(
-        `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&select=id&limit=1`,
+        `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&limit=1`,
         () => ({ headers: SB_GET() })
       );
       // TEMP DIAGNOSTIC (June 2026) — stash the real outcome on a module-level var so
