@@ -113,9 +113,9 @@ const sb = {
   // ── PROFILES ──────────────────────────────────────────────────────────────
   async getProfile(supabaseUserId) {
     try {
-      const res = await fetch(
+      const res = await sbFetchRetry(
         `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&limit=1`,
-        { headers: SB_GET() }
+        () => ({ headers: SB_GET() })
       );
       const rows = await res.json();
       return rows?.[0] || null;
@@ -171,13 +171,17 @@ const sb = {
   // Resolves supabase_user_id → profiles.id (UUID used as FK in workout/meal logs)
   async getProfileId(supabaseUserId) {
     try {
-      const res = await fetch(
+      const res = await sbFetchRetry(
         `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&select=id&limit=1`,
-        { headers: SB_GET() }
+        () => ({ headers: SB_GET() })
       );
+      // TEMP DIAGNOSTIC (June 2026) — getProfileId returning null was indistinguishable
+      // from "no profile exists" vs "request was rejected" (e.g. stale token even after
+      // retry). Logging status + body here so a recurrence is visible, not silent.
+      if (!res.ok) { console.error("[Morphiq] getProfileId: request failed", res.status, await res.text().catch(() => "")); return null; }
       const rows = await res.json();
       return rows?.[0]?.id || null;
-    } catch { return null; }
+    } catch (e) { console.error("[Morphiq] getProfileId threw:", e); return null; }
   },
 
   // Creates a real profile row in Supabase for dev bypass testing so cloud save works
