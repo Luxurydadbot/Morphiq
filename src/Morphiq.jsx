@@ -1162,11 +1162,37 @@ function AppProvider({ children }) {
         const patchedPlan = resolvedPlan?.weekStartDate
           ? resolvedPlan
           : { ...resolvedPlan, weekStartDate: new Date().toISOString().split("T")[0], weekNumber: resolvedPlan?.weekNumber || 1 };
-        if (!resolvedPlan?.weekStartDate) sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).catch(() => {});
-        // If we loaded from cache but Supabase had no plan, push it back up now
-        if (!planSource?.plan && cachedData?.plan) {
-          sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).catch(() => {});
+
+        // Fix (June 2026): previously, if Supabase had NO plan but the browser's local
+        // cache did (e.g. an earlier onboarding attempt that built a plan locally but
+        // failed to save it — see the timeout bug from tonight), this code trusted the
+        // cache, showed "home" looking completely normal, and tried to silently re-save
+        // the cache up to Supabase in the background with no confirmation. If THAT save
+        // also failed, the member would be stuck forever looking logged-in with a real
+        // plan on screen, while the database never actually had their data — and every
+        // future open of the app would repeat this same silent failure. Now, when we're
+        // relying on the cache (not a confirmed Supabase plan), we wait for the re-save
+        // to genuinely succeed before showing home. If it fails, we show a clear retry
+        // screen instead of a falsely-normal-looking home screen.
+        const needsConfirmedResave = !planSource?.plan && !!cachedData?.plan;
+
+        if (needsConfirmedResave) {
+          sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).then((ok) => {
+            if (!ok) {
+              setScreen("network_error");
+              return;
+            }
+            setPlan(patchedPlan);
+            loadHistoricalData(savedSession.uid);
+            checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser).catch(() => {});
+            setScreen("home");
+          }).catch(() => setScreen("network_error"));
+          return;
         }
+
+        // Plan was already confirmed in Supabase (planSource?.plan was real) — just a
+        // missing weekStartDate patch, which is low-stakes and fine to fire-and-forget.
+        if (!resolvedPlan?.weekStartDate) sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).catch(() => {});
         setPlan(patchedPlan);
         loadHistoricalData(savedSession.uid);
         checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser).catch(() => {});
@@ -3545,7 +3571,7 @@ function NetworkErrorScreen() {
         <div style={{ fontSize: 40 }}>📶</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: theme.text }}>Connection issue</div>
         <div style={{ fontSize: 14, color: theme.textMuted, lineHeight: 1.6 }}>
-          Couldn't reach the server. You're still logged in — just tap retry when you have a connection.
+          We couldn't confirm your data saved — could be a connection issue or a brief server hiccup. You're still logged in — just tap retry.
         </div>
         <button
           onClick={() => window.location.reload()}
