@@ -82,7 +82,32 @@ const sb = {
   // (workouts, weight, etc.) don't fail with an expired token after the app has
   // been closed overnight. Returns true if a new token was obtained. (Fix: "stats
   // reset to zero on reopen" — expired token was rejected by RLS on reads.)
+  //
+  // RACE-CONDITION FIX (June 2026): Supabase refresh tokens are SINGLE-USE — once
+  // exchanged, the old refresh token is permanently dead. Several places in this app
+  // fire multiple Supabase requests back-to-back (e.g. signIn() calls both
+  // loadHistoricalData() and checkAndGenerateNextWeek() at once, each making their own
+  // calls). If the access token is stale at that moment, EACH of those requests
+  // independently sees a 401 and independently calls refreshSession(). The first one
+  // to reach Supabase wins and gets a new token pair; every other one is still holding
+  // the now-burned old refresh token, so ITS refresh attempt is correctly rejected by
+  // Supabase — and that caller then reports a false 401/NO_PROFILE_ID even though the
+  // session is actually fine. This is the confirmed cause of the intermittent
+  // NO_PROFILE_ID(HTTP_401) bug (see MORPHIQ_HANDOFF.md). The fix: track ONE shared
+  // in-flight refresh. If a refresh is already happening when this is called again,
+  // every caller awaits that SAME promise instead of starting a second, competing
+  // refresh. Do NOT remove this sharing — without it the race comes back.
+  _refreshInFlight: null,
   async refreshSession() {
+    if (this._refreshInFlight) return this._refreshInFlight;
+    this._refreshInFlight = this._doRefreshSession();
+    try {
+      return await this._refreshInFlight;
+    } finally {
+      this._refreshInFlight = null;
+    }
+  },
+  async _doRefreshSession() {
     try {
       const rt = localStorage.getItem("mq_refresh_token");
       if (!rt) return false;
