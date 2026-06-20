@@ -220,15 +220,23 @@ const sb = {
         await new Promise(r => setTimeout(r, 1000));
         profileId = await this.getProfileId(supabaseUserId);
       }
-      if (!profileId) return false;
+      // TEMP DIAGNOSTIC (June 2026) — workouts stuck on "Saving..." forever with no
+      // visible cause. Report WHY instead of a silent false so the failure reason
+      // shows up in the UI/console instead of disappearing. Remove once fixed.
+      if (!profileId) { console.error("[Morphiq] insertWorkoutLog: no profileId found for", supabaseUserId); return "NO_PROFILE_ID"; }
       const body = { user_id: profileId, exercise_name: exerciseName, set_number: setNumber, reps, weight, workout_date: localDateStr() };
       const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/workout_logs`, () => ({
         method: "POST",
         headers: SB_HEADERS(),
         body: JSON.stringify(body),
       }));
-      return res.ok;
-    } catch { return false; }
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        console.error("[Morphiq] insertWorkoutLog: insert failed", res.status, errBody);
+        return "HTTP_" + res.status;
+      }
+      return true;
+    } catch (e) { console.error("[Morphiq] insertWorkoutLog threw:", e); return "EXCEPTION"; }
   },
 
   // Fetch recent workout logs for the progress screen
