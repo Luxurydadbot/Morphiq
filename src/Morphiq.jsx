@@ -1782,25 +1782,35 @@ function OnboardingScreen() {
         const parsed = buildPlan(profileForPlan, macrosForPlan);
         if (!cancelled) {
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
-          setUser(userData);
-          setPlan(parsed);
-          // Cache plan locally so session restore works even if Supabase is slow or returns stale data
+          // Cache plan locally FIRST so it's never lost, even if the save below fails —
+          // this is a safety net, not a substitute for confirming the cloud save succeeded.
           try { localStorage.setItem("mq_cached_plan_" + (supabaseUser?.id || "anon"), JSON.stringify({ plan: parsed, user: userData })); } catch {}
-          // Persist to Supabase — upsertProfile MUST finish before insertWeightLog
-          // because insertWeightLog does getProfileId() which needs the profile row to exist first.
-          // If we fire both at the same time (race condition), weight save silently fails.
+
+          // Fix (June 2026): previously the app showed the plan and moved on to step 13
+          // on a fixed 400ms timer, WITHOUT waiting to see if the database save actually
+          // succeeded. If upsertProfile failed (e.g. a Supabase timeout), the member saw
+          // their full plan with nothing saved behind it, and the very next action that
+          // needed a profile row (like logging a workout set) would fail with no clear
+          // explanation. Now we wait for the save to genuinely confirm before advancing,
+          // and show a real retry screen if it fails, instead of guessing it worked.
           if (supabaseUser?.id) {
-            sb.upsertProfile(supabaseUser.id, userData, parsed)
-              .then(() => {
-                // Profile row now exists — safe to write the starting weight
-                const startingWeight = parseFloat(weight);
-                if (startingWeight > 0) {
-                  sb.insertWeightLog(supabaseUser.id, startingWeight).catch(() => {});
-                }
-              })
-              .catch(() => {});
+            const saveOk = await sb.upsertProfile(supabaseUser.id, userData, parsed);
+            if (!cancelled && !saveOk) {
+              setPlanError("Your plan was built, but we couldn't save it — your connection or our database may have had a hiccup. Tap to try again.");
+              return;
+            }
+            // Profile row now exists — safe to write the starting weight
+            const startingWeight = parseFloat(weight);
+            if (startingWeight > 0) {
+              sb.insertWeightLog(supabaseUser.id, startingWeight).catch(() => {});
+            }
           }
-          setTimeout(() => { if (!cancelled) setStep(13); }, 400);
+
+          if (!cancelled) {
+            setUser(userData);
+            setPlan(parsed);
+            setTimeout(() => { if (!cancelled) setStep(13); }, 400);
+          }
         }
       } catch (planErr) {
         console.error("[Morphiq] Plan build failed:", planErr.message);
