@@ -175,13 +175,28 @@ const sb = {
         `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&select=id&limit=1`,
         () => ({ headers: SB_GET() })
       );
-      // TEMP DIAGNOSTIC (June 2026) — getProfileId returning null was indistinguishable
-      // from "no profile exists" vs "request was rejected" (e.g. stale token even after
-      // retry). Logging status + body here so a recurrence is visible, not silent.
-      if (!res.ok) { console.error("[Morphiq] getProfileId: request failed", res.status, await res.text().catch(() => "")); return null; }
+      // TEMP DIAGNOSTIC (June 2026) — stash the real outcome on a module-level var so
+      // callers (insertWorkoutLog etc.) can report the EXACT cause instead of a flat
+      // null. _lastProfileIdDebug is overwritten on every call — read it immediately
+      // after awaiting getProfileId, before any other sb call runs. Remove once fixed.
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        sb._lastProfileIdDebug = "HTTP_" + res.status;
+        console.error("[Morphiq] getProfileId: request failed", res.status, body);
+        return null;
+      }
       const rows = await res.json();
-      return rows?.[0]?.id || null;
-    } catch (e) { console.error("[Morphiq] getProfileId threw:", e); return null; }
+      if (!rows?.[0]?.id) {
+        sb._lastProfileIdDebug = "ZERO_ROWS";
+        return null;
+      }
+      sb._lastProfileIdDebug = "OK";
+      return rows[0].id;
+    } catch (e) {
+      sb._lastProfileIdDebug = "THROW_" + (e?.message || e);
+      console.error("[Morphiq] getProfileId threw:", e);
+      return null;
+    }
   },
 
   // Creates a real profile row in Supabase for dev bypass testing so cloud save works
@@ -227,7 +242,11 @@ const sb = {
       // TEMP DIAGNOSTIC (June 2026) — workouts stuck on "Saving..." forever with no
       // visible cause. Report WHY instead of a silent false so the failure reason
       // shows up in the UI/console instead of disappearing. Remove once fixed.
-      if (!profileId) { console.error("[Morphiq] insertWorkoutLog: no profileId found for", supabaseUserId); return "NO_PROFILE_ID"; }
+      if (!profileId) {
+        const why = sb._lastProfileIdDebug || "UNKNOWN";
+        console.error("[Morphiq] insertWorkoutLog: no profileId found for", supabaseUserId, "reason:", why);
+        return "NO_PROFILE_ID(" + why + ")";
+      }
       const body = { user_id: profileId, exercise_name: exerciseName, set_number: setNumber, reps, weight, workout_date: localDateStr() };
       const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/workout_logs`, () => ({
         method: "POST",
