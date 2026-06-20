@@ -330,6 +330,10 @@ function WorkoutScreen() {
   const [lastLoggedReps, setLastLoggedReps] = useState(null);
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [savedToCloud, setSavedToCloud] = useState(false);
+  // TEMP DIAGNOSTIC (June 2026) — workouts stuck on "Saving..." with no visible
+  // cause. Holds the specific failure reason from insertWorkoutLog so it can be
+  // shown on screen instead of failing silently. Remove once the save bug is fixed.
+  const [saveFailReason, setSaveFailReason] = useState(null);
 
   const ex = exercises[exIdx];
   const nextEx = exercises[exIdx + 1];
@@ -508,16 +512,19 @@ function WorkoutScreen() {
     if (supabaseUser?.id) {
       setSavingToCloud(true);
       setSavedToCloud(false);
+      setSaveFailReason(null);
       sb.insertWorkoutLog(supabaseUser.id, {
         exerciseName: ex.name,
         setNumber: currentSpec.kind === "warmup" ? 0 : workingIdx,
         reps,
         weight: currentWeight,
-      }).then(ok => {
+      }).then(result => {
         setSavingToCloud(false);
+        const ok = result === true;
         setSavedToCloud(ok);
         if (ok) setTimeout(() => setSavedToCloud(false), 3000);
-      }).catch(() => { setSavingToCloud(false); });
+        else setSaveFailReason(typeof result === "string" ? result : "UNKNOWN");
+      }).catch((e) => { setSavingToCloud(false); setSaveFailReason("THROW:" + (e?.message || e)); });
     }
 
     // Show 3-second confirmation window before starting rest timer
@@ -871,9 +878,16 @@ function WorkoutScreen() {
               {wasSkipped ? "Set Skipped" : "Set Logged"}
             </div>
             {!wasSkipped && (
-              <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : savedToCloud ? a : theme.textFaint, marginTop: 4 }}>
-                {savingToCloud ? "☁ Saving to account..." : savedToCloud ? "☁ Saved to account ✓" : supabaseUser?.id ? "☁ Saving..." : ""}
-              </div>
+              <>
+                <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : savedToCloud ? a : theme.textFaint, marginTop: 4 }}>
+                  {savingToCloud ? "☁ Saving to account..." : savedToCloud ? "☁ Saved to account ✓" : supabaseUser?.id ? "☁ Saving..." : ""}
+                </div>
+                {saveFailReason && (
+                  <div style={{ fontSize: 10, color: theme.amber || "#F59E0B", marginTop: 2 }}>
+                    ☁ Save failed: {saveFailReason}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
