@@ -1260,17 +1260,6 @@ function AppProvider({ children }) {
     setScreen("loading");
     try {
       const profile = await sb.getProfile(uid);
-      // TEMP DIAGNOSTIC (June 2026) — existing member lands on onboarding instead of
-      // home. Reports the login uid, the raw profile-read HTTP status (401 = the DB
-      // rejected the login token = signing-key/RLS issue; 200 = token fine), how many
-      // profile rows matched this uid, and whether a plan is attached. Remove once fixed.
-      try {
-        const _r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&select=id,plan`, { headers: SB_GET() });
-        const _rows = await _r.json().catch(() => null);
-        const _n = Array.isArray(_rows) ? _rows.length : "n/a";
-        const _hasPlan = (Array.isArray(_rows) && _rows[0]) ? (_rows[0].plan ? "yes" : "no") : "n/a";
-        alert("DIAG\nlogin uid: " + uid + "\nread status: " + _r.status + "\nrows found: " + _n + "\nplan in row: " + _hasPlan + "\nrouting sees plan: " + (profile?.plan ? "yes" : "no"));
-      } catch (_e) { alert("DIAG read error: " + (_e?.message || _e)); }
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
@@ -3051,31 +3040,6 @@ function ProgressScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // TEMP DIAGNOSTIC — remove after token-401 investigation (June 2026).
-  // Decodes the saved access token's expiry/role and runs two test reads of the
-  // same endpoint: one with the user token (what the app uses) and one with the
-  // anon key only. This tells an expired/invalid user token (userRead 401, anonRead OK)
-  // apart from a rejected connection key / key migration (both 401).
-  const [dbg, setDbg] = useState("…");
-  useEffect(() => {
-    if (!supabaseUser?.id) return;
-    const uid = supabaseUser.id;
-    const PROF = `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&select=id`;
-    let exp = "?";
-    try {
-      const t = localStorage.getItem("mq_access_token");
-      if (t && t.split(".").length === 3) {
-        const p = JSON.parse(atob(t.split(".")[1]));
-        const now = Math.floor(Date.now() / 1000);
-        exp = (p.exp ? (p.exp - now) + "s" : "noexp") + "/" + (p.role || "?");
-      } else { exp = "missing-or-anon"; }
-    } catch { exp = "decode-fail"; }
-    Promise.all([
-      fetch(PROF, { headers: SB_GET() }).then(r => r.status).catch(() => "x"),
-      fetch(PROF, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }).then(r => r.status).catch(() => "x"),
-    ]).then(([a, b]) => setDbg(`exp:${exp} userRead:${a} anonRead:${b}`));
-  }, [supabaseUser?.id]);
-
   // realLogs: use whatever historicalData has — even an empty array means "loaded, just no data yet"
   const realLogs = historicalData?.workoutLogs ?? null;
   // hasData = logs loaded AND at least one row exists
@@ -3172,10 +3136,6 @@ function ProgressScreen() {
   return (
     <Layout activeNav="progress">
       <div style={{ padding:"1.25rem 1.25rem 0" }}>
-        {/* TEMP DIAGNOSTIC — remove after orphaned-workout investigation */}
-        <div style={{ background:"#1F1010", border:"1px solid #F87171", borderRadius:10, padding:"8px 10px", marginBottom:14, fontFamily:"monospace", fontSize:11, color:"#F87171", wordBreak:"break-all" }}>
-          DEBUG · {dbg}
-        </div>
         <div style={{ marginBottom:16 }}>
           <div style={{ fontSize:20, fontWeight:600, color:theme.text }}>Your Progress</div>
           <div style={{ fontSize:12, color:theme.textDim, marginTop:2 }}>
