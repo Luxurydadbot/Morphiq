@@ -1259,6 +1259,15 @@ function AppProvider({ children }) {
     // Production: query profile from Supabase using the real auth UID
     setScreen("loading");
     try {
+      // TEMP DIAGNOSTIC (June 2026) — investigating existing member sent to onboarding
+      // on a second device, even though Supabase Auth confirms only one account exists.
+      // getProfile() normally swallows the real HTTP status/body, so this does its own
+      // raw read first to show the real ground truth. REMOVE THIS SESSION once answered.
+      try {
+        const _r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&limit=1`, { headers: SB_GET() });
+        const _body = await _r.text();
+        alert("LOGIN DIAG\nuid: " + uid + "\nhttp status: " + _r.status + "\nraw body: " + _body.slice(0, 400));
+      } catch (_e) { alert("LOGIN DIAG fetch threw: " + (_e?.message || _e)); }
       const profile = await sb.getProfile(uid);
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
