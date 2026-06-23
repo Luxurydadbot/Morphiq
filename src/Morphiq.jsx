@@ -759,6 +759,12 @@ function buildPlan(userProfile, existingMacros) {
   const restAccessory = isOver40
     ? (goal === "lose_fat" ? 75 : 90)
     : (goal === "lose_fat" ? 45 : 60);
+  // If the user explicitly picked a rest preference in onboarding, honour it
+  // instead of the calculated value. restPref is in seconds (60, 120, or 180).
+  const effectiveRestCompound = profile.restPref || restCompound;
+  const effectiveRestAccessory = profile.restPref
+    ? Math.round(profile.restPref * 0.75)
+    : restAccessory;
 
   // ── RPE ───────────────────────────────────────────────────────────
   const rpeMax = isOver40 ? 8 : 9;
@@ -854,7 +860,7 @@ function buildPlan(userProfile, existingMacros) {
       muscle: exObj.muscle,
       pattern: exObj.pattern,
       rpe,
-      restSeconds: isLower ? restCompound : (exObj.pattern === "accessory" ? restAccessory : restCompound),
+      restSeconds: isLower ? effectiveRestCompound : (exObj.pattern === "accessory" ? effectiveRestAccessory : effectiveRestCompound),
       alternative: "", // filled by alternative lookup below
       usePyramid,
       weightIncrement: isLower ? 5 : 2.5,
@@ -882,7 +888,7 @@ function buildPlan(userProfile, existingMacros) {
       muscle: lib.core.muscle,
       pattern: lib.core.pattern,
       rpe: Math.min(rpe, 7),
-      restSeconds: restAccessory,
+      restSeconds: effectiveRestAccessory,
       alternative: "Pallof press",
       usePyramid: false,
       weightIncrement: 5,
@@ -907,7 +913,7 @@ function buildPlan(userProfile, existingMacros) {
     daysPerWeek,
     workoutType,
     workoutDuration,
-    restSeconds: restCompound,
+    restSeconds: effectiveRestCompound,
     weeklyFocus: goal === "lose_fat"
       ? "Build the habit. Every session counts more than any single weight."
       : goal === "build_muscle"
@@ -1795,6 +1801,7 @@ function OnboardingScreen() {
       const profileForPlan = {
         goal, sex, age, trainingHistory, recentActivity,
         daysPerWeek, equipment, injuries,
+        restPref, // Fix (June 2026): restPref was captured in onboarding but never passed to buildPlan — rest times were always calculated from age/goal, ignoring the user's choice
       };
       const macrosForPlan = {
         calories: targetCals, protein: targetProtein,
@@ -2597,11 +2604,7 @@ function HomeDashboardScreen() {
           )}
         </div>
       </div>
-      <div style={{ padding: "1.25rem 1.25rem 0" }}>
-        <button onClick={() => navigate("meals")} style={{ width: "100%", background: "transparent", border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem", fontSize: 14, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-          View full meal plan →
-        </button>
-      </div>
+
     </Layout>
   );
 }
@@ -3102,8 +3105,11 @@ function ProgressScreen() {
   // Build chart data: real entries or mock fallback
   const useRealWeightData = weightLogs !== null && weightLogs.length >= 1;
   const weightChartData = useRealWeightData
-    ? weightLogs.map((r, i) => ({
-        week: `W${i + 1}`,
+    ? weightLogs.map((r) => ({
+        // Fix (June 2026): labels were W1/W2/W3 by entry order, not real dates.
+        // Now shows the actual date (e.g. "Jun 3") so two weigh-ins on the same
+        // day get the same label, and the chart reflects real time spacing.
+        week: new Date(r.logged_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         weight: parseFloat(r.weight_lbs),
         date: r.logged_date,
       }))
