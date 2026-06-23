@@ -1184,15 +1184,28 @@ function AppProvider({ children }) {
         const needsConfirmedResave = !planSource?.plan && !!cachedData?.plan;
 
         if (needsConfirmedResave) {
-          sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).then((ok) => {
-            if (!ok) {
-              setScreen("network_error");
+          // Fix (June 2026): before trying to re-save, do one more Supabase read.
+          // The profile IS in the database (confirmed on other devices) — the first
+          // getProfile() may have returned a partial row due to a timing issue.
+          // A second read often succeeds. Only fall back to upsert if it also fails.
+          sb.getProfile(savedSession.uid).then(freshProfile => {
+            if (freshProfile?.plan) {
+              const fp = freshProfile.plan?.weekStartDate
+                ? freshProfile.plan
+                : { ...freshProfile.plan, weekStartDate: new Date().toISOString().split("T")[0], weekNumber: freshProfile.plan?.weekNumber || 1 };
+              setPlan(fp);
+              loadHistoricalData(savedSession.uid);
+              checkAndGenerateNextWeek(savedSession.uid, fp, resolvedUser).catch(() => {});
+              setScreen("home");
               return;
             }
-            setPlan(patchedPlan);
-            loadHistoricalData(savedSession.uid);
-            checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser).catch(() => {});
-            setScreen("home");
+            return sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).then((ok) => {
+              if (!ok) { setScreen("network_error"); return; }
+              setPlan(patchedPlan);
+              loadHistoricalData(savedSession.uid);
+              checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser).catch(() => {});
+              setScreen("home");
+            }).catch(() => setScreen("network_error"));
           }).catch(() => setScreen("network_error"));
           return;
         }
