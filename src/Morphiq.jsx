@@ -715,6 +715,7 @@ function buildPlan(userProfile, existingMacros) {
     daysPerWeek = 3,
     equipment = "dumbbell",
     injuries = "none",
+    restPref = null,
   } = userProfile;
 
   // Resolve experience tier
@@ -761,9 +762,9 @@ function buildPlan(userProfile, existingMacros) {
     : (goal === "lose_fat" ? 45 : 60);
   // If the user explicitly picked a rest preference in onboarding, honour it
   // instead of the calculated value. restPref is in seconds (60, 120, or 180).
-  const effectiveRestCompound = profile.restPref || restCompound;
-  const effectiveRestAccessory = profile.restPref
-    ? Math.round(profile.restPref * 0.75)
+  const effectiveRestCompound = restPref || restCompound;
+  const effectiveRestAccessory = restPref
+    ? Math.round(restPref * 0.75)
     : restAccessory;
 
   // ── RPE ───────────────────────────────────────────────────────────
