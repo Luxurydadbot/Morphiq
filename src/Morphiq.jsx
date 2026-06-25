@@ -1290,7 +1290,16 @@ function AppProvider({ children }) {
       try {
         const _r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&limit=1`, { headers: SB_GET() });
         const _body = await _r.text();
-        alert("LOGIN DIAG\nuid: " + uid + "\nhttp status: " + _r.status + "\nraw body: " + _body.slice(0, 400));
+        const _parsed = JSON.parse(_body);
+        const _row = _parsed?.[0];
+        // Show: does the row exist? does it have a plan field? what type is it?
+        alert("LOGIN DIAG\nuid: " + uid + 
+          "\nhttp status: " + _r.status + 
+          "\nrow found: " + (!!_row) +
+          "\nplan field type: " + typeof _row?.plan +
+          "\nplan is null: " + (_row?.plan === null) +
+          "\nplan keys: " + (_row?.plan ? Object.keys(_row.plan).slice(0,5).join(",") : "NONE") +
+          "\nraw body start: " + _body.slice(0, 200));
       } catch (_e) { alert("LOGIN DIAG fetch threw: " + (_e?.message || _e)); }
       const profile = await sb.getProfile(uid);
       if (profile?.plan) {
