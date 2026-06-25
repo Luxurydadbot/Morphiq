@@ -1325,10 +1325,12 @@ function AppProvider({ children }) {
           : { ...profile.plan, weekStartDate: new Date().toISOString().split("T")[0], weekNumber: profile.plan?.weekNumber || 1 };
         if (!profile.plan?.weekStartDate) sb.upsertProfile(uid, u, patchedPlan).catch(() => {});
         setPlan(patchedPlan);
+        window._mq_plan_set = true; // flag so outer catch knows plan was set
         // Save session so next open skips login
         try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
-        loadHistoricalData(uid);
-        checkAndGenerateNextWeek(uid, patchedPlan, u).catch(() => {});
+        // Fire-and-forget — errors here must never prevent home screen from showing
+        try { loadHistoricalData(uid); } catch {}
+        try { checkAndGenerateNextWeek(uid, patchedPlan, u).catch(() => {}); } catch {}
         setScreen("home");
       } else {
         setUser(DEFAULT_USER); setPlan(null);
@@ -1336,7 +1338,13 @@ function AppProvider({ children }) {
         try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
         setScreen("onboarding");
       }
-    } catch { setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding"); }
+    } catch(err) {
+      // Fix (June 2026): outer catch was sending to onboarding on ANY error — including
+      // errors thrown by loadHistoricalData or checkAndGenerateNextWeek AFTER the plan
+      // was already set. Now we check if we already have a plan and go home anyway.
+      if (plan || window._mq_plan_set) { setScreen("home"); return; }
+      setUser(DEFAULT_USER); setPlan(null); setScreen("onboarding");
+    }
   }
 
   // ── REAL SUPABASE MAGIC-LINK CALLBACK ─────────────────────────────────────
