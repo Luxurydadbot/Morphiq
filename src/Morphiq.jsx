@@ -1311,9 +1311,8 @@ function AppProvider({ children }) {
         if (profile && typeof profile.plan === "string") {
           try { profile.plan = JSON.parse(profile.plan); } catch { profile.plan = null; }
         }
-        alert("PARSED: row=" + (!!profile) + " | plan type=" + typeof profile?.plan + " | plan truthy=" + (!!profile?.plan) + " | name=" + profile?.name);
       } catch(fetchErr) {
-        alert("FETCH ERROR: " + (fetchErr?.message || String(fetchErr)));
+        console.error("[Morphiq] profile fetch error:", fetchErr?.message || fetchErr);
       }
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
