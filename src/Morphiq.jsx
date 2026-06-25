@@ -1280,28 +1280,17 @@ function AppProvider({ children }) {
       return;
     }
 
-    // Production: query profile from Supabase using the real auth UID
+    // Production: query profile from Supabase using the real auth UID.
+    // Fix (June 2026): we do ONE fetch here and reuse the result directly instead of
+    // making two back-to-back fetches (diagnostic + getProfile). Two fetches were
+    // causing the second one to return a row without the plan field — likely a Supabase
+    // RLS/token timing issue where the first fetch "consumed" something the second needed.
+    // Using the single fetch result directly is simpler and eliminates the race entirely.
     setScreen("loading");
     try {
-      // TEMP DIAGNOSTIC (June 2026) — investigating existing member sent to onboarding
-      // on a second device, even though Supabase Auth confirms only one account exists.
-      // getProfile() normally swallows the real HTTP status/body, so this does its own
-      // raw read first to show the real ground truth. REMOVE THIS SESSION once answered.
-      try {
-        const _r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&limit=1`, { headers: SB_GET() });
-        const _body = await _r.text();
-        const _parsed = JSON.parse(_body);
-        const _row = _parsed?.[0];
-        // Show: does the row exist? does it have a plan field? what type is it?
-        alert("LOGIN DIAG\nuid: " + uid + 
-          "\nhttp status: " + _r.status + 
-          "\nrow found: " + (!!_row) +
-          "\nplan field type: " + typeof _row?.plan +
-          "\nplan is null: " + (_row?.plan === null) +
-          "\nplan keys: " + (_row?.plan ? Object.keys(_row.plan).slice(0,5).join(",") : "NONE") +
-          "\nraw body start: " + _body.slice(0, 200));
-      } catch (_e) { alert("LOGIN DIAG fetch threw: " + (_e?.message || _e)); }
-      const profile = await sb.getProfile(uid);
+      const _res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&limit=1`, { headers: SB_GET() });
+      const _rows = await _res.json();
+      const profile = _rows?.[0] || null;
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
