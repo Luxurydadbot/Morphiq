@@ -1130,11 +1130,15 @@ function AppProvider({ children }) {
     // ~1 hour, so reopening the app the next day was using an expired token: RLS
     // rejected the workout reads and Progress/home showed zero. Renew first, then load.
     sb.refreshSession().then((renewed) => {
-      if (renewed === "expired") {
-        // The login token couldn't be renewed because the session is dead. Do NOT fall
-        // through to showing stale cached data with an expired token (that made workouts
-        // look like they had vanished) — clear everything and force a clean re-login.
-        // (Fix: June 2026 stuck-token / "stats show zero on reopen" bug.)
+      if (renewed === "expired" || renewed === false) {
+        // "expired" = Supabase explicitly rejected the refresh token (4xx).
+        // false     = no refresh token exists at all (e.g. PC where the user never
+        //             completed an OTP login on this device, so nothing was ever stored).
+        // In both cases we have no valid auth token, so any Supabase read will use the
+        // anon key and RLS will block it — returning an empty row that looks like "no plan"
+        // and sending the user to the error screen. The only safe path is a clean re-login.
+        // Fix (June 2026): previously only "expired" triggered this — "false" fell through
+        // and tried to read the profile with the anon key, always failing on new devices.
         try { localStorage.removeItem("mq_access_token"); } catch {}
         try { localStorage.removeItem("mq_refresh_token"); } catch {}
         try { localStorage.removeItem(SESSION_KEY); } catch {}
