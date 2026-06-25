@@ -1291,6 +1291,8 @@ function AppProvider({ children }) {
       const _res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&limit=1`, { headers: SB_GET() });
       const _rows = await _res.json();
       const profile = _rows?.[0] || null;
+      // TEMP: one-line alert to confirm what we actually got back
+      alert("ROW: " + (!!profile) + " | PLAN TYPE: " + typeof profile?.plan + " | PLAN NULL: " + (profile?.plan === null) + " | KEYS: " + (profile ? Object.keys(profile).join(",") : "NO ROW"));
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
