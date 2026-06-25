@@ -1304,7 +1304,6 @@ function AppProvider({ children }) {
       try {
         const _res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(uid)}&limit=1`, { headers: SB_GET() });
         const _text = await _res.text();
-        alert("STATUS: " + _res.status + " | BODY: " + _text.slice(0, 300));
         const _rows = JSON.parse(_text);
         profile = _rows?.[0] || null;
         // Fix (June 2026): plan column may come back as a JSON string instead of
@@ -1312,7 +1311,7 @@ function AppProvider({ children }) {
         if (profile && typeof profile.plan === "string") {
           try { profile.plan = JSON.parse(profile.plan); } catch { profile.plan = null; }
         }
-        // Remove debug alert now that we know status 200 is working
+        alert("PARSED: row=" + (!!profile) + " | plan type=" + typeof profile?.plan + " | plan truthy=" + (!!profile?.plan) + " | name=" + profile?.name);
       } catch(fetchErr) {
         alert("FETCH ERROR: " + (fetchErr?.message || String(fetchErr)));
       }
