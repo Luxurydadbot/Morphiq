@@ -1100,6 +1100,11 @@ function AppProvider({ children }) {
   const [user, setUser] = useState(DEFAULT_USER);
   const [plan, setPlan] = useState(null);
   const [supabaseUser, setSupabaseUser] = useState(null);
+  // Ref mirrors supabaseUser.id synchronously — state updates are async so
+  // supabaseUser?.id can be null inside onboarding even after setSupabaseUser runs.
+  // Fix (June 2026): plan was never saved to Supabase on fresh PC login because
+  // supabaseUser?.id was null when the save ran. Use this ref instead.
+  const supabaseUserIdRef = useRef(null);
   const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
   const [historicalData, setHistoricalData] = useState(null);
   // Tracks the current exercise + set while WorkoutScreen is active
@@ -1225,6 +1230,7 @@ function AppProvider({ children }) {
         // No plan in Supabase or local cache — go to onboarding. Do NOT wipe the session.
         // This prevents OTP being required every time when plan is null.
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
+        supabaseUserIdRef.current = savedSession.uid;
         setScreen("onboarding");
       }
     }).catch(() => {
@@ -1274,6 +1280,7 @@ function AppProvider({ children }) {
   async function signIn(email, role, realAuthUserId = null) {
     const uid = realAuthUserId || ("sim-" + Date.now());
     setSupabaseUser({ email, id: uid });
+    supabaseUserIdRef.current = uid;
     if (role === "owner") {
       // Look up the owner's gym and store the real gym_id in branding context
       // so GymOwnerDashboard can query real member data
@@ -1436,7 +1443,7 @@ function AppProvider({ children }) {
   }
 
   return (
-    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext, pendingAISwap, setPendingAISwap }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, supabaseUserIdRef, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext, pendingAISwap, setPendingAISwap }}>
       {children}
     </AppContext.Provider>
   );
@@ -1765,7 +1772,7 @@ const GOAL_OPTIONS = [
 ];
 
 function OnboardingScreen() {
-  const { navigate, setUser, setPlan, plan, gymBranding, supabaseUser } = useApp();
+  const { navigate, setUser, setPlan, plan, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
   const ob = theme.ob;
   const a = gymBranding.accent || ob.teal;
   const [step, setStep] = useState(0);
@@ -1849,7 +1856,8 @@ function OnboardingScreen() {
           const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           // Cache plan locally FIRST so it's never lost, even if the save below fails —
           // this is a safety net, not a substitute for confirming the cloud save succeeded.
-          try { localStorage.setItem("mq_cached_plan_" + (supabaseUser?.id || "anon"), JSON.stringify({ plan: parsed, user: userData })); } catch {}
+          const _saveUid = supabaseUserIdRef?.current || supabaseUser?.id;
+          try { localStorage.setItem("mq_cached_plan_" + (_saveUid || "anon"), JSON.stringify({ plan: parsed, user: userData })); } catch {}
 
           // Fix (June 2026): previously the app showed the plan and moved on to step 13
           // on a fixed 400ms timer, WITHOUT waiting to see if the database save actually
@@ -1858,8 +1866,8 @@ function OnboardingScreen() {
           // needed a profile row (like logging a workout set) would fail with no clear
           // explanation. Now we wait for the save to genuinely confirm before advancing,
           // and show a real retry screen if it fails, instead of guessing it worked.
-          if (supabaseUser?.id) {
-            const saveOk = await sb.upsertProfile(supabaseUser.id, userData, parsed);
+          if (_saveUid) {
+            const saveOk = await sb.upsertProfile(_saveUid, userData, parsed);
             if (!cancelled && !saveOk) {
               setPlanError("Your plan was built, but we couldn't save it — your connection or our database may have had a hiccup. Tap to try again.");
               return;
@@ -1867,7 +1875,7 @@ function OnboardingScreen() {
             // Profile row now exists — safe to write the starting weight
             const startingWeight = parseFloat(weight);
             if (startingWeight > 0) {
-              sb.insertWeightLog(supabaseUser.id, startingWeight).catch(() => {});
+              sb.insertWeightLog(_saveUid, startingWeight).catch(() => {});
             }
           }
 
