@@ -1228,8 +1228,11 @@ function AppProvider({ children }) {
         setScreen("onboarding");
       }
     }).catch(() => {
-      // Network error — check local cache before showing error screen.
-      // If we have a cached plan, we can restore the full session without any network at all.
+      // Network error on session restore — check local cache first.
+      // Fix (June 2026): if there's no cache either, send to auth screen instead of
+      // showing the error screen. The error screen was a dead end — the user had no
+      // way to log in again without knowing to tap "Use a different account".
+      // Sending to auth is cleaner: they log in once, tokens get stored, future opens work.
       try {
         const raw = localStorage.getItem("mq_cached_plan_" + savedSession.uid);
         const cached = raw ? JSON.parse(raw) : null;
@@ -1241,9 +1244,11 @@ function AppProvider({ children }) {
           return;
         }
       } catch {}
-      // No cache either — show retry screen. Do NOT wipe the session.
-      // This prevents testers losing their session on spotty phone connections.
-      setScreen("network_error");
+      // No cache — clear stale session and send to login screen cleanly.
+      try { localStorage.removeItem("mq_access_token"); } catch {}
+      try { localStorage.removeItem("mq_refresh_token"); } catch {}
+      try { localStorage.removeItem(SESSION_KEY); } catch {}
+      setScreen("auth");
     });
   }, []);
 
