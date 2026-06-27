@@ -605,14 +605,95 @@ function WorkoutScreen() {
     setTimeout(() => setSwapConfirmName(null), 2500);
   }
 
+  // Muscle groups that load each injury area.
+  // Used by bulk swaps to identify which remaining exercises need replacing.
+  const INJURY_MUSCLES = {
+    back:     /back|lat|rhomboid|row|deadlift|rdl|hinge|spine|erector/i,
+    knee:     /quad|glute|squat|lunge|leg press|step.up|hamstring/i,
+    shoulder: /shoulder|delt|overhead|press|rotator|trap/i,
+    wrist:    /wrist|curl|grip|barbell/i,
+  };
+
+  // Safe bodyweight replacements keyed by muscle pattern
+  const BW_SWAP = {
+    squat:  { name: "Bodyweight Squat",    muscle: "Quads / Glutes", sets: 3, targetReps: 15, weight: 0 },
+    hinge:  { name: "Glute Bridge",        muscle: "Glutes / Hamstrings", sets: 3, targetReps: 15, weight: 0 },
+    push:   { name: "Push-Up",             muscle: "Chest",          sets: 3, targetReps: 12, weight: 0 },
+    pull:   { name: "Inverted Row",        muscle: "Back",           sets: 3, targetReps: 10, weight: 0 },
+    core:   { name: "Plank",               muscle: "Core",           sets: 3, targetReps: 30, weight: 0 },
+    legs:   { name: "Reverse Lunge",       muscle: "Quads / Glutes", sets: 3, targetReps: 12, weight: 0 },
+  };
+
+  function getBWSwap(ex) {
+    const m = (ex.muscle || "").toLowerCase();
+    const n = (ex.name || "").toLowerCase();
+    if (/quad|glute|squat|lunge|leg press/i.test(m + n)) return { ...BW_SWAP.squat };
+    if (/hamstring|hinge|deadlift|rdl|hip thrust/i.test(m + n)) return { ...BW_SWAP.hinge };
+    if (/chest|pec|tricep|press/i.test(m + n)) return { ...BW_SWAP.push };
+    if (/back|lat|row|bicep/i.test(m + n)) return { ...BW_SWAP.pull };
+    if (/core|abs|plank/i.test(m + n)) return { ...BW_SWAP.core };
+    return { ...BW_SWAP.core }; // safe fallback
+  }
+
   // When the AI chat sends a swap action, pendingAISwap is set in AppContext.
-  // We watch it here and apply it exactly like a manual swap, then clear it
-  // so it doesn't fire again. This is the bridge between chat and workout.
+  // Single swap: apply to current exercise only.
+  // Bulk swap: apply to current + all remaining exercises that match the criteria.
   useEffect(() => {
     if (!pendingAISwap) return;
-    doSwap(pendingAISwap);
+
+    if (!pendingAISwap._bulk) {
+      // Simple single-exercise swap — existing behaviour unchanged
+      doSwap(pendingAISwap);
+      setPendingAISwap(null);
+      return;
+    }
+
+    // ── BULK SWAP ─────────────────────────────────────────────────────────
+    const { _type, area, minutes } = pendingAISwap;
+
+    setExercises(prev => {
+      const next = [...prev];
+
+      if (_type === "injury" && area && INJURY_MUSCLES[area]) {
+        // Replace every exercise from current position onward that loads the injured area
+        for (let i = exIdx; i < next.length; i++) {
+          const muscle = (next[i].muscle || "").toLowerCase();
+          const name   = (next[i].name   || "").toLowerCase();
+          if (INJURY_MUSCLES[area].test(muscle + " " + name)) {
+            // Use the safest swap from getSwapOptions — first result that
+            // avoids the injury area. Fall back to plank if nothing found.
+            const opts = getSwapOptions(next[i], user?.equipment)
+              .filter(o => !INJURY_MUSCLES[area].test((o.muscle || "").toLowerCase() + " " + (o.name || "").toLowerCase()));
+            const replacement = opts[0] || { name: "Plank", muscle: "Core", sets: next[i].sets, targetReps: 30, weight: 0 };
+            next[i] = { ...replacement, sets: next[i].sets, rpe: 6, alternative: null, warmupSets: null };
+          }
+        }
+      } else if (_type === "bodyweight") {
+        // Replace every remaining exercise with its bodyweight equivalent
+        for (let i = exIdx; i < next.length; i++) {
+          const bw = getBWSwap(next[i]);
+          next[i] = { ...bw, sets: next[i].sets, rpe: 7, alternative: null, warmupSets: null };
+        }
+      } else if (_type === "trim" && minutes) {
+        // Remove enough exercises from the end to fit within the time budget.
+        // Rough estimate: each exercise takes ~5 minutes (3 sets × 45s work + 90s rest).
+        const minsPerEx = 5;
+        const canFit = Math.max(1, Math.floor(minutes / minsPerEx));
+        // Only cut exercises AFTER the current one — never remove what's in progress
+        const remaining = next.length - exIdx;
+        if (remaining > canFit) {
+          next.splice(exIdx + canFit); // remove from end
+        }
+      }
+
+      return next;
+    });
+
+    // Reset set counter — the exercise at exIdx may have changed
+    setSetIdx(0);
+    setNudgedWeight(null);
+    setRepCount(null);
     setPendingAISwap(null);
-  // doSwap reads exIdx from closure — eslint would warn about deps but this is correct
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAISwap]);
 
