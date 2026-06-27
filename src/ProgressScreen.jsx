@@ -106,7 +106,7 @@ function getWeekStreak(daysPerWeek) {
   } catch(e) { return 0; }
 }
 
-function ProgressScreen() {
+export function ProgressScreen() {
   const { gymBranding, supabaseUser, user, plan, historicalData, loadHistoricalData } = useApp();
   const a = gymBranding.accent;
   const [tab, setTab] = useState("body");
@@ -491,7 +491,7 @@ const EQUIPMENT_OPTIONS = [
   { id: "kettlebell",  label: "Kettlebells",         sub: "Home gym or functional fitness" },
 ];
 
-function ProfileScreen() {
+export function ProfileScreen() {
   const { navigate, user, setUser, plan, setPlan, gymBranding, signOut, supabaseUser } = useApp();
   const a = gymBranding.accent;
   const sL = theme.sL;
@@ -712,7 +712,7 @@ function ProfileScreen() {
 }
 
 // Derive display properties from a raw profile + stats
-function LoadingScreen() {
+export function LoadingScreen() {
   return (
     <Layout>
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
@@ -723,7 +723,7 @@ function LoadingScreen() {
   );
 }
 
-function NetworkErrorScreen() {
+export function NetworkErrorScreen() {
   const { navigate } = useApp();
   return (
     <Layout>
