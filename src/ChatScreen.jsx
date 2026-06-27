@@ -4,7 +4,7 @@ import {
   MicIcon, Spinner,
   CHAT_SUGGESTIONS,
   getFallbackReply, fetchAIReply,
-} from "./shared.js";
+} from "./shared.jsx";
 
 function ChatScreen({ fromScreen = "home" }) {
   const { navigate, user, plan, gymBranding, workoutContext, supabaseUser, setPendingAISwap } = useApp();
