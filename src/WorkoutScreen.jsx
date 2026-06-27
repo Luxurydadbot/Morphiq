@@ -330,6 +330,9 @@ function WorkoutScreen() {
   const [lastLoggedReps, setLastLoggedReps] = useState(null);
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [savedToCloud, setSavedToCloud] = useState(false);
+  // "Last time" history — loaded from Supabase when exercise changes
+  // null = loading, false = no history found, object = { weight, reps, date }
+  const [lastSetHistory, setLastSetHistory] = useState(null);
   // TEMP DIAGNOSTIC (June 2026) — workouts stuck on "Saving..." with no visible
   // cause. Holds the specific failure reason from insertWorkoutLog so it can be
   // shown on screen instead of failing silently. Remove once the save bug is fixed.
@@ -435,6 +438,17 @@ function WorkoutScreen() {
     return () => setWorkoutContext(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exIdx, setIdx, currentWeight, isWarmupSet]);
+
+  // Fetch last working set for the current exercise whenever exIdx changes.
+  // This powers the "Last time: X lbs × Y reps" display below the weight card.
+  // Runs silently — null while loading, false if no history, object if found.
+  useEffect(() => {
+    setLastSetHistory(null); // reset to loading state on exercise change
+    if (!supabaseUser?.id || !ex?.name) return;
+    sb.getLastSetForExercise(supabaseUser.id, ex.name)
+      .then(result => setLastSetHistory(result || false))
+      .catch(() => setLastSetHistory(false));
+  }, [exIdx, ex?.name, supabaseUser?.id]);
 
   const restStartRef = useRef(null);
   const activeRestSecsRef = useRef(activeRestSecs);
@@ -1073,6 +1087,22 @@ function WorkoutScreen() {
             <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === ex.weight ? "Today's target" : `+${currentWeight - ex.weight} lbs from plan`}</div>
           )}
         </div>
+
+        {/* ── LAST TIME display — shown when we have history for this exercise ── */}
+        {!isWarmupSet && lastSetHistory && (
+          <div style={{ background: "#0A1A14", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 10, padding: "8px 14px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 11, color: "#6B7A8D" }}>Last time</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#E8EDF2" }}>{lastSetHistory.weight} lbs × {lastSetHistory.reps} reps</span>
+              {currentWeight > lastSetHistory.weight && (
+                <span style={{ fontSize: 10, color: a, background: "#003D35", borderRadius: 6, padding: "2px 6px" }}>↑ PR pace</span>
+              )}
+            </div>
+          </div>
+        )}
+        {!isWarmupSet && lastSetHistory === null && supabaseUser?.id && (
+          <div style={{ height: 34, marginBottom: 10 }} /> 
+        )}
 
         {/* Warm-up callout — shown on every warm-up set so it's unmistakable
             this is NOT a working set and shouldn't be taken hard. */}
