@@ -4,7 +4,7 @@ import {
   Layout, Spinner,
   WeightChart, StreakCalendar, getWeekStreak,
   PERSONAL_BESTS, WEIGHT_DATA_MOCK,
-} from "./shared.js";
+} from "./shared.jsx";
 
 function ProgressScreen() {
   const { gymBranding, supabaseUser, user, plan, historicalData, loadHistoricalData } = useApp();
