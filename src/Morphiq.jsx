@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
-import { WorkoutScreen } from "./WorkoutScreen.jsx";
+import { WorkoutScreen, CustomPlanScreen } from "./WorkoutScreen.jsx";
 import { MealPlanScreen } from "./MealScreen.jsx";
 import { GymOwnerDashboard, PricingScreen } from "./GymOwnerDashboard.jsx";
 
@@ -1840,6 +1840,7 @@ function OnboardingScreen() {
   const [trainingHistory, setTrainingHistory] = useState(null);
   const [recentActivity, setRecentActivity] = useState(null);
   const [restPref, setRestPref] = useState(120);
+  const [routeChoice, setRouteChoice] = useState(null); // null=not chosen, 'ai'=build for me, 'custom'=own routine
   const [checklist, setChecklist] = useState([false, false, false, false]);
   // Tracks whether each checklist item is visible yet (fades in before turning teal)
   const [checklistVisible, setChecklistVisible] = useState([false, false, false, false]);
@@ -2009,9 +2010,33 @@ function OnboardingScreen() {
           <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "12px 14px", fontSize: 13, lineHeight: 1.6, color: ob.body, marginBottom: 20 }}>
             I'll build a training plan personal to you in about 2 minutes. Let's start with your name.
           </div>
-          <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && name.trim().length >= 2 && setStep(1)} placeholder="Your first name..." style={{ background: ob.card, border: `1.5px solid ${name.trim().length >= 2 ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 12, padding: "12px 14px", fontSize: 16, color: ob.white, outline: "none", fontFamily: ob.font, width: "100%", transition: "border-color .2s" }} maxLength={30} />
-          <button onClick={() => name.trim().length >= 2 && setStep(1)} disabled={name.trim().length < 2} style={{ ...s.tealBtn(name.trim().length < 2), marginTop: 12, padding: 12, fontSize: 13 }}>
+          <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && name.trim().length >= 2 && setStep('choose')} placeholder="Your first name..." style={{ background: ob.card, border: `1.5px solid ${name.trim().length >= 2 ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 12, padding: "12px 14px", fontSize: 16, color: ob.white, outline: "none", fontFamily: ob.font, width: "100%", transition: "border-color .2s" }} maxLength={30} />
+          <button onClick={() => name.trim().length >= 2 && setStep('choose')} disabled={name.trim().length < 2} style={{ ...s.tealBtn(name.trim().length < 2), marginTop: 12, padding: 12, fontSize: 13 }}>
             Let's go, {name.trim() || "..."} →
+          </button>
+        </div>}
+
+        {step === 'choose' && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Your plan</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>How would you like to train?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Both paths track your progress and adjust your weights automatically</div>
+          </div>
+          <button onClick={() => { setRouteChoice("ai"); setStep(1); }}
+            style={{ background: ob.tealDk, border: `1.5px solid ${a}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", marginBottom: 10, width: "100%" }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(0,212,177,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 22 }}>🤖</div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: a }}>Build my plan for me</div>
+              <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>AI creates a personalised program from scratch based on your goal and level</div>
+            </div>
+          </button>
+          <button onClick={() => navigate("custom_plan")}
+            style={{ background: ob.card, border: "1.5px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", width: "100%" }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 22 }}>📋</div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: ob.white }}>I have my own routine</div>
+              <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>Enter your exercises, sets, reps, and starting weights — we handle the rest</div>
+            </div>
           </button>
         </div>}
 
@@ -3855,6 +3880,7 @@ function AppRouter() {
   if (screen === "onboarding") return <OnboardingScreen />;
   if (screen === "plan") return <PlanOverviewScreen />;
   if (screen === "workout") return <WorkoutScreen />;
+  if (screen === "custom_plan") return <CustomPlanScreen />;
   if (screen === "meals") return <MealPlanScreen />;
   if (screen === "progress") return <ProgressScreen />;
   if (screen === "profile") return <ProfileScreen />;
