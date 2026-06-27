@@ -1434,6 +1434,325 @@ const EXERCISES_DISPLAY = [{name:"Goblet squat",weight:"35 lbs",reps:"10 reps",s
 
 const WEEK = [{name:"Mon",type:"Full body",isWorkout:true},{name:"Tue",type:"Rest",isWorkout:false},{name:"Wed",type:"Full body",isWorkout:true},{name:"Thu",type:"Rest",isWorkout:false},{name:"Fri",type:"Full body",isWorkout:true},{name:"Sat",type:"Rest",isWorkout:false},{name:"Sun",type:"Rest",isWorkout:false}];
 
-export { WorkoutScreen };
+
+// ═══════════════════════════════════════════════════════════════════
+// CUSTOM PLAN SCREEN
+// For members who already have their own routine.
+// Flow: goal → days/week → exercises per day (name + sets + reps + weight) → review → save
+// Uses same plan shape as buildPlan() so all progression logic works identically.
+// ═══════════════════════════════════════════════════════════════════
+
+// Canonical exercise names for autocomplete suggestions — covers all equipment types
+const CUSTOM_EX_SUGGESTIONS = [
+  "Barbell back squat","Barbell bench press","Barbell bent over row","Barbell Romanian deadlift",
+  "Barbell overhead press","Trap bar deadlift","Box squat","Goblet squat","Dumbbell bench press",
+  "Dumbbell Romanian deadlift","Single-arm dumbbell row","Dumbbell shoulder press",
+  "Neutral-grip incline press","Chest-supported DB row","Dumbbell curl to press",
+  "Leg press","Lying leg curl","Chest press machine","Seated cable row","Lat pulldown",
+  "Hip thrust","Kettlebell goblet squat","Kettlebell deadlift","Kettlebell floor press",
+  "Kettlebell single-arm row","Kettlebell swings","Pull-up","Push-up","Dip",
+  "Romanian deadlift","Incline dumbbell press","Cable fly","Tricep pushdown",
+  "Bicep curl","Hammer curl","Lateral raise","Face pull","Plank","Deadlift",
+];
+
+// Goal options for the custom plan — drives rep ranges and progression rate
+const CUSTOM_GOALS = [
+  { id: "lose_fat",      label: "Lose fat",         sub: "Higher reps, shorter rest, steady progression",  icon: "🔥" },
+  { id: "build_muscle",  label: "Build muscle",      sub: "Moderate reps, progressive overload focus",      icon: "💪" },
+  { id: "build_strength",label: "Build strength",    sub: "Lower reps, heavier weight, longer rest",        icon: "🏋️" },
+  { id: "general_fitness",label: "General fitness",  sub: "Balanced — energy, health, and consistency",     icon: "⚡" },
+];
+
+// Rep range presets per goal — shown as default suggestion, member can override per exercise
+const GOAL_REP_RANGES = {
+  lose_fat:       { reps: 15, sets: 3, rest: 60  },
+  build_muscle:   { reps: 10, sets: 3, rest: 120 },
+  build_strength: { reps: 5,  sets: 4, rest: 180 },
+  general_fitness:{ reps: 12, sets: 3, rest: 90  },
+};
+
+function CustomPlanScreen() {
+  const { navigate, setUser, setPlan, user, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
+  const a = gymBranding.accent || "#00D4B1";
+  const ob = theme.ob;
+
+  const [step, setStep]         = useState(0); // 0=goal, 1=days, 2=exercises, 3=review
+  const [goal, setGoal]         = useState(null);
+  const [daysPerWeek, setDays]  = useState(3);
+  const [currentDay, setCurrentDay] = useState(0); // which day we're adding exercises for
+  const [dayExercises, setDayExercises] = useState([]); // exercises for the current day being built
+  const [allDays, setAllDays]   = useState([]); // [{dayLabel, exercises:[{name,sets,reps,weight}]}]
+  const [query, setQuery]       = useState("");
+  const [calories, setCalories] = useState("");
+  const [protein, setProtein]   = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  // Pending exercise being configured before adding to the day
+  const [pending, setPending]   = useState(null); // {name, sets, reps, weight}
+
+  const defaults = GOAL_REP_RANGES[goal] || GOAL_REP_RANGES.general_fitness;
+
+  // Filtered suggestions — hide already-added exercises for this day
+  const addedNames = dayExercises.map(e => e.name.toLowerCase());
+  const suggestions = query.length >= 2
+    ? CUSTOM_EX_SUGGESTIONS.filter(n => n.toLowerCase().includes(query.toLowerCase()) && !addedNames.includes(n.toLowerCase())).slice(0, 5)
+    : [];
+
+  function selectExercise(name) {
+    setPending({ name, sets: defaults.sets, reps: defaults.reps, weight: "" });
+    setQuery("");
+  }
+
+  function addPending() {
+    if (!pending || !pending.weight) return;
+    setDayExercises(prev => [...prev, { ...pending, weight: parseFloat(pending.weight) || 20 }]);
+    setPending(null);
+  }
+
+  function finishDay() {
+    if (dayExercises.length === 0) return;
+    const dayLabel = `Day ${currentDay + 1}`;
+    const newAll = [...allDays, { dayLabel, exercises: dayExercises }];
+    setAllDays(newAll);
+    setDayExercises([]);
+    setPending(null);
+    setQuery("");
+    if (currentDay + 1 < daysPerWeek) {
+      setCurrentDay(currentDay + 1);
+    } else {
+      setStep(3); // all days done — go to review/macros
+    }
+  }
+
+  async function savePlan() {
+    setSaving(true); setSaveError("");
+    // Build plan object in the same shape as buildPlan() so WorkoutScreen works unchanged
+    const repDefaults = GOAL_REP_RANGES[goal] || GOAL_REP_RANGES.general_fitness;
+    // Use exercises from day 1 as the active exercise list (same as AI plan — rotates by day)
+    const exercises = (allDays[0]?.exercises || []).map(e => ({
+      name: e.name, sets: e.sets, reps: e.reps, repMin: e.reps, repMax: e.reps + 2,
+      weight: e.weight, warmupSets: [], muscle: "", pattern: "custom",
+      rpe: 7, restSeconds: repDefaults.rest, weightIncrement: 2.5, usePyramid: false,
+    }));
+    const plan = {
+      calories: parseInt(calories) || null,
+      protein:  parseInt(protein)  || null,
+      carbs: null, fat: null,
+      weekNumber: 1, weekStartDate: new Date().toISOString().split("T")[0],
+      daysPerWeek, workoutType: "Custom", workoutDuration: 45,
+      restSeconds: repDefaults.rest,
+      customDays: allDays, // store all days for future rotation
+      isCustomPlan: true,  // flag so app knows this wasn't AI-generated
+      weeklyFocus: "Your plan, your rules. Keep showing up and the results will follow.",
+      tip: "Track every set. The data is what lets us push your weights forward each week.",
+      progressionRule: "Hit the top of your rep range two sessions in a row → add weight next session.",
+      warmup: [], cooldown: [], exercises,
+    };
+    const userData = { ...user, goal, daysPerWeek, isCustomPlan: true };
+    const uid = supabaseUserIdRef?.current || supabaseUser?.id;
+    if (uid) {
+      try { localStorage.setItem("mq_cached_plan_" + uid, JSON.stringify({ plan, user: userData })); } catch {}
+      const ok = await sb.upsertProfile(uid, userData, plan);
+      if (!ok) { setSaveError("Couldn't save — check your connection and try again."); setSaving(false); return; }
+    }
+    setUser(userData);
+    setPlan(plan);
+    navigate("plan");
+  }
+
+  const s = {
+    root: { background: ob.bg, minHeight: "100dvh", display: "flex", flexDirection: "column", fontFamily: ob.font, color: ob.white },
+    inner: { flex: 1, padding: "12px 16px", display: "flex", flexDirection: "column" },
+    hdr: { fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 },
+    title: { fontSize: 18, fontWeight: 700, color: ob.white, marginBottom: 4 },
+    sub: { fontSize: 12, color: ob.muted, marginBottom: 20 },
+    card: { background: ob.card, borderRadius: 12, padding: "10px 12px", marginBottom: 8 },
+    tealBtn: (dis) => ({ width: "100%", background: dis ? ob.card : a, color: dis ? ob.muted : ob.tealDk, border: "none", borderRadius: 10, padding: 11, fontSize: 13, fontWeight: 600, cursor: dis ? "default" : "pointer", fontFamily: ob.font, marginTop: 8 }),
+    input: { background: ob.card, border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 8, padding: "8px 10px", fontSize: 13, color: ob.white, outline: "none", fontFamily: ob.font, width: "100%" },
+    smallInput: { background: "#0F1922", border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 8, padding: "7px 8px", fontSize: 13, color: ob.white, outline: "none", fontFamily: ob.font, width: "100%", textAlign: "center" },
+  };
+
+  return (
+    <div style={s.root}>
+      {/* Header */}
+      <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <button onClick={() => step > 0 ? setStep(step - 1) : navigate("onboarding")}
+          style={{ background: "transparent", border: "none", color: ob.muted, fontSize: 20, cursor: "pointer", lineHeight: 1, padding: 0 }}>←</button>
+        <span style={{ fontSize: 13, fontWeight: 600, color: ob.white }}>Build your own plan</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step + 1} of 4</span>
+      </div>
+      {/* Progress bar */}
+      <div style={{ height: 3, background: ob.card, margin: "10px 16px 0", borderRadius: 2, flexShrink: 0 }}>
+        <div style={{ height: 3, background: a, borderRadius: 2, width: `${((step + 1) / 4) * 100}%`, transition: "width .4s ease" }} />
+      </div>
+
+      <div style={s.inner}>
+
+        {/* ── STEP 0: Goal ── */}
+        {step === 0 && <div className="mq-fade">
+          <div style={s.hdr}>Your goal</div>
+          <div style={s.title}>What are you training for?</div>
+          <div style={s.sub}>This sets your rep ranges and how aggressively we progress your weights.</div>
+          {CUSTOM_GOALS.map(g => (
+            <button key={g.id} onClick={() => { setGoal(g.id); setTimeout(() => setStep(1), 180); }}
+              style={{ background: goal === g.id ? ob.tealDk : ob.card, border: `1.5px solid ${goal === g.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", marginBottom: 8, width: "100%" }}>
+              <span style={{ fontSize: 24 }}>{g.icon}</span>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: goal === g.id ? a : ob.white }}>{g.label}</div>
+                <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>{g.sub}</div>
+              </div>
+              {goal === g.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+            </button>
+          ))}
+        </div>}
+
+        {/* ── STEP 1: Days per week ── */}
+        {step === 1 && <div className="mq-fade">
+          <div style={s.hdr}>Your schedule</div>
+          <div style={s.title}>How many days per week?</div>
+          <div style={s.sub}>You'll enter exercises for each training day.</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+            {[2,3,4,5,6].map(d => (
+              <button key={d} onClick={() => setDays(d)}
+                style={{ width: 52, height: 52, borderRadius: 12, background: daysPerWeek === d ? ob.tealDk : ob.card, border: `1.5px solid ${daysPerWeek === d ? a : "rgba(255,255,255,0.07)"}`, color: daysPerWeek === d ? a : ob.white, fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>
+                {d}
+              </button>
+            ))}
+          </div>
+          <div style={{ background: ob.card, borderRadius: 10, padding: "10px 12px", marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: ob.muted, lineHeight: 1.6 }}>
+              You'll enter your exercises for each of your <span style={{ color: ob.white, fontWeight: 600 }}>{daysPerWeek} training days</span> next. Takes about 2 minutes.
+            </div>
+          </div>
+          <button onClick={() => { setCurrentDay(0); setDayExercises([]); setAllDays([]); setStep(2); }} style={s.tealBtn(false)}>
+            Next — add exercises →
+          </button>
+        </div>}
+
+        {/* ── STEP 2: Exercises per day ── */}
+        {step === 2 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={s.hdr}>Day {currentDay + 1} of {daysPerWeek}</div>
+          <div style={s.title}>Add your exercises</div>
+          <div style={{ fontSize: 11, color: ob.muted, marginBottom: 12 }}>
+            Default: <span style={{ color: ob.white }}>{defaults.sets} sets × {defaults.reps} reps</span> based on your goal. Edit each exercise as needed.
+          </div>
+
+          {/* Already-added exercises for this day */}
+          {dayExercises.map((ex, i) => (
+            <div key={i} style={{ ...s.card, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>{ex.name}</div>
+                <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>{ex.sets} sets × {ex.reps} reps · {ex.weight} lbs</div>
+              </div>
+              <button onClick={() => setDayExercises(prev => prev.filter((_,j) => j !== i))}
+                style={{ background: "transparent", border: "none", color: ob.muted, fontSize: 16, cursor: "pointer" }}>✕</button>
+            </div>
+          ))}
+
+          {/* Pending exercise — configure before adding */}
+          {pending ? (
+            <div style={{ background: "#0A1A14", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 12, padding: "12px", marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: a, marginBottom: 10 }}>{pending.name}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+                {[["Sets", "sets"], ["Reps", "reps"], ["Weight (lbs)", "weight"]].map(([lbl, key]) => (
+                  <div key={key}>
+                    <div style={{ fontSize: 9, color: ob.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.8px" }}>{lbl}</div>
+                    <input type="number" value={pending[key]} onChange={e => setPending(p => ({ ...p, [key]: e.target.value }))}
+                      style={s.smallInput} placeholder={key === "weight" ? "e.g. 45" : ""} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 9, color: ob.muted, marginBottom: 8 }}>
+                We'll adjust this automatically as you progress each week.
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setPending(null)}
+                  style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: 8, fontSize: 12, color: ob.muted, cursor: "pointer", fontFamily: ob.font }}>
+                  Cancel
+                </button>
+                <button onClick={addPending} disabled={!pending.weight}
+                  style={{ flex: 2, background: pending.weight ? a : ob.card, color: pending.weight ? ob.tealDk : ob.muted, border: "none", borderRadius: 8, padding: 8, fontSize: 12, fontWeight: 600, cursor: pending.weight ? "pointer" : "default", fontFamily: ob.font }}>
+                  Add exercise ✓
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Search box */
+            <div style={{ marginBottom: 8 }}>
+              <input value={query} onChange={e => setQuery(e.target.value)}
+                placeholder="Search exercise name..." style={{ ...s.input, marginBottom: 4 }} autoComplete="off" />
+              {suggestions.map(name => (
+                <button key={name} onClick={() => selectExercise(name)}
+                  style={{ width: "100%", background: ob.card, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "8px 12px", textAlign: "left", fontSize: 12, color: ob.white, cursor: "pointer", fontFamily: ob.font, marginBottom: 3 }}>
+                  {name}
+                </button>
+              ))}
+              {/* Allow typing a custom name not in the list */}
+              {query.length >= 3 && suggestions.length === 0 && (
+                <button onClick={() => selectExercise(query.trim())}
+                  style={{ width: "100%", background: ob.tealDk, border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 8, padding: "8px 12px", textAlign: "left", fontSize: 12, color: a, cursor: "pointer", fontFamily: ob.font }}>
+                  Add "{query.trim()}" as a custom exercise
+                </button>
+              )}
+            </div>
+          )}
+
+          <div style={{ marginTop: "auto" }}>
+            {dayExercises.length > 0 && !pending && (
+              <button onClick={finishDay} style={s.tealBtn(false)}>
+                {currentDay + 1 < daysPerWeek ? `Done with Day ${currentDay + 1} → add Day ${currentDay + 2}` : "Review plan →"}
+              </button>
+            )}
+            {dayExercises.length === 0 && (
+              <div style={{ fontSize: 11, color: ob.muted, textAlign: "center", padding: 8 }}>
+                Search for an exercise above to get started
+              </div>
+            )}
+          </div>
+        </div>}
+
+        {/* ── STEP 3: Macros + review ── */}
+        {step === 3 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          <div style={s.hdr}>Almost done</div>
+          <div style={s.title}>Daily targets (optional)</div>
+          <div style={{ fontSize: 11, color: ob.muted, marginBottom: 14 }}>
+            If you track nutrition, add your targets. Skip if you don't — you can add them later in Profile.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+            {[["Daily calories", calories, setCalories, "e.g. 2200"], ["Protein (g/day)", protein, setProtein, "e.g. 160"]].map(([lbl, val, set, ph]) => (
+              <div key={lbl}>
+                <div style={{ fontSize: 10, color: ob.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.8px" }}>{lbl}</div>
+                <input type="number" value={val} onChange={e => set(e.target.value)} placeholder={ph} style={s.input} />
+              </div>
+            ))}
+          </div>
+
+          {/* Plan summary */}
+          <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Your plan</div>
+          {allDays.map((day, di) => (
+            <div key={di} style={s.card}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: ob.white, marginBottom: 6 }}>{day.dayLabel}</div>
+              {day.exercises.map((ex, ei) => (
+                <div key={ei} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderTop: ei > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <span style={{ fontSize: 11, color: ob.body }}>{ex.name}</span>
+                  <span style={{ fontSize: 10, color: ob.muted }}>{ex.sets}×{ex.reps} · {ex.weight} lbs</span>
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {saveError && <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8, textAlign: "center" }}>{saveError}</div>}
+          <button onClick={savePlan} disabled={saving} style={{ ...s.tealBtn(saving), marginTop: "auto" }}>
+            {saving ? "Saving..." : "Save my plan →"}
+          </button>
+        </div>}
+
+      </div>
+    </div>
+  );
+}
+
+export { WorkoutScreen, CustomPlanScreen };
 
 
