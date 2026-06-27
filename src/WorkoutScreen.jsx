@@ -330,6 +330,7 @@ function WorkoutScreen() {
   const [lastLoggedReps, setLastLoggedReps] = useState(null);
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [savedToCloud, setSavedToCloud] = useState(false);
+  const [isPR, setIsPR] = useState(false); // true when this set is a new personal record
   // "Last time" history — loaded from Supabase when exercise changes
   // null = loading, false = no history found, object = { weight, reps, date }
   const [lastSetHistory, setLastSetHistory] = useState(null);
@@ -512,6 +513,7 @@ function WorkoutScreen() {
   const nudgeAcceptedRef = useRef(false);
 
   function logSet(reps = currentTargetReps + 1) {
+    setIsPR(false); // reset before each set — new PR check will re-set if needed
     const entry = { exIdx, setIdx: safeSetIdx, reps, weight: currentWeight, kind: currentSpec.kind };
     const newLogs = [...loggedSets, entry];
     setLoggedSets(newLogs);
@@ -538,6 +540,13 @@ function WorkoutScreen() {
         setSavedToCloud(ok);
         if (ok) setTimeout(() => setSavedToCloud(false), 3000);
         else setSaveFailReason(typeof result === "string" ? result : "UNKNOWN");
+        // PR check: only for working sets (not warm-ups) with a real weight value
+        if (ok && currentSpec.kind !== "warmup" && currentWeight > 0) {
+          sb.getPersonalRecord(supabaseUser.id, ex.name).then(prevBest => {
+            // If no previous record exists OR current weight beats it → it's a PR
+            if (prevBest === null || currentWeight > prevBest) setIsPR(true);
+          }).catch(() => {});
+        }
       }).catch((e) => { setSavingToCloud(false); setSaveFailReason("THROW:" + (e?.message || e)); });
     }
 
@@ -988,6 +997,16 @@ function WorkoutScreen() {
 
           {/* Middle — the big info */}
           <div style={{ textAlign: "center", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            {/* PR celebration banner — only shown when member sets a new personal record */}
+            {isPR && !wasSkipped && (
+              <div style={{ background: "linear-gradient(135deg, #2D1A00, #1A2A00)", border: "1.5px solid #F59E0B", borderRadius: 14, padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+                <div style={{ fontSize: 28 }}>🏆</div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#F59E0B" }}>New personal record!</div>
+                  <div style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>{currentWeight} lbs on {ex.name}</div>
+                </div>
+              </div>
+            )}
             {/* Icon */}
             <div style={{ width: 110, height: 110, borderRadius: "50%", background: wasSkipped ? "#1A1A0A" : "#003D35", border: `3px solid ${wasSkipped ? theme.amber : a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 58, boxShadow: `0 0 50px ${wasSkipped ? "rgba(245,158,11,0.2)" : "rgba(0,212,177,0.3)"}` }}>
               {wasSkipped ? "→" : "✓"}
