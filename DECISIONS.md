@@ -17,8 +17,8 @@ Updated automatically at the end of every session. Never delete entries — appe
 - These are **situational (today only)** changes — they do not permanently alter the plan
 
 ### Decision: Two types of plan changes defined
-1. **Situational** — affects today's session only (injury, location, time constraint). Handled via AI chat.
-2. **Permanent** — changes goal, days per week, or equipment going forward. Preserves history and streak. To be built later.
+1. **Situational** — affects today's session only (injury, location, time constraint). Handled via AI chat. ✅ BUILT
+2. **Permanent** — changes goal, days per week, or equipment going forward. Preserves history and streak. To be built.
 
 ### Decision: Build-your-own workout path
 - Some members will arrive with their own existing routine and won't want AI-generated workouts
@@ -32,56 +32,27 @@ Updated automatically at the end of every session. Never delete entries — appe
 - **Long term requirement:** a proper `exercises` table with canonical names, muscle groups, equipment needed, and difficulty rating
 - **Decision:** use current JSON blob approach now, build the exercises library before scaling to multiple gyms or adding build-your-own-workout
 
-### Decision: Workout logs — ABSOLUTE TOP PRIORITY DATABASE BUILD ⭐
-- **Current state (gap):** every set logged is buried inside the plan JSON blob. There is no permanent per-set record.
-- **Problem this causes:** strength progression over time is fragile. If exercise names change or plan regenerates, history disconnects. Cannot build reliable progress charts per exercise.
-- **What the top 1% apps do (Strong, Whoop, Apple Fitness+):**
-  - Every single set is a permanent row in the database forever — no exceptions
-  - Personal records detected automatically ("new PR on bench press!")
-  - Full history graph for every exercise going back to day one
-  - Previous session's exact numbers auto-loaded before each set — member never has to think
-  - Advanced apps correlate strength with sleep, recovery, etc. — only possible because every data point is a permanent row
-- **What we need to build:**
-  - `workout_logs` table — one row per set, forever. Columns: date, user_id, exercise_name, weight, reps, set_number, workout_session_id
-  - `exercises` table — canonical exercise library. Columns: id, name, muscle_groups, equipment_needed, difficulty, is_custom
-  - `workout_sessions` table — one row per completed workout. Columns: id, user_id, date, duration_minutes, plan_day_name
-- **Target features once built:**
-  - "Last time you did this: 135lbs × 8 reps" shown automatically before each set
-  - Personal record detection and celebration
-  - Per-exercise strength chart on the Progress screen
-  - AI can say "your bench press has gone up 18lbs in 6 weeks" with real data
-- **Decision:** do not scale to multiple paying gyms until this is built. This is the foundation the whole product promise sits on.
-
----
-
-## Backlog — carried from previous sessions
-
-### Tier 1 — Next up
-1. ⭐ Workout logs database (see above — newly elevated to absolute top priority)
-2. In-workout AI adjustments via chat (situational swaps — injury, location, time)
-3. Plan editability — permanent changes without full re-onboarding
-4. AI coach note on home screen — needs real device testing
-5. Photo meal logging — needs real device testing
-
-### Tier 2 — Soon
-6. Build-your-own workout path
-7. Grocery list redesign — flexible food categories instead of hardcoded ingredients
-8. Weight chart — daily/weekly toggle
-
-### Tier 3 — Before any paid gyms go live
-9. Exercises library table (canonical names, muscle groups, equipment)
-10. Self-serve gym signup flow
-11. Billing integration (Stripe — Starter $99/mo + $2/active member, Growth $199/mo + $1.75, Scale $399/mo + $1.50, 14-day trial)
-12. hypergentiq.com domain — connect Cloudflare DNS to Vercel
+### Decision: Workout logs database — foundational infrastructure
+- Top 1% apps (Strong, Whoop, Apple Fitness+) store every single set as a permanent row forever
+- This enables: "Last time: 135lbs × 8 reps" before each set, PR detection, per-exercise progress charts, AI insights
+- **Tables created this session:** workout_logs (one row per set) and workout_sessions (one row per completed workout)
+- **Already wired:** every set logged in WorkoutScreen writes to workout_logs in Supabase
+- **Already live:** "Last time: X lbs × Y reps" display before each working set
+- **Still needed:** PR detection and celebration, per-exercise strength chart on Progress screen
+- **Still needed:** exercises library table for canonical names before scaling
 
 ---
 
 ## Standing technical decisions
 
-- **Single file rule:** everything in Morphiq.jsx until explicitly decided to split. Currently split into Morphiq.jsx, WorkoutScreen.jsx, MealScreen.jsx, GymOwnerDashboard.jsx
+- **File structure:** Morphiq.jsx (3,714 lines), WorkoutScreen.jsx (1,421 lines), MealScreen.jsx (585 lines), GymOwnerDashboard.jsx (separate)
+- **File size limit:** 3,800 lines soft cap, 4,000 hard limit — propose split if exceeded
 - **AI responses:** always 1–2 sentences max in UI. Always forward-looking, no guilt language.
 - **Meal log key:** morphiq_meals_v2_ (changed June 2026 — old key was morphiq_meals_)
 - **Billing model:** per active member only — members who logged at least one workout that month
 - **"Powered by Morphiq"** footer hardcoded on all member screens — cannot be removed by gym owner
-- **Tech stack:** React + Supabase + Claude API (claude-sonnet-4-20250514) + Vercel + Expo
+- **Tech stack:** React + Supabase + Claude API (claude-sonnet-4-6) + Vercel
+- **AI proxy endpoints:** /api/chat.js, /api/plan.js, /api/parse-meal.js, /api/ping.js, /api/coach-note.js, /api/photo-meal.js
+- **Foreign keys:** always use profiles.id not auth.users.id
+- **Supabase writes:** always fire-and-forget (.catch(() => {})) — a failed save must never crash the UI
 
