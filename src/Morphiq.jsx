@@ -207,25 +207,13 @@ const sb = {
         `${SUPABASE_URL}/rest/v1/profiles?supabase_user_id=eq.${encodeURIComponent(supabaseUserId)}&limit=1`,
         () => ({ headers: SB_GET() })
       );
-      // TEMP DIAGNOSTIC (June 2026) — stash the real outcome on a module-level var so
-      // callers (insertWorkoutLog etc.) can report the EXACT cause instead of a flat
-      // null. _lastProfileIdDebug is overwritten on every call — read it immediately
-      // after awaiting getProfileId, before any other sb call runs. Remove once fixed.
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        sb._lastProfileIdDebug = "HTTP_" + res.status;
-        console.error("[Morphiq] getProfileId: request failed", res.status, body);
-        return null;
-      }
+      if (!res.ok) return null;
       const rows = await res.json();
       if (!rows?.[0]?.id) {
-        sb._lastProfileIdDebug = "ZERO_ROWS";
         return null;
       }
-      sb._lastProfileIdDebug = "OK";
       return rows[0].id;
     } catch (e) {
-      sb._lastProfileIdDebug = "THROW_" + (e?.message || e);
       console.error("[Morphiq] getProfileId threw:", e);
       return null;
     }
@@ -271,14 +259,7 @@ const sb = {
         await new Promise(r => setTimeout(r, 1000));
         profileId = await this.getProfileId(supabaseUserId);
       }
-      // TEMP DIAGNOSTIC (June 2026) — workouts stuck on "Saving..." forever with no
-      // visible cause. Report WHY instead of a silent false so the failure reason
-      // shows up in the UI/console instead of disappearing. Remove once fixed.
-      if (!profileId) {
-        const why = sb._lastProfileIdDebug || "UNKNOWN";
-        console.error("[Morphiq] insertWorkoutLog: no profileId found for", supabaseUserId, "reason:", why);
-        return "NO_PROFILE_ID(" + why + ")";
-      }
+      if (!profileId) return false;
       const body = { user_id: profileId, exercise_name: exerciseName, set_number: setNumber, reps, weight, workout_date: localDateStr() };
       const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/workout_logs`, () => ({
         method: "POST",
