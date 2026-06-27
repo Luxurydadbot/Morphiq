@@ -3520,13 +3520,51 @@ function ProgressScreen() {
   );
 }
 
+const EQUIPMENT_OPTIONS = [
+  { id: "dumbbell",    label: "Dumbbells",         sub: "Home or gym — most common" },
+  { id: "barbell",     label: "Barbell & rack",     sub: "Full gym with squat rack" },
+  { id: "machine",     label: "Machines only",      sub: "Commercial gym machines" },
+  { id: "kettlebell",  label: "Kettlebells",         sub: "Home gym or functional fitness" },
+];
+
 function ProfileScreen() {
   const { navigate, user, setUser, plan, setPlan, gymBranding, signOut, supabaseUser } = useApp();
   const a = gymBranding.accent;
-  const [editGoal, setEditGoal] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState(user.goal || "lose_fat");
-  const goalLabel = GOAL_OPTIONS.find(g => g.id === selectedGoal)?.label || "Lose fat";
   const sL = theme.sL;
+
+  // Edit state for each editable field
+  const [editGoal, setEditGoal]         = useState(false);
+  const [editDays, setEditDays]         = useState(false);
+  const [editEquip, setEditEquip]       = useState(false);
+  const [saving, setSaving]             = useState(false);
+  const [savedMsg, setSavedMsg]         = useState("");
+
+  // Local selections — initialised from live data
+  const [selectedGoal,  setSelectedGoal]  = useState(user.goal || "lose_fat");
+  const [selectedDays,  setSelectedDays]  = useState(user.daysPerWeek || plan?.daysPerWeek || 3);
+  const [selectedEquip, setSelectedEquip] = useState(user.equipment || "dumbbell");
+
+  const goalLabel  = GOAL_OPTIONS.find(g => g.id === selectedGoal)?.label  || "Lose fat";
+  const equipLabel = EQUIPMENT_OPTIONS.find(e => e.id === selectedEquip)?.label || "Dumbbells";
+
+  // Shared save function — rebuilds plan from scratch, keeps all history/streaks untouched
+  async function saveChanges(newGoal, newDays, newEquip) {
+    setSaving(true);
+    const updatedUser = { ...user, goal: newGoal, daysPerWeek: newDays, equipment: newEquip };
+    const newPlan = buildPlan(updatedUser);
+    // Preserve week tracking so streak isn't lost
+    newPlan.weekNumber    = plan?.weekNumber    || 1;
+    newPlan.weekStartDate = plan?.weekStartDate || new Date().toISOString().split("T")[0];
+    setUser(updatedUser);
+    setPlan(newPlan);
+    // Fire-and-forget save to Supabase — never blocks the UI
+    if (supabaseUser?.id) {
+      sb.upsertProfile(supabaseUser.id, updatedUser, newPlan).catch(() => {});
+    }
+    setSaving(false);
+    setSavedMsg("Plan updated ✓");
+    setTimeout(() => setSavedMsg(""), 3000);
+  }
 
   const StatRow = ({ label, value, sub }) => (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
@@ -3535,6 +3573,19 @@ function ProfileScreen() {
         {sub && <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{sub}</div>}
       </div>
       <div style={{ fontSize: 13, fontWeight: 600, color: a }}>{value}</div>
+    </div>
+  );
+
+  const EditBtn = ({ onClick }) => (
+    <button onClick={onClick} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "5px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
+  );
+
+  const SaveCancelRow = ({ onSave, onCancel }) => (
+    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+      <button onClick={onCancel} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+      <button onClick={onSave} disabled={saving} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "8px", fontSize: 12, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+        {saving ? "Saving…" : "Save & rebuild plan"}
+      </button>
     </div>
   );
 
@@ -3556,36 +3607,103 @@ function ProfileScreen() {
           </div>
         </div>
 
-        {/* Goal card */}
+        {/* Saved confirmation banner */}
+        {savedMsg && (
+          <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.4)`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: a, textAlign: "center" }}>
+            {savedMsg}
+          </div>
+        )}
+
+        {/* ── Goal ── */}
         <div style={sL}>Your Goal</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           {!editGoal ? (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>{goalLabel}</div>
-                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{(plan?.workoutDays?.length || user.daysPerWeek || 3)} workouts/week · {user.fitnessLevel || "Beginner"}</div>
+                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{selectedDays} workouts/week</div>
               </div>
-              <button onClick={() => setEditGoal(true)} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "5px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
+              <EditBtn onClick={() => setEditGoal(true)} />
             </div>
           ) : (
             <div>
               <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Choose new goal:</div>
               {GOAL_OPTIONS.map(g => (
                 <button key={g.id} onClick={() => setSelectedGoal(g.id)}
-                  style={{ width: "100%", background: selectedGoal === g.id ? "#003D35" : "transparent", border: `1px solid ${selectedGoal === g.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "8px 10px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6, fontFamily: "inherit", textAlign: "left" }}>
-                  <span style={{ fontSize: 14 }}>{g.icon}</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: selectedGoal === g.id ? a : theme.text }}>{g.label}</span>
+                  style={{ width: "100%", background: selectedGoal === g.id ? "#003D35" : "transparent", border: `1px solid ${selectedGoal === g.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "9px 10px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6, fontFamily: "inherit", textAlign: "left" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: selectedGoal === g.id ? a : theme.text }}>{g.label}</span>
+                  {g.sub && <span style={{ fontSize: 11, color: theme.textDim, marginLeft: "auto" }}>{g.sub}</span>}
                 </button>
               ))}
-              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                <button onClick={() => setEditGoal(false)} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                <button onClick={() => setEditGoal(false)} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "8px", fontSize: 12, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit" }}>Save goal</button>
-              </div>
+              <SaveCancelRow
+                onCancel={() => { setEditGoal(false); setSelectedGoal(user.goal || "lose_fat"); }}
+                onSave={() => { setEditGoal(false); saveChanges(selectedGoal, selectedDays, selectedEquip); }}
+              />
             </div>
           )}
         </div>
 
-        {/* Body stats */}
+        {/* ── Days per week ── */}
+        <div style={sL}>Workouts per Week</div>
+        <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+          {!editDays ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>{selectedDays} days/week</div>
+                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>~{Math.round((plan?.exercises?.length || 5) * 8)} min per session</div>
+              </div>
+              <EditBtn onClick={() => setEditDays(true)} />
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>How many days per week?</div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+                {[2, 3, 4, 5].map(d => (
+                  <button key={d} onClick={() => setSelectedDays(d)}
+                    style={{ flex: 1, background: selectedDays === d ? "#003D35" : "transparent", border: `1px solid ${selectedDays === d ? a : "rgba(255,255,255,0.1)"}`, borderRadius: 10, padding: "10px 4px", fontSize: 16, fontWeight: 700, color: selectedDays === d ? a : theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: theme.textDim, textAlign: "center", marginBottom: 4 }}>days per week</div>
+              <SaveCancelRow
+                onCancel={() => { setEditDays(false); setSelectedDays(user.daysPerWeek || 3); }}
+                onSave={() => { setEditDays(false); saveChanges(selectedGoal, selectedDays, selectedEquip); }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ── Equipment ── */}
+        <div style={sL}>Equipment</div>
+        <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+          {!editEquip ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>{equipLabel}</div>
+                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{EQUIPMENT_OPTIONS.find(e => e.id === selectedEquip)?.sub || ""}</div>
+              </div>
+              <EditBtn onClick={() => setEditEquip(true)} />
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>What equipment do you have?</div>
+              {EQUIPMENT_OPTIONS.map(e => (
+                <button key={e.id} onClick={() => setSelectedEquip(e.id)}
+                  style={{ width: "100%", background: selectedEquip === e.id ? "#003D35" : "transparent", border: `1px solid ${selectedEquip === e.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "9px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", marginBottom: 6, fontFamily: "inherit" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: selectedEquip === e.id ? a : theme.text }}>{e.label}</span>
+                  <span style={{ fontSize: 11, color: theme.textDim }}>{e.sub}</span>
+                </button>
+              ))}
+              <SaveCancelRow
+                onCancel={() => { setEditEquip(false); setSelectedEquip(user.equipment || "dumbbell"); }}
+                onSave={() => { setEditEquip(false); saveChanges(selectedGoal, selectedDays, selectedEquip); }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Body stats — read-only */}
         <div style={sL}>Body Stats</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "0 14px", marginBottom: 16 }}>
           <StatRow label="Height" value={user.height || "5′ 10″"} />
@@ -3610,14 +3728,11 @@ function ProfileScreen() {
           ))}
         </div>
 
-        {/* Plan settings */}
-        <div style={sL}>Plan Settings</div>
+        {/* Injuries */}
+        <div style={sL}>Injuries / Notes</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
-          <StatRow label="Workouts per week" value={`${plan?.daysPerWeek || user.daysPerWeek || 3}×`} />
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 10 }}>
-            <StatRow label="Session length" value={`~${plan?.workoutDuration || 40} min`} />
-          </div>
-          <StatRow label="Injuries/notes" value={user.injuries || "None"} />
+          <div style={{ fontSize: 13, color: user.injuries ? theme.text : theme.textDim }}>{user.injuries || "None noted"}</div>
+          <div style={{ fontSize: 11, color: theme.textDim, marginTop: 4 }}>Tell the AI trainer in chat to update these</div>
         </div>
 
         {/* Danger zone */}
