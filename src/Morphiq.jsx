@@ -15,7 +15,7 @@ import {
   WEIGHT_DATA_MOCK, PERSONAL_BESTS,
   getFallbackReply, fetchAIReply,
   WeightChart, StreakCalendar, getWeekStreak,
-} from "./shared.js";
+} from "./shared.jsx";
 
 const useApp = () => useContext(AppContext);
 
