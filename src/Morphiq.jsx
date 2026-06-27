@@ -583,6 +583,33 @@ const sb = {
       return rows[0].weight;
     } catch { return null; }
   },
+
+  // Fetches max weight lifted per session date for one exercise — powers the strength chart.
+  // Returns array of { week: "Jun 3", weight: 30 } sorted oldest→newest, max 20 sessions.
+  async getExerciseHistory(supabaseUserId, exerciseName) {
+    try {
+      const profileId = await sb.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const url = `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${encodeURIComponent(exerciseName)}&set_number=gt.0&order=workout_date.asc&limit=200`;
+      const res = await fetch(url, { headers: SB_GET() });
+      if (!res.ok) return [];
+      const rows = await res.json();
+      if (!rows || rows.length === 0) return [];
+      // Group by date — take max weight per session
+      const byDate = {};
+      rows.forEach(r => {
+        if (!byDate[r.workout_date] || r.weight > byDate[r.workout_date]) {
+          byDate[r.workout_date] = r.weight;
+        }
+      });
+      return Object.entries(byDate)
+        .slice(-20)
+        .map(([date, weight]) => ({
+          week: new Date(date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          weight,
+        }));
+    } catch { return []; }
+  },
 };
 
 const theme = {
@@ -3149,6 +3176,9 @@ function ProgressScreen() {
   // Fetch fresh workout + weight data every time Progress screen opens.
   // Track loading so we show "..." instead of "—" while waiting.
   const [logsLoading, setLogsLoading] = useState(!historicalData);
+  const [selectedExercise, setSelectedExercise] = useState(null); // exercise name tapped for strength chart
+  const [exerciseHistory, setExerciseHistory] = useState([]);     // chart data for selected exercise
+  const [exerciseHistoryLoading, setExerciseHistoryLoading] = useState(false);
   useEffect(() => {
     if (!supabaseUser?.id) return;
     setLogsLoading(true);
@@ -3474,22 +3504,55 @@ function ProgressScreen() {
                 <>
                   <div style={sL}>Current bests</div>
                   <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
-                    {realPBs.map((pb, i) => (
-                      <div key={pb.exercise} style={{ padding:"11px 14px", borderBottom: i < realPBs.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
-                            <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>
-                              {pb.date ? new Date(pb.date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "—"}
+                    {realPBs.map((pb, i) => {
+                      const isOpen = selectedExercise === pb.exercise;
+                      return (
+                        <div key={pb.exercise}>
+                          {/* Tappable row — tap to expand/collapse strength chart */}
+                          <div
+                            onClick={() => {
+                              if (isOpen) { setSelectedExercise(null); return; }
+                              setSelectedExercise(pb.exercise);
+                              setExerciseHistory([]);
+                              setExerciseHistoryLoading(true);
+                              sb.getExerciseHistory(supabaseUser.id, pb.exercise)
+                                .then(data => { setExerciseHistory(data); setExerciseHistoryLoading(false); })
+                                .catch(() => setExerciseHistoryLoading(false));
+                            }}
+                            style={{ padding:"11px 14px", borderBottom: (!isOpen && i < realPBs.length-1) ? "1px solid rgba(255,255,255,0.04)" : "none", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}
+                          >
+                            <div>
+                              <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
+                              <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>
+                                {pb.date ? new Date(pb.date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "—"}
+                              </div>
+                            </div>
+                            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                              <div style={{ textAlign:"right" }}>
+                                <div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div>
+                                <div style={{ fontSize:11, color:"#6B7A8D" }}>{pb.reps} reps</div>
+                              </div>
+                              <div style={{ fontSize:14, color:"#6B7A8D", transition:"transform .2s", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</div>
                             </div>
                           </div>
-                          <div style={{ textAlign:"right" }}>
-                            <div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div>
-                            <div style={{ fontSize:11, color:"#6B7A8D" }}>{pb.reps} reps</div>
-                          </div>
+                          {/* Inline strength chart — shown when this exercise is selected */}
+                          {isOpen && (
+                            <div className="mq-fade" style={{ background:"#0A1628", borderTop:"1px solid rgba(255,255,255,0.04)", padding:"12px 14px 14px", borderBottom: i < realPBs.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                              <div style={{ fontSize:10, color:a, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Strength over time</div>
+                              {exerciseHistoryLoading ? (
+                                <div style={{ display:"flex", justifyContent:"center", padding:"12px 0" }}><Spinner size={20} color={a} /></div>
+                              ) : exerciseHistory.length < 2 ? (
+                                <div style={{ fontSize:12, color:"#6B7A8D", textAlign:"center", padding:"10px 0" }}>
+                                  {exerciseHistory.length === 1 ? "Log one more session to see your trend" : "No history found for this exercise"}
+                                </div>
+                              ) : (
+                                <WeightChart data={exerciseHistory} accent={a} />
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
