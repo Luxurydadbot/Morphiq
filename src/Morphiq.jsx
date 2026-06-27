@@ -1,8 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
-import { WorkoutScreen } from "./WorkoutScreen.jsx";
-import { MealPlanScreen } from "./MealScreen.jsx";
-import { GymOwnerDashboard, PricingScreen } from "./GymOwnerDashboard.jsx";
-import { ProgressScreen, ProfileScreen, LoadingScreen, NetworkErrorScreen } from "./ProgressScreen.jsx";
+
 
 const SUPABASE_URL  = "https://uvnyjegmhsztdednjclb.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04";
@@ -1607,7 +1604,9 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 // ── Shared exports for child screen files ───────────────────────────────────
 export { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, getAuthToken, theme,
-         MEAL_DATA, GROCERY_DATA, WORKOUT_EXERCISES, localDateStr, GOAL_OPTIONS, buildPlan };
+         MEAL_DATA, GROCERY_DATA, WORKOUT_EXERCISES, localDateStr, GOAL_OPTIONS, buildPlan,
+         AuthScreen, OnboardingScreen, PlanOverviewScreen, HomeDashboardScreen, ChatScreen,
+         AppProvider, css };
 
 function AuthScreen() {
   const { signIn, gymBranding } = useApp();
@@ -3051,48 +3050,5 @@ function ChatScreen({ fromScreen = "home" }) {
     </div>
   );
 }
-
-const WEIGHT_DATA_MOCK = [{week:"W1",weight:187.0},{week:"W2",weight:185.5},{week:"W3",weight:184.2},{week:"W4",weight:183.0},{week:"W5",weight:182.1},{week:"W6",weight:181.4}];
-
-
-
-function AppRouter() {
-  const { screen } = useApp();
-  if (screen === "auth") return <AuthScreen />;
-  if (screen === "network_error") return <NetworkErrorScreen />;
-  if (screen === "loading") return <LoadingScreen />;
-  if (screen === "onboarding") return <OnboardingScreen />;
-  if (screen === "plan") return <PlanOverviewScreen />;
-  if (screen === "workout") return <WorkoutScreen />;
-  if (screen === "meals") return <MealPlanScreen />;
-  if (screen === "progress") return <ProgressScreen />;
-  if (screen === "profile") return <ProfileScreen />;
-  if (screen === "owner") return <GymOwnerDashboard />;
-  if (screen === "chat") return <ChatScreen fromScreen="home" />;
-  if (screen === "chat_workout") return <ChatScreen fromScreen="workout" />;
-  if (screen === "chat_meals") return <ChatScreen fromScreen="meals" />;
-  if (screen === "pricing") return <PricingScreen />;
-  return <HomeDashboardScreen />;
-}
-
-export default function Morphiq() {
-  return (
-    <>
-      <style>{css}</style>
-      <AppProvider>
-        <div className="mq-shell">
-          <AppRouter />
-        </div>
-      </AppProvider>
-    </>
-  );
-}
-
-
-
-
-
-
-
 
 
