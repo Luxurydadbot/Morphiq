@@ -2842,13 +2842,10 @@ function ChatScreen({ fromScreen = "home" }) {
       setThinking(false);
       setMessages(prev => [...prev, { id: Date.now() + 1, role: "ai", text: reply }]);
       if (chips?.length) setDynamicChips(chips);
-      // Action handling — swap exercise or adjust meal
+      // Action handling — wire AI decisions to live workout screen
       if (action?.type === "swap_exercise") {
-        // Store the swap in shared context. WorkoutScreen watches this and
-        // calls doSwap() automatically, then clears it. This wires the AI
-        // chat action to the live workout screen without prop drilling.
-        // workoutContext has the current exercise's stats so the new exercise
-        // starts with sensible defaults (slightly lighter weight to be safe).
+        // Single exercise swap — WorkoutScreen watches pendingAISwap and
+        // calls doSwap() automatically, then clears it.
         setPendingAISwap({
           name: action.to,
           muscle: action.muscle || "",
@@ -2857,6 +2854,28 @@ function ChatScreen({ fromScreen = "home" }) {
           weight: workoutContext?.weight ? Math.round(workoutContext.weight * 0.85) : 20,
           rpe: 7,
           alternative: null,
+        });
+      } else if (action?.type === "swap_remaining") {
+        // Injury affecting multiple exercises — swap all remaining exercises
+        // that load the injured area. Store as special pendingAISwap with
+        // type so WorkoutScreen knows to apply it across multiple exercises.
+        setPendingAISwap({
+          _bulk: true,
+          _type: "injury",
+          area: action.area, // "back" | "knee" | "shoulder" | "wrist"
+        });
+      } else if (action?.type === "bodyweight_mode") {
+        // "I'm at home today" — swap all remaining exercises to bodyweight
+        setPendingAISwap({
+          _bulk: true,
+          _type: "bodyweight",
+        });
+      } else if (action?.type === "trim_workout") {
+        // "Only have 15 minutes" — trim remaining sets
+        setPendingAISwap({
+          _bulk: true,
+          _type: "trim",
+          minutes: action.minutes,
         });
       }
     } catch (err) {
