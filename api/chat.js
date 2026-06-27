@@ -180,7 +180,12 @@ STRICT RULES:
 5. Only ask a follow-up question if you truly cannot answer without it — one question max, at the end.
 6. Keep replies to 2-3 sentences max. Use their first name. No guilt language. Be warm and direct.
 7. If live workout context is present, reference the specific exercise and set number.
-8. EXERCISE SWAP RULE: When recommending a swap, the replacement MUST follow the equipment rules above — if the member has a barbell gym, give a barbell alternative. If they have dumbbells only, give a dumbbell alternative. NEVER suggest an exercise the member cannot perform with their available equipment. At the END of your reply include exactly this tag: <!--ACTION:swap_exercise:REPLACEMENT_EXERCISE_NAME--> replacing REPLACEMENT_EXERCISE_NAME with the actual exercise name (e.g. "Barbell Front Squat", "Leg Press", "Dumbbell Romanian Deadlift"). Only add this tag when recommending a swap.
+8. EXERCISE SWAP RULES — read carefully, only ONE tag per reply:
+   a) SINGLE SWAP (one exercise hurts or member wants to swap current exercise): <!--ACTION:swap_exercise:REPLACEMENT_NAME-->
+   b) INJURY AFFECTING MULTIPLE EXERCISES (e.g. "my back hurts", "knee is sore"): <!--ACTION:swap_remaining:INJURY_AREA--> where INJURY_AREA is one of: back, knee, shoulder, wrist. This swaps ALL remaining exercises that load that area.
+   c) BODYWEIGHT ONLY TODAY (e.g. "I'm at home", "no equipment today", "only bodyweight"): <!--ACTION:bodyweight_mode--> This swaps ALL remaining exercises to bodyweight alternatives.
+   d) SHORT ON TIME (e.g. "only have 15 minutes", "need to be quick"): <!--ACTION:trim_workout:MINUTES--> where MINUTES is the number available (e.g. 15, 20).
+   For ALL swaps: replacements MUST follow the equipment rules above. NEVER suggest an exercise the member cannot perform.
 
 After every reply add: <!--CHIPS:["short followup 1","short followup 2","short followup 3"]-->`;
 
@@ -203,13 +208,23 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
     let chips = [];
     let action = null;
 
-    // Parse swap action tag from Claude's response
-    const actionMatch = text.match(/<!--ACTION:swap_exercise:([^-]+?)-->/);
-    if (actionMatch) {
-      const exerciseName = actionMatch[1].trim();
-      action = { type: "swap_exercise", to: exerciseName };
-      text = text.replace(/<!--ACTION:swap_exercise:[^-]+?-->/g, "").trim();
+    // Parse action tags from Claude's response — only one will be present per reply
+    const swapMatch    = text.match(/<!--ACTION:swap_exercise:([^-]+?)-->/);
+    const injuryMatch  = text.match(/<!--ACTION:swap_remaining:([^-]+?)-->/);
+    const bwMatch      = text.match(/<!--ACTION:bodyweight_mode-->/);
+    const trimMatch    = text.match(/<!--ACTION:trim_workout:(\d+)-->/);
+
+    if (swapMatch) {
+      action = { type: "swap_exercise", to: swapMatch[1].trim() };
+    } else if (injuryMatch) {
+      action = { type: "swap_remaining", area: injuryMatch[1].trim().toLowerCase() };
+    } else if (bwMatch) {
+      action = { type: "bodyweight_mode" };
+    } else if (trimMatch) {
+      action = { type: "trim_workout", minutes: parseInt(trimMatch[1]) };
     }
+    // Strip all action tags from displayed text
+    text = text.replace(/<!--ACTION:[^>]+?-->/g, "").trim();
 
     const chipsMatch = text.match(/<!--CHIPS:(.*?)-->/s);
     if (chipsMatch) {
