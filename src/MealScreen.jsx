@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useApp, sb, Pill, Spinner, VoiceBtn, Layout, theme, GROCERY_DATA, localDateStr } from "./shared.js";
+import { useApp, sb, Pill, Spinner, VoiceBtn, Layout, theme, GROCERY_DATA, localDateStr } from "./shared.jsx";
 
 // ─── MacroBar ────────────────────────────────────────────────────────────────
 function MacroBar({ label, current, goal, color }) {
