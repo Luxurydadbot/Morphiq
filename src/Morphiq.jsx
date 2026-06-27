@@ -307,6 +307,24 @@ const sb = {
     } catch { return []; }
   },
 
+  // Fetch the most recent WORKING set for a specific exercise (excludes warm-ups tagged set_number=0).
+  // Used to show "Last time: X lbs × Y reps" before each set.
+  // Returns { weight, reps, date } or null if no history found.
+  async getLastSetForExercise(supabaseUserId, exerciseName) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return null;
+      const name = encodeURIComponent(exerciseName);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${name}&set_number=gt.0&order=logged_at.desc&limit=1`,
+        { headers: SB_GET() }
+      );
+      const rows = await res.json();
+      if (!rows || rows.length === 0) return null;
+      return { weight: rows[0].weight, reps: rows[0].reps, date: rows[0].workout_date };
+    } catch { return null; }
+  },
+
   // ── MEAL LOGS ─────────────────────────────────────────────────────────────
   async insertMealLog(supabaseUserId, { mealId, status, loggedName, loggedCal, loggedProtein, loggedCarbs, loggedFat }) {
     try {
