@@ -8,6 +8,7 @@ import { ChatScreen } from "./ChatScreen.jsx";
 import {
   sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY,
   localDateStr, buildPlan, progressPlan,
+  SUPABASE_URL, SB_GET, getAuthToken,
   MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout,
   GOAL_OPTIONS, GOAL_ICONS, EQUIPMENT_OPTIONS,
   WORKOUT_EXERCISES, MEAL_DATA, GROCERY_DATA,
