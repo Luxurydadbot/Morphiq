@@ -4,7 +4,7 @@ import {
   GOAL_OPTIONS, GOAL_ICONS,
   Pill, Spinner,
   buildPlan,
-} from "./shared.js";
+} from "./shared.jsx";
 
 function OnboardingScreen() {
   const { navigate, setUser, setPlan, plan, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
