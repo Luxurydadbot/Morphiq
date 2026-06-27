@@ -2415,19 +2415,14 @@ const CHAT_SUGGESTIONS = {
 function HomeDashboardScreen() {
   const { navigate, user, plan, gymBranding, historicalData, supabaseUser } = useApp();
   const a = gymBranding.accent;
-  // Read today's logged calories from MealScreen's localStorage (same key, same format)
+  // Read today's logged calories from MealScreen's localStorage (new v2 flat-entry format)
   const calGoal = plan?.calories || 1800;
-  const todayNutritionKey = `morphiq_meals_${supabaseUser?.id || user?.id || "anon"}_${localDateStr()}`;
+  const todayNutritionKey = `morphiq_meals_v2_${supabaseUser?.id || user?.id || "anon"}_${localDateStr()}`;
   const todayNutritionCals = (() => {
     try {
       const saved = JSON.parse(localStorage.getItem(todayNutritionKey) || "[]");
-      return saved.reduce((sum, m) => {
-        if (m.status === "done" || m.status === "swapped") {
-          const cal = m.loggedCal ?? m.suggested?.cal ?? 0;
-          return sum + cal;
-        }
-        return sum;
-      }, 0);
+      // v2 format: flat array of {id, name, cal, protein, carbs, fat, loggedAt}
+      return saved.reduce((sum, e) => sum + (e.cal || 0), 0);
     } catch { return 0; }
   })();
   const cals = todayNutritionCals;
@@ -2435,31 +2430,14 @@ function HomeDashboardScreen() {
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   const sL = theme.sL;
 
-  // Find the next upcoming meal — reads localStorage (same source as MealScreen)
-  // so we show the real meal name and real macros, not hardcoded text
+  // With the new freeform meal log, there are no fixed meal slots.
+  // nextMeal is simplified — just a nudge to log food if nothing logged yet.
   const nextMeal = (() => {
-    // Default meals built from the plan's macros (same split as MealScreen)
-    const cal = plan?.calories || 1800;
-    const pro = plan?.protein  || 140;
-    const r = (n) => Math.round(n);
-    const defaultMeals = [
-      { id: "breakfast", label: "Breakfast", name: "Greek yogurt, berries & granola", cal: r(cal*0.22), protein: r(pro*0.22) },
-      { id: "lunch",     label: "Lunch",     name: "Grilled chicken wrap with salad", cal: r(cal*0.30), protein: r(pro*0.30) },
-      { id: "snack",     label: "Snack",     name: "Protein shake + banana",          cal: r(cal*0.14), protein: r(pro*0.14) },
-      { id: "dinner",    label: "Dinner",    name: "Salmon fillet with roasted veg",  cal: r(cal*0.34), protein: r(pro*0.34) },
-    ];
     try {
       const saved = JSON.parse(localStorage.getItem(todayNutritionKey) || "[]");
-      // Merge saved status onto defaults
-      const merged = defaultMeals.map(m => {
-        const s = saved.find(sm => sm.id === m.id);
-        return s ? { ...m, status: s.status } : { ...m, status: "upcoming" };
-      });
-      // Return the first meal that hasn't been logged, swapped, or skipped
-      return merged.find(m => m.status === "upcoming") || null;
-    } catch {
-      return defaultMeals.find(m => h < 10) || defaultMeals[1]; // fallback by time of day
-    }
+      if (saved.length === 0) return { label: "Food log", name: "Nothing logged yet — tap Meals to add", cal: 0, protein: 0 };
+      return null; // already logging — no nudge needed
+    } catch { return null; }
   })();
 
   // Weekly workout queue — resets every Monday, stored in localStorage
