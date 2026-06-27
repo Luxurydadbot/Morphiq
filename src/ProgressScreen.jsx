@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useApp, sb, Pill, Spinner, Layout, theme, localDateStr } from "./Morphiq.jsx";
+import { useApp, sb, Spinner, Layout, theme, GOAL_OPTIONS, buildPlan } from "./Morphiq.jsx";
 
 const PERSONAL_BESTS = [{exercise:"Goblet Squat",weight:"35 lbs",reps:13,date:"May 14"},{exercise:"Dumbbell Bench Press",weight:"35 lbs",reps:11,date:"May 12"},{exercise:"Seated Cable Row",weight:"95 lbs",reps:12,date:"May 14"},{exercise:"Romanian Deadlift",weight:"75 lbs",reps:10,date:"May 9"}];
 
