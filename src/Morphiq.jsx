@@ -586,6 +586,23 @@ const sb = {
     const failed = results.length - sent;
     return { sent, failed };
   },
+
+  // Returns the highest weight ever logged for an exercise by this user BEFORE today,
+  // so we can detect personal records when a set is saved. Returns null if no history.
+  // Only looks at working sets (set_number > 0) to exclude warm-ups from PR tracking.
+  async getPersonalRecord(supabaseUserId, exerciseName) {
+    try {
+      const profileId = await sb.getProfileId(supabaseUserId);
+      if (!profileId) return null;
+      const today = localDateStr();
+      const url = `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${encodeURIComponent(exerciseName)}&set_number=gt.0&workout_date=lt.${today}&order=weight.desc&limit=1`;
+      const res = await fetch(url, { headers: SB_GET() });
+      if (!res.ok) return null;
+      const rows = await res.json();
+      if (!rows || rows.length === 0) return null;
+      return rows[0].weight; // highest weight before today
+    } catch { return null; }
+  },
 };
 
 const theme = {
