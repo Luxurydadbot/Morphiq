@@ -121,19 +121,56 @@ function ChatScreen({ fromScreen = "home" }) {
   }
 
   function startVoice() {
-    setVoicePhase("listening");
-    timerRef.current = setTimeout(() => {
-      setVoiceText(defaultChips[Math.floor(Math.random() * defaultChips.length)]);
+    // Use real Web Speech API — works in Chrome on Android
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      // Fallback: just go idle so they can type instead
+      setVoicePhase("idle");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    timerRef.current = recognition;
+
+    recognition.onstart = () => setVoicePhase("listening");
+
+    recognition.onresult = (event) => {
+      const heard = event.results[0][0].transcript;
+      setVoiceText(heard);
       setVoicePhase("heard");
-    }, 2000);
+    };
+
+    recognition.onerror = () => {
+      // Quietly go back to idle so they can try again or type
+      setVoicePhase("idle");
+      setVoiceText("");
+    };
+
+    recognition.onend = () => {
+      // If still listening (no result came), go idle
+      setVoicePhase(prev => prev === "listening" ? "idle" : prev);
+    };
+
+    recognition.start();
   }
+
   function cancelVoice() {
-    clearTimeout(timerRef.current);
+    // Stop recognition if running
+    if (timerRef.current && typeof timerRef.current.abort === "function") {
+      timerRef.current.abort();
+    }
+    timerRef.current = null;
     setVoicePhase("idle");
     setVoiceText("");
   }
   function confirmVoice() { sendMessage(voiceText); }
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  useEffect(() => () => {
+    if (timerRef.current && typeof timerRef.current.abort === "function") {
+      timerRef.current.abort();
+    }
+  }, []);
 
   // Build a detailed context string — if we have live workout context, use it
   const ctxBase = { home: "Dashboard", workout: "Mid-workout", meals: "Meal plan", chat: "Dashboard" }[fromScreen] || "Dashboard";
