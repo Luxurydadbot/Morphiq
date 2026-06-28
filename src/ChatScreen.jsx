@@ -121,56 +121,41 @@ function ChatScreen({ fromScreen = "home" }) {
   }
 
   function startVoice() {
-    // Use real Web Speech API — works in Chrome on Android
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      // Fallback: just go idle so they can type instead
-      setVoicePhase("idle");
+      // No mic support — focus the text input so they can type instead
+      const inp = document.querySelector("input[placeholder='Ask anything...']");
+      if (inp) inp.focus();
       return;
     }
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    timerRef.current = recognition;
-
-    recognition.onstart = () => setVoicePhase("listening");
-
-    recognition.onresult = (event) => {
-      const heard = event.results[0][0].transcript;
+    setVoicePhase("listening");
+    setVoiceText("");
+    const rec = new SpeechRecognition();
+    rec.lang = "en-US";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+      const heard = e.results[0][0].transcript.trim();
       setVoiceText(heard);
       setVoicePhase("heard");
     };
-
-    recognition.onerror = () => {
-      // Quietly go back to idle so they can try again or type
+    rec.onerror = () => {
       setVoicePhase("idle");
       setVoiceText("");
     };
-
-    recognition.onend = () => {
-      // If still listening (no result came), go idle
+    rec.onend = () => {
+      // onresult fires before onend — only reset if no result came through
       setVoicePhase(prev => prev === "listening" ? "idle" : prev);
     };
-
-    recognition.start();
+    rec.start();
   }
 
   function cancelVoice() {
-    // Stop recognition if running
-    if (timerRef.current && typeof timerRef.current.abort === "function") {
-      timerRef.current.abort();
-    }
-    timerRef.current = null;
     setVoicePhase("idle");
     setVoiceText("");
   }
   function confirmVoice() { sendMessage(voiceText); }
-  useEffect(() => () => {
-    if (timerRef.current && typeof timerRef.current.abort === "function") {
-      timerRef.current.abort();
-    }
-  }, []);
+  useEffect(() => () => {}, []);
 
   // Build a detailed context string — if we have live workout context, use it
   const ctxBase = { home: "Dashboard", workout: "Mid-workout", meals: "Meal plan", chat: "Dashboard" }[fromScreen] || "Dashboard";
