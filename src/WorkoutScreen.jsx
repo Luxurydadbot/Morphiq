@@ -611,7 +611,7 @@ function WorkoutScreen() {
     setShowSwapSheet(false);
     // Show a brief "Swapped in X ✓" confirmation banner for 2.5 seconds
     setSwapConfirmName(alt.name);
-    setTimeout(() => setSwapConfirmName(null), 2500);
+    setTimeout(() => setSwapConfirmName(null), 5000);
   }
 
   // Muscle groups that load each injury area.
@@ -703,6 +703,13 @@ function WorkoutScreen() {
     setNudgedWeight(null);
     setRepCount(null);
     setPendingAISwap(null);
+    // Show confirmation banner so member knows the AI swap happened
+    const swapLabel = _type === "injury" ? `${area} exercises swapped out`
+      : _type === "bodyweight" ? "Switched to bodyweight"
+      : _type === "trim" ? `Workout trimmed to ~${minutes} min`
+      : "Exercises updated";
+    setSwapConfirmName(swapLabel);
+    setTimeout(() => setSwapConfirmName(null), 5000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAISwap]);
 
@@ -1284,7 +1291,7 @@ function WorkoutScreen() {
           <button onClick={() => { logSet(0); }}
             style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
           <button onClick={() => setShowSwapSheet(true)}
-            style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Swap exercise</button>
+            style={{ flex: 1, background: "rgba(0,212,177,0.06)", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: a, cursor: "pointer", fontFamily: "inherit" }}>⇄ Swap</button>
           <button onClick={() => logSet(displayReps)}
             style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px 6px", fontSize: 12, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Log {displayReps} reps ✓</button>
         </div>
