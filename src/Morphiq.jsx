@@ -698,6 +698,33 @@ function HomeDashboardScreen() {
     return `${g}, ${user.name || "there"}.`;
   });
   const [coachLoading, setCoachLoading] = useState(false);
+
+  function refreshCoachNote() {
+    // Clear today's cache and fetch a fresh message
+    try { localStorage.removeItem(coachNoteKey); } catch {}
+    setCoachLoading(true);
+    fetch("/api/coach-note", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: user.name,
+        goal: user.goal,
+        weeklyDone, weeklyTarget, streak, totalWorkouts,
+        weightChange, lastSession, weekNumber: weekNum, allDone,
+        seed: Math.floor(Math.random() * 10000),
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.note) {
+          setCoachMsg(data.note);
+          try { localStorage.setItem(coachNoteKey, data.note); } catch {}
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCoachLoading(false));
+  }
+
   useEffect(() => {
     // If we already have today's cached note, nothing to do
     try {
@@ -719,6 +746,7 @@ function HomeDashboardScreen() {
         lastSession,
         weekNumber: weekNum,
         allDone,
+        seed: Math.floor(Math.random() * 10000),
       }),
     })
       .then(r => r.json())
@@ -753,7 +781,12 @@ function HomeDashboardScreen() {
       <div style={{ margin: "1.5rem 1.25rem 0", background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem 1.25rem", display: "flex", gap: 12, alignItems: "flex-start" }}>
         <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A2E2B", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🤖</div>
         <div>
-          <div style={{ fontSize: 12, color: a, fontWeight: 500, marginBottom: 4 }}>Your coach</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+            <div style={{ fontSize: 12, color: a, fontWeight: 500 }}>Your coach</div>
+            <button onClick={refreshCoachNote} disabled={coachLoading}
+              style={{ background: "none", border: "none", cursor: coachLoading ? "default" : "pointer", fontSize: 13, color: coachLoading ? "transparent" : "#6B7A8D", padding: 0, lineHeight: 1 }}
+              title="Get a new message">↺</button>
+          </div>
           <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{coachLoading ? "..." : coachMsg}</div>
         </div>
       </div>
