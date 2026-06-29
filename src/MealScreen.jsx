@@ -408,6 +408,117 @@ function todayMealKey(userId) {
   return `morphiq_meals_v2_${userId || "anon"}_${localDateStr()}`;
 }
 
+
+// ─── WaterTracker ─────────────────────────────────────────────────────────────
+function WaterTracker({ userId }) {
+  const { gymBranding, plan } = useApp();
+  const a = gymBranding.accent;
+  const WATER_GOAL_OZ = 64; // 8 glasses = 64oz
+  const QUICK_AMOUNTS = [8, 16, 24];
+
+  const waterKey = `morphiq_water_${userId || "anon"}_${localDateStr()}`;
+
+  const [oz, setOz] = useState(() => {
+    try { return parseInt(localStorage.getItem(waterKey) || "0", 10); } catch { return 0; }
+  });
+  const [customInput, setCustomInput] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+  const [justAdded, setJustAdded] = useState(null); // brief "+Xoz" flash
+
+  function addWater(amount) {
+    const next = Math.min(oz + amount, 999);
+    setOz(next);
+    try { localStorage.setItem(waterKey, String(next)); } catch {}
+    setJustAdded(`+${amount}oz`);
+    setTimeout(() => setJustAdded(null), 1500);
+  }
+
+  function submitCustom() {
+    const val = parseInt(customInput, 10);
+    if (val > 0 && val < 200) {
+      addWater(val);
+      setCustomInput("");
+      setShowCustom(false);
+    }
+  }
+
+  function removeWater(amount) {
+    const next = Math.max(0, oz - amount);
+    setOz(next);
+    try { localStorage.setItem(waterKey, String(next)); } catch {}
+  }
+
+  const pct = Math.min(100, Math.round((oz / WATER_GOAL_OZ) * 100));
+  const glasses = Math.floor(oz / 8);
+  const goalGlasses = WATER_GOAL_OZ / 8;
+  const done = oz >= WATER_GOAL_OZ;
+
+  return (
+    <div style={{ background: "#0D1E35", border: `1px solid ${done ? "rgba(0,212,177,0.4)" : "rgba(96,165,250,0.25)"}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
+      {/* Header row */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2C12 2 5 10 5 15a7 7 0 0 0 14 0c0-5-7-13-7-13z" fill="rgba(96,165,250,0.3)" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Water</div>
+          {done && <div style={{ fontSize: 10, background: "rgba(0,212,177,0.15)", color: a, borderRadius: 6, padding: "2px 7px", fontWeight: 600 }}>Goal hit ✓</div>}
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: done ? a : "#60A5FA" }}>{glasses}</span>
+          <span style={{ fontSize: 12, color: "#6B7A8D" }}>/{goalGlasses} glasses</span>
+          {justAdded && (
+            <div style={{ fontSize: 11, color: a, fontWeight: 600, animation: "mqFadeOut 1.5s forwards" }}>{justAdded}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ height: 6, background: "#0F1922", borderRadius: 3, marginBottom: 12 }}>
+        <div style={{ height: 6, borderRadius: 3, background: done ? a : "#60A5FA", width: `${pct}%`, transition: "width .4s" }} />
+      </div>
+
+      {/* Quick add buttons */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        {QUICK_AMOUNTS.map(amt => (
+          <button key={amt} onClick={() => addWater(amt)}
+            style={{ flex: 1, background: "#111827", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 9, padding: "8px 4px", fontSize: 12, fontWeight: 600, color: "#60A5FA", cursor: "pointer", fontFamily: "inherit" }}>
+            +{amt}oz
+          </button>
+        ))}
+        <button onClick={() => setShowCustom(!showCustom)}
+          style={{ flex: 1, background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, padding: "8px 4px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>
+          Custom
+        </button>
+        {oz > 0 && (
+          <button onClick={() => removeWater(8)}
+            style={{ background: "none", border: "none", fontSize: 16, color: "#6B7A8D", cursor: "pointer", padding: "4px 6px", lineHeight: 1 }} title="Remove 8oz">
+            ↩
+          </button>
+        )}
+      </div>
+
+      {/* Custom input */}
+      {showCustom && (
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <input
+            value={customInput}
+            onChange={e => setCustomInput(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={e => e.key === "Enter" && submitCustom()}
+            placeholder="oz amount"
+            type="number"
+            style={{ flex: 1, background: "#111827", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }}
+          />
+          <button onClick={submitCustom}
+            style={{ background: "#60A5FA", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: "#0D1E35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            Add
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MealPlanScreen ───────────────────────────────────────────────────────────
 function MealPlanScreen() {
   const { gymBranding, supabaseUser, plan, user } = useApp();
@@ -522,6 +633,9 @@ function MealPlanScreen() {
             <MacroBar label="Fat"     current={totals.fat}     goal={FAT_GOAL}     color="#f472b6" />
           </div>
         </div>
+
+        {/* ── Water tracker ── */}
+        <WaterTracker userId={supabaseUser?.id} />
 
         {/* ── Tab bar ── */}
         <div style={{ display: "flex", background: "#1A2332", borderRadius: 10, padding: 3, marginBottom: 16 }}>
