@@ -483,12 +483,14 @@ function WorkoutScreen() {
   // 3-second confirmation window before rest timer starts
   useEffect(() => {
     if (state === "confirm") {
+      // Give PRs longer to breathe — 6 seconds instead of 3
+      const duration = isPR ? 6000 : 3000;
       confirmTimerRef.current = setTimeout(() => {
         goToRestOrNudge();
-      }, 3000);
+      }, duration);
     }
     return () => clearTimeout(confirmTimerRef.current);
-  }, [state]);
+  }, [state, isPR]);
 
   function goToRestOrNudge() {
     const allLogs = loggedSetsRef.current;
@@ -1004,14 +1006,13 @@ function WorkoutScreen() {
 
           {/* Middle — the big info */}
           <div style={{ textAlign: "center", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-            {/* PR celebration banner — only shown when member sets a new personal record */}
+            {/* PR celebration banner — full centrepiece when member sets a new personal record */}
             {isPR && !wasSkipped && (
-              <div style={{ background: "linear-gradient(135deg, #2D1A00, #1A2A00)", border: "1.5px solid #F59E0B", borderRadius: 14, padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-                <div style={{ fontSize: 28 }}>🏆</div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#F59E0B" }}>New personal record!</div>
-                  <div style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>{currentWeight} lbs on {ex.name}</div>
-                </div>
+              <div className="mq-fade" style={{ background: "linear-gradient(135deg, #2D1A00 0%, #1A1200 100%)", border: "2px solid #F59E0B", borderRadius: 18, padding: "20px 24px", width: "100%", textAlign: "center", boxShadow: "0 0 40px rgba(245,158,11,0.25)" }}>
+                <div style={{ fontSize: 52, marginBottom: 8 }}>🏆</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#F59E0B", marginBottom: 4 }}>New personal record!</div>
+                <div style={{ fontSize: 14, color: "#E8C97A", marginBottom: 2 }}>{currentWeight} lbs on {ex.name}</div>
+                <div style={{ fontSize: 12, color: "#9B7A3A", marginTop: 6 }}>Rest screen starting in a moment</div>
               </div>
             )}
             {/* Icon */}
