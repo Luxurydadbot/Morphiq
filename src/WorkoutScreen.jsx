@@ -1722,10 +1722,14 @@ function CustomPlanScreen() {
             <div style={{ marginBottom: 8 }}>
               <input value={query} onChange={e => setQuery(e.target.value)}
                 placeholder="Search exercise name..." style={{ ...s.input, marginBottom: 4 }} autoComplete="off" />
-              {suggestions.map(name => (
-                <button key={name} onClick={() => selectExercise(name)}
-                  style={{ width: "100%", background: ob.card, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "8px 12px", textAlign: "left", fontSize: 12, color: ob.white, cursor: "pointer", fontFamily: ob.font, marginBottom: 3 }}>
-                  {name}
+              {query.length >= 2 && suggestions.length === 0 && (
+                <div style={{ fontSize: 11, color: ob.muted, padding: "6px 4px" }}>Searching...</div>
+              )}
+              {suggestions.map(ex => (
+                <button key={ex.name} onClick={() => selectExercise(ex.name)}
+                  style={{ width: "100%", background: ob.card, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "8px 12px", textAlign: "left", cursor: "pointer", fontFamily: ob.font, marginBottom: 3 }}>
+                  <div style={{ fontSize: 12, color: ob.white, fontWeight: 500 }}>{ex.name}</div>
+                  <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>{ex.muscle_group}</div>
                 </button>
               ))}
               {/* Allow typing a custom name not in the list */}
