@@ -7,7 +7,7 @@ function MacroBar({ label, current, goal, color }) {
   return (
     <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
       <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{current}</div>
+      <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{current}</div>
       <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>of {goal}g</div>
       <div style={{ height: 5, background: "#0F1922", borderRadius: 3 }}>
         <div style={{ height: 5, borderRadius: 3, background: color, width: `${pct}%`, transition: "width .6s" }} />
