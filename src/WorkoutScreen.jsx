@@ -256,16 +256,34 @@ function WorkoutScreen() {
   const a = gymBranding.accent;
 
   // Use AI-generated exercises if available, else fall back to defaults.
+  // For custom plans with multiple days, rotate by workouts-done-this-week so each
+  // session shows the correct day (Day 1 → Day 2 → Day 3 → back to Day 1...).
   // Stored in state (not const) so swapping an exercise updates it live.
-  const [exercises, setExercises] = useState(() =>
-    (plan?.exercises || WORKOUT_EXERCISES).map(e => ({
-      name: e.name, muscle: e.muscle, sets: e.sets,
+  const [exercises, setExercises] = useState(() => {
+    // Determine which day index to use for custom multi-day plans
+    let sourceExercises = plan?.exercises || WORKOUT_EXERCISES;
+    if (plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1) {
+      // Read how many workouts are done this week (same key the home screen uses)
+      try {
+        const now = new Date();
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(now); monday.setDate(diff);
+        const weekKey = `morphiq_week_${monday.toISOString().slice(0, 10)}`;
+        const weeklyDone = parseInt(localStorage.getItem(weekKey) || "0", 10);
+        const dayIdx = weeklyDone % plan.customDays.length;
+        const dayData = plan.customDays[dayIdx];
+        if (dayData?.exercises?.length > 0) sourceExercises = dayData.exercises;
+      } catch { /* localStorage unavailable — fall back to plan.exercises */ }
+    }
+    return sourceExercises.map(e => ({
+      name: e.name, muscle: e.muscle || "", sets: e.sets,
       targetReps: e.reps || e.targetReps, weight: e.weight,
       rpe: e.rpe || 8, alternative: e.alternative || null,
       restSeconds: e.restSeconds || null,
       warmupSets: Array.isArray(e.warmupSets) ? e.warmupSets : null, // keep ramp data; null lets the fallback compute it
-    }))
-  );
+    }));
+  });
 
   // ── Mid-workout progress persistence ──────────────────────────────
   // Saves where the member is (phase, exercise, set, logged sets) to local
