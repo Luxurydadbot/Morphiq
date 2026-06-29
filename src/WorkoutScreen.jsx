@@ -345,6 +345,8 @@ function WorkoutScreen() {
   const [swapConfirmName, setSwapConfirmName] = useState(null); // shows "Swapped in X ✓" briefly
   const [voiceSwapActive, setVoiceSwapActive] = useState(false); // mic open inside swap sheet
   const [voiceSwapHeard, setVoiceSwapHeard] = useState("");     // what the mic captured
+  const [swapDbResults, setSwapDbResults] = useState(null);  // live Supabase swap alternatives (null = not loaded yet)
+  const [swapDbLoading, setSwapDbLoading] = useState(false); // true while Supabase query is in flight
   const [lastLoggedReps, setLastLoggedReps] = useState(null);
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [savedToCloud, setSavedToCloud] = useState(false);
@@ -732,6 +734,53 @@ function WorkoutScreen() {
     setTimeout(() => setSwapConfirmName(null), 5000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAISwap]);
+
+  // ── Fetch swap alternatives from Supabase when the swap sheet opens ────────
+  // Queries exercises table for same pattern + equipment, excludes current exercise.
+  // Falls back to hardcoded getSwapOptions() if Supabase returns nothing.
+  useEffect(() => {
+    if (!showSwapSheet) { setSwapDbResults(null); return; }
+    const pattern = (ex?.pattern || "").toLowerCase();
+    const equip   = (user?.equipment || "dumbbell").toLowerCase();
+    if (!pattern || pattern === "custom") {
+      // Custom exercises have no pattern in the DB — skip the query, use fallback
+      setSwapDbResults(null);
+      return;
+    }
+    setSwapDbLoading(true);
+    const encoded = encodeURIComponent(ex.name);
+    const url = `${SUPABASE_URL}/rest/v1/exercises?select=name,muscle_group,pattern,equipment,difficulty`
+      + `&is_active=eq.true`
+      + `&pattern=eq.${encodeURIComponent(pattern)}`
+      + `&name=neq.${encoded}`
+      + `&limit=6`;
+    fetch(url, { headers: SB_HEADERS })
+      .then(r => r.json())
+      .then(rows => {
+        if (!Array.isArray(rows) || rows.length === 0) {
+          setSwapDbResults(null); // trigger fallback
+          return;
+        }
+        // Filter to matching equipment first; if that leaves fewer than 2, include all
+        const equipMatches = rows.filter(r =>
+          (r.equipment || "").toLowerCase() === equip
+        );
+        const finalRows = equipMatches.length >= 2 ? equipMatches : rows;
+        // Shape into the same format doSwap() expects
+        setSwapDbResults(finalRows.map(r => ({
+          name:       r.name,
+          muscle:     r.muscle_group,
+          pattern:    r.pattern,
+          sets:       ex.sets,
+          targetReps: ex.targetReps,
+          weight:     ex.weight,  // keep current weight — member has context
+          rpe:        ex.rpe,
+          alternative: null,
+        })));
+      })
+      .catch(() => setSwapDbResults(null)) // silent fallback on network error
+      .finally(() => setSwapDbLoading(false));
+  }, [showSwapSheet]);
 
   function simulateListen() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1383,8 +1432,15 @@ function WorkoutScreen() {
                 <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Swap →</div>
               </button>
             )}
-            {getSwapOptions(ex, user?.equipment).map((alt) => (
-              <button key={alt.name} onClick={() => doSwap({ ...alt, sets: ex.sets, targetReps: ex.targetReps, weight: alt.weight, rpe: ex.rpe })}
+            {/* Loading indicator while Supabase query is in flight */}
+            {swapDbLoading && (
+              <div style={{ textAlign: "center", padding: "12px 0", fontSize: 12, color: "#6B7A8D" }}>
+                Loading alternatives...
+              </div>
+            )}
+            {/* Supabase results when loaded, otherwise hardcoded fallback */}
+            {!swapDbLoading && (swapDbResults || getSwapOptions(ex, user?.equipment)).map((alt) => (
+              <button key={alt.name} onClick={() => doSwap({ ...alt, sets: ex.sets, targetReps: ex.targetReps, rpe: ex.rpe })}
                 style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(255,255,255,0.06)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2" }}>{alt.name}</div>
