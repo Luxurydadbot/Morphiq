@@ -670,8 +670,26 @@ function HomeDashboardScreen() {
   const weeklyDone = parseInt(localStorage.getItem(weekKey) || "0", 10);
   const allDone = weeklyDone >= weeklyTarget;
   const weekNum = plan?.weekNumber ?? 1;
-  const workoutType = "Full Body";
-  const exerciseCount = plan?.exercises?.length ?? 5;
+  // For custom multi-day plans, show the upcoming day's name and exercises
+  const getUpcomingDayData = () => {
+    if (plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1) {
+      try {
+        const now = new Date();
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(now); monday.setDate(diff);
+        const wk = `morphiq_week_${monday.toISOString().slice(0, 10)}`;
+        const done = parseInt(localStorage.getItem(wk) || "0", 10);
+        const dayIdx = done % plan.customDays.length;
+        return plan.customDays[dayIdx];
+      } catch { return null; }
+    }
+    return null;
+  };
+  const upcomingDay = getUpcomingDayData();
+  const workoutType = upcomingDay ? upcomingDay.dayLabel : (plan?.workoutType || "Full Body");
+  const upcomingExercises = upcomingDay ? upcomingDay.exercises : plan?.exercises;
+  const exerciseCount = upcomingExercises?.length ?? 5;
   const workoutDuration = Math.round(exerciseCount * 8);
 
   // Real historical values — fall back to placeholders until data loads
@@ -888,9 +906,9 @@ function HomeDashboardScreen() {
                 </div>
                 <div style={{ fontSize: 12, color: theme.textDim }}>{weeklyDone} of {weeklyTarget} workouts done this week</div>
               </div>
-              {plan?.exercises?.length > 0 && (
+              {upcomingExercises?.length > 0 && (
                 <div style={{ padding: "0 1.25rem .75rem", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {plan.exercises.slice(0, 5).map((ex, idx) => (
+                  {upcomingExercises.slice(0, 5).map((ex, idx) => (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(0,212,177,0.1)", border: `0.5px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0 }}>{idx + 1}</div>
                       <div style={{ flex: 1 }}>
@@ -903,7 +921,7 @@ function HomeDashboardScreen() {
                       </div>
                     </div>
                   ))}
-                  {plan.exercises.length > 5 && (
+                  {upcomingExercises.length > 5 && (
                     <div style={{ fontSize: 12, color: theme.textMuted, paddingLeft: 34 }}>+{plan.exercises.length - 5} more exercises</div>
                   )}
                 </div>
