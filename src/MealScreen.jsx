@@ -5,12 +5,14 @@ import { useApp, sb, Pill, Spinner, VoiceBtn, Layout, theme, GROCERY_DATA, local
 function MacroBar({ label, current, goal, color }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));
   return (
-    <div style={{ flex: 1, background: "#1A2332", borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color }}>{current}<span style={{ fontSize: 9, color: theme.textDim, fontWeight: 400 }}>/{goal}</span></div>
-      <div style={{ fontSize: 9, color: theme.textDim, margin: "2px 0 4px" }}>{label}</div>
-      <div style={{ height: 3, background: "#0F1922", borderRadius: 2 }}>
-        <div style={{ height: 3, borderRadius: 2, background: color, width: `${pct}%`, transition: "width .6s" }} />
+    <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+      <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{current}</div>
+      <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>of {goal}g</div>
+      <div style={{ height: 5, background: "#0F1922", borderRadius: 3 }}>
+        <div style={{ height: 5, borderRadius: 3, background: color, width: `${pct}%`, transition: "width .6s" }} />
       </div>
+      <div style={{ fontSize: 10, color: color, marginTop: 4, fontWeight: 600 }}>{pct}%</div>
     </div>
   );
 }
@@ -146,8 +148,12 @@ function HungryButton({ calsLeft, proteinLeft, goal }) {
   return (
     <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: state === "idle" ? 0 : 10 }}>
-        <div style={{ fontSize: 12, color: "#9BB3C8" }}>
-          <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{calsLeft} cal</span> and <span style={{ color: "#E8EDF2", fontWeight: 600 }}>{proteinLeft}g protein</span> left today
+        <div>
+          <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>Remaining today</div>
+          <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#E8EDF2" }}>{calsLeft}</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>cal</span></div>
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#F59E0B" }}>{proteinLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>protein</span></div>
+          </div>
         </div>
         {state === "idle" && (
           <button onClick={getSuggestions} style={{ background: a, border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>I'm Hungry</button>
@@ -303,15 +309,23 @@ function LogInput({ onLog, accent }) {
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             {/* Voice */}
             <button onClick={startVoice}
-              style={{ flex: 1, background: "#111827", border: "1px solid rgba(0,212,177,0.25)", borderRadius: 10, padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 20 }}>🎤</span>
-              <span style={{ fontSize: 11, color: accent, fontWeight: 500 }}>Voice</span>
+              style={{ flex: 1, background: "#111827", border: "1px solid rgba(0,212,177,0.25)", borderRadius: 12, padding: "14px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer", fontFamily: "inherit" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <rect x="8" y="2" width="8" height="12" rx="4" fill={accent} opacity="0.9"/>
+                <path d="M5 11c0 3.866 3.134 7 7 7s7-3.134 7-7" stroke={accent} strokeWidth="2" strokeLinecap="round"/>
+                <line x1="12" y1="18" x2="12" y2="22" stroke={accent} strokeWidth="2" strokeLinecap="round"/>
+                <line x1="9" y1="22" x2="15" y2="22" stroke={accent} strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              <span style={{ fontSize: 12, color: accent, fontWeight: 600 }}>Voice</span>
             </button>
             {/* Photo */}
             <button onClick={openCamera}
-              style={{ flex: 1, background: "#111827", border: "1px solid rgba(0,212,177,0.25)", borderRadius: 10, padding: "10px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, cursor: "pointer", fontFamily: "inherit" }}>
-              <span style={{ fontSize: 20 }}>📷</span>
-              <span style={{ fontSize: 11, color: accent, fontWeight: 500 }}>Photo</span>
+              style={{ flex: 1, background: "#111827", border: "1px solid rgba(0,212,177,0.25)", borderRadius: 12, padding: "14px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer", fontFamily: "inherit" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="13" r="4" stroke={accent} strokeWidth="2"/>
+              </svg>
+              <span style={{ fontSize: 12, color: accent, fontWeight: 600 }}>Photo</span>
             </button>
           </div>
 
