@@ -1468,18 +1468,8 @@ const WEEK = [{name:"Mon",type:"Full body",isWorkout:true},{name:"Tue",type:"Res
 // Uses same plan shape as buildPlan() so all progression logic works identically.
 // ═══════════════════════════════════════════════════════════════════
 
-// Canonical exercise names for autocomplete suggestions — covers all equipment types
-const CUSTOM_EX_SUGGESTIONS = [
-  "Barbell back squat","Barbell bench press","Barbell bent over row","Barbell Romanian deadlift",
-  "Barbell overhead press","Trap bar deadlift","Box squat","Goblet squat","Dumbbell bench press",
-  "Dumbbell Romanian deadlift","Single-arm dumbbell row","Dumbbell shoulder press",
-  "Neutral-grip incline press","Chest-supported DB row","Dumbbell curl to press",
-  "Leg press","Lying leg curl","Chest press machine","Seated cable row","Lat pulldown",
-  "Hip thrust","Kettlebell goblet squat","Kettlebell deadlift","Kettlebell floor press",
-  "Kettlebell single-arm row","Kettlebell swings","Pull-up","Push-up","Dip",
-  "Romanian deadlift","Incline dumbbell press","Cable fly","Tricep pushdown",
-  "Bicep curl","Hammer curl","Lateral raise","Face pull","Plank","Deadlift",
-];
+// Exercise search now pulls from Supabase exercises table (91 exercises, all equipment types).
+// Hardcoded list removed June 2026 — database is the single source of truth.
 
 // Goal options for the custom plan — drives rep ranges and progression rate
 const CUSTOM_GOALS = [
@@ -1513,17 +1503,41 @@ function CustomPlanScreen() {
   const [protein, setProtein]   = useState("");
   const [saving, setSaving]     = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [dbSuggestions, setDbSuggestions] = useState([]); // live results from Supabase exercises table
 
   // Pending exercise being configured before adding to the day
   const [pending, setPending]   = useState(null); // {name, sets, reps, weight}
 
   const defaults = GOAL_REP_RANGES[goal] || GOAL_REP_RANGES.general_fitness;
 
-  // Filtered suggestions — hide already-added exercises for this day
+  // Live exercise search — queries Supabase exercises table as member types.
+  // Debounced 200ms so we don't fire on every keystroke.
+  // Falls back to empty list silently if the fetch fails — never crashes the UI.
+  const searchRef = React.useRef(null);
+  React.useEffect(() => {
+    if (query.length < 2) { setDbSuggestions([]); return; }
+    clearTimeout(searchRef.current);
+    searchRef.current = setTimeout(async () => {
+      try {
+        const encoded = encodeURIComponent(query);
+        // Filter by equipment if we know it, otherwise search all
+        const equipFilter = user?.equipment && user.equipment !== "any"
+          ? `&equipment=in.(${encodeURIComponent(user.equipment)},any)`
+          : "";
+        const url = `${SUPABASE_URL}/rest/v1/exercises?name=ilike.*${encoded}*${equipFilter}&is_active=eq.true&order=difficulty.asc,name.asc&limit=6&select=name,muscle_group,difficulty`;
+        const res = await fetch(url, { headers: { apikey: SUPABASE_ANON, Authorization: \`Bearer \${SUPABASE_ANON}\` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const addedNames = dayExercises.map(e => e.name.toLowerCase());
+        setDbSuggestions((data || []).filter(ex => !addedNames.includes(ex.name.toLowerCase())));
+      } catch { setDbSuggestions([]); }
+    }, 200);
+    return () => clearTimeout(searchRef.current);
+  }, [query, dayExercises, user?.equipment]);
+
+  // Filtered suggestions — use live DB results, fall back to empty
   const addedNames = dayExercises.map(e => e.name.toLowerCase());
-  const suggestions = query.length >= 2
-    ? CUSTOM_EX_SUGGESTIONS.filter(n => n.toLowerCase().includes(query.toLowerCase()) && !addedNames.includes(n.toLowerCase())).slice(0, 5)
-    : [];
+  const suggestions = dbSuggestions;
 
   function selectExercise(name) {
     setPending({ name, sets: defaults.sets, reps: defaults.reps, weight: "" });
