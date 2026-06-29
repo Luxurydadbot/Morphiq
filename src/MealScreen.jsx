@@ -415,6 +415,7 @@ function WaterTracker({ userId }) {
   const a = gymBranding.accent;
   const WATER_GOAL_OZ = 64; // 8 glasses = 64oz
   const QUICK_AMOUNTS = [8, 16, 24];
+  const QUICK_LABELS  = ["1 Glass", "1 Bottle", "Large Bottle"];
 
   const waterKey = `morphiq_water_${userId || "anon"}_${localDateStr()}`;
 
@@ -480,10 +481,10 @@ function WaterTracker({ userId }) {
 
       {/* Quick add buttons */}
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {QUICK_AMOUNTS.map(amt => (
+        {QUICK_AMOUNTS.map((amt, i) => (
           <button key={amt} onClick={() => addWater(amt)}
-            style={{ flex: 1, background: "#111827", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 9, padding: "8px 4px", fontSize: 12, fontWeight: 600, color: "#60A5FA", cursor: "pointer", fontFamily: "inherit" }}>
-            +{amt}oz
+            style={{ flex: 1, background: "#111827", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 9, padding: "8px 4px", fontSize: 11, fontWeight: 600, color: "#60A5FA", cursor: "pointer", fontFamily: "inherit", lineHeight: 1.3 }}>
+            {QUICK_LABELS[i]}<br/><span style={{ fontSize: 9, fontWeight: 400, color: "#6B7A8D" }}>{amt}oz</span>
           </button>
         ))}
         <button onClick={() => setShowCustom(!showCustom)}
