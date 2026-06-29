@@ -12,58 +12,68 @@ export default async function handler(req, res) {
   try { body = typeof req.body === "string" ? JSON.parse(req.body) : req.body; }
   catch { res.status(400).json({ error: "Invalid JSON" }); return; }
 
-  const { name, goal, weeklyDone, weeklyTarget, streak, totalWorkouts, weightChange, lastSession, weekNumber, allDone, seed } = body;
+  const {
+    name, goal, weeklyDone, weeklyTarget, streak, totalWorkouts,
+    weightChange, lastSession, weekNumber, allDone, seed,
+    lastSessionExercises, nextWorkoutExercises,
+  } = body;
+
+  const firstName = (name || "there").split(" ")[0];
 
   const lastSessionStr = lastSession
     ? new Date(lastSession + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
     : null;
 
-  const weightNote = weightChange !== null && weightChange !== undefined
-    ? parseFloat(weightChange) < 0
-      ? `They have lost ${Math.abs(parseFloat(weightChange))} lbs since starting.`
-      : parseFloat(weightChange) > 0
-      ? `Their weight is up ${parseFloat(weightChange)} lbs — likely building muscle.`
-      : "Their weight is holding steady."
-    : "";
-
-  // Build specific situation string so Claude has something real to comment on
-  let situation = "";
-  if (totalWorkouts === 0) {
-    situation = "They haven't logged their first workout yet.";
-  } else if (allDone) {
-    situation = `Perfect week — they hit all ${weeklyTarget} workouts. Acknowledge that specifically.`;
-  } else if (weeklyDone === 0) {
-    situation = `Week ${weekNumber}, no workouts logged yet this week. Be encouraging without guilt.`;
-  } else if (weeklyDone >= weeklyTarget - 1) {
-    situation = `${weeklyDone} of ${weeklyTarget} workouts done this week — almost there.`;
+  // Build what we actually know about their last workout
+  let lastWorkoutDetail = "";
+  if (lastSessionExercises && lastSessionExercises.length > 0) {
+    lastWorkoutDetail = `Last session (${lastSessionStr}): ${lastSessionExercises.join(", ")}.`;
+  } else if (lastSessionStr) {
+    lastWorkoutDetail = `Last session was ${lastSessionStr} but no exercise detail available.`;
   } else {
-    situation = `${weeklyDone} of ${weeklyTarget} workouts done this week, ${weeklyTarget - weeklyDone} to go.`;
+    lastWorkoutDetail = "No workouts logged yet.";
   }
 
-  if (streak >= 7) situation += ` They're on a ${streak}-day streak — that's impressive.`;
-  if (lastSessionStr) situation += ` Last session was ${lastSessionStr}.`;
-  if (weightNote) situation += ` ${weightNote}`;
+  const weightNote = weightChange !== null && weightChange !== undefined
+    ? parseFloat(weightChange) < 0
+      ? `Down ${Math.abs(parseFloat(weightChange))} lbs since starting.`
+      : parseFloat(weightChange) > 0
+      ? `Up ${parseFloat(weightChange)} lbs — likely muscle gain.`
+      : "Weight holding steady."
+    : "";
 
-  const prompt = `You are a real, no-nonsense fitness coach writing a one-line message for ${name || "a member"}'s home screen. 
+  const nextNote = nextWorkoutExercises
+    ? `Next workout includes: ${nextWorkoutExercises}.`
+    : "";
 
-Their situation: ${situation}
-Their goal: ${goal || "get fit"}
-Week ${weekNumber || 1} of their program.
-Seed for variety: ${seed || 1}
+  const prompt = `You are a real fitness coach. Write ONE practical coaching note for ${firstName}'s home screen — the kind of thing a good personal trainer would actually say, not a motivational quote.
 
-Write ONE sentence, maximum 20 words. 
+WHAT YOU KNOW ABOUT THEM:
+- Goal: ${goal || "get fit"}
+- ${lastWorkoutDetail}
+- ${nextNote}
+- Week ${weekNumber || 1}, ${weeklyDone} of ${weeklyTarget} sessions done this week${allDone ? " — completed all sessions" : ""}
+- Total sessions: ${totalWorkouts || 0}
+- Streak: ${streak || 0} days
+- ${weightNote}
+- Seed: ${seed}
 
-RULES — follow all of these:
-- Sound like a real person talking, not a motivational poster
-- Be specific to their actual situation above — don't be generic
-- Never use phrases like: "journey", "on the other side", "every rep counts", "one day at a time", "you've got this", "keep pushing", "stay consistent", "results", "transformation", "unleash", "potential", "champion", "warrior", "beast mode"
-- No greetings, no name at the start, no emojis
-- If they haven't worked out yet, give them a practical nudge — not a pep talk
-- If they had a good week, say something specific about that
-- If there's weight data, reference it if interesting
-- Vary your style: sometimes practical ("Your next session is the most important one"), sometimes observational ("Three weeks in and still showing up — that's the hard part done"), sometimes direct ("Protein first, everything else second today")
+WRITE ONE SENTENCE, max 20 words. Examples of the RIGHT tone:
+- "Your squat weight went up last session — go one more rep on the first set today."
+- "Three sessions logged this week. One more and you've hit your target."
+- "You haven't lifted since Tuesday — a short session today beats skipping entirely."
+- "Goblet squat at 35lbs last time — try 40lbs on the first set and drop back if needed."
 
-Write only the message. No quotes, no labels.`;
+NEVER write:
+- Motivational slogans or quotes
+- Anything with "journey", "potential", "warrior", "beast", "grind", "hustle", "on the other side", "you've got this", "keep pushing", "every rep counts", "transformation", "results"
+- Fortune cookie phrases
+- Greetings or ${firstName}'s name
+- Questions
+
+If you have their last session data — reference a specific exercise, weight, or rep count. That is always more useful than anything generic.
+
+Write only the message. No quotes, no labels, no preamble.`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
