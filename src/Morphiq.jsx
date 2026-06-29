@@ -703,6 +703,19 @@ function HomeDashboardScreen() {
     // Clear today's cache and fetch a fresh message
     try { localStorage.removeItem(coachNoteKey); } catch {}
     setCoachLoading(true);
+    const allLogsR = historicalData?.workoutLogs || [];
+    const lastDateR = lastSession;
+    const lastLogsR = lastDateR ? allLogsR.filter(r => r.workout_date === lastDateR) : [];
+    const seenR = {};
+    for (const row of lastLogsR) {
+      const name = row.exercise_name;
+      if (!seenR[name] || (row.weight || 0) >= seenR[name].weight) {
+        seenR[name] = { name, weight: row.weight || 0, reps: row.reps || 0 };
+      }
+    }
+    const exSummaryR = Object.values(seenR).map(ex =>
+      ex.weight > 0 ? `${ex.name}: ${ex.weight}lbs × ${ex.reps} reps` : `${ex.name}: ${ex.reps} reps`
+    );
     fetch("/api/coach-note", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -712,6 +725,8 @@ function HomeDashboardScreen() {
         weeklyDone, weeklyTarget, streak, totalWorkouts,
         weightChange, lastSession, weekNumber: weekNum, allDone,
         seed: Math.floor(Math.random() * 10000),
+        lastSessionExercises: exSummaryR,
+        nextWorkoutExercises: plan?.exercises?.slice(0, 3).map(e => e.name).join(", ") || null,
       }),
     })
       .then(r => r.json())
@@ -732,6 +747,32 @@ function HomeDashboardScreen() {
     } catch {}
     // No cache — call the AI
     setCoachLoading(true);
+    // Build a real summary of the last workout session from actual log data
+    const allLogs = historicalData?.workoutLogs || [];
+    const lastDate = lastSession; // most recent workout date string
+    const lastSessionLogs = lastDate
+      ? allLogs.filter(r => r.workout_date === lastDate)
+      : [];
+    // Summarise: unique exercises with best set (highest weight × reps)
+    const exerciseSummary = [];
+    const seen = {};
+    for (const row of lastSessionLogs) {
+      const name = row.exercise_name;
+      if (!seen[name]) {
+        seen[name] = { name, weight: row.weight || 0, reps: row.reps || 0 };
+      } else if ((row.weight || 0) >= seen[name].weight) {
+        seen[name] = { name, weight: row.weight || 0, reps: row.reps || 0 };
+      }
+    }
+    for (const ex of Object.values(seen)) {
+      exerciseSummary.push(ex.weight > 0
+        ? `${ex.name}: ${ex.weight}lbs × ${ex.reps} reps`
+        : `${ex.name}: ${ex.reps} reps`);
+    }
+
+    // Next planned workout — first day in plan that isn't today
+    const nextWorkout = plan?.exercises?.slice(0, 3).map(e => e.name).join(", ") || null;
+
     fetch("/api/coach-note", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -747,6 +788,8 @@ function HomeDashboardScreen() {
         weekNumber: weekNum,
         allDone,
         seed: Math.floor(Math.random() * 10000),
+        lastSessionExercises: exerciseSummary,
+        nextWorkoutExercises: nextWorkout,
       }),
     })
       .then(r => r.json())
