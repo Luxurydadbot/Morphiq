@@ -391,6 +391,53 @@ const sb = {
     } catch (e) { console.error("saveGymBranding exception:", e); return false; }
   },
 
+  // ── GYM SELF-SERVE SIGNUP ────────────────────────────────────────────────
+  // Returns true if gymId is free to use, false if it's already taken.
+  async isGymIdAvailable(gymId) {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1`,
+        { headers: SB_GET() }
+      );
+      if (!res.ok) return false; // be safe — treat a failed check as "not available"
+      const rows = await res.json();
+      return rows.length === 0;
+    } catch { return false; }
+  },
+
+  // Creates a new gym row. Caller must already have confirmed the owner_email
+  // isn't taken (via getGymByOwnerEmail) and the gymId is available
+  // (via isGymIdAvailable) before calling this.
+  // Returns { ok: true, gymId } on success, or { ok: false, error } on failure.
+  async createGym({ gymId, name, ownerEmail, planTier }) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms`, {
+        method: "POST",
+        headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
+        body: JSON.stringify({
+          gym_id: gymId,
+          name,
+          owner_email: ownerEmail.toLowerCase(),
+          plan_tier: planTier,
+          accent: "#00D4B1",
+          welcome: `Welcome to ${name}. Your personal AI trainer is ready. Let's get to work.`,
+          logo_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "no body");
+        console.error("createGym POST failed:", res.status, errText);
+        return { ok: false, error: errText || `Server error (${res.status})` };
+      }
+      return { ok: true, gymId };
+    } catch (e) {
+      console.error("createGym exception:", e);
+      return { ok: false, error: "Network error — check your connection and try again." };
+    }
+  },
+
   // ── WEIGHT LOGS ───────────────────────────────────────────────────────────
   async insertWeightLog(supabaseUserId, weightLbs) {
     try {
