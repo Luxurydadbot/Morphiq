@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { WorkoutScreen, CustomPlanScreen } from "./WorkoutScreen.jsx";
 import { MealPlanScreen } from "./MealScreen.jsx";
 import { GymOwnerDashboard, PricingScreen } from "./GymOwnerDashboard.jsx";
+import { GymSignupScreen } from "./GymSignupScreen.jsx";
 import { OnboardingScreen } from "./OnboardingScreen.jsx";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { ChatScreen } from "./ChatScreen.jsx";
@@ -26,7 +27,7 @@ function AppProvider({ children }) {
     try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
   })();
 
-  const [screen, setScreen] = useState(savedSession ? "loading" : "auth");
+  const [screen, setScreen] = useState(savedSession ? "loading" : (new URLSearchParams(window.location.search).get("join") === "gym" ? "gym_signup" : "auth"));
   const [user, setUser] = useState(DEFAULT_USER);
   const [plan, setPlan] = useState(null);
   const [supabaseUser, setSupabaseUser] = useState(null);
@@ -1251,6 +1252,7 @@ function NetworkErrorScreen() {
 function AppRouter() {
   const { screen } = useApp();
   if (screen === "auth") return <AuthScreen />;
+  if (screen === "gym_signup") return <GymSignupScreen />;
   if (screen === "network_error") return <NetworkErrorScreen />;
   if (screen === "loading") return <LoadingScreen />;
   if (screen === "onboarding") return <OnboardingScreen />;
