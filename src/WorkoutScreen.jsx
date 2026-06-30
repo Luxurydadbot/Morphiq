@@ -1569,8 +1569,8 @@ function CustomPlanScreen() {
   // Live exercise search — queries Supabase exercises table as member types.
   // Debounced 200ms so we don't fire on every keystroke.
   // Falls back to empty list silently if the fetch fails — never crashes the UI.
-  const searchRef = React.useRef(null);
-  React.useEffect(() => {
+  const searchRef = useRef(null);
+  useEffect(() => {
     if (query.length < 2) { setDbSuggestions([]); return; }
     clearTimeout(searchRef.current);
     searchRef.current = setTimeout(async () => {
@@ -1581,7 +1581,7 @@ function CustomPlanScreen() {
           ? `&equipment=in.(${encodeURIComponent(user.equipment)},any)`
           : "";
         const url = `${SUPABASE_URL}/rest/v1/exercises?name=ilike.*${encoded}*${equipFilter}&is_active=eq.true&order=difficulty.asc,name.asc&limit=6&select=name,muscle_group,difficulty`;
-        const res = await fetch(url, { headers: { apikey: SUPABASE_ANON, Authorization: \`Bearer \${SUPABASE_ANON}\` } });
+        const res = await fetch(url, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } });
         if (!res.ok) return;
         const data = await res.json();
         const addedNames = dayExercises.map(e => e.name.toLowerCase());
