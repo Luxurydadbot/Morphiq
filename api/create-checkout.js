@@ -81,6 +81,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ url: session.url });
   } catch (err) {
     console.error("create-checkout: Stripe error:", err.message);
-    return res.status(500).json({ error: "Could not start checkout. Please try again." });
+    // TEMPORARY DEBUG: exposing err.message directly in the response so we can
+    // see the real reason in the browser during testing. Must be reverted to
+    // the generic message before real gym owners use this — a raw Stripe
+    // error is not something an end user should see.
+    return res.status(500).json({ error: "Could not start checkout. Please try again.", debug: err.message });
   }
 }
