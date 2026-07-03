@@ -17,11 +17,11 @@ import Stripe from "stripe";
 const PLAN_PRICES = {
   starter: {
     flat: "price_1ToYs1R8eoLB9l0R3p43EFLm",
-    usage: "price_1ToZ2yR8eoLB9l0RbOlxgrCOG",
+    usage: "price_1ToZ2yR8eoLB9l0RbOlxgrCO", // corrected — old value had an extra trailing "G"
   },
   growth: {
     flat: "price_1TpAtHR8eoLB9l0RoNZ3tnIE",
-    usage: "price_1TpAwJR8eoLB9l0ROMup1AqCS",
+    usage: "price_1TpAwJR8eoLB9l0ROMup1AqC", // corrected — old value had an extra trailing "S"
   },
   scale: {
     flat: "price_1TpB4zR8eoLB9l0RbNRvmWdH",
@@ -81,10 +81,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ url: session.url });
   } catch (err) {
     console.error("create-checkout: Stripe error:", err.message);
-    // TEMPORARY DEBUG: exposing err.message directly in the response so we can
-    // see the real reason in the browser during testing. Must be reverted to
-    // the generic message before real gym owners use this — a raw Stripe
-    // error is not something an end user should see.
-    return res.status(500).json({ error: "Could not start checkout. Please try again.", debug: err.message });
+    return res.status(500).json({ error: "Could not start checkout. Please try again." });
   }
 }
