@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { sb, theme, useApp } from "./shared.jsx";
 
 const PLANS = [
@@ -17,17 +17,53 @@ function slugify(name) {
     .slice(0, 40) || "gym";
 }
 
+// Sends the browser to Stripe's payment page for the given gym + plan.
+// Used both for a brand-new signup and for "resume checkout" after a cancel.
+async function startCheckout({ gymId, gymName, planTier, email }) {
+  const res = await fetch("/api/create-checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gymId, gymName, planTier, email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.url) {
+    throw new Error(data.error || "Could not start checkout. Please try again.");
+  }
+  window.location.href = data.url; // full-page redirect to Stripe's own site
+}
+
 function GymSignupScreen() {
   const { navigate } = useApp();
   const ob = theme.ob;
 
-  const [step, setStep] = useState(1); // 1 = details, 2 = submitting/done
+  // step: 1 = enter details, 2 = trial started (after real payment), 3 = checkout was canceled
+  const [step, setStep] = useState(1);
+  const [gymId, setGymId] = useState(null);
   const [gymName, setGymName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [email, setEmail] = useState("");
   const [planTier, setPlanTier] = useState("starter");
-  const [status, setStatus] = useState("idle"); // idle | checking | error | success
+  const [status, setStatus] = useState("idle"); // idle | checking | redirecting | error | success
   const [errorMsg, setErrorMsg] = useState("");
+
+  // On load, check if we've just been sent back here by Stripe (either
+  // finished paying, or backed out of the payment page).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    if (checkout === "success") {
+      setGymId(params.get("gym") || null);
+      setGymName(params.get("name") || "");
+      setEmail(params.get("email") || "");
+      setStep(2);
+    } else if (checkout === "canceled") {
+      setGymId(params.get("gym") || null);
+      setGymName(params.get("name") || "");
+      setEmail(params.get("email") || "");
+      setPlanTier(params.get("plan") || "starter");
+      setStep(3);
+    }
+  }, []);
 
   const inp = {
     width: "100%", background: ob.card, border: "1px solid rgba(255,255,255,0.08)",
@@ -70,7 +106,8 @@ function GymSignupScreen() {
       return;
     }
 
-    // 3. Create the gym row
+    // 3. Create the gym row (still free/unpaid at this point — the row exists
+    // so the webhook has something to update once Stripe confirms payment)
     const result = await sb.createGym({
       gymId: candidateId,
       name: gymName.trim(),
@@ -78,12 +115,33 @@ function GymSignupScreen() {
       planTier,
     });
 
-    if (result.ok) {
-      setStatus("success");
-      setStep(2);
-    } else {
+    if (!result.ok) {
       setStatus("error");
       setErrorMsg(result.error || "Something went wrong creating your gym. Please try again.");
+      return;
+    }
+
+    // 4. Send them to Stripe to actually enter payment details
+    setStatus("redirecting");
+    try {
+      await startCheckout({ gymId: candidateId, gymName: gymName.trim(), planTier, email });
+      // no further code runs — the line above navigates the browser away
+    } catch (e) {
+      setStatus("error");
+      setErrorMsg(
+        `${e.message} Your gym "${gymName.trim()}" was created, but payment hasn't been set up yet — refresh this page and use "Resume checkout" once it appears, or contact support.`
+      );
+    }
+  }
+
+  async function handleResumeCheckout() {
+    setStatus("redirecting");
+    setErrorMsg("");
+    try {
+      await startCheckout({ gymId, gymName, planTier, email });
+    } catch (e) {
+      setStatus("error");
+      setErrorMsg(e.message);
     }
   }
 
@@ -148,16 +206,16 @@ function GymSignupScreen() {
 
             <button
               onClick={handleSubmit}
-              disabled={status === "checking"}
+              disabled={status === "checking" || status === "redirecting"}
               style={{
-                width: "100%", background: status === "checking" ? "#1A2332" : "#00D4B1",
-                color: status === "checking" ? ob.muted : "#003D35", border: "none",
+                width: "100%", background: (status === "checking" || status === "redirecting") ? "#1A2332" : "#00D4B1",
+                color: (status === "checking" || status === "redirecting") ? ob.muted : "#003D35", border: "none",
                 borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600,
-                marginTop: 22, cursor: status === "checking" ? "default" : "pointer",
+                marginTop: 22, cursor: (status === "checking" || status === "redirecting") ? "default" : "pointer",
                 fontFamily: ob.font,
               }}
             >
-              {status === "checking" ? "Setting up your gym..." : "Create my gym →"}
+              {status === "checking" ? "Setting up your gym..." : status === "redirecting" ? "Taking you to payment..." : "Create my gym →"}
             </button>
 
             <div style={{ textAlign: "center", fontSize: 10, color: ob.muted, marginTop: 14 }}>
@@ -170,7 +228,7 @@ function GymSignupScreen() {
         {step === 2 && (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
             <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#003D35", border: "2px solid #00D4B1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22, color: "#00D4B1" }}>✓</div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white, marginBottom: 8 }}>{gymName} is ready</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white, marginBottom: 8 }}>{gymName || "Your gym"} is ready</div>
             <div style={{ fontSize: 12, color: ob.body, lineHeight: 1.6, marginBottom: 22 }}>
               Your 14-day free trial has started. Sign in below with <span style={{ color: ob.white }}>{email}</span> — we'll email you a one-time code, no password needed.
             </div>
@@ -179,6 +237,26 @@ function GymSignupScreen() {
               style={{ width: "100%", background: "#00D4B1", color: "#003D35", border: "none", borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}
             >
               Go to sign in →
+            </button>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#2D1A00", border: "2px solid #F59E0B", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22, color: "#F59E0B" }}>!</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white, marginBottom: 8 }}>Payment wasn't finished</div>
+            <div style={{ fontSize: 12, color: ob.body, lineHeight: 1.6, marginBottom: 22 }}>
+              {gymName || "Your gym"} was created, but checkout was closed before payment went through. No charge was made. Pick up where you left off below.
+            </div>
+            {errorMsg ? (
+              <div style={{ fontSize: 11, color: "#F87171", marginBottom: 14, lineHeight: 1.5 }}>{errorMsg}</div>
+            ) : null}
+            <button
+              onClick={handleResumeCheckout}
+              disabled={status === "redirecting"}
+              style={{ width: "100%", background: status === "redirecting" ? "#1A2332" : "#00D4B1", color: status === "redirecting" ? ob.muted : "#003D35", border: "none", borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600, cursor: status === "redirecting" ? "default" : "pointer", fontFamily: ob.font }}
+            >
+              {status === "redirecting" ? "Taking you to payment..." : "Resume checkout →"}
             </button>
           </div>
         )}
