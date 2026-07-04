@@ -3,12 +3,21 @@
 // Reports last month's active-member count to Stripe for ONE gym at a time,
 // so it becomes a real usage charge on that gym's next invoice.
 //
+// IMPORTANT (discovered while building this): Stripe retired the old
+// "usage records" method this app's usage-based prices were originally set
+// up to expect. The current replacement is called "Meters" — usage is now
+// reported per Stripe customer via a Meter Event, not per subscription
+// item. Confirmed via a read-only check that all 3 existing usage prices
+// already point to one shared meter, event_name "_active_member" — so
+// nothing about the Stripe setup itself needed to be rebuilt, only this
+// file's reporting method.
+//
 // SAFETY — two modes, controlled by the address bar:
-//   PREVIEW (default) — shows exactly what would be reported. Touches Stripe
-//     only to look up account info, never writes/reports anything. Safe to
+//   PREVIEW (default) — shows exactly what would be reported. Touches
+//     Stripe only to read account info, never reports anything. Safe to
 //     visit as many times as you want.
-//   LIVE (?confirm=yes) — actually sends the usage number to Stripe. This is
-//     the ONLY mode that can affect a real invoice.
+//   LIVE (?confirm=yes) — actually sends the usage number to Stripe. This
+//     is the ONLY mode that can affect a real invoice.
 //
 // Usage — replace YOUR_GYM_ID with a value from /api/monthly-usage-report:
 //   Preview: https://morphiq-nine.vercel.app/api/report-usage?gym_id=YOUR_GYM_ID
@@ -18,9 +27,9 @@
 // before ever being pointed at a real paying gym. Stage 3 (running this
 // automatically for every gym, on a schedule) is separate, later work.
 //
-// Tables/columns used: gyms (gym_id, name, plan_tier, stripe_subscription_id),
-// profiles (id, gym_id), workout_logs (user_id, workout_date) — same as
-// api/monthly-usage-report.js.
+// Tables/columns used: gyms (gym_id, name, plan_tier, stripe_customer_id,
+// stripe_subscription_id), profiles (id, gym_id), workout_logs (user_id,
+// workout_date) — same as api/monthly-usage-report.js.
 
 import Stripe from "stripe";
 
@@ -28,27 +37,25 @@ const SUPABASE_URL = "https://uvnyjegmhsztdednjclb.supabase.co";
 const SUPABASE_ANON =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bnlqZWdtaHN6dGRlZG5qY2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTgwMjcsImV4cCI6MjA5NDI5NDAyN30.-hMNwCO-GymvbiyAKer6Q5AjDbDZl6GhXmSTmr5bY04";
 
-// Same usage-based price IDs as api/create-checkout.js — keep these two
-// files in sync if pricing is ever regenerated in Stripe.
-const USAGE_PRICE_IDS = {
-  starter: "price_1ToZ2yR8eoLB9l0RbOlxgrCO",
-  growth: "price_1TpAwJR8eoLB9l0ROMup1AqC",
-  scale: "price_1TpB5sR8eoLB9l0RdHMfNMnx",
-};
+// Same per-active-member dollar rates as api/create-checkout.js — for
+// display in the preview only. Kept in sync manually if pricing changes.
+const RATE_PER_MEMBER = { starter: 2, growth: 1.75, scale: 1.5 };
+
+// Confirmed via /api/debug-price-config — all 3 plan tiers share this one
+// meter, so the same event_name is used regardless of plan tier.
+const METER_EVENT_NAME = "_active_member";
 
 function previousMonthBounds() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
   const label = start.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  return { start, end, label };
+  const periodKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+  return { start, end, label, periodKey };
 }
 
 // Counts how many distinct members at ONE gym logged a workout last month.
-// Same logic/tables as api/monthly-usage-report.js, scoped to a single gym
-// (this file deliberately doesn't import from that one — Vercel serverless
-// functions are simplest kept self-contained, same pattern as create-checkout.js
-// and stripe-webhook.js already not sharing code with each other).
+// Same logic/tables as api/monthly-usage-report.js, scoped to a single gym.
 async function countActiveMembersLastMonth(gymId) {
   const { start, end } = previousMonthBounds();
   const startStr = start.toISOString().slice(0, 10);
@@ -93,7 +100,7 @@ export default async function handler(req, res) {
 
   try {
     const gymRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&select=gym_id,name,plan_tier,stripe_subscription_id`,
+      `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&select=gym_id,name,plan_tier,stripe_customer_id,stripe_subscription_id`,
       { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
     );
     const gymRows = await gymRes.json();
@@ -101,33 +108,15 @@ export default async function handler(req, res) {
     if (!gym) {
       return res.status(404).json({ error: `No gym found with gym_id "${gymId}".` });
     }
-    if (!gym.stripe_subscription_id) {
+    if (!gym.stripe_customer_id || !gym.stripe_subscription_id) {
       return res.status(400).json({
         error: `${gym.name || gymId} hasn't completed Stripe checkout yet, so there's no subscription to report usage against.`,
       });
     }
 
-    const usagePriceId = USAGE_PRICE_IDS[gym.plan_tier];
-    if (!usagePriceId) {
-      return res.status(400).json({
-        error: `Unknown or missing plan_tier ("${gym.plan_tier}") for this gym — can't tell which Stripe usage price to report against.`,
-      });
-    }
-
     const activeCount = await countActiveMembersLastMonth(gym.gym_id);
-    const { label } = previousMonthBounds();
-
-    const stripe = new Stripe(secretKey);
-
-    // Find the specific line item on this gym's subscription that matches
-    // the usage-based price for their plan tier.
-    const subscription = await stripe.subscriptions.retrieve(gym.stripe_subscription_id);
-    const usageItem = subscription.items.data.find(item => item.price.id === usagePriceId);
-    if (!usageItem) {
-      return res.status(400).json({
-        error: `Couldn't find a usage-based line item on this gym's Stripe subscription matching price ${usagePriceId}. The subscription may have been set up differently than expected — stop and check before proceeding.`,
-      });
-    }
+    const { label, periodKey } = previousMonthBounds();
+    const rate = RATE_PER_MEMBER[gym.plan_tier] ?? 0;
 
     if (!confirmed) {
       // PREVIEW MODE — nothing sent to Stripe.
@@ -138,25 +127,33 @@ export default async function handler(req, res) {
         billing_period: label,
         active_members_last_month: activeCount,
         would_report_quantity: activeCount,
+        estimated_charge: +(activeCount * rate).toFixed(2),
       });
     }
 
-    // LIVE MODE — actually reports the number to Stripe. Using action:"set"
-    // (not "increment") means visiting this twice for the same gym/month
-    // safely overwrites to the same number rather than double-counting.
-    const usageRecord = await stripe.subscriptionItems.createUsageRecord(usageItem.id, {
-      quantity: activeCount,
+    // LIVE MODE — actually reports the number to Stripe via a Meter Event.
+    // The "identifier" field makes this safe to re-run for the same
+    // gym/month: Stripe treats a repeated identifier as a duplicate rather
+    // than double-counting, so accidentally visiting this twice is safe.
+    const stripe = new Stripe(secretKey);
+    const event = await stripe.billing.meterEvents.create({
+      event_name: METER_EVENT_NAME,
+      identifier: `usage-${gym.gym_id}-${periodKey}`,
+      payload: {
+        stripe_customer_id: gym.stripe_customer_id,
+        value: String(activeCount), // Stripe requires this as a string, not a number
+      },
       timestamp: Math.floor(Date.now() / 1000),
-      action: "set",
     });
 
     return res.status(200).json({
       mode: "live",
-      note: "This number has been reported to Stripe and will appear on this gym's next invoice.",
+      note: "This number has been reported to Stripe and will appear on this gym's next invoice. Stripe processes meter events asynchronously, so it may take a few minutes to show up in the Stripe dashboard.",
       gym_name: gym.name || gym.gym_id,
       billing_period: label,
       active_members_reported: activeCount,
-      stripe_usage_record_id: usageRecord.id,
+      estimated_charge: +(activeCount * rate).toFixed(2),
+      stripe_meter_event_identifier: event.identifier,
     });
   } catch (err) {
     console.error("report-usage error:", err);
