@@ -467,6 +467,52 @@ const sb = {
     } catch { return { active7: 0, active30: 0 }; }
   },
 
+  // Returns { [gym_id]: { active7, active30 } } — same activity window and
+  // workout_logs columns as getPlatformActivitySummary above, just grouped
+  // per gym (via profiles.gym_id) instead of totalled across the platform.
+  async getActiveMemberCountsByGym() {
+    try {
+      const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+      const startStr = d30.toISOString().slice(0, 10);
+      const [profilesRes, logsRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,gym_id`, { headers: SB_GET() }),
+        fetch(`${SUPABASE_URL}/rest/v1/workout_logs?workout_date=gte.${startStr}&select=user_id,workout_date`, { headers: SB_GET() }),
+      ]);
+      if (!profilesRes.ok || !logsRes.ok) return {};
+      const profiles = await profilesRes.json();
+      const logs = await logsRes.json();
+
+      // Map each member's profile id to their gym, so we can tell which gym
+      // a workout log entry belongs to.
+      const gymByProfileId = {};
+      profiles.forEach(p => { if (p.gym_id) gymByProfileId[p.id] = p.gym_id; });
+
+      const d7 = new Date(); d7.setDate(d7.getDate() - 7);
+      const d7Str = d7.toISOString().slice(0, 10);
+      const set7ByGym = {};
+      const set30ByGym = {};
+      logs.forEach(r => {
+        const gymId = gymByProfileId[r.user_id];
+        if (!gymId) return;
+        if (!set30ByGym[gymId]) set30ByGym[gymId] = new Set();
+        set30ByGym[gymId].add(r.user_id);
+        if (r.workout_date >= d7Str) {
+          if (!set7ByGym[gymId]) set7ByGym[gymId] = new Set();
+          set7ByGym[gymId].add(r.user_id);
+        }
+      });
+
+      const result = {};
+      Object.keys(set30ByGym).forEach(gymId => {
+        result[gymId] = {
+          active7: set7ByGym[gymId] ? set7ByGym[gymId].size : 0,
+          active30: set30ByGym[gymId].size,
+        };
+      });
+      return result;
+    } catch { return {}; }
+  },
+
   // ── GYM SELF-SERVE SIGNUP ────────────────────────────────────────────────
   // Returns true if gymId is free to use, false if it's already taken.
   async isGymIdAvailable(gymId) {
