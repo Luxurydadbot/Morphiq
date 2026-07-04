@@ -113,6 +113,7 @@ function SuperAdminDashboard() {
   const { signOut } = useApp();
   const [gyms, setGyms] = useState([]);
   const [memberCounts, setMemberCounts] = useState({});
+  const [activity, setActivity] = useState({ active7: 0, active30: 0 });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState("");
@@ -124,15 +125,15 @@ function SuperAdminDashboard() {
     async function load() {
       setLoading(true);
       setLoadError(false);
-      const [gymRows, counts] = await Promise.all([sb.getAllGyms(), sb.getMemberCountsByGym()]);
+      const [gymRows, counts, activitySummary] = await Promise.all([
+        sb.getAllGyms(),
+        sb.getMemberCountsByGym(),
+        sb.getPlatformActivitySummary(),
+      ]);
       if (cancelled) return;
-      if (!gymRows.length && !Object.keys(counts).length) {
-        // Could be a genuinely empty platform, or the is_suspended/admin_notes
-        // columns not existing yet causing the query to fail silently.
-        // We don't distinguish here — just show the empty state either way.
-      }
       setGyms(gymRows);
       setMemberCounts(counts);
+      setActivity(activitySummary);
       setLoading(false);
     }
     load();
@@ -176,6 +177,7 @@ function SuperAdminDashboard() {
   const totalRevenue = gyms.reduce((sum, g) => sum + expectedRevenue(g.plan_tier, memberCounts[g.gym_id]), 0);
   const activeGymCount = gyms.filter(g => !g.is_suspended).length;
   const suspendedCount = gyms.filter(g => g.is_suspended).length;
+  const totalMembers = Object.values(memberCounts).reduce((sum, c) => sum + c, 0);
 
   const selectStyle = { background: "#1A2332", border: "1px solid #1E2D42", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "#E8EDF2", fontFamily: "inherit" };
 
@@ -215,6 +217,23 @@ function SuperAdminDashboard() {
             <div style={{ background: "#1A2332", borderRadius: 12, padding: "12px 14px" }}>
               <div style={{ fontSize: 22, fontWeight: 700, color: "#F87171" }}>{suspendedCount}</div>
               <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>Locked out</div>
+            </div>
+          </div>
+
+          {/* Platform-wide usage — how many people, and how many are still coming back */}
+          <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Platform usage</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
+            <div style={{ background: "#1A2332", borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{totalMembers}</div>
+              <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>Total members, all gyms</div>
+            </div>
+            <div style={{ background: "#0A1A14", border: "1px solid rgba(0,212,177,0.2)", borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#00D4B1" }}>{activity.active7}</div>
+              <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>Logged a workout, last 7 days</div>
+            </div>
+            <div style={{ background: "#1A2332", borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#60A5FA" }}>{activity.active30}</div>
+              <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>Logged a workout, last 30 days</div>
             </div>
           </div>
 
