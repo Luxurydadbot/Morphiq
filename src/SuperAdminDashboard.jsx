@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useApp, sb, Spinner, MonthlyActiveBarChart } from "./shared.jsx";
+import { useApp, sb, Spinner, MonthlyTrendLineChart } from "./shared.jsx";
 
 // ── PRICING — must match api/create-checkout.js exactly ──────────────────
 // If the real Stripe prices ever change, update both places at once.
@@ -119,6 +119,7 @@ function SuperAdminDashboard() {
   const [memberCounts, setMemberCounts] = useState({});
   const [activeCounts, setActiveCounts] = useState({});
   const [monthlyActive, setMonthlyActive] = useState([]);
+  const [monthlyTotal, setMonthlyTotal] = useState([]);
   const [activity, setActivity] = useState({ active7: 0, active30: 0 });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -131,12 +132,13 @@ function SuperAdminDashboard() {
     async function load() {
       setLoading(true);
       setLoadError(false);
-      const [gymRows, counts, activitySummary, activeByGym, monthly] = await Promise.all([
+      const [gymRows, counts, activitySummary, activeByGym, monthly, monthlyTotalMembers] = await Promise.all([
         sb.getAllGyms(),
         sb.getMemberCountsByGym(),
         sb.getPlatformActivitySummary(),
         sb.getActiveMemberCountsByGym(),
         sb.getMonthlyActiveMembers(),
+        sb.getMonthlyTotalMembers(),
       ]);
       if (cancelled) return;
       setGyms(gymRows);
@@ -144,6 +146,7 @@ function SuperAdminDashboard() {
       setActivity(activitySummary);
       setActiveCounts(activeByGym);
       setMonthlyActive(monthly);
+      setMonthlyTotal(monthlyTotalMembers);
       setLoading(false);
     }
     load();
@@ -230,12 +233,15 @@ function SuperAdminDashboard() {
             </div>
           </div>
 
-          {/* Active members trend — last 12 calendar months, platform-wide */}
+          {/* Membership growth vs. engagement — last 12 calendar months, platform-wide */}
           <div style={{ background: "#1A2332", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
             <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>
-              Active members — last 12 months
+              Membership growth — last 12 months
             </div>
-            <MonthlyActiveBarChart data={monthlyActive} accent="#00D4B1" />
+            <MonthlyTrendLineChart series={[
+              { label: "Total members", color: "#60A5FA", data: monthlyTotal },
+              { label: "Active members", color: "#00D4B1", data: monthlyActive },
+            ]} />
           </div>
 
           {/* Platform-wide usage — how many people, and how many are still coming back */}
