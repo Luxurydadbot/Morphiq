@@ -443,6 +443,30 @@ const sb = {
     } catch { return false; }
   },
 
+  // Platform-wide usage snapshot — how many distinct members logged a workout
+  // in the last 7 / 30 days, across every gym combined. Reuses the same
+  // workout_logs table and columns already used for per-gym activity tracking.
+  async getPlatformActivitySummary() {
+    try {
+      const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+      const startStr = d30.toISOString().slice(0, 10);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?workout_date=gte.${startStr}&select=user_id,workout_date`,
+        { headers: SB_GET() }
+      );
+      const rows = await res.json();
+      if (!Array.isArray(rows)) return { active7: 0, active30: 0 };
+      const d7 = new Date(); d7.setDate(d7.getDate() - 7);
+      const d7Str = d7.toISOString().slice(0, 10);
+      const set7 = new Set(); const set30 = new Set();
+      rows.forEach(r => {
+        set30.add(r.user_id);
+        if (r.workout_date >= d7Str) set7.add(r.user_id);
+      });
+      return { active7: set7.size, active30: set30.size };
+    } catch { return { active7: 0, active30: 0 }; }
+  },
+
   // ── GYM SELF-SERVE SIGNUP ────────────────────────────────────────────────
   // Returns true if gymId is free to use, false if it's already taken.
   async isGymIdAvailable(gymId) {
