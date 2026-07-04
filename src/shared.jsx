@@ -553,6 +553,31 @@ const sb = {
     } catch { return []; }
   },
 
+  // Platform-wide running total of signed-up members — last 12 calendar
+  // months. Table: profiles, column: created_at (confirmed to exist). For
+  // each month, counts every profile whose created_at falls on or before the
+  // end of that month — a cumulative total, since members don't "unjoin" in
+  // this count, so the line only ever climbs or holds flat, never drops.
+  async getMonthlyTotalMembers() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=created_at`, { headers: SB_GET() });
+      if (!res.ok) return [];
+      const rows = await res.json();
+      const now = new Date();
+      const months = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const cutoff = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+        months.push({ label: d.toLocaleDateString("en-US", { month: "short" }), cutoff });
+      }
+      if (!Array.isArray(rows)) return months.map(m => ({ label: m.label, count: 0 }));
+      return months.map(m => ({
+        label: m.label,
+        count: rows.filter(r => r.created_at && new Date(r.created_at) <= m.cutoff).length,
+      }));
+    } catch { return []; }
+  },
+
   // ── GYM SELF-SERVE SIGNUP ────────────────────────────────────────────────
   // Returns true if gymId is free to use, false if it's already taken.
   async isGymIdAvailable(gymId) {
@@ -1614,31 +1639,44 @@ function WeightChart({ data, accent }) {
   );
 }
 
-function MonthlyActiveBarChart({ data, accent }) {
-  const W = 600, H = 130, PAD = 16;
-  if (!data || data.length === 0) return null;
-  const maxCount = Math.max(...data.map(d => d.count), 1);
-  const slot = (W - PAD * 2) / data.length;
-  const barWidth = slot * 0.6;
+function MonthlyTrendLineChart({ series }) {
+  // series: [{ label, color, data: [{ label, count }, ...] }, ...]
+  // All series are expected to share the same month labels/order.
+  const W = 600, H = 150, PAD = 18;
+  if (!series || series.length === 0 || !series[0].data || series[0].data.length === 0) return null;
+  const months = series[0].data;
+  const allCounts = series.flatMap(s => s.data.map(d => d.count));
+  const maxV = Math.max(...allCounts, 1);
+  const xStep = (W - PAD * 2) / Math.max(months.length - 1, 1);
+  const toY = v => PAD + (1 - v / maxV) * (H - PAD * 2 - 18);
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-      {data.map((d, i) => {
-        const barHeight = (d.count / maxCount) * (H - PAD * 2 - 16);
-        const x = PAD + i * slot + (slot - barWidth) / 2;
-        const y = H - 22 - barHeight;
-        const isLast = i === data.length - 1;
-        return (
-          <g key={i}>
-            <rect x={x} y={y} width={barWidth} height={Math.max(barHeight, 2)} rx="3"
-              fill={accent} opacity={isLast ? 1 : 0.5} />
-            <text x={x + barWidth / 2} y={H - 8} textAnchor="middle" fontSize="9" fill="#6B7A8D">{d.label}</text>
-            {d.count > 0 && (
-              <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="9" fill="#E8EDF2" fontWeight="600">{d.count}</text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+    <div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+        {series.map((s, si) => {
+          const points = s.data.map((d, i) => [PAD + i * xStep, toY(d.count)]);
+          const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+          return (
+            <g key={si}>
+              <path d={linePath} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              {points.map((p, i) => (
+                <circle key={i} cx={p[0]} cy={p[1]} r="2.5" fill={s.color} />
+              ))}
+            </g>
+          );
+        })}
+        {months.map((m, i) => (
+          <text key={i} x={PAD + i * xStep} y={H - 4} textAnchor="middle" fontSize="9" fill="#6B7A8D">{m.label}</text>
+        ))}
+      </svg>
+      <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
+        {series.map((s, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#9BB3C8" }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+            {s.label}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1734,5 +1772,5 @@ export {
   // Progress screen sub-components
   WeightChart, StreakCalendar, getWeekStreak,
   // Admin dashboard sub-components
-  MonthlyActiveBarChart,
+  MonthlyTrendLineChart,
 };
