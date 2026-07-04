@@ -513,6 +513,46 @@ const sb = {
     } catch { return {}; }
   },
 
+  // Platform-wide monthly active member counts — last 12 calendar months.
+  // Each month shows how many distinct people (profiles.id, via workout_logs
+  // user_id) logged at least one workout that month. Same workout_logs
+  // table/columns as getPlatformActivitySummary and getActiveMemberCountsByGym
+  // above, just bucketed by calendar month instead of a rolling 7/30-day window.
+  async getMonthlyActiveMembers() {
+    try {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      const startStr = start.toISOString().slice(0, 10);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?workout_date=gte.${startStr}&select=user_id,workout_date`,
+        { headers: SB_GET() }
+      );
+      if (!res.ok) return [];
+      const rows = await res.json();
+
+      // Build all 12 month buckets up front (oldest to newest) so a month
+      // with zero activity still shows as a bar, not a missing gap.
+      const months = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        months.push({ key, label: d.toLocaleDateString("en-US", { month: "short" }), set: new Set() });
+      }
+      const byKey = {};
+      months.forEach(m => { byKey[m.key] = m; });
+
+      if (Array.isArray(rows)) {
+        rows.forEach(r => {
+          if (!r.workout_date) return;
+          const key = r.workout_date.slice(0, 7); // "YYYY-MM"
+          if (byKey[key]) byKey[key].set.add(r.user_id);
+        });
+      }
+
+      return months.map(m => ({ label: m.label, count: m.set.size }));
+    } catch { return []; }
+  },
+
   // ── GYM SELF-SERVE SIGNUP ────────────────────────────────────────────────
   // Returns true if gymId is free to use, false if it's already taken.
   async isGymIdAvailable(gymId) {
@@ -1574,6 +1614,34 @@ function WeightChart({ data, accent }) {
   );
 }
 
+function MonthlyActiveBarChart({ data, accent }) {
+  const W = 600, H = 130, PAD = 16;
+  if (!data || data.length === 0) return null;
+  const maxCount = Math.max(...data.map(d => d.count), 1);
+  const slot = (W - PAD * 2) / data.length;
+  const barWidth = slot * 0.6;
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      {data.map((d, i) => {
+        const barHeight = (d.count / maxCount) * (H - PAD * 2 - 16);
+        const x = PAD + i * slot + (slot - barWidth) / 2;
+        const y = H - 22 - barHeight;
+        const isLast = i === data.length - 1;
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={barWidth} height={Math.max(barHeight, 2)} rx="3"
+              fill={accent} opacity={isLast ? 1 : 0.5} />
+            <text x={x + barWidth / 2} y={H - 8} textAnchor="middle" fontSize="9" fill="#6B7A8D">{d.label}</text>
+            {d.count > 0 && (
+              <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="9" fill="#E8EDF2" fontWeight="600">{d.count}</text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 function StreakCalendar({ accent, workoutDates }) {
   const days = ["M","T","W","T","F","S","S"];
   // Build a 4-week grid ending today
@@ -1665,4 +1733,6 @@ export {
   getFallbackReply, fetchAIReply,
   // Progress screen sub-components
   WeightChart, StreakCalendar, getWeekStreak,
+  // Admin dashboard sub-components
+  MonthlyActiveBarChart,
 };
