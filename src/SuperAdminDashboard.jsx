@@ -30,7 +30,7 @@ function StatusPill({ gym }) {
   return <span style={{ background: s.bg, color: s.color, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>{s.label}</span>;
 }
 
-function GymCard({ gym, memberCount, onToggleSuspend, onSaveNotes }) {
+function GymCard({ gym, memberCount, activeCount, onToggleSuspend, onSaveNotes }) {
   const [notes, setNotes] = useState(gym.admin_notes || "");
   const [savingNotes, setSavingNotes] = useState(false);
   const [confirmingLock, setConfirmingLock] = useState(false);
@@ -63,6 +63,7 @@ function GymCard({ gym, memberCount, onToggleSuspend, onSaveNotes }) {
         <div style={{ background: "#0D1623", borderRadius: 8, padding: "8px 10px" }}>
           <div style={{ fontSize: 10, color: "#6B7A8D" }}>Members</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{memberCount}</div>
+          <div style={{ fontSize: 9, color: "#00D4B1", marginTop: 2 }}>{activeCount?.active30 || 0} active (30d)</div>
         </div>
         <div style={{ background: "#0A1A14", borderRadius: 8, padding: "8px 10px" }}>
           <div style={{ fontSize: 10, color: "#6B7A8D" }}>Expected/mo</div>
@@ -113,6 +114,7 @@ function SuperAdminDashboard() {
   const { signOut } = useApp();
   const [gyms, setGyms] = useState([]);
   const [memberCounts, setMemberCounts] = useState({});
+  const [activeCounts, setActiveCounts] = useState({});
   const [activity, setActivity] = useState({ active7: 0, active30: 0 });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -125,15 +127,17 @@ function SuperAdminDashboard() {
     async function load() {
       setLoading(true);
       setLoadError(false);
-      const [gymRows, counts, activitySummary] = await Promise.all([
+      const [gymRows, counts, activitySummary, activeByGym] = await Promise.all([
         sb.getAllGyms(),
         sb.getMemberCountsByGym(),
         sb.getPlatformActivitySummary(),
+        sb.getActiveMemberCountsByGym(),
       ]);
       if (cancelled) return;
       setGyms(gymRows);
       setMemberCounts(counts);
       setActivity(activitySummary);
+      setActiveCounts(activeByGym);
       setLoading(false);
     }
     load();
@@ -271,6 +275,7 @@ function SuperAdminDashboard() {
                 key={gym.gym_id}
                 gym={gym}
                 memberCount={memberCounts[gym.gym_id] || 0}
+                activeCount={activeCounts[gym.gym_id]}
                 onToggleSuspend={handleToggleSuspend}
                 onSaveNotes={handleSaveNotes}
               />
