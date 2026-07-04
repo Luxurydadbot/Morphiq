@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useApp, sb, Spinner } from "./shared.jsx";
+import { useApp, sb, Spinner, MonthlyActiveBarChart } from "./shared.jsx";
 
 // ── PRICING — must match api/create-checkout.js exactly ──────────────────
 // If the real Stripe prices ever change, update both places at once.
@@ -55,7 +55,7 @@ function GymCard({ gym, memberCount, activeCount, onToggleSuspend, onSaveNotes }
         <StatusPill gym={gym} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 12 }}>
         <div style={{ background: "#0D1623", borderRadius: 8, padding: "8px 10px" }}>
           <div style={{ fontSize: 10, color: "#6B7A8D" }}>Plan</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: plan.color }}>{plan.label}</div>
@@ -63,7 +63,10 @@ function GymCard({ gym, memberCount, activeCount, onToggleSuspend, onSaveNotes }
         <div style={{ background: "#0D1623", borderRadius: 8, padding: "8px 10px" }}>
           <div style={{ fontSize: 10, color: "#6B7A8D" }}>Members</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{memberCount}</div>
-          <div style={{ fontSize: 9, color: "#00D4B1", marginTop: 2 }}>{activeCount?.active30 || 0} active (30d)</div>
+        </div>
+        <div style={{ background: "#0A1A14", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 8, padding: "8px 10px" }}>
+          <div style={{ fontSize: 10, color: "#6B7A8D" }}>Active members</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#00D4B1" }}>{activeCount?.active30 || 0}</div>
         </div>
         <div style={{ background: "#0A1A14", borderRadius: 8, padding: "8px 10px" }}>
           <div style={{ fontSize: 10, color: "#6B7A8D" }}>Expected/mo</div>
@@ -115,6 +118,7 @@ function SuperAdminDashboard() {
   const [gyms, setGyms] = useState([]);
   const [memberCounts, setMemberCounts] = useState({});
   const [activeCounts, setActiveCounts] = useState({});
+  const [monthlyActive, setMonthlyActive] = useState([]);
   const [activity, setActivity] = useState({ active7: 0, active30: 0 });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -127,17 +131,19 @@ function SuperAdminDashboard() {
     async function load() {
       setLoading(true);
       setLoadError(false);
-      const [gymRows, counts, activitySummary, activeByGym] = await Promise.all([
+      const [gymRows, counts, activitySummary, activeByGym, monthly] = await Promise.all([
         sb.getAllGyms(),
         sb.getMemberCountsByGym(),
         sb.getPlatformActivitySummary(),
         sb.getActiveMemberCountsByGym(),
+        sb.getMonthlyActiveMembers(),
       ]);
       if (cancelled) return;
       setGyms(gymRows);
       setMemberCounts(counts);
       setActivity(activitySummary);
       setActiveCounts(activeByGym);
+      setMonthlyActive(monthly);
       setLoading(false);
     }
     load();
@@ -222,6 +228,14 @@ function SuperAdminDashboard() {
               <div style={{ fontSize: 22, fontWeight: 700, color: "#F87171" }}>{suspendedCount}</div>
               <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>Locked out</div>
             </div>
+          </div>
+
+          {/* Active members trend — last 12 calendar months, platform-wide */}
+          <div style={{ background: "#1A2332", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
+            <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>
+              Active members — last 12 months
+            </div>
+            <MonthlyActiveBarChart data={monthlyActive} accent="#00D4B1" />
           </div>
 
           {/* Platform-wide usage — how many people, and how many are still coming back */}
