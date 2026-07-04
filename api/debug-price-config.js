@@ -37,7 +37,13 @@ export default async function handler(req, res) {
         billing_scheme: price.billing_scheme,
       };
     }
-    return res.status(200).json({ note: "Read-only inspection. Nothing changed.", prices: results });
+    const meterId = results.starter.meter;
+    let meterDetails = null;
+    if (meterId) {
+      const meter = await stripe.billing.meters.retrieve(meterId);
+      meterDetails = { id: meter.id, event_name: meter.event_name, status: meter.status, display_name: meter.display_name };
+    }
+    return res.status(200).json({ note: "Read-only inspection. Nothing changed.", prices: results, meter: meterDetails });
   } catch (err) {
     console.error("debug-price-config error:", err);
     return res.status(500).json({ error: "Something went wrong: " + err.message });
