@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { WorkoutScreen, CustomPlanScreen } from "./WorkoutScreen.jsx";
 import { MealPlanScreen } from "./MealScreen.jsx";
 import { GymOwnerDashboard, PricingScreen } from "./GymOwnerDashboard.jsx";
+import { SuperAdminDashboard } from "./SuperAdminDashboard.jsx";
 import { GymSignupScreen } from "./GymSignupScreen.jsx";
 import { OnboardingScreen } from "./OnboardingScreen.jsx";
 import { ProgressScreen } from "./ProgressScreen.jsx";
@@ -20,6 +21,11 @@ import {
 } from "./shared.jsx";
 
 const useApp = () => useContext(AppContext);
+
+// The one email address recognized as "the person who runs Morphiq itself."
+// Logging in with this email skips every gym entirely and goes straight to
+// the platform-wide Super Admin Dashboard, instead of a member or gym-owner view.
+const SUPER_ADMIN_EMAIL = "admin@hypergentiq.com";
 
 function AppProvider({ children }) {
   // ── Restore session from localStorage on first load ──────────────────────
@@ -207,11 +213,16 @@ function AppProvider({ children }) {
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
   }, [savedSession?.uid]);
 
-  // Called after successful auth. role = "member" | "owner".
+  // Called after successful auth. role = "member" | "owner" | "super_admin".
   async function signIn(email, role, realAuthUserId = null) {
     const uid = realAuthUserId || ("sim-" + Date.now());
     setSupabaseUser({ email, id: uid });
     supabaseUserIdRef.current = uid;
+    if (role === "super_admin") {
+      // No gym to look up — this account sits above every gym, not inside one.
+      setScreen("super_admin");
+      return;
+    }
     if (role === "owner") {
       // Look up the owner's gym and store the real gym_id in branding context
       // so GymOwnerDashboard can query real member data
@@ -442,6 +453,11 @@ function AuthScreen() {
     setStep("verifying"); setErrorMsg("");
     const result = await sb.verifyOTP(email, token);
     if (result?.uid) {
+      // The platform admin email always wins — skip the gym-owner lookup entirely.
+      if (email.trim().toLowerCase() === SUPER_ADMIN_EMAIL) {
+        signIn(result.email, "super_admin", result.uid);
+        return;
+      }
       // Check if this email is a gym owner
       const gymRow = await sb.getGymByOwnerEmail(email);
       const role = gymRow ? "owner" : "member";
@@ -1263,6 +1279,7 @@ function AppRouter() {
   if (screen === "progress") return <ProgressScreen />;
   if (screen === "profile") return <ProfileScreen />;
   if (screen === "owner") return <GymOwnerDashboard />;
+  if (screen === "super_admin") return <SuperAdminDashboard />;
   if (screen === "chat") return <ChatScreen fromScreen="home" />;
   if (screen === "chat_workout") return <ChatScreen fromScreen="workout" />;
   if (screen === "chat_meals") return <ChatScreen fromScreen="meals" />;
