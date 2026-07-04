@@ -391,6 +391,58 @@ const sb = {
     } catch (e) { console.error("saveGymBranding exception:", e); return false; }
   },
 
+  // ── SUPER ADMIN — PLATFORM-WIDE GYM MANAGEMENT ──────────────────────────
+  // Returns every gym row, newest first. Used only by SuperAdminDashboard.
+  async getAllGyms() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms?order=created_at.desc`, { headers: SB_GET() });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch { return []; }
+  },
+
+  // Returns { [gym_id]: memberCount } across every gym in one query, so the
+  // super admin dashboard doesn't need one request per gym.
+  async getMemberCountsByGym() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=gym_id`, { headers: SB_GET() });
+      if (!res.ok) return {};
+      const rows = await res.json();
+      const counts = {};
+      for (const r of rows) {
+        if (!r.gym_id) continue;
+        counts[r.gym_id] = (counts[r.gym_id] || 0) + 1;
+      }
+      return counts;
+    } catch { return {}; }
+  },
+
+  // Manual lock/unlock switch — sets is_suspended on a gym's row.
+  // Requires the is_suspended column to exist on the gyms table.
+  async setGymSuspended(gymId, suspended) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}`, {
+        method: "PATCH",
+        headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
+        body: JSON.stringify({ is_suspended: suspended, updated_at: new Date().toISOString() }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // Saves the super admin's private note about a gym.
+  // Requires the admin_notes column to exist on the gyms table.
+  async saveGymNotes(gymId, notes) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}`, {
+        method: "PATCH",
+        headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
+        body: JSON.stringify({ admin_notes: notes, updated_at: new Date().toISOString() }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
   // ── GYM SELF-SERVE SIGNUP ────────────────────────────────────────────────
   // Returns true if gymId is free to use, false if it's already taken.
   async isGymIdAvailable(gymId) {
