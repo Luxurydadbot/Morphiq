@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon,
+import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
          WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan } from "./shared.jsx";
 
@@ -36,7 +36,7 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
   return (
     <div className="mq-fade" style={{ background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, color: a }}>✓</div>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="check" size={14} /></div>
         <div style={{ fontSize: 15, color: a, fontWeight: 700 }}>Hypergentiq noticed something</div>
       </div>
       <div style={{ fontSize: 14, color: "#9BB3C8", lineHeight: 1.6, marginBottom: 12 }}>
@@ -45,7 +45,7 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={onKeep} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.12)`, borderRadius: 10, padding: "10px 4px", fontSize: 13, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Keep {oldWeight} lbs</button>
-        <button onClick={onAccept} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "10px 4px", fontSize: 14, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Use {newWeight} lbs ✦</button>
+        <button onClick={onAccept} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "10px 4px", fontSize: 14, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Use {newWeight} lbs <Icon name="sparkle" size={12} /></button>
       </div>
     </div>
   );
@@ -909,7 +909,7 @@ function WorkoutScreen() {
 
           {/* Exercise name + duration */}
           <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <div style={{ fontSize: 42 }}>🔥</div>
+            <div style={{ display: "flex", justifyContent: "center", color: a }}><Icon name="flame" size={42} /></div>
             <div style={{ fontSize: 34, fontWeight: 700, color: theme.text, lineHeight: 1.2, marginTop: 10 }}>{currentWarmup?.name}</div>
             <div style={{ fontSize: 22, color: a, fontWeight: 600, marginTop: 8 }}>{currentWarmup?.duration}</div>
           </div>
@@ -935,7 +935,7 @@ function WorkoutScreen() {
               if (isLastWarmup) { setPhase("active"); }
               else { setWarmupStep(s => s + 1); }
             }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              {isLastWarmup ? "Start workout →" : "Done — next →"}
+              {isLastWarmup ? <>Start workout <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></> : <>Done — next <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>}
             </button>
             <button onClick={() => setPhase("active")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
               Skip warm-up
@@ -968,7 +968,7 @@ function WorkoutScreen() {
             <div style={{ height: 4, borderRadius: 2, background: a, width: `${Math.round(((cooldownStep + 1) / cooldownExercises.length) * 100)}%`, transition: "width .4s" }} />
           </div>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 12 }}>
-            <div style={{ fontSize: 40 }}>🧘</div>
+            <div style={{ display: "flex", justifyContent: "center", color: a }}><Icon name="meditate" size={40} /></div>
             <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, lineHeight: 1.2 }}>{currentCooldown?.name}</div>
             <div style={{ fontSize: 18, color: a, fontWeight: 500 }}>{currentCooldown?.duration}</div>
           </div>
@@ -977,7 +977,7 @@ function WorkoutScreen() {
               if (isLastCooldown) { setPhase("complete"); setState("done"); }
               else { setCooldownStep(s => s + 1); }
             }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              {isLastCooldown ? "Finish workout ✓" : "Done — next →"}
+              {isLastCooldown ? <>Finish workout <Icon name="check" size={15} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></> : <>Done — next <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>}
             </button>
             <button onClick={() => setState("done")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
               Skip cool-down
@@ -1007,7 +1007,7 @@ function WorkoutScreen() {
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "2rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🏆</div>
+          <div style={{ marginBottom: 12, color: "#F59E0B" }}><Icon name="trophy" size={36} /></div>
           <div style={{ fontSize: 22, fontWeight: 700, color: theme.text, marginBottom: 4 }}>Workout complete!</div>
           <div style={{ fontSize: 14, color: theme.textDim, marginBottom: "1.5rem" }}>Great work, {user.name || "champ"}. Recovery starts now.</div>
           {/* Big stats grid */}
@@ -1045,14 +1045,14 @@ function WorkoutScreen() {
           </div>
           {overloadApplied && (
             <div style={{ width: "100%", background: "#1A1200", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: "10px 14px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 20 }}>⚡</div>
+              <div style={{ color: "#F59E0B" }}><Icon name="bolt" size={20} /></div>
               <div style={{ textAlign: "left" }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#F59E0B" }}>Progressive overload applied</div>
                 <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>Hypergentiq nudged your weight up this session — you're getting stronger.</div>
               </div>
             </div>
           )}
-          <button onClick={() => { recordWorkoutComplete(); navigate("home"); }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Back to dashboard →</button>
+          <button onClick={() => { recordWorkoutComplete(); navigate("home"); }} style={{ width: "100%", background: a, color: "#003D35", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Back to dashboard <Icon name="arrow-right" size={15} /></button>
         </div>
       </Layout>
     );
@@ -1070,7 +1070,9 @@ function WorkoutScreen() {
 
           {/* Logged confirmation strip */}
           <div style={{ background: wasSkipped ? "#1A1A0A" : "#003D35", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: wasSkipped ? theme.amber : a, textAlign: "center", marginBottom: 4 }}>
-            {wasSkipped ? "→ Set skipped" : `✓ Logged — ${loggedSets[loggedSets.length - 1]?.reps} reps at ${loggedSets[loggedSets.length - 1]?.weight} lbs`}
+            {wasSkipped
+              ? <><Icon name="arrow-right" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Set skipped</>
+              : <><Icon name="check" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Logged — {loggedSets[loggedSets.length - 1]?.reps} reps at {loggedSets[loggedSets.length - 1]?.weight} lbs</>}
           </div>
 
           {/* Cloud save status — merged in from the old separate confirm
@@ -1083,11 +1085,11 @@ function WorkoutScreen() {
           {!wasSkipped && (savingToCloud || savedToCloud || saveFailReason) && (
             <div style={{ textAlign: "center", marginBottom: 8 }}>
               <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : a }}>
-                {savingToCloud ? "☁ Saving to account..." : "☁ Saved to account ✓"}
+                <Icon name="cloud" size={11} style={{ verticalAlign: "-1px", marginRight: 3 }} /> {savingToCloud ? "Saving to account..." : "Saved to account"}{!savingToCloud && <Icon name="check" size={10} style={{ verticalAlign: "-1px", marginLeft: 3 }} />}
               </div>
               {saveFailReason && (
                 <div style={{ fontSize: 10, color: theme.amber || "#F59E0B", marginTop: 2 }}>
-                  ☁ Save failed: {saveFailReason}
+                  <Icon name="cloud" size={10} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Save failed: {saveFailReason}
                 </div>
               )}
             </div>
@@ -1096,7 +1098,7 @@ function WorkoutScreen() {
           {/* PR celebration banner — compact, sits above the rest ring */}
           {isPR && !wasSkipped && (
             <div className="mq-fade" style={{ background: "linear-gradient(135deg, #2D1A00 0%, #1A1200 100%)", border: "2px solid #F59E0B", borderRadius: 14, padding: "10px 16px", width: "100%", textAlign: "center", boxShadow: "0 0 30px rgba(245,158,11,0.2)", marginBottom: 12 }}>
-              <span style={{ fontSize: 18, marginRight: 6 }}>🏆</span>
+              <span style={{ marginRight: 6, color: "#F59E0B", verticalAlign: "-3px", display: "inline-block" }}><Icon name="trophy" size={18} /></span>
               <span style={{ fontSize: 14, fontWeight: 700, color: "#F59E0B" }}>New personal record!</span>
               <span style={{ fontSize: 13, color: "#E8C97A", marginLeft: 6 }}>{currentWeight} lbs on {ex.name}</span>
             </div>
@@ -1157,11 +1159,11 @@ function WorkoutScreen() {
               <>
                 <button onClick={() => { setCorrectionValue(lastLoggedReps); setCorrectingReps(true); }}
                   style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 14, padding: "16px", fontSize: 18, color: a, cursor: "pointer", fontFamily: "inherit", marginBottom: correctionSaving || correctionSaved ? 4 : 12 }}>
-                  ✏️ Wrong number? Fix it
+                  <Icon name="pencil" size={15} style={{ verticalAlign: "-3px", marginRight: 5 }} /> Wrong number? Fix it
                 </button>
                 {(correctionSaving || correctionSaved) && (
                   <div style={{ fontSize: 11, color: correctionSaving ? theme.textDim : a, textAlign: "center", marginBottom: 12 }}>
-                    {correctionSaving ? "☁ Saving correction..." : "☁ Correction saved ✓"}
+                    <Icon name="cloud" size={11} style={{ verticalAlign: "-1px", marginRight: 3 }} /> {correctionSaving ? "Saving correction..." : "Correction saved"}{!correctionSaving && <Icon name="check" size={10} style={{ verticalAlign: "-1px", marginLeft: 3 }} />}
                   </div>
                 )}
               </>
@@ -1170,7 +1172,7 @@ function WorkoutScreen() {
 
           {/* Up next — large and prominent */}
           <div style={{ background: "#0A1A14", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20, color: a }}>→</div>
+            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="arrow-right" size={20} /></div>
             <div>
               <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Up next</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, lineHeight: 1.1 }}>{ex.name}</div>
@@ -1228,7 +1230,7 @@ function WorkoutScreen() {
             workout, then fades. Makes auto-resume visible and intentional. */}
         {showResumeBanner && (
           <div className="mq-fade" style={{ background: "#0A1A14", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0, color: a }}>↻</div>
+            <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="refresh" size={13} /></div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: a }}>Picked up where you left off</div>
               <div style={{ fontSize: 11, color: "#9BB3C8" }}>Exercise {exIdx + 1}, {currentSpec?.label || `Set ${safeSetIdx + 1}`} · your logged sets are saved</div>
@@ -1272,7 +1274,7 @@ function WorkoutScreen() {
           {isWarmupSet ? (
             <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
           ) : nudgeAcceptedRef.current ? (
-            <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>⚡ Progressive overload applied</div>
+            <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
           ) : (
             <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === ex.weight ? "Today's target" : `+${currentWeight - ex.weight} lbs from plan`}</div>
           )}
@@ -1285,7 +1287,7 @@ function WorkoutScreen() {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "#E8EDF2" }}>{lastSetHistory.weight} lbs × {lastSetHistory.reps} reps</span>
               {currentWeight > lastSetHistory.weight && (
-                <span style={{ fontSize: 10, color: a, background: "#003D35", borderRadius: 6, padding: "2px 6px" }}>↑ PR pace</span>
+                <span style={{ fontSize: 10, color: a, background: "#003D35", borderRadius: 6, padding: "2px 6px" }}><Icon name="arrow-up" size={9} style={{ verticalAlign: "-1px", marginRight: 2 }} /> PR pace</span>
               )}
             </div>
           </div>
@@ -1298,7 +1300,7 @@ function WorkoutScreen() {
             this is NOT a working set and shouldn't be taken hard. */}
         {isWarmupSet && (
           <div style={{ background: "#1A1206", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 10, padding: "10px 12px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <div style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>🔥</div>
+            <div style={{ flexShrink: 0, color: "#F59E0B" }}><Icon name="flame" size={16} /></div>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#F59E0B", marginBottom: 2 }}>This is a warm-up set — take it easy</div>
               <div style={{ fontSize: 11, color: "#9BB3C8", lineHeight: 1.45 }}>
@@ -1348,7 +1350,7 @@ function WorkoutScreen() {
               style={{ width: 52, height: 52, borderRadius: "50%", background: "#1A2332", border: `1px solid rgba(255,255,255,0.1)`, fontSize: 26, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}>+</button>
           </div>
           <div style={{ fontSize: 11, color: theme.textDim, marginTop: 4 }}>
-            {repCount !== null ? "Tap mic or Log ✓ to save" : "Tap − / + to adjust, or speak your reps"}
+            {repCount !== null ? <>Tap mic or Log <Icon name="check" size={11} style={{ verticalAlign: "-1px" }} /> to save</> : "Tap − / + to adjust, or speak your reps"}
           </div>
         </div>
 
@@ -1374,9 +1376,9 @@ function WorkoutScreen() {
           <button onClick={() => { logSet(0); }}
             style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
           <button onClick={() => setShowSwapSheet(true)}
-            style={{ flex: 1, background: "rgba(0,212,177,0.06)", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: a, cursor: "pointer", fontFamily: "inherit" }}>⇄ Swap</button>
+            style={{ flex: 1, background: "rgba(0,212,177,0.06)", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: a, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Icon name="swap" size={11} /> Swap</button>
           <button onClick={() => logSet(displayReps)}
-            style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px 6px", fontSize: 12, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Log {displayReps} reps ✓</button>
+            style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px 6px", fontSize: 12, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Log {displayReps} reps <Icon name="check" size={13} /></button>
         </div>
 
         <div style={{ marginTop: 8, display: "flex", justifyContent: "center", gap: 16, alignItems: "center" }}>
@@ -1408,7 +1410,7 @@ function WorkoutScreen() {
       {/* ── Swap confirmation banner ── */}
       {swapConfirmName && (
         <div className="mq-fade" style={{ position: "absolute", top: 60, left: 16, right: 16, background: "#0A1628", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, zIndex: 20 }}>
-          <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>✓</div>
+          <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#003D35", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="check" size={13} /></div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: a }}>Swapped in {swapConfirmName}</div>
             <div style={{ fontSize: 11, color: "#9BB3C8" }}>Sets reset to 1 — same muscle group</div>
@@ -1429,11 +1431,11 @@ function WorkoutScreen() {
                 </div>
               </div>
               <button onClick={() => setShowSwapSheet(false)}
-                style={{ background: "#1A2332", border: "none", borderRadius: 8, width: 30, height: 30, fontSize: 16, color: "#6B7A8D", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                style={{ background: "#1A2332", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6B7A8D", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="x" size={15} /></button>
             </div>
             {/* Muscle group label */}
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#0A1628", border: `1px solid rgba(0,212,177,0.15)`, borderRadius: 20, padding: "3px 10px", marginBottom: 14 }}>
-              <span style={{ fontSize: 10, color: a }}>💪</span>
+              <Icon name="flex" size={12} style={{ color: a }} />
               <span style={{ fontSize: 11, color: "#9BB3C8" }}>{ex.muscle}</span>
             </div>
             {/* Alternatives list — plan's AI-suggested alternative shown first */}
@@ -1442,9 +1444,9 @@ function WorkoutScreen() {
                 style={{ width: "100%", background: "#0A1A14", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2" }}>{ex.alternative}</div>
-                  <div style={{ fontSize: 11, color: a, marginTop: 2 }}>✦ AI recommended — same movement pattern</div>
+                  <div style={{ fontSize: 11, color: a, marginTop: 2 }}><Icon name="sparkle" size={10} style={{ verticalAlign: "-1px", marginRight: 3 }} /> AI recommended — same movement pattern</div>
                 </div>
-                <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Swap →</div>
+                <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10, display: "flex", alignItems: "center", gap: 3 }}>Swap <Icon name="arrow-right" size={11} /></div>
               </button>
             )}
             {/* Loading indicator while Supabase query is in flight */}
@@ -1461,7 +1463,7 @@ function WorkoutScreen() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#E8EDF2" }}>{alt.name}</div>
                   <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>{alt.muscle} · {ex.targetReps} reps · {ex.sets} sets</div>
                 </div>
-                <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>Swap →</div>
+                <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10, display: "flex", alignItems: "center", gap: 3 }}>Swap <Icon name="arrow-right" size={11} /></div>
               </button>
             ))}
             {/* ── Voice swap option ── */}
@@ -1510,7 +1512,7 @@ function WorkoutScreen() {
                       setVoiceSwapHeard("");
                     }}
                     style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px", fontSize: 13, fontWeight: 700, color: "#003D35", cursor: "pointer", fontFamily: "inherit" }}>
-                    ✓ Use {voiceSwapHeard}
+                    <Icon name="check" size={13} style={{ verticalAlign: "-2px", marginRight: 3 }} /> Use {voiceSwapHeard}
                   </button>
                 </div>
               </div>
@@ -1544,10 +1546,10 @@ const WEEK = [{name:"Mon",type:"Full body",isWorkout:true},{name:"Tue",type:"Res
 
 // Goal options for the custom plan — drives rep ranges and progression rate
 const CUSTOM_GOALS = [
-  { id: "lose_fat",      label: "Lose fat",         sub: "Higher reps, shorter rest, steady progression",  icon: "🔥" },
-  { id: "build_muscle",  label: "Build muscle",      sub: "Moderate reps, progressive overload focus",      icon: "💪" },
-  { id: "build_strength",label: "Build strength",    sub: "Lower reps, heavier weight, longer rest",        icon: "🏋️" },
-  { id: "general_fitness",label: "General fitness",  sub: "Balanced — energy, health, and consistency",     icon: "⚡" },
+  { id: "lose_fat",      label: "Lose fat",         sub: "Higher reps, shorter rest, steady progression",  icon: <Icon name="flame" size={22} /> },
+  { id: "build_muscle",  label: "Build muscle",      sub: "Moderate reps, progressive overload focus",      icon: <Icon name="flex" size={22} /> },
+  { id: "build_strength",label: "Build strength",    sub: "Lower reps, heavier weight, longer rest",        icon: <Icon name="dumbbell" size={22} /> },
+  { id: "general_fitness",label: "General fitness",  sub: "Balanced — energy, health, and consistency",     icon: <Icon name="bolt" size={22} /> },
 ];
 
 // Rep range presets per goal — shown as default suggestion, member can override per exercise
@@ -1689,7 +1691,7 @@ function CustomPlanScreen() {
       {/* Header */}
       <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
         <button onClick={() => step > 0 ? setStep(step - 1) : navigate("onboarding")}
-          style={{ background: "transparent", border: "none", color: ob.muted, fontSize: 20, cursor: "pointer", lineHeight: 1, padding: 0 }}>←</button>
+          style={{ background: "transparent", border: "none", color: ob.muted, cursor: "pointer", lineHeight: 1, padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={20} /></button>
         <span style={{ fontSize: 13, fontWeight: 600, color: ob.white }}>Build your own plan</span>
         <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step + 1} of 4</span>
       </div>
@@ -1708,12 +1710,12 @@ function CustomPlanScreen() {
           {CUSTOM_GOALS.map(g => (
             <button key={g.id} onClick={() => { setGoal(g.id); setTimeout(() => setStep(1), 180); }}
               style={{ background: goal === g.id ? ob.tealDk : ob.card, border: `1.5px solid ${goal === g.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", marginBottom: 8, width: "100%" }}>
-              <span style={{ fontSize: 24 }}>{g.icon}</span>
+              <span style={{ color: goal === g.id ? a : ob.muted, display: "flex" }}>{g.icon}</span>
               <div style={{ textAlign: "left" }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: goal === g.id ? a : ob.white }}>{g.label}</div>
                 <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>{g.sub}</div>
               </div>
-              {goal === g.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+              {goal === g.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", color: ob.tealDk, flexShrink: 0 }}><Icon name="check" size={11} /></div>}
             </button>
           ))}
         </div>}
@@ -1737,7 +1739,7 @@ function CustomPlanScreen() {
             </div>
           </div>
           <button onClick={() => { setCurrentDay(0); setDayExercises([]); setAllDays([]); setStep(2); }} style={s.tealBtn(false)}>
-            Next — add exercises →
+            Next — add exercises <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} />
           </button>
         </div>}
 
@@ -1757,7 +1759,7 @@ function CustomPlanScreen() {
                 <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>{ex.sets} sets × {ex.reps} reps · {ex.weight} lbs</div>
               </div>
               <button onClick={() => setDayExercises(prev => prev.filter((_,j) => j !== i))}
-                style={{ background: "transparent", border: "none", color: ob.muted, fontSize: 16, cursor: "pointer" }}>✕</button>
+                style={{ background: "transparent", border: "none", color: ob.muted, cursor: "pointer" }}><Icon name="x" size={15} /></button>
             </div>
           ))}
 
@@ -1784,7 +1786,7 @@ function CustomPlanScreen() {
                 </button>
                 <button onClick={addPending} disabled={!pending.weight}
                   style={{ flex: 2, background: pending.weight ? a : ob.card, color: pending.weight ? ob.tealDk : ob.muted, border: "none", borderRadius: 8, padding: 8, fontSize: 12, fontWeight: 600, cursor: pending.weight ? "pointer" : "default", fontFamily: ob.font }}>
-                  Add exercise ✓
+                  Add exercise <Icon name="check" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} />
                 </button>
               </div>
             </div>
@@ -1816,7 +1818,9 @@ function CustomPlanScreen() {
           <div style={{ marginTop: "auto" }}>
             {dayExercises.length > 0 && !pending && (
               <button onClick={finishDay} style={s.tealBtn(false)}>
-                {currentDay + 1 < daysPerWeek ? `Done with Day ${currentDay + 1} → add Day ${currentDay + 2}` : "Review plan →"}
+                {currentDay + 1 < daysPerWeek
+                  ? <>Done with Day {currentDay + 1} <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", margin: "0 3px" }} /> add Day {currentDay + 2}</>
+                  : <>Review plan <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>}
               </button>
             )}
             {dayExercises.length === 0 && (
@@ -1859,7 +1863,7 @@ function CustomPlanScreen() {
 
           {saveError && <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8, textAlign: "center" }}>{saveError}</div>}
           <button onClick={savePlan} disabled={saving} style={{ ...s.tealBtn(saving), marginTop: "auto" }}>
-            {saving ? "Saving..." : "Save my plan →"}
+            {saving ? "Saving..." : <>Save my plan <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>}
           </button>
         </div>}
 
