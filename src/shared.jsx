@@ -242,6 +242,9 @@ const sb = {
   },
 
   // ── WORKOUT LOGS ──────────────────────────────────────────────────────────
+  // Returns { ok: true, id } on success (id is the new row's UUID — needed so
+  // a later correction via updateWorkoutLogReps can target the right row) or
+  // { ok: false, reason } on failure.
   async insertWorkoutLog(supabaseUserId, { exerciseName, setNumber, reps, weight }) {
     try {
       // Resolve to profiles.id so the FK constraint is satisfied
@@ -256,20 +259,41 @@ const sb = {
         await new Promise(r => setTimeout(r, 1000));
         profileId = await this.getProfileId(supabaseUserId);
       }
-      if (!profileId) return false;
+      if (!profileId) return { ok: false, reason: "NO_PROFILE" };
       const body = { user_id: profileId, exercise_name: exerciseName, set_number: setNumber, reps, weight, workout_date: localDateStr() };
       const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/workout_logs`, () => ({
         method: "POST",
-        headers: SB_HEADERS(),
+        headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
         body: JSON.stringify(body),
       }));
       if (!res.ok) {
         const errBody = await res.text().catch(() => "");
         console.error("[Morphiq] insertWorkoutLog: insert failed", res.status, errBody);
-        return "HTTP_" + res.status;
+        return { ok: false, reason: "HTTP_" + res.status };
+      }
+      const rows = await res.json().catch(() => []);
+      return { ok: true, id: rows?.[0]?.id ?? null };
+    } catch (e) { console.error("[Morphiq] insertWorkoutLog threw:", e); return { ok: false, reason: "EXCEPTION" }; }
+  },
+
+  // Corrects the rep count on an already-saved set (used by the "Wrong
+  // number? Fix it" flow). Updates the existing row rather than inserting a
+  // new one, so a correction never double-counts toward totals/analytics.
+  async updateWorkoutLogReps(rowId, newReps) {
+    if (!rowId) return false;
+    try {
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/workout_logs?id=eq.${encodeURIComponent(rowId)}`, () => ({
+        method: "PATCH",
+        headers: SB_HEADERS(),
+        body: JSON.stringify({ reps: newReps }),
+      }));
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        console.error("[Morphiq] updateWorkoutLogReps: update failed", res.status, errBody);
+        return false;
       }
       return true;
-    } catch (e) { console.error("[Morphiq] insertWorkoutLog threw:", e); return "EXCEPTION"; }
+    } catch (e) { console.error("[Morphiq] updateWorkoutLogReps threw:", e); return false; }
   },
 
   // Fetch recent workout logs for the progress screen

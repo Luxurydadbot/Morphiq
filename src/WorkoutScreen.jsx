@@ -347,8 +347,13 @@ function WorkoutScreen() {
   const [swapDbResults, setSwapDbResults] = useState(null);  // live Supabase swap alternatives (null = not loaded yet)
   const [swapDbLoading, setSwapDbLoading] = useState(false); // true while Supabase query is in flight
   const [lastLoggedReps, setLastLoggedReps] = useState(null);
+  const [lastLoggedRowId, setLastLoggedRowId] = useState(null); // workout_logs row id — lets a later correction target the right row
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [savedToCloud, setSavedToCloud] = useState(false);
+  const [correctingReps, setCorrectingReps] = useState(false); // true while the in-app "fix it" number picker is open
+  const [correctionValue, setCorrectionValue] = useState(null);
+  const [correctionSaving, setCorrectionSaving] = useState(false);
+  const [correctionSaved, setCorrectionSaved] = useState(false);
   const [isPR, setIsPR] = useState(false); // true when this set is a new personal record
   // "Last time" history — loaded from Supabase when exercise changes
   // null = loading, false = no history found, object = { weight, reps, date }
@@ -512,6 +517,18 @@ function WorkoutScreen() {
       setNudgedWeight((nudgedWeight ?? ex.weight) + increment);
       setState("nudge");
     } else {
+      // Seed the rest ring's numbers here, in the same tick as the state
+      // change, so the very first frame of the rest screen already shows
+      // the correct countdown. Previously these were only set in a useEffect
+      // that ran a moment AFTER the rest screen first rendered, so the ring
+      // would briefly flash whatever numbers were left over from the last
+      // rest period before snapping to the right ones — that flash is what
+      // made the ring look like it had no relationship to the real time.
+      const newRestSecs = isWarmupSet ? 30 : (plan?.restSeconds || 120);
+      restStartRef.current = Date.now();
+      activeRestSecsRef.current = newRestSecs;
+      setActiveRestSecs(newRestSecs);
+      setRestSecs(newRestSecs);
       setState("rest");
     }
   }
@@ -523,6 +540,7 @@ function WorkoutScreen() {
 
   function logSet(reps = currentTargetReps + 1) {
     setIsPR(false); // reset before each set — new PR check will re-set if needed
+    setLastLoggedRowId(null); // reset until the new row's id comes back, so a correction can't accidentally target the previous set
     const entry = { exIdx, setIdx: safeSetIdx, reps, weight: currentWeight, kind: currentSpec.kind };
     const newLogs = [...loggedSets, entry];
     setLoggedSets(newLogs);
@@ -545,10 +563,14 @@ function WorkoutScreen() {
         weight: currentWeight,
       }).then(result => {
         setSavingToCloud(false);
-        const ok = result === true;
+        const ok = result?.ok === true;
         setSavedToCloud(ok);
-        if (ok) setTimeout(() => setSavedToCloud(false), 3000);
-        else setSaveFailReason(typeof result === "string" ? result : "UNKNOWN");
+        if (ok) {
+          setLastLoggedRowId(result.id);
+          setTimeout(() => setSavedToCloud(false), 3000);
+        } else {
+          setSaveFailReason(result?.reason || "UNKNOWN");
+        }
         // PR check: only for working sets (not warm-ups) with a real weight value
         if (ok && currentSpec.kind !== "warmup" && currentWeight > 0) {
           sb.getPersonalRecord(supabaseUser.id, ex.name).then(prevBest => {
@@ -1053,11 +1075,15 @@ function WorkoutScreen() {
 
           {/* Cloud save status — merged in from the old separate confirm
               screen so there's only one countdown (this rest timer), not a
-              3-second one followed by the real one. */}
-          {!wasSkipped && (
+              3-second one followed by the real one. Only shows text while
+              something is actually happening or just finished — previously
+              this fell back to a permanent "Saving..." message even long
+              after the save had already succeeded, which looked like it was
+              stuck. */}
+          {!wasSkipped && (savingToCloud || savedToCloud || saveFailReason) && (
             <div style={{ textAlign: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : savedToCloud ? a : theme.textFaint }}>
-                {savingToCloud ? "☁ Saving to account..." : savedToCloud ? "☁ Saved to account ✓" : supabaseUser?.id ? "☁ Saving..." : ""}
+              <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : a }}>
+                {savingToCloud ? "☁ Saving to account..." : "☁ Saved to account ✓"}
               </div>
               {saveFailReason && (
                 <div style={{ fontSize: 10, color: theme.amber || "#F59E0B", marginTop: 2 }}>
@@ -1086,21 +1112,60 @@ function WorkoutScreen() {
           </div>
 
           {/* Wrong number? Fix it — full-size button, sits right above the
-              "Up next" exercise card so it's easy to spot during rest. */}
+              "Up next" exercise card so it's easy to spot during rest.
+              Uses an in-app number picker instead of the browser's native
+              prompt() popup — that popup was unreliable (it can hang or
+              fail to appear at all in some mobile/home-screen-app contexts)
+              and the corrected number used to only change what's on screen
+              without ever saving to the account. Now it does both properly. */}
           {!wasSkipped && (
-            <button onClick={() => {
-              const typed = window.prompt("How many reps did you actually do?");
-              const n = parseInt(typed);
-              if (n > 0 && n < 100) {
-                const updated = [...loggedSets];
-                updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
-                setLoggedSets(updated);
-                loggedSetsRef.current = updated;
-                setLastLoggedReps(n);
-              }
-            }} style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 14, padding: "16px", fontSize: 18, color: a, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>
-              ✏️ Wrong number? Fix it
-            </button>
+            correctingReps ? (
+              <div style={{ background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 14, padding: "16px", marginBottom: 12 }}>
+                <div style={{ fontSize: 13, color: theme.textDim, textAlign: "center", marginBottom: 10 }}>How many reps did you actually do?</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 14 }}>
+                  <button onClick={() => setCorrectionValue(v => Math.max(0, (v ?? 0) - 1))}
+                    style={{ width: 44, height: 44, borderRadius: "50%", background: "#0F1922", border: "1px solid rgba(255,255,255,0.1)", color: theme.text, fontSize: 20, cursor: "pointer", fontFamily: "inherit" }}>−</button>
+                  <div style={{ fontSize: 40, fontWeight: 700, color: a, minWidth: 56, textAlign: "center" }}>{correctionValue}</div>
+                  <button onClick={() => setCorrectionValue(v => Math.min(99, (v ?? 0) + 1))}
+                    style={{ width: 44, height: 44, borderRadius: "50%", background: "#0F1922", border: "1px solid rgba(255,255,255,0.1)", color: theme.text, fontSize: 20, cursor: "pointer", fontFamily: "inherit" }}>+</button>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setCorrectingReps(false)}
+                    style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "12px", fontSize: 14, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  <button onClick={() => {
+                    const n = correctionValue;
+                    setCorrectingReps(false);
+                    if (n == null || n < 0 || n >= 100) return;
+                    const updated = [...loggedSets];
+                    updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
+                    setLoggedSets(updated);
+                    loggedSetsRef.current = updated;
+                    setLastLoggedReps(n);
+                    if (lastLoggedRowId) {
+                      setCorrectionSaving(true);
+                      setCorrectionSaved(false);
+                      sb.updateWorkoutLogReps(lastLoggedRowId, n).then(ok => {
+                        setCorrectionSaving(false);
+                        setCorrectionSaved(ok === true);
+                        if (ok === true) setTimeout(() => setCorrectionSaved(false), 3000);
+                      }).catch(() => setCorrectionSaving(false));
+                    }
+                  }} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "12px", fontSize: 14, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save correction</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button onClick={() => { setCorrectionValue(lastLoggedReps); setCorrectingReps(true); }}
+                  style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 14, padding: "16px", fontSize: 18, color: a, cursor: "pointer", fontFamily: "inherit", marginBottom: correctionSaving || correctionSaved ? 4 : 12 }}>
+                  ✏️ Wrong number? Fix it
+                </button>
+                {(correctionSaving || correctionSaved) && (
+                  <div style={{ fontSize: 11, color: correctionSaving ? theme.textDim : a, textAlign: "center", marginBottom: 12 }}>
+                    {correctionSaving ? "☁ Saving correction..." : "☁ Correction saved ✓"}
+                  </div>
+                )}
+              </>
+            )
           )}
 
           {/* Up next — large and prominent */}
