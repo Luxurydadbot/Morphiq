@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useApp, sb, Pill, Spinner, VoiceBtn, Layout, theme, GROCERY_DATA, localDateStr } from "./shared.jsx";
+import { useApp, sb, Pill, Spinner, VoiceBtn, Layout, theme, GROCERY_DATA, localDateStr, Icon } from "./shared.jsx";
 
 // ─── MacroBar ────────────────────────────────────────────────────────────────
 function MacroBar({ label, current, goal, color }) {
@@ -27,7 +27,7 @@ function GroceryList({ groceries, onToggle }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: theme.text }}>Grocery List</div>
-        <Pill variant="teal">{done} of {total} ✓</Pill>
+        <Pill variant="teal">{done} of {total} <Icon name="check" size={10} style={{ verticalAlign: "-1px" }} /></Pill>
       </div>
       <div style={{ fontSize: 11, color: theme.textDim, fontStyle: "italic", marginBottom: 14, lineHeight: 1.5, background: "#0D1623", borderRadius: 8, padding: "8px 10px", borderLeft: "2px solid rgba(0,212,177,0.3)" }}>
         These are smart choices based on your goal — not a strict meal plan. Buy what works for you and your family.
@@ -40,7 +40,7 @@ function GroceryList({ groceries, onToggle }) {
               <button key={item.name} onClick={() => onToggle(cat.category, i)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "none", border: "none", borderBottom: i < cat.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                 <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${item.done ? a : "rgba(0,212,177,0.3)"}`, background: item.done ? "#003D35" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 9, color: a }}>
-                  {item.done ? "✓" : ""}
+                  {item.done ? <Icon name="check" size={10} /> : ""}
                 </div>
                 <span style={{ flex: 1, fontSize: 13, color: item.done ? theme.textDim : theme.text, textDecoration: item.done ? "line-through" : "none" }}>{item.name}</span>
                 <span style={{ fontSize: 11, color: theme.textFaint }}>{item.qty}</span>
@@ -60,7 +60,7 @@ function buildGroceryFromPlan(plan) {
   const highProtein = (plan.protein || 140) >= 130;
   const isMuscleBuild = goal === "build_muscle";
   const isLoseFat = goal === "lose_fat";
-  const protein = { category: "Protein", emoji: "🥩", items: [
+  const protein = { category: "Protein", emoji: <Icon name="meat" size={13} style={{ verticalAlign: "-2px", marginRight: 3 }} />, items: [
     { name: "Chicken breast", qty: "3 lbs", done: false },
     { name: "Salmon fillets", qty: "4 pieces", done: false },
     { name: "Eggs", qty: "1 dozen", done: false },
@@ -69,13 +69,13 @@ function buildGroceryFromPlan(plan) {
     ...(isMuscleBuild ? [{ name: "Cottage cheese", qty: "16 oz", done: false }] : []),
     ...(highProtein ? [{ name: "Protein powder", qty: "1 tub", done: false }] : []),
   ]};
-  const dairy = { category: "Dairy", emoji: "🧀", items: [
+  const dairy = { category: "Dairy", emoji: <Icon name="cheese" size={13} style={{ verticalAlign: "-2px", marginRight: 3 }} />, items: [
     { name: "Greek yogurt", qty: "32 oz", done: false },
     { name: "Low-fat milk", qty: "½ gallon", done: false },
     ...(isMuscleBuild ? [{ name: "Shredded mozzarella", qty: "8 oz", done: false }] : []),
     ...(isLoseFat ? [{ name: "String cheese", qty: "1 pack", done: false }] : []),
   ]};
-  const produce = { category: "Produce", emoji: "🥦", items: [
+  const produce = { category: "Produce", emoji: <Icon name="broccoli" size={13} style={{ verticalAlign: "-2px", marginRight: 3 }} />, items: [
     { name: "Spinach", qty: "5 oz bag", done: false },
     { name: "Broccoli", qty: "1 head", done: false },
     { name: "Mixed berries", qty: "1 bag", done: false },
@@ -87,7 +87,7 @@ function buildGroceryFromPlan(plan) {
     ...(isMuscleBuild ? [{ name: "Sweet potato", qty: "3 medium", done: false }] : []),
     ...(isMuscleBuild ? [{ name: "Banana", qty: "1 bunch", done: false }] : []),
   ]};
-  const pantry = { category: "Pantry", emoji: "🫙", items: [
+  const pantry = { category: "Pantry", emoji: <Icon name="jar" size={13} style={{ verticalAlign: "-2px", marginRight: 3 }} />, items: [
     { name: "Olive oil", qty: "1 bottle", done: false },
     { name: "Almond butter", qty: "1 jar", done: false },
     { name: "Olive oil spray", qty: "1 can", done: false },
@@ -96,7 +96,7 @@ function buildGroceryFromPlan(plan) {
     ...(isMuscleBuild ? [{ name: "Brown rice", qty: "2 lbs", done: false }] : []),
     ...(isMuscleBuild ? [{ name: "Oats", qty: "1 bag", done: false }] : []),
   ]};
-  const snacks = { category: "Snacks", emoji: "🍎", items: [
+  const snacks = { category: "Snacks", emoji: <Icon name="apple" size={13} style={{ verticalAlign: "-2px", marginRight: 3 }} />, items: [
     { name: "Apples", qty: "4", done: false },
     { name: "Dark chocolate", qty: "1 bar", done: false },
     ...(isLoseFat ? [{ name: "Baby carrots", qty: "1 bag", done: false }] : []),
@@ -141,7 +141,7 @@ function HungryButton({ calsLeft, proteinLeft, goal }) {
 
   if (calledOut) return (
     <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5 }}>You've hit your calorie goal today — great work. Stay hydrated and your body will take care of the rest. 💧</div>
+      <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5, display: "flex", alignItems: "center", gap: 5 }}>You've hit your calorie goal today — great work. Stay hydrated and your body will take care of the rest. <Icon name="droplet" size={12} color="#60A5FA" /></div>
     </div>
   );
 
@@ -172,7 +172,7 @@ function HungryButton({ calsLeft, proteinLeft, goal }) {
               </div>
             </div>
           ))}
-          <button onClick={() => { setState("idle"); setSuggestions([]); }} style={{ background: "transparent", border: "none", fontSize: 10, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", marginTop: 2 }}>↺ Get different ideas</button>
+          <button onClick={() => { setState("idle"); setSuggestions([]); }} style={{ background: "transparent", border: "none", fontSize: 10, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}><Icon name="refresh" size={10} /> Get different ideas</button>
         </div>
       )}
     </div>
@@ -185,7 +185,7 @@ function LogEntryRow({ entry, onDelete, accent }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
       {entry.isPhotoEstimate && (
-        <span style={{ fontSize: 14, flexShrink: 0 }}>📷</span>
+        <span style={{ flexShrink: 0, display: "flex" }}><Icon name="camera" size={14} /></span>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.name}</div>
@@ -344,7 +344,7 @@ function LogInput({ onLog, accent }) {
               style={{ flex: 1, background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }}
             />
             <button onClick={submitText} disabled={!textVal.trim()}
-              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 14, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4 }}>→</button>
+              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4, display: "flex", alignItems: "center" }}><Icon name="arrow-right" size={14} /></button>
           </div>
         </>
       )}
@@ -376,7 +376,7 @@ function LogInput({ onLog, accent }) {
           <div style={{ background: "#111827", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "#E8EDF2", marginBottom: 6 }}>
               {parsed.name}
-              {parsed.isPhotoEstimate && <span style={{ fontSize: 10, color: theme.textDim, fontWeight: 400, marginLeft: 6 }}>📷 photo estimate</span>}
+              {parsed.isPhotoEstimate && <span style={{ fontSize: 10, color: theme.textDim, fontWeight: 400, marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 3 }}><Icon name="camera" size={10} /> photo estimate</span>}
             </div>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, color: accent, fontWeight: 600 }}>{parsed.cal} cal</span>
@@ -387,7 +387,7 @@ function LogInput({ onLog, accent }) {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "8px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
-            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log this ✓</button>
+            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Log this <Icon name="check" size={12} /></button>
           </div>
         </>
       )}
@@ -463,7 +463,7 @@ function WaterTracker({ userId }) {
             <path d="M12 2C12 2 5 10 5 15a7 7 0 0 0 14 0c0-5-7-13-7-13z" fill="rgba(96,165,250,0.3)" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Water</div>
-          {done && <div style={{ fontSize: 10, background: "rgba(0,212,177,0.15)", color: a, borderRadius: 6, padding: "2px 7px", fontWeight: 600 }}>Goal hit ✓</div>}
+          {done && <div style={{ fontSize: 10, background: "rgba(0,212,177,0.15)", color: a, borderRadius: 6, padding: "2px 7px", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>Goal hit <Icon name="check" size={9} /></div>}
         </div>
         <div style={{ textAlign: "right" }}>
           <span style={{ fontSize: 22, fontWeight: 700, color: done ? a : "#60A5FA" }}>{glasses}</span>
@@ -493,8 +493,8 @@ function WaterTracker({ userId }) {
         </button>
         {oz > 0 && (
           <button onClick={() => removeWater(8)}
-            style={{ background: "none", border: "none", fontSize: 16, color: "#6B7A8D", cursor: "pointer", padding: "4px 6px", lineHeight: 1 }} title="Remove 8oz">
-            ↩
+            style={{ background: "none", border: "none", color: "#6B7A8D", cursor: "pointer", padding: "4px 6px", lineHeight: 1, display: "flex", alignItems: "center" }} title="Remove 8oz">
+            <Icon name="arrow-left" size={14} />
           </button>
         )}
       </div>
@@ -667,7 +667,7 @@ function MealPlanScreen() {
               </div>
             ) : (
               <div style={{ textAlign: "center", padding: "24px 0 12px", color: theme.textDim, fontSize: 13 }}>
-                Nothing logged yet — add your first meal above 👆
+                Nothing logged yet — add your first meal above <Icon name="arrow-up" size={12} style={{ verticalAlign: "-1px" }} />
               </div>
             )}
 
