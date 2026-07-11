@@ -338,7 +338,6 @@ function WorkoutScreen() {
   const [restSecs, setRestSecs] = useState(REST_SECS);
   const [activeRestSecs, setActiveRestSecs] = useState(REST_SECS);
   const timerRef = useRef(null);
-  const confirmTimerRef = useRef(null);
 
   const [nudgedWeight, setNudgedWeight] = useState(null);
   const [showSwapSheet, setShowSwapSheet] = useState(false);  // controls the swap picker sheet
@@ -500,18 +499,6 @@ function WorkoutScreen() {
     return () => clearInterval(timerRef.current);
   }, [state]);
 
-  // 3-second confirmation window before rest timer starts
-  useEffect(() => {
-    if (state === "confirm") {
-      // Give PRs longer to breathe — 6 seconds instead of 3
-      const duration = isPR ? 6000 : 3000;
-      confirmTimerRef.current = setTimeout(() => {
-        goToRestOrNudge();
-      }, duration);
-    }
-    return () => clearTimeout(confirmTimerRef.current);
-  }, [state, isPR]);
-
   function goToRestOrNudge() {
     const allLogs = loggedSetsRef.current;
     // Only WORKING sets count toward progressive overload — warm-ups are excluded.
@@ -572,8 +559,11 @@ function WorkoutScreen() {
       }).catch((e) => { setSavingToCloud(false); setSaveFailReason("THROW:" + (e?.message || e)); });
     }
 
-    // Show 3-second confirmation window before starting rest timer
-    setState("confirm");
+    // Go straight to rest — no separate confirmation screen (avoids a
+    // double-countdown: this used to wait 3s here, then start the rest
+    // timer on the next screen. Now rest starts immediately; the "fix it"
+    // correction and PR banner live inside the rest screen instead.)
+    goToRestOrNudge();
   }
 
   function advanceSet() {
@@ -1046,62 +1036,35 @@ function WorkoutScreen() {
     );
   }
 
-  if (state === "confirm") {
+  if (state === "rest") {
+    const RING_SIZE = 220;
     const wasSkipped = lastLoggedReps === 0;
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
-        <div className="mq-fade" style={{ padding: "1.5rem 1.25rem", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", flex: 1 }}>
+        <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
 
-          {/* Top — status label */}
-          <div style={{ textAlign: "center", paddingTop: "1rem" }}>
-            <div style={{ fontSize: 13, color: wasSkipped ? theme.amber : a, textTransform: "uppercase", letterSpacing: "3px", fontWeight: 600 }}>
-              {wasSkipped ? "Set Skipped" : "Set Logged"}
-            </div>
-            {!wasSkipped && (
-              <>
-                <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : savedToCloud ? a : theme.textFaint, marginTop: 4 }}>
-                  {savingToCloud ? "☁ Saving to account..." : savedToCloud ? "☁ Saved to account ✓" : supabaseUser?.id ? "☁ Saving..." : ""}
-                </div>
-                {saveFailReason && (
-                  <div style={{ fontSize: 10, color: theme.amber || "#F59E0B", marginTop: 2 }}>
-                    ☁ Save failed: {saveFailReason}
-                  </div>
-                )}
-              </>
-            )}
+          {/* Status label */}
+          <div style={{ textAlign: "center", fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Rest</div>
+
+          {/* Logged confirmation strip */}
+          <div style={{ background: wasSkipped ? "#1A1A0A" : "#003D35", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: wasSkipped ? theme.amber : a, textAlign: "center", marginBottom: 4 }}>
+            {wasSkipped ? "→ Set skipped" : `✓ Logged — ${loggedSets[loggedSets.length - 1]?.reps} reps at ${loggedSets[loggedSets.length - 1]?.weight} lbs`}
           </div>
 
-          {/* Middle — the big info */}
-          <div style={{ textAlign: "center", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-            {/* PR celebration banner — full centrepiece when member sets a new personal record */}
-            {isPR && !wasSkipped && (
-              <div className="mq-fade" style={{ background: "linear-gradient(135deg, #2D1A00 0%, #1A1200 100%)", border: "2px solid #F59E0B", borderRadius: 18, padding: "20px 24px", width: "100%", textAlign: "center", boxShadow: "0 0 40px rgba(245,158,11,0.25)" }}>
-                <div style={{ fontSize: 52, marginBottom: 8 }}>🏆</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#F59E0B", marginBottom: 4 }}>New personal record!</div>
-                <div style={{ fontSize: 14, color: "#E8C97A", marginBottom: 2 }}>{currentWeight} lbs on {ex.name}</div>
-                <div style={{ fontSize: 12, color: "#9B7A3A", marginTop: 6 }}>Rest screen starting in a moment</div>
+          {/* Cloud save status + correction — merged in from the old separate
+              confirm screen so there's only one countdown (this rest timer),
+              not a 3-second one followed by the real one. */}
+          {!wasSkipped && (
+            <div style={{ textAlign: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : savedToCloud ? a : theme.textFaint }}>
+                {savingToCloud ? "☁ Saving to account..." : savedToCloud ? "☁ Saved to account ✓" : supabaseUser?.id ? "☁ Saving..." : ""}
               </div>
-            )}
-            {/* Icon */}
-            <div style={{ width: 110, height: 110, borderRadius: "50%", background: wasSkipped ? "#1A1A0A" : "#003D35", border: `3px solid ${wasSkipped ? theme.amber : a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 58, boxShadow: `0 0 50px ${wasSkipped ? "rgba(245,158,11,0.2)" : "rgba(0,212,177,0.3)"}` }}>
-              {wasSkipped ? "→" : "✓"}
-            </div>
-
-            {wasSkipped ? (
-              <div style={{ fontSize: 28, fontWeight: 600, color: theme.textDim }}>Moving to next set</div>
-            ) : (
-              <>
-                <div style={{ fontSize: 96, fontWeight: 700, color: a, lineHeight: 1 }}>{lastLoggedReps}</div>
-                <div style={{ fontSize: 28, fontWeight: 500, color: theme.text }}>reps at {currentWeight} lbs</div>
-              </>
-            )}
-          </div>
-
-          {/* Bottom — correction button + countdown bar */}
-          <div style={{ width: "100%", paddingBottom: "1rem" }}>
-            {!wasSkipped && (
+              {saveFailReason && (
+                <div style={{ fontSize: 10, color: theme.amber || "#F59E0B", marginTop: 2 }}>
+                  ☁ Save failed: {saveFailReason}
+                </div>
+              )}
               <button onClick={() => {
-                clearTimeout(confirmTimerRef.current);
                 const typed = window.prompt("How many reps did you actually do?");
                 const n = parseInt(typed);
                 if (n > 0 && n < 100) {
@@ -1111,38 +1074,20 @@ function WorkoutScreen() {
                   loggedSetsRef.current = updated;
                   setLastLoggedReps(n);
                 }
-                goToRestOrNudge();
-              }} style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 14, padding: "16px", fontSize: 18, color: a, cursor: "pointer", fontFamily: "inherit", marginBottom: 16 }}>
+              }} style={{ background: "transparent", border: "none", color: a, fontSize: 12, cursor: "pointer", fontFamily: "inherit", marginTop: 4, textDecoration: "underline" }}>
                 ✏️ Wrong number? Fix it
               </button>
-            )}
-            <div style={{ fontSize: 13, color: theme.textDim, textAlign: "center", marginBottom: 10 }}>
-              {wasSkipped ? "Continuing in 3 seconds..." : "Rest timer starts in 3 seconds..."}
             </div>
-            <div style={{ height: 6, background: "#1A2332", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", background: wasSkipped ? theme.amber : a, borderRadius: 4, animation: "confirmCountdown 3s linear forwards" }} />
+          )}
+
+          {/* PR celebration banner — compact, sits above the rest ring */}
+          {isPR && !wasSkipped && (
+            <div className="mq-fade" style={{ background: "linear-gradient(135deg, #2D1A00 0%, #1A1200 100%)", border: "2px solid #F59E0B", borderRadius: 14, padding: "10px 16px", width: "100%", textAlign: "center", boxShadow: "0 0 30px rgba(245,158,11,0.2)", marginBottom: 12 }}>
+              <span style={{ fontSize: 18, marginRight: 6 }}>🏆</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#F59E0B" }}>New personal record!</span>
+              <span style={{ fontSize: 13, color: "#E8C97A", marginLeft: 6 }}>{currentWeight} lbs on {ex.name}</span>
             </div>
-          </div>
-
-        </div>
-        <style>{`@keyframes confirmCountdown { from { width: 100%; } to { width: 0%; } }`}</style>
-      </Layout>
-    );
-  }
-
-  if (state === "rest") {
-    const RING_SIZE = 220;
-    return (
-      <Layout activeNav="workout" chatTarget="chat_workout">
-        <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
-
-          {/* Status label */}
-          <div style={{ textAlign: "center", fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Rest</div>
-
-          {/* Logged confirmation strip */}
-          <div style={{ background: "#003D35", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: a, textAlign: "center", marginBottom: 16 }}>
-            ✓ Logged — {loggedSets[loggedSets.length - 1]?.reps} reps at {loggedSets[loggedSets.length - 1]?.weight} lbs
-          </div>
+          )}
 
           {/* Big ring + countdown number */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 16, position: "relative" }}>
