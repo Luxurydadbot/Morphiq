@@ -3,7 +3,7 @@ import {
   useApp, theme, sb,
   Layout, Spinner,
   WeightChart, StreakCalendar, getWeekStreak,
-  PERSONAL_BESTS, WEIGHT_DATA_MOCK,
+  PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon,
 } from "./shared.jsx";
 
 function ProgressScreen() {
@@ -134,7 +134,7 @@ function ProgressScreen() {
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
           {[
             { val: lost > 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, lbl:"Weight change", color: lost >= 0 ? a : "#F87171" },
-            { val: (() => { var ws = getWeekStreak(plan ? plan.daysPerWeek : 3); return ws > 0 ? "🔥 " + ws : "—"; })(), lbl:"Week streak", color:"#F59E0B" },
+            { val: (() => { var ws = getWeekStreak(plan ? plan.daysPerWeek : 3); return ws > 0 ? <><Icon name="flame" size={14} style={{verticalAlign:"-2px", marginRight:2}} />{ws}</> : "—"; })(), lbl:"Week streak", color:"#F59E0B" },
             { val: String(realPBs.length || 0), lbl:"PBs logged", color:"#A78BFA" },
           ].map(({ val, lbl, color }) => (
             <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
@@ -167,12 +167,12 @@ function ProgressScreen() {
                     {curr} <span style={{ fontSize:13, color:"#6B7A8D", fontWeight:400 }}>lbs</span>
                   </div>
                   <div style={{ fontSize:12, color: lost >= 0 ? a : "#F87171", marginTop:2 }}>
-                    {lost >= 0 ? `↓ ${lost} lbs since day 1` : `↑ ${Math.abs(lost)} lbs since day 1`}
+                    {lost >= 0 ? <><Icon name="arrow-down" size={12} style={{verticalAlign:"-1px", marginRight:2}} />{lost} lbs since day 1</> : <><Icon name="arrow-up" size={12} style={{verticalAlign:"-1px", marginRight:2}} />{Math.abs(lost)} lbs since day 1</>}
                   </div>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
                   <div style={{ background: weightError ? "#1F1010" : "#003D35", borderRadius:8, padding:"4px 10px", fontSize:11, color: weightError ? "#F87171" : a, fontWeight:500 }}>
-                    {weightError ? "Save failed — try again" : weightSaved ? "Saved ✓" : "On track ✓"}
+                    {weightError ? "Save failed — try again" : weightSaved ? <><Icon name="check" size={12} style={{verticalAlign:"-1px", marginRight:2}} />Saved</> : <><Icon name="check" size={12} style={{verticalAlign:"-1px", marginRight:2}} />On track</>}
                   </div>
                 </div>
               </div>
@@ -296,7 +296,7 @@ function ProgressScreen() {
                     </div>
                     {w.pbs > 0 && (
                       <span style={{ background:"#2D1A00", color:"#F59E0B", borderRadius:20, padding:"2px 8px", fontSize:10, fontWeight:500, flexShrink:0 }}>
-                        🔥 {w.pbs} PB{w.pbs > 1 ? "s" : ""}
+                        <Icon name="flame" size={11} style={{verticalAlign:"-1px", marginRight:2}} />{w.pbs} PB{w.pbs > 1 ? "s" : ""}
                       </span>
                     )}
                   </div>

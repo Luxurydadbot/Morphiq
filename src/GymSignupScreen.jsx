@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { sb, theme, useApp } from "./shared.jsx";
+import { sb, theme, useApp, Icon } from "./shared.jsx";
 
 const PLANS = [
   { id: "starter", name: "Starter", price: "$99/mo + $2 per active member" },
@@ -215,7 +215,7 @@ function GymSignupScreen() {
                 fontFamily: ob.font,
               }}
             >
-              {status === "checking" ? "Setting up your gym..." : status === "redirecting" ? "Taking you to payment..." : "Create my gym →"}
+              {status === "checking" ? "Setting up your gym..." : status === "redirecting" ? "Taking you to payment..." : <>Create my gym <Icon name="arrow-right" size={14} style={{verticalAlign:"-2px", marginLeft:2}} /></>}
             </button>
 
             <div style={{ textAlign: "center", fontSize: 10, color: ob.muted, marginTop: 14 }}>
@@ -227,7 +227,7 @@ function GymSignupScreen() {
 
         {step === 2 && (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#003D35", border: "2px solid #00D4B1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22, color: "#00D4B1" }}>✓</div>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#003D35", border: "2px solid #00D4B1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: "#00D4B1" }}><Icon name="check" size={26} /></div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white, marginBottom: 8 }}>{gymName || "Your gym"} is ready</div>
             <div style={{ fontSize: 12, color: ob.body, lineHeight: 1.6, marginBottom: 22 }}>
               Your 14-day free trial has started. Sign in below with <span style={{ color: ob.white }}>{email}</span> — we'll email you a one-time code, no password needed.
@@ -236,7 +236,7 @@ function GymSignupScreen() {
               onClick={() => navigate("auth")}
               style={{ width: "100%", background: "#00D4B1", color: "#003D35", border: "none", borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}
             >
-              Go to sign in →
+              Go to sign in <Icon name="arrow-right" size={14} style={{verticalAlign:"-2px", marginLeft:2}} />
             </button>
           </div>
         )}
@@ -256,7 +256,7 @@ function GymSignupScreen() {
               disabled={status === "redirecting"}
               style={{ width: "100%", background: status === "redirecting" ? "#1A2332" : "#00D4B1", color: status === "redirecting" ? ob.muted : "#003D35", border: "none", borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600, cursor: status === "redirecting" ? "default" : "pointer", fontFamily: ob.font }}
             >
-              {status === "redirecting" ? "Taking you to payment..." : "Resume checkout →"}
+              {status === "redirecting" ? "Taking you to payment..." : <>Resume checkout <Icon name="arrow-right" size={14} style={{verticalAlign:"-2px", marginLeft:2}} /></>}
             </button>
           </div>
         )}

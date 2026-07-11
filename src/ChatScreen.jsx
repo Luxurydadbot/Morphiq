@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   useApp, theme, sb,
-  MicIcon, Spinner,
+  MicIcon, Spinner, Icon,
   CHAT_SUGGESTIONS,
   getFallbackReply, fetchAIReply,
 } from "./shared.jsx";
@@ -168,7 +168,7 @@ function ChatScreen({ fromScreen = "home" }) {
       {/* Header */}
       <div style={{ background: "#0D1117", borderBottom: `1px solid ${theme.borderSubtle}`, padding: "14px 16px 12px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={() => navigate(fromScreen === "chat" ? "home" : fromScreen)} style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", fontSize: 20, padding: 0, lineHeight: 1, marginRight: 2 }}>←</button>
+          <button onClick={() => navigate(fromScreen === "chat" ? "home" : fromScreen)} style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", padding: 0, lineHeight: 1, marginRight: 2, display:"flex", alignItems:"center" }}><Icon name="arrow-left" size={20} /></button>
           <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#003D35", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: a, flexShrink: 0 }}>AI</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Hypergentiq Trainer</div>
@@ -226,7 +226,7 @@ function ChatScreen({ fromScreen = "home" }) {
       {/* API error banner — shown when proxy is unreachable */}
       {apiError && (
         <div style={{ margin: "6px 14px 0", background: "#1A1010", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "7px 12px", fontSize: 11, color: "#F87171", flexShrink: 0 }}>
-          ⚠ API error: {apiErrorMsg || "check console for details"}
+          <Icon name="alert" size={12} style={{verticalAlign:"-1px", marginRight:3}} />API error: {apiErrorMsg || "check console for details"}
         </div>
       )}
 
@@ -258,7 +258,7 @@ function ChatScreen({ fromScreen = "home" }) {
             <div style={{ background: "#111827", borderRadius: 8, padding: "7px 12px", fontSize: 12, color: "#9BB3C8", fontStyle: "italic", marginBottom: 10 }}>"{voiceText}"</div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "7px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
-              <button onClick={confirmVoice} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Send ✓</button>
+              <button onClick={confirmVoice} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:4 }}>Send <Icon name="check" size={12} /></button>
             </div>
           </>}
         </div>
@@ -280,7 +280,7 @@ function ChatScreen({ fromScreen = "home" }) {
           style={{ flex: 1, background: "#1A2332", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "8px 12px", fontSize: 13, color: theme.text, outline: "none", fontFamily: "inherit" }}
         />
         <button onClick={() => sendMessage(input)} disabled={!input.trim()}
-          style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() ? a : "#1A2332", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", flexShrink: 0, fontSize: 15, color: input.trim() ? "#003D35" : theme.textFaint, fontWeight: 700 }}>→</button>
+          style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() ? a : "#1A2332", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", flexShrink: 0, color: input.trim() ? "#003D35" : theme.textFaint }}><Icon name="arrow-right" size={16} /></button>
       </div>
 
       {/* Bottom text */}
