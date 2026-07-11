@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./shared.jsx";
+import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon, SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./shared.jsx";
 
 function buildMemberRow(profile, sessions, lastDate, weightDelta) {
   const initials = (profile.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -162,7 +162,7 @@ function OwnerOverviewTab() {
           {/* Nudge button — sends a pre-written re-engagement message to all at-risk members only */}
           {nudgeResult ? (
             <div style={{ background: "#0A1A14", border: "1px solid rgba(0,212,177,0.3)", borderRadius: 10, padding: "10px 14px", textAlign: "center", fontSize: 12, color: "#00D4B1", marginTop: 4 }}>
-              ✓ Nudge sent to {nudgeResult.sent} member{nudgeResult.sent !== 1 ? "s" : ""}
+              <Icon name="check" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Nudge sent to {nudgeResult.sent} member{nudgeResult.sent !== 1 ? "s" : ""}
               {nudgeResult.failed > 0 && <span style={{ color: "#F87171", marginLeft: 6 }}>({nudgeResult.failed} failed)</span>}
             </div>
           ) : (
@@ -171,7 +171,7 @@ function OwnerOverviewTab() {
               disabled={nudgeSending}
               style={{ width: "100%", marginTop: 4, background: nudgeSending ? "#1A2332" : "transparent", border: "1px solid rgba(248,113,113,0.35)", borderRadius: 10, padding: "10px 14px", fontSize: 12, fontWeight: 600, color: nudgeSending ? "#6B7A8D" : "#F87171", cursor: nudgeSending ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
             >
-              {nudgeSending ? "Sending nudges..." : `💬 Nudge ${atRisk.length} at-risk member${atRisk.length !== 1 ? "s" : ""}`}
+              {nudgeSending ? "Sending nudges..." : <><Icon name="chat" size={12} /> Nudge {atRisk.length} at-risk member{atRisk.length !== 1 ? "s" : ""}</>}
             </button>
           )}
         </>
@@ -256,7 +256,7 @@ function OwnerMembersTab() {
           style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: broadcastOpen ? "#1A2E2B" : "#1A2332", border: `1px solid ${broadcastOpen ? "rgba(0,212,177,0.35)" : "rgba(255,255,255,0.06)"}`, borderRadius: broadcastOpen ? "14px 14px 0 0" : 14, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(0,212,177,0.12)", border: "1px solid rgba(0,212,177,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>📢</div>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(0,212,177,0.12)", border: "1px solid rgba(0,212,177,0.25)", display: "flex", alignItems: "center", justifyContent: "center", color: "#00D4B1" }}><Icon name="megaphone" size={13} /></div>
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Message all members</div>
               <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 1 }}>{members.length} member{members.length !== 1 ? "s" : ""} will receive this</div>
@@ -295,7 +295,7 @@ function OwnerMembersTab() {
             {broadcastResult && (
               <div style={{ background: broadcastResult.failed === 0 ? "#003D35" : "#1F1010", border: `1px solid ${broadcastResult.failed === 0 ? "rgba(0,212,177,0.4)" : "rgba(248,113,113,0.3)"}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: broadcastResult.failed === 0 ? "#00D4B1" : "#F87171" }}>
                 {broadcastResult.failed === 0
-                  ? `✓ Sent to all ${broadcastResult.sent} member${broadcastResult.sent !== 1 ? "s" : ""} — they'll see it next time they open the app.`
+                  ? <><Icon name="check" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Sent to all {broadcastResult.sent} member{broadcastResult.sent !== 1 ? "s" : ""} — they'll see it next time they open the app.</>
                   : `Sent to ${broadcastResult.sent}, failed for ${broadcastResult.failed}. Check your connection and try again.`}
               </div>
             )}
@@ -310,7 +310,7 @@ function OwnerMembersTab() {
                 disabled={!broadcastText.trim() || broadcastSending || broadcastText.length > 280}
                 style={{ flex: 2, background: broadcastResult?.sent > 0 ? "#003D35" : "#00D4B1", color: broadcastResult?.sent > 0 ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: (!broadcastText.trim() || broadcastSending) ? "default" : "pointer", fontFamily: "inherit", opacity: (!broadcastText.trim() || broadcastSending) ? 0.5 : 1, transition: "all .2s" }}
               >
-                {broadcastSending ? "Sending..." : broadcastResult?.sent > 0 ? "Sent ✓" : `Send to all ${members.length} members`}
+                {broadcastSending ? "Sending..." : broadcastResult?.sent > 0 ? <>Sent <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : `Send to all ${members.length} members`}
               </button>
             </div>
           </div>
@@ -353,7 +353,7 @@ function OwnerMembersTab() {
             style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 80, lineHeight: 1.5, marginBottom: 10 }} />
           {sendError && <div style={{ fontSize: 12, color: "#F87171", marginBottom: 8 }}>{sendError}</div>}
           <button onClick={sendMsg} disabled={sending} style={{ width: "100%", background: sent ? "#003D35" : "#00D4B1", color: sent ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: sending ? "default" : "pointer", fontFamily: "inherit", opacity: sending ? 0.7 : 1 }}>
-            {sent ? "Sent ✓" : sending ? "Sending..." : "Send message"}
+            {sent ? <>Sent <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : sending ? "Sending..." : "Send message"}
           </button>
         </div>
       )}
@@ -425,14 +425,14 @@ function OwnerBrandingTab() {
         </div>
         <div style={{ padding: "14px" }}>
           <div style={{ fontSize: 12, color: "#9BB3C8", marginBottom: 12, lineHeight: 1.5 }}>"{welcome}"</div>
-          <div style={{ background: brandColor, borderRadius: 10, padding: "9px", fontSize: 12, fontWeight: 600, color: "#003D35", textAlign: "center" }}>Build my plan →</div>
+          <div style={{ background: brandColor, borderRadius: 10, padding: "9px", fontSize: 12, fontWeight: 600, color: "#003D35", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Build my plan <Icon name="arrow-right" size={12} /></div>
         </div>
       </div>
 
       {error && <div style={{ fontSize: 12, color: "#F87171", marginBottom: 8, padding: "8px 12px", background: "#1F1010", borderRadius: 8 }}>{error}</div>}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={save} disabled={saving} style={{ flex: 2, background: saved ? "#003D35" : "#00D4B1", color: saved ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
+          {saving ? "Saving…" : saved ? <>Saved <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : "Save changes"}
         </button>
         <button onClick={() => { setGymName(gymBranding.name); setBrandColor(gymBranding.accent); setWelcome(gymBranding.welcome || ""); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
       </div>
@@ -472,7 +472,7 @@ function OwnerInviteTab() {
         <div style={{ background: "#0D1623", border: "1px solid #1E2D42", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div style={{ flex: 1, fontSize: 11, color: "#9BB3C8", fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.5 }}>{inviteUrl}</div>
           <button onClick={copyLink} style={{ flexShrink: 0, background: copied ? "#003D35" : "#00D4B1", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: copied ? "#00D4B1" : "#003D35", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
-            {copied ? "Copied ✓" : "Copy"}
+            {copied ? <>Copied <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : "Copy"}
           </button>
         </div>
         <div style={{ fontSize: 10, color: "#6B7A8D", lineHeight: 1.6 }}>
@@ -587,7 +587,7 @@ function PricingScreen() {
   return (
     <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
       <div style={{ background: "#0D1623", borderBottom: "1px solid #1E2D42", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-        <button onClick={() => navigate("owner")} style={{ background: "none", border: "none", color: "#6B7A8D", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+        <button onClick={() => navigate("owner")} style={{ background: "none", border: "none", color: "#6B7A8D", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={18} /></button>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF2" }}>Pricing Plans</div>
       </div>
 
@@ -621,7 +621,7 @@ function PricingScreen() {
             <div style={{ borderTop: `1px solid rgba(255,255,255,0.06)`, paddingTop: 10 }}>
               {plan.features.map(f => (
                 <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
-                  <div style={{ width: 14, height: 14, borderRadius: "50%", background: plan.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "#080E1A", fontWeight: 700, flexShrink: 0 }}>✓</div>
+                  <div style={{ width: 14, height: 14, borderRadius: "50%", background: plan.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#080E1A", flexShrink: 0 }}><Icon name="check" size={9} /></div>
                   <span style={{ fontSize: 12, color: "#C0C0C0" }}>{f}</span>
                 </div>
               ))}
@@ -638,18 +638,18 @@ function PricingScreen() {
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <button onClick={() => setLeadPlan(null)} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px", fontSize: 12, color: "#9BB3C8", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                   <button onClick={submitLead} disabled={!leadEmail.includes("@") || leadSaving} style={{ flex: 2, background: plan.color, color: "#080E1A", border: "none", borderRadius: 10, padding: "9px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: leadSaving ? 0.6 : 1 }}>
-                    {leadSaving ? "Saving..." : "Start free trial →"}
+                    {leadSaving ? "Saving..." : <>Start free trial <Icon name="arrow-right" size={12} /></>}
                   </button>
                 </div>
               </div>
             ) : leadPlan === plan.name && leadSent ? (
               <div style={{ marginTop: 14, background: "rgba(0,0,0,0.3)", border: `1px solid ${plan.color}`, borderRadius: 10, padding: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: 14, color: plan.color, fontWeight: 700, marginBottom: 4 }}>✓ You're on the list!</div>
+                <div style={{ fontSize: 14, color: plan.color, fontWeight: 700, marginBottom: 4 }}><Icon name="check" size={13} style={{ verticalAlign: "-2px", marginRight: 3 }} /> You're on the list!</div>
                 <div style={{ fontSize: 11, color: "#9BB3C8" }}>We'll reach out to {leadEmail} within 24 hours to get you set up.</div>
               </div>
             ) : (
               <button onClick={() => { setLeadPlan(plan.name); setLeadEmail(""); setLeadSent(false); }} style={{ width: "100%", background: plan.color, color: "#080E1A", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 14 }}>
-                Start {plan.name} trial →
+                Start {plan.name} trial <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px" }} />
               </button>
             )}
           </div>
@@ -774,7 +774,7 @@ function GymOwnerDashboard() {
 
       {/* Footer back link */}
       <div style={{ padding: "14px 16px", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-        <button onClick={() => navigate("pricing")} style={{ background: "none", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit" }}>Plans & pricing →</button>
+        <button onClick={() => navigate("pricing")} style={{ background: "none", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4 }}>Plans & pricing <Icon name="arrow-right" size={12} /></button>
       </div>
       <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "0 0 12px" }}>POWERED BY MORPHIQ</div>
     </div>
