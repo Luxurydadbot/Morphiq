@@ -1051,9 +1051,9 @@ function WorkoutScreen() {
             {wasSkipped ? "→ Set skipped" : `✓ Logged — ${loggedSets[loggedSets.length - 1]?.reps} reps at ${loggedSets[loggedSets.length - 1]?.weight} lbs`}
           </div>
 
-          {/* Cloud save status + correction — merged in from the old separate
-              confirm screen so there's only one countdown (this rest timer),
-              not a 3-second one followed by the real one. */}
+          {/* Cloud save status — merged in from the old separate confirm
+              screen so there's only one countdown (this rest timer), not a
+              3-second one followed by the real one. */}
           {!wasSkipped && (
             <div style={{ textAlign: "center", marginBottom: 8 }}>
               <div style={{ fontSize: 11, color: savingToCloud ? theme.textDim : savedToCloud ? a : theme.textFaint }}>
@@ -1064,19 +1064,6 @@ function WorkoutScreen() {
                   ☁ Save failed: {saveFailReason}
                 </div>
               )}
-              <button onClick={() => {
-                const typed = window.prompt("How many reps did you actually do?");
-                const n = parseInt(typed);
-                if (n > 0 && n < 100) {
-                  const updated = [...loggedSets];
-                  updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
-                  setLoggedSets(updated);
-                  loggedSetsRef.current = updated;
-                  setLastLoggedReps(n);
-                }
-              }} style={{ background: "transparent", border: "none", color: a, fontSize: 12, cursor: "pointer", fontFamily: "inherit", marginTop: 4, textDecoration: "underline" }}>
-                ✏️ Wrong number? Fix it
-              </button>
             </div>
           )}
 
@@ -1097,6 +1084,24 @@ function WorkoutScreen() {
               <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>seconds</div>
             </div>
           </div>
+
+          {/* Wrong number? Fix it — full-size button, sits right above the
+              "Up next" exercise card so it's easy to spot during rest. */}
+          {!wasSkipped && (
+            <button onClick={() => {
+              const typed = window.prompt("How many reps did you actually do?");
+              const n = parseInt(typed);
+              if (n > 0 && n < 100) {
+                const updated = [...loggedSets];
+                updated[updated.length - 1] = { ...updated[updated.length - 1], reps: n };
+                setLoggedSets(updated);
+                loggedSetsRef.current = updated;
+                setLastLoggedReps(n);
+              }
+            }} style={{ width: "100%", background: "#1A2332", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 14, padding: "16px", fontSize: 18, color: a, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>
+              ✏️ Wrong number? Fix it
+            </button>
+          )}
 
           {/* Up next — large and prominent */}
           <div style={{ background: "#0A1A14", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
