@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   useApp, theme, sb,
   GOAL_OPTIONS, GOAL_ICONS,
-  Pill, Spinner,
+  Pill, Spinner, Icon,
   buildPlan,
 } from "./shared.jsx";
 
@@ -198,7 +198,7 @@ function OnboardingScreen() {
           </div>
           <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && name.trim().length >= 2 && setStep('choose')} placeholder="Your first name..." style={{ background: ob.card, border: `1.5px solid ${name.trim().length >= 2 ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 12, padding: "12px 14px", fontSize: 16, color: ob.white, outline: "none", fontFamily: ob.font, width: "100%", transition: "border-color .2s" }} maxLength={30} />
           <button onClick={() => name.trim().length >= 2 && setStep('choose')} disabled={name.trim().length < 2} style={{ ...s.tealBtn(name.trim().length < 2), marginTop: 12, padding: 12, fontSize: 13 }}>
-            Let's go, {name.trim() || "..."} →
+            Let's go, {name.trim() || "..."} <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px", marginLeft: 2 }} />
           </button>
         </div>}
 
@@ -210,7 +210,7 @@ function OnboardingScreen() {
           </div>
           <button onClick={() => { setRouteChoice("ai"); setStep(1); }}
             style={{ background: ob.tealDk, border: `1.5px solid ${a}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", marginBottom: 10, width: "100%" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(0,212,177,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 22 }}>🤖</div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(0,212,177,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="bot" size={22} /></div>
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: a }}>Build my plan for me</div>
               <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>AI creates a personalised program from scratch based on your goal and level</div>
@@ -218,7 +218,7 @@ function OnboardingScreen() {
           </button>
           <button onClick={() => navigate("custom_plan")}
             style={{ background: ob.card, border: "1.5px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", width: "100%" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 22 }}>📋</div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: ob.muted }}><Icon name="clipboard" size={22} /></div>
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: ob.white }}>I have my own routine</div>
               <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>Enter your exercises, sets, reps, and starting weights — we handle the rest</div>
@@ -243,7 +243,7 @@ function OnboardingScreen() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: goal === g.id ? a : ob.white }}>{g.label}</div>
                   <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{g.sub}</div>
                 </div>
-                {goal === g.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+                {goal === g.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", color: ob.tealDk, flexShrink: 0 }}><Icon name="check" size={10} /></div>}
               </button>
             ))}
           </div>
@@ -258,9 +258,9 @@ function OnboardingScreen() {
           </div>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
             {[
-              { id: "new", label: "New to working out", sub: "Just getting started", icon: "🌱" },
-              { id: "some", label: "Some experience", sub: "6 months to 2 years, on and off", icon: "📈" },
-              { id: "years", label: "Several years of training", sub: "I know my way around a gym", icon: "🏋️" },
+              { id: "new", label: "New to working out", sub: "Just getting started", icon: <Icon name="sprout" size={20} /> },
+              { id: "some", label: "Some experience", sub: "6 months to 2 years, on and off", icon: <Icon name="trending-up" size={20} /> },
+              { id: "years", label: "Several years of training", sub: "I know my way around a gym", icon: <Icon name="dumbbell" size={20} /> },
             ].map(opt => (
               <button key={opt.id} onClick={() => { setTrainingHistory(opt.id); setTimeout(() => setStep(3), 180); }}
                 style={{ background: trainingHistory === opt.id ? ob.tealDk : ob.card, border: `1.5px solid ${trainingHistory === opt.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
@@ -269,7 +269,7 @@ function OnboardingScreen() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: trainingHistory === opt.id ? a : ob.white }}>{opt.label}</div>
                   <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{opt.sub}</div>
                 </div>
-                {trainingHistory === opt.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+                {trainingHistory === opt.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", color: ob.tealDk, flexShrink: 0 }}><Icon name="check" size={10} /></div>}
               </button>
             ))}
           </div>
@@ -283,9 +283,9 @@ function OnboardingScreen() {
           </div>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
             {[
-              { id: "returning", label: "Just getting back into it", sub: "Been a while — starting fresh", icon: "🔄" },
-              { id: "consistent", label: "Pretty consistent", sub: "Training here and there recently", icon: "⚡" },
-              { id: "active", label: "Training regularly right now", sub: "Already in a routine", icon: "🔥" },
+              { id: "returning", label: "Just getting back into it", sub: "Been a while — starting fresh", icon: <Icon name="refresh" size={20} /> },
+              { id: "consistent", label: "Pretty consistent", sub: "Training here and there recently", icon: <Icon name="bolt" size={20} /> },
+              { id: "active", label: "Training regularly right now", sub: "Already in a routine", icon: <Icon name="flame" size={20} /> },
             ].map(opt => (
               <button key={opt.id} onClick={() => { setRecentActivity(opt.id); setTimeout(() => setStep(4), 180); }}
                 style={{ background: recentActivity === opt.id ? ob.tealDk : ob.card, border: `1.5px solid ${recentActivity === opt.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
@@ -294,7 +294,7 @@ function OnboardingScreen() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: recentActivity === opt.id ? a : ob.white }}>{opt.label}</div>
                   <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{opt.sub}</div>
                 </div>
-                {recentActivity === opt.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+                {recentActivity === opt.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", color: ob.tealDk, flexShrink: 0 }}><Icon name="check" size={10} /></div>}
               </button>
             ))}
           </div>
@@ -312,7 +312,7 @@ function OnboardingScreen() {
                 style={{ flex: 1, background: sex === label ? ob.tealDk : ob.card, border: `1.5px solid ${sex === label ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: "24px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", transition: "all .15s" }}>
                 <div style={{ color: sex === label ? a : ob.muted }}>{icon}</div>
                 <span style={{ fontSize: 14, fontWeight: 600, color: sex === label ? a : ob.white }}>{label}</span>
-                {sex === label && <div style={{ width: 16, height: 16, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: ob.tealDk, fontWeight: 700 }}>✓</div>}
+                {sex === label && <div style={{ width: 16, height: 16, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", color: ob.tealDk }}><Icon name="check" size={9} /></div>}
               </button>
             ))}
           </div>
@@ -339,7 +339,7 @@ function OnboardingScreen() {
             <div style={s.label}>Age</div>
             <input value={age} onChange={e => setAge(e.target.value)} placeholder="e.g. 32" style={s.numInput} type="number" min="13" max="100" />
           </div>
-          <button onClick={() => setStep(6)} disabled={!bodyValid || !ageValid} style={{ ...s.tealBtn(!bodyValid || !ageValid), marginTop: "auto" }}>Continue →</button>
+          <button onClick={() => setStep(6)} disabled={!bodyValid || !ageValid} style={{ ...s.tealBtn(!bodyValid || !ageValid), marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
         </div>}
 
         {step === 6 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
@@ -372,7 +372,7 @@ function OnboardingScreen() {
             </div>
             <div style={{ fontSize: 11, color: ob.muted, marginTop: 4, textAlign: "center", lineHeight: 1.5 }}>Do them any day that works for you — the app always shows your next workout.</div>
           </div>
-          <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13 }}>Continue →</button>
+          <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
         </div>}
 
         
@@ -383,15 +383,15 @@ function OnboardingScreen() {
             <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>You can always change this mid-workout</div>
           </div>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
-            {[[60, "1 minute", "High intensity, keep the burn going", "🔥"], [120, "2 minutes", "Balanced — works for most people", "⚡"], [180, "3 minutes", "Full recovery, lift heavier", "💪"]].map(([secs, label, sub, icon]) => (
+            {[[60, "1 minute", "High intensity, keep the burn going", <Icon name="flame" size={22} />], [120, "2 minutes", "Balanced — works for most people", <Icon name="bolt" size={22} />], [180, "3 minutes", "Full recovery, lift heavier", <Icon name="flex" size={22} />]].map(([secs, label, sub, icon]) => (
               <button key={secs} onClick={() => { setRestPref(secs); setTimeout(() => setStep(8), 180); }}
                 style={{ background: restPref === secs ? ob.tealDk : ob.card, border: `2px solid ${restPref === secs ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "all .15s" }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: restPref === secs ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 24 }}>{icon}</div>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: restPref === secs ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: restPref === secs ? a : ob.muted }}>{icon}</div>
                 <div style={{ textAlign: "left", flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: restPref === secs ? a : ob.white }}>{label}</div>
                   <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>{sub}</div>
                 </div>
-                {restPref === secs && <div style={{ width: 20, height: 20, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+                {restPref === secs && <div style={{ width: 20, height: 20, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", color: ob.tealDk, flexShrink: 0 }}><Icon name="check" size={11} /></div>}
               </button>
             ))}
           </div>
@@ -417,8 +417,8 @@ function OnboardingScreen() {
           </div>
           <textarea value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="Or type anything else (e.g. no overhead pressing)..." style={{ ...s.numInput, minHeight: 64, resize: "none", lineHeight: 1.5, fontSize: 12 }} maxLength={200} />
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button onClick={() => { setInjuries(""); setStep(9); }} style={{ ...s.outlineBtn, flex: 1 }}>None →</button>
-            <button onClick={() => setStep(9)} style={{ ...s.tealBtn(false), flex: 2, marginTop: 0, padding: 10 }}>Continue →</button>
+            <button onClick={() => { setInjuries(""); setStep(9); }} style={{ ...s.outlineBtn, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>None <Icon name="arrow-right" size={13} /></button>
+            <button onClick={() => setStep(9)} style={{ ...s.tealBtn(false), flex: 2, marginTop: 0, padding: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
           </div>
         </div>}
 
@@ -447,7 +447,7 @@ function OnboardingScreen() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: equipment === eq.id ? a : ob.white }}>{eq.label}</div>
                   <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{eq.sub}</div>
                 </div>
-                {equipment === eq.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ob.tealDk, fontWeight: 700, flexShrink: 0 }}>✓</div>}
+                {equipment === eq.id && <div style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", color: ob.tealDk, flexShrink: 0 }}><Icon name="check" size={10} /></div>}
               </button>
             ))}
           </div>
@@ -456,7 +456,7 @@ function OnboardingScreen() {
         {step === 10 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Before I build your plan, please review the health disclaimer below. Your safety comes first.</div></div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "12px 14px", marginBottom: 10, flex: 1, overflowY: "auto" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ob.white, marginBottom: 6 }}>⚠️ Health & Fitness Disclaimer</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ob.white, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}><Icon name="alert" size={13} color={theme.amber} /> Health & Fitness Disclaimer</div>
             <div style={{ fontSize: 11, color: ob.body, lineHeight: 1.65 }}>
               The fitness and nutrition plans provided by Hypergentiq are for <span style={{ color: ob.white, fontWeight: 600 }}>informational and educational purposes only</span> and do not constitute medical advice.<br /><br />
               Before starting any new exercise or nutrition program, consult a qualified healthcare provider — especially if you have a medical condition, injury, or concern.<br /><br />
@@ -464,7 +464,7 @@ function OnboardingScreen() {
               By tapping "I agree", you confirm you are at least 13 years old and accept these terms.
             </div>
           </div>
-          <button onClick={() => setStep(11)} style={{ ...s.tealBtn(false), marginTop: 6 }}>I agree — build my plan ✦</button>
+          <button onClick={() => setStep(11)} style={{ ...s.tealBtn(false), marginTop: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>I agree — build my plan <Icon name="sparkle" size={13} /></button>
           <div style={{ textAlign: "center", marginTop: 8 }}>
             <button onClick={() => navigate("auth")} style={{ fontSize: 10, color: ob.muted, background: "none", border: "none", cursor: "pointer", fontFamily: ob.font }}>Decline — go back</button>
           </div>
@@ -480,7 +480,7 @@ function OnboardingScreen() {
               </div>
             ))}
           </div>
-          <button onClick={() => { setChecklist([false, false, false, false]); setChecklistVisible([false, false, false, false]); setStep(12); }} style={{ ...s.tealBtn(false), marginTop: "auto" }}>Build my plan ✦</button>
+          <button onClick={() => { setChecklist([false, false, false, false]); setChecklistVisible([false, false, false, false]); setStep(12); }} style={{ ...s.tealBtn(false), marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Build my plan <Icon name="sparkle" size={13} /></button>
           <button onClick={() => setStep(0)} style={{ ...s.outlineBtn, width: "100%", marginTop: 6 }}>Start over</button>
         </div>}
 
@@ -512,9 +512,9 @@ function OnboardingScreen() {
           <div style={{ opacity: revealStep >= 1 ? 1 : 0, transform: revealStep >= 1 ? "translateY(0)" : "translateY(-10px)", transition: "opacity .4s ease, transform .4s ease" }}>
             <div style={{ textAlign: "center", marginBottom: 14 }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: ob.tealDk, border: `1px solid ${a}`, borderRadius: 20, padding: "5px 14px", marginBottom: 10 }}>
-                <span style={{ fontSize: 13 }}>✦</span>
+                <Icon name="sparkle" size={13} color={a} />
                 <span style={{ fontSize: 10, color: a, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Your plan is ready</span>
-                <span style={{ fontSize: 13 }}>✦</span>
+                <Icon name="sparkle" size={13} color={a} />
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: ob.white, letterSpacing: "-0.3px" }}>{name}&apos;s {goalLabel} Plan</div>
               <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>Built by Hypergentiq AI · Week 1</div>
@@ -579,7 +579,7 @@ function OnboardingScreen() {
               onClick={() => navigate("plan")}
               style={{ ...s.tealBtn(false), padding: "13px 10px", fontSize: 14, fontWeight: 700, borderRadius: 14, boxShadow: `0 0 28px rgba(0,212,177,0.4)`, letterSpacing: "0.2px" }}
             >
-              Start Day 1 →
+              Start Day 1 <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px" }} />
             </button>
 
           </div>
