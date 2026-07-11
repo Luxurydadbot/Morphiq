@@ -1404,7 +1404,7 @@ const css = `
   .mq-wave span:nth-child(6){height:16px;animation-delay:.25s}
   @keyframes wv{0%,100%{transform:scaleY(0.5)}50%{transform:scaleY(1.2)}}
   @keyframes spin{to{transform:rotate(360deg);}}
-  .mq-ring-fill{stroke-dasharray:220;transition:stroke-dashoffset 1s linear;}
+  .mq-ring-fill{transition:stroke-dashoffset 1s linear;}
   .mq-meal-tap:active{transform:scale(0.97);}
   .mq-shell{
     width:100%;
