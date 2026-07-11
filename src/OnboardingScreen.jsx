@@ -103,7 +103,7 @@ function OnboardingScreen() {
           // explanation. Now we wait for the save to genuinely confirm before advancing,
           // and show a real retry screen if it fails, instead of guessing it worked.
           if (_saveUid) {
-            const saveOk = await sb.upsertProfile(_saveUid, userData, parsed);
+            const saveOk = await sb.upsertProfile(_saveUid, userData, parsed, gymBranding?.gymId || "demo-gym");
             if (!cancelled && !saveOk) {
               setPlanError("Your plan was built, but we couldn't save it — your connection or our database may have had a hiccup. Tap to try again.");
               return;

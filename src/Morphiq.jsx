@@ -11,7 +11,7 @@ import {
   sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY,
   localDateStr, buildPlan, progressPlan,
   SUPABASE_URL, SB_GET, getAuthToken,
-  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon,
+  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout,
   GOAL_OPTIONS, GOAL_ICONS, EQUIPMENT_OPTIONS,
   WORKOUT_EXERCISES, MEAL_DATA, GROCERY_DATA,
   FALLBACK_REPLIES, CHAT_SUGGESTIONS,
@@ -60,7 +60,7 @@ function AppProvider({ children }) {
 
     sb.getGymBranding(gymToLoad).then(row => {
       if (row?.name) {
-        setGymBranding({ name: row.name, accent: row.accent || "#00D4B1", welcome: row.welcome || "", units: "imperial" });
+        setGymBranding({ name: row.name, accent: row.accent || "#00D4B1", welcome: row.welcome || "", units: "imperial", gymId: gymToLoad });
       }
     });
   }, []);
@@ -513,7 +513,7 @@ function AuthScreen() {
             />
             {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
             <button onClick={handleSend} style={btn(!email.includes("@") || step === "sending")}>
-              {step === "sending" ? "Sending code…" : <>Send code <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px" }} /></>}
+              {step === "sending" ? "Sending code…" : "Send code →"}
             </button>
           </div>
         ) : null}
@@ -522,7 +522,7 @@ function AuthScreen() {
         {(step === "code" || step === "verifying") ? (
           <div className="mq-fade">
             <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <div style={{ marginBottom: 10, display: "flex", justifyContent: "center", color: a }}><Icon name="phone" size={32} /></div>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>📱</div>
               <div style={{ fontSize: 15, fontWeight: 600, color: ob.white, marginBottom: 6 }}>Enter your code</div>
               <div style={{ fontSize: 12, color: ob.body, lineHeight: 1.6 }}>
                 We sent a 6-digit code to<br />
@@ -570,7 +570,7 @@ function AuthScreen() {
                 onClick={() => verifyCode(code.join(""))}
                 style={btn(code.some(d => !d))}
               >
-                Verify code <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px" }} />
+                Verify code →
               </button>
             )}
 
@@ -640,7 +640,7 @@ function PlanOverviewScreen() {
         </div>
       </div>
       <div style={{ padding: "1.25rem" }}>
-        <button onClick={() => navigate("home")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 16, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Go to dashboard <Icon name="arrow-right" size={15} /></button>
+        <button onClick={() => navigate("home")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 16, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Go to dashboard →</button>
       </div>
     </Layout>
   );
@@ -857,13 +857,13 @@ function HomeDashboardScreen() {
   return (
     <Layout activeNav="home">
       <div style={{ margin: "1.5rem 1.25rem 0", background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem 1.25rem", display: "flex", gap: 12, alignItems: "flex-start" }}>
-        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A2E2B", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="bot" size={16} /></div>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A2E2B", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🤖</div>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <div style={{ fontSize: 12, color: a, fontWeight: 500 }}>Your coach</div>
             <button onClick={refreshCoachNote} disabled={coachLoading}
               style={{ background: "none", border: "none", cursor: coachLoading ? "default" : "pointer", fontSize: 13, color: coachLoading ? "transparent" : "#6B7A8D", padding: 0, lineHeight: 1 }}
-              title="Get a new message"><Icon name="refresh" size={16} /></button>
+              title="Get a new message">↺</button>
           </div>
           <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{coachLoading ? "..." : coachMsg}</div>
         </div>
@@ -876,7 +876,7 @@ function HomeDashboardScreen() {
               onClick={() => setMsgExpanded(v => !v)}
               style={{ padding: "0.85rem 1.25rem", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
             >
-              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(0,212,177,0.12)", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="chat" size={15} /></div>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(0,212,177,0.12)", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>💬</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, color: a, fontWeight: 500 }}>Message from your gym</div>
                 <div style={{ fontSize: 13, color: "#C0C0C0", marginTop: 2 }}>{unreadMessages.length} new message{unreadMessages.length > 1 ? "s" : ""}</div>
@@ -891,7 +891,7 @@ function HomeDashboardScreen() {
                   <button
                     onClick={() => dismissMessage(msg)}
                     style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "4px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}
-                  ><Icon name="check" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} />Got it</button>
+                  >Got it ✓</button>
                 </div>
               </div>
             ))}
@@ -903,7 +903,7 @@ function HomeDashboardScreen() {
         <div style={{ background: theme.surface, border: `0.5px solid ${allDone ? theme.border : theme.border}`, borderRadius: 16, overflow: "hidden" }}>
           {allDone ? (
             <div style={{ padding: "1.5rem 1.25rem", textAlign: "center" }}>
-              <div style={{ marginBottom: 8, display: "flex", justifyContent: "center", color: "#F59E0B" }}><Icon name="trophy" size={32} /></div>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🏆</div>
               <div style={{ fontSize: 18, fontWeight: 500, color: a, marginBottom: 6 }}>Week complete!</div>
               <div style={{ fontSize: 14, color: theme.textDim, marginBottom: 4 }}>You finished all {weeklyTarget} workouts this week.</div>
               <div style={{ fontSize: 13, color: theme.textMuted }}>New workouts unlock on Monday.</div>
@@ -945,7 +945,7 @@ function HomeDashboardScreen() {
               )}
               <div style={{ padding: "0 1.25rem 1.25rem" }}>
                 <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                  Start workout <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px" }} />
+                  Start workout →
                 </button>
               </div>
             </>
@@ -990,12 +990,12 @@ function HomeDashboardScreen() {
                 <div style={{ fontSize: 12, color: theme.textDim }}>{nextMeal.cal} cal · {nextMeal.protein}g protein</div>
               </div>
               <button onClick={() => navigate("meals")} style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
-                Log meal <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px" }} />
+                Log meal →
               </button>
             </div>
           ) : (
             <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, textAlign: "center" }}>
-              <div style={{ fontSize: 13, color: a, fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}>All meals logged today <Icon name="party" size={14} /></div>
+              <div style={{ fontSize: 13, color: a, fontWeight: 500 }}>All meals logged today 🎉</div>
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 3 }}>Great job hitting your nutrition targets.</div>
             </div>
           )}
@@ -1041,7 +1041,7 @@ function ProfileScreen() {
       sb.upsertProfile(supabaseUser.id, updatedUser, newPlan).catch(() => {});
     }
     setSaving(false);
-    setSavedMsg("Plan updated");
+    setSavedMsg("Plan updated ✓");
     setTimeout(() => setSavedMsg(""), 3000);
   }
 
@@ -1089,7 +1089,7 @@ function ProfileScreen() {
         {/* Saved confirmation banner */}
         {savedMsg && (
           <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.4)`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: a, textAlign: "center" }}>
-            <Icon name="check" size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} />{savedMsg}
+            {savedMsg}
           </div>
         )}
 
@@ -1242,7 +1242,7 @@ function NetworkErrorScreen() {
   return (
     <Layout>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 16, padding: "0 32px", textAlign: "center" }}>
-        <div style={{ display: "flex", justifyContent: "center", color: theme.textMuted }}><Icon name="signal" size={40} /></div>
+        <div style={{ fontSize: 40 }}>📶</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: theme.text }}>Connection issue</div>
         <div style={{ fontSize: 14, color: theme.textMuted, lineHeight: 1.6 }}>
           We couldn't confirm your data saved — could be a connection issue or a brief server hiccup. You're still logged in — just tap retry.
