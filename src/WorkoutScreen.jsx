@@ -313,7 +313,7 @@ function WorkoutScreen() {
   const [cooldownStep, setCooldownStep] = useState(savedProgress?.cooldownStep ?? 0);
 
   const [exIdx, setExIdx] = useState(savedProgress?.exIdx ?? 0);
-  const [setIdx, setSetIdx] = useState(savedProgress?.setIdx ?? 0);
+  const [setIdx, setSetIdx] = useState((savedProgress?.setIdx ?? 0) + (savedProgress?.state === "rest" ? 1 : 0));
   const [loggedSets, setLoggedSets] = useState(savedProgress?.loggedSets ?? []);
   const [state, setState] = useState("active");
 
@@ -372,10 +372,10 @@ function WorkoutScreen() {
     try {
       localStorage.setItem(progressKey, JSON.stringify({
         date: localDateStr(),
-        phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets,
+        phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state,
       }));
     } catch {}
-  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, progressKey]);
+  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state, progressKey]);
 
   // Clears saved progress — used when the workout finishes or the member
   // chooses to restart. Without this, a completed workout would try to resume.
