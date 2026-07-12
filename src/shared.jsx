@@ -191,6 +191,17 @@ const sb = {
 
   // ── HELPERS ───────────────────────────────────────────────────────────────
   // Resolves supabase_user_id → profiles.id (UUID used as FK in workout/meal logs)
+  async logSyncIssue(supabaseUserId, gymId, reason) {
+    try {
+      const res = await sbFetchRetry(\`\${SUPABASE_URL}/rest/v1/sync_issues\`, () => ({
+        method: "POST",
+        headers: SB_HEADERS(),
+        body: JSON.stringify({ supabase_user_id: supabaseUserId, gym_id: gymId || null, reason }),
+      }));
+      return res.ok;
+    } catch { return false; }
+  },
+
   async getProfileId(supabaseUserId) {
     try {
       // Fix (June 2026): the narrow "select=id" query was being rejected with HTTP 401
