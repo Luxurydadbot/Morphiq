@@ -27,6 +27,17 @@ const useApp = () => useContext(AppContext);
 // the platform-wide Super Admin Dashboard, instead of a member or gym-owner view.
 const SUPER_ADMIN_EMAIL = "admin@hypergentiq.com";
 
+async function getProfileWithRetry(uid, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const p = await sb.getProfile(uid);
+      if (p?.plan) return p;
+    } catch {}
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, 800));
+  }
+  return null;
+}
+
 function AppProvider({ children }) {
   // ── Restore session from localStorage on first load ──────────────────────
   const savedSession = (() => {
@@ -50,6 +61,7 @@ function AppProvider({ children }) {
   // When AI chat suggests swapping an exercise mid-workout, this holds the swap payload.
   // WorkoutScreen watches this and calls doSwap when it's non-null, then clears it.
   const [pendingAISwap, setPendingAISwap] = useState(null);
+  const [syncIssue, setSyncIssue] = useState(false);
 
   // ── On mount: load gym branding from Supabase ────────────────────────────
   useEffect(() => {
@@ -87,7 +99,7 @@ function AppProvider({ children }) {
         setScreen("auth");
         return "AUTH_REQUIRED";
       }
-      return sb.getProfile(savedSession.uid);
+      return getProfileWithRetry(savedSession.uid);
     }).then(profile => {
       if (profile === "AUTH_REQUIRED") return;
       // Helper: try localStorage cache if Supabase returns no plan
@@ -101,6 +113,8 @@ function AppProvider({ children }) {
       };
 
       const planSource = profile?.plan ? profile : null;
+
+      if (!planSource) { setSyncIssue(true); sb.logSyncIssue(savedSession.uid, gymBranding?.gymId, "profile_fetch_failed_after_retries").catch(() => {}); } else if (syncIssue) { setSyncIssue(false); }
       const cachedData = !planSource ? getCachedPlanData() : null;
       const resolvedPlan = planSource?.plan || cachedData?.plan || null;
       const resolvedUser = planSource
@@ -391,7 +405,7 @@ function AppProvider({ children }) {
   }
 
   return (
-    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, supabaseUserIdRef, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext, pendingAISwap, setPendingAISwap }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, supabaseUserIdRef, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext, pendingAISwap, setPendingAISwap, syncIssue }}>
       {children}
     </AppContext.Provider>
   );
@@ -647,7 +661,7 @@ function PlanOverviewScreen() {
 }
 
 function HomeDashboardScreen() {
-  const { navigate, user, plan, gymBranding, historicalData, supabaseUser } = useApp();
+  const { navigate, user, plan, gymBranding, historicalData, supabaseUser, syncIssue } = useApp();
   const a = gymBranding.accent;
   // Read today's logged calories from MealScreen's localStorage (new v2 flat-entry format)
   const calGoal = plan?.calories || 1800;
@@ -856,6 +870,12 @@ function HomeDashboardScreen() {
 
   return (
     <Layout activeNav="home">
+    {syncIssue && (
+      <div style={{ margin: "1rem 1.25rem 0", background: "#2A1F1F", border: "1px solid #7A3B3B", borderRadius: 12, padding: "0.75rem 1rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div style={{ fontSize: 13, color: "#F0B0B0" }}>Could not sync your latest progress. Showing your last saved plan.</div>
+        <button onClick={() => window.location.reload()} style={{ background: "none", border: "1px solid #F0B0B0", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: "#F0B0B0", cursor: "pointer", flexShrink: 0 }}>Try again</button>
+      </div>
+    )}
       <div style={{ margin: "1.5rem 1.25rem 0", background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem 1.25rem", display: "flex", gap: 12, alignItems: "flex-start" }}>
         <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A2E2B", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="bot" size={16} /></div>
         <div>
