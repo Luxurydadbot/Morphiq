@@ -714,30 +714,31 @@ function HomeDashboardScreen() {
     } catch { return null; }
   })();
 
-  // Weekly workout queue — resets every Monday, stored in localStorage
-  const getWeekKey = () => {
+  // Weekly workout count -- derived from real logged sets (Supabase), not a
+  // local counter. Any day with at least one logged set counts as a workout
+  // for that week. Fixes two real problems: stopping partway through a
+  // session used to not count at all, and the old counter lived only in this
+  // device's local storage so it didn't follow you across devices.
+  const weeklyTarget = plan?.daysPerWeek ?? 3;
+  const monday = (() => {
     const now = new Date();
     const day = now.getDay(); // 0=Sun,1=Mon,...
     const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday of this week
-    const monday = new Date(now.setDate(diff));
-    return `morphiq_week_${monday.toISOString().slice(0,10)}`;
-  };
-  const weekKey = getWeekKey();
-  const weeklyTarget = plan?.daysPerWeek ?? 3;
-  const weeklyDone = parseInt(localStorage.getItem(weekKey) || "0", 10);
+    return new Date(now.getFullYear(), now.getMonth(), diff);
+  })();
+  const mondayStr = localDateStr(monday);
+  const weeklyDone = new Set(
+    (historicalData?.workoutLogs || [])
+      .map((l) => l.workout_date)
+      .filter((d) => d >= mondayStr)
+  ).size;
   const allDone = weeklyDone >= weeklyTarget;
   const weekNum = plan?.weekNumber ?? 1;
   // For custom multi-day plans, show the upcoming day's name and exercises
   const getUpcomingDayData = () => {
     if (plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1) {
       try {
-        const now = new Date();
-        const day = now.getDay();
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(now); monday.setDate(diff);
-        const wk = `morphiq_week_${monday.toISOString().slice(0, 10)}`;
-        const done = parseInt(localStorage.getItem(wk) || "0", 10);
-        const dayIdx = done % plan.customDays.length;
+        const dayIdx = weeklyDone % plan.customDays.length;
         return plan.customDays[dayIdx];
       } catch { return null; }
     }
