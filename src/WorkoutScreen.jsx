@@ -252,7 +252,7 @@ function getSwapOptions(ex, equipment) {
 }
 
 function WorkoutScreen() {
-  const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap } = useApp();
+  const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData } = useApp();
   const a = gymBranding.accent;
 
   // Use AI-generated exercises if available, else fall back to defaults.
@@ -263,18 +263,23 @@ function WorkoutScreen() {
     // Determine which day index to use for custom multi-day plans
     let sourceExercises = plan?.exercises || WORKOUT_EXERCISES;
     if (plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1) {
-      // Read how many workouts are done this week (same key the home screen uses)
+      // How many workouts are done this week -- derived from real logged sets
+      // (same source the home screen uses), not a local-only counter.
       try {
         const now = new Date();
         const day = now.getDay();
         const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(now); monday.setDate(diff);
-        const weekKey = `morphiq_week_${monday.toISOString().slice(0, 10)}`;
-        const weeklyDone = parseInt(localStorage.getItem(weekKey) || "0", 10);
+        const monday = new Date(now.getFullYear(), now.getMonth(), diff);
+        const mondayStr = localDateStr(monday);
+        const weeklyDone = new Set(
+          (historicalData?.workoutLogs || [])
+            .map((l) => l.workout_date)
+            .filter((d) => d >= mondayStr)
+        ).size;
         const dayIdx = weeklyDone % plan.customDays.length;
         const dayData = plan.customDays[dayIdx];
         if (dayData?.exercises?.length > 0) sourceExercises = dayData.exercises;
-      } catch { /* localStorage unavailable — fall back to plan.exercises */ }
+      } catch { /* fall back to plan.exercises */ }
     }
     return sourceExercises.map(e => ({
       name: e.name, muscle: e.muscle || "", sets: e.sets,
@@ -611,21 +616,14 @@ function WorkoutScreen() {
     advanceSet();
   }
 
-  // Called once when the workout is fully complete (exercises done + cool-down done).
-  // Increments the morphiq_week_YYYY-MM-DD key so the home screen streak and
-  // weekly progress bar reflect the completed workout immediately.
+    // Called once when the workout is fully complete (exercises done + cool-down done).
+  // The weekly count now comes straight from logged sets in the database
+  // (see historicalData.workoutLogs), not a local-only counter -- so just
+  // refresh that data here so the home screen (and the day-picker above)
+  // reflect this session right away, instead of waiting for the next
+  // sign-in/resume to catch up.
   function recordWorkoutComplete() {
-    try {
-      const now = new Date();
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(now.setDate(diff));
-      const weekKey = `morphiq_week_${monday.toISOString().slice(0, 10)}`;
-      const current = parseInt(localStorage.getItem(weekKey) || "0", 10);
-      localStorage.setItem(weekKey, String(current + 1));
-    } catch {
-      // localStorage unavailable — not a fatal error, streak just won't update
-    }
+    try { if (supabaseUser?.id) loadHistoricalData(supabaseUser.id); } catch {}
     // Workout is finished — clear the in-progress save so it won't resume.
     clearProgress();
   }
