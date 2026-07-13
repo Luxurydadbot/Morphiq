@@ -8,7 +8,7 @@ import { OnboardingScreen } from "./OnboardingScreen.jsx";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { ChatScreen } from "./ChatScreen.jsx";
 import {
-  sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY,
+  sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY, isGymBlocked,
   localDateStr, buildPlan, progressPlan,
   SUPABASE_URL, SB_GET, getAuthToken,
   MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon,
@@ -244,6 +244,12 @@ function AppProvider({ children }) {
       if (gymRow?.gym_id) {
         setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: gymRow.accent || prev.accent, welcome: gymRow.welcome || prev.welcome }));
       }
+      // Paywall gate: owners get locked out the same way members do if their
+      // gym's subscription has lapsed -- unless it's an internal/beta-exempt gym.
+      if (isGymBlocked(gymRow)) {
+        setScreen("billing_blocked");
+        return;
+      }
       setScreen("owner");
       return;
     }
@@ -270,6 +276,26 @@ function AppProvider({ children }) {
       } catch(fetchErr) {
         console.error("[Morphiq] profile fetch error:", fetchErr?.message || fetchErr);
       }
+
+      // Paywall gate: if this member's gym has been suspended or its Stripe
+      // subscription has lapsed (past_due / unpaid / canceled), stop here and
+      // show the billing-blocked screen instead of the normal app. Internal/
+      // beta-exempt gyms are never blocked. Any lookup failure fails OPEN.
+      if (profile?.gym_id) {
+        try {
+          const gymRow = await sb.getGymBranding(profile.gym_id);
+          if (gymRow) {
+            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: gymRow.accent || prev.accent, welcome: gymRow.welcome || prev.welcome }));
+            if (isGymBlocked(gymRow)) {
+              setScreen("billing_blocked");
+              return;
+            }
+          }
+        } catch (gymErr) {
+          console.error("[Morphiq] gym status check failed (failing open):", gymErr?.message || gymErr);
+        }
+      }
+
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
@@ -1285,11 +1311,33 @@ function NetworkErrorScreen() {
 }
 
 
+function BillingBlockedScreen() {
+  const { gymBranding } = useApp();
+  return (
+    <Layout>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 16, padding: "0 32px", textAlign: "center" }}>
+        <div style={{ display: "flex", justifyContent: "center", color: theme.textMuted }}><Icon name="alert" size={40} /></div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: theme.text }}>This gym's account needs attention</div>
+        <div style={{ fontSize: 14, color: theme.textMuted, lineHeight: 1.6 }}>
+          {gymBranding?.name || "This gym"}'s Morphiq subscription isn't active right now. Please check with your gym owner, or if you're the owner, update your billing to restore access.
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ background: theme.accent, color: "#003D35", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8 }}
+        >
+          Try again
+        </button>
+      </div>
+    </Layout>
+  );
+}
+
 function AppRouter() {
   const { screen } = useApp();
   if (screen === "auth") return <AuthScreen />;
   if (screen === "gym_signup") return <GymSignupScreen />;
   if (screen === "network_error") return <NetworkErrorScreen />;
+  if (screen === "billing_blocked") return <BillingBlockedScreen />;
   if (screen === "loading") return <LoadingScreen />;
   if (screen === "onboarding") return <OnboardingScreen />;
   if (screen === "plan") return <PlanOverviewScreen />;
