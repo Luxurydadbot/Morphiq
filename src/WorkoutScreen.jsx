@@ -1265,19 +1265,24 @@ function WorkoutScreen() {
           />
         )}
 
-        {/* Weight display */}
-        <div style={{ background: "#1A2332", borderRadius: 12, padding: "10px 12px", marginBottom: 10, textAlign: "center" }}>
-          <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
-          <div style={{ fontSize: 52, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 18, color: theme.textDim }}>lbs</span></div>
-          {isWarmupSet ? (
-            <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
-          ) : nudgeAcceptedRef.current ? (
-            <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
-          ) : (
-            <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === ex.weight ? "Today's target" : `+${currentWeight - ex.weight} lbs from plan`}</div>
-          )}
+        {/* Weight + target reps display */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
+            <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
+            <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
+            {isWarmupSet ? (
+              <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
+            ) : nudgeAcceptedRef.current ? (
+              <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
+            ) : (
+              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === ex.weight ? "Today's target" : `+${currentWeight - ex.weight} lbs from plan`}</div>
+            )}
+          </div>
+          <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
+            <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Target reps</div>
+            <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{currentTargetReps} <span style={{ fontSize: 15, color: theme.textDim }}>reps</span></div>
+          </div>
         </div>
-
         {/* ── LAST TIME display — shown when we have history for this exercise ── */}
         {!isWarmupSet && lastSetHistory && (
           <div style={{ background: "#0A1A14", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 10, padding: "8px 14px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
