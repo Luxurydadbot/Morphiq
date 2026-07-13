@@ -328,8 +328,12 @@ const sb = {
       const profileId = await this.getProfileId(supabaseUserId);
       if (!profileId) return null;
       const name = encodeURIComponent(exerciseName);
+      // Only look at PRIOR workouts (before today) -- otherwise, mid-session,
+      // this would show the set you just logged a few minutes ago instead of
+      // last time you actually trained this exercise (a real prior session).
+      const today = localDateStr();
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${name}&set_number=gt.0&order=logged_at.desc&limit=1`,
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${name}&set_number=gt.0&workout_date=lt.${today}&order=logged_at.desc&limit=1`,
         { headers: SB_GET() }
       );
       const rows = await res.json();
