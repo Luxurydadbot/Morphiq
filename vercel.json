@@ -12,11 +12,5 @@
     "api/chat.js": {
       "maxDuration": 30
     }
-  },
-  "crons": [
-    {
-      "path": "/api/report-usage",
-      "schedule": "0 6 1 * *"
-    }
-  ]
+  }
 }
