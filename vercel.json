@@ -1,9 +1,22 @@
 {
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ],
   "functions": {
-    "api/plan.js": { "maxDuration": 30 },
-    "api/chat.js": { "maxDuration": 30 }
-  }
+    "api/plan.js": {
+      "maxDuration": 30
+    },
+    "api/chat.js": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/report-usage",
+      "schedule": "0 6 1 * *"
+    }
+  ]
 }
