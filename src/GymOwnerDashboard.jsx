@@ -33,7 +33,7 @@ function buildMemberRow(profile, sessions, lastDate, weightDelta) {
     ? (parseFloat(weightDelta) < 0 ? "#00D4B1" : "#F87171")
     : "#6B7A8D";
 
-  return { id: profile.id, name: profile.name || "Member", initials, bg, color, sessions: sessions || 0, status, statusColor, delta, deltaColor, atRisk: daysSince === null || daysSince > 7 };
+  return { id: profile.id, name: profile.name || "Member", initials, bg, color, sessions: sessions || 0, status, statusColor, delta, deltaColor, atRisk: daysSince === null || daysSince > 7, isActive: profile.is_active !== false };
 }
 
 // Shared hook — loads all owner data once, shared between Overview + Members tabs
@@ -67,7 +67,11 @@ function useOwnerData() {
     return () => { cancelled = true; };
   }, [gymBranding?.gymId]); // re-fetch if gym changes
 
-  return { members, loading };
+  function updateLocalActive(id, isActive) {
+    setMembers(prev => prev.map(m => (m.id === id ? { ...m, isActive } : m)));
+  }
+
+  return { members, loading, updateLocalActive };
 }
 
 function OwnerStatCard({ value, label, sub, color }) {
@@ -187,8 +191,27 @@ function OwnerOverviewTab() {
 }
 
 function OwnerMembersTab() {
-  const { members, loading } = useOwnerData();
+  const { members, loading, updateLocalActive } = useOwnerData();
   const { gymBranding } = useApp();
+  const activeMembers = members.filter(m => m.isActive !== false);
+  const removedMembers = members.filter(m => m.isActive === false);
+  const [busyMemberId, setBusyMemberId] = useState(null);
+  const [showRemoved, setShowRemoved] = useState(false);
+
+  async function handleRemoveMember(m) {
+    if (!window.confirm(`Remove ${m.name} from this gym? They'll stop counting toward your active member total. You can restore them anytime.`)) return;
+    setBusyMemberId(m.id);
+    const ok = await sb.setMemberActive(m.id, false);
+    setBusyMemberId(null);
+    if (ok) updateLocalActive(m.id, false);
+  }
+
+  async function handleRestoreMember(m) {
+    setBusyMemberId(m.id);
+    const ok = await sb.setMemberActive(m.id, true);
+    setBusyMemberId(null);
+    if (ok) updateLocalActive(m.id, true);
+  }
 
   // ── Individual message state ──────────────────────────────────────────────
   const [composeTo, setComposeTo] = useState(null);
@@ -221,11 +244,11 @@ function OwnerMembersTab() {
 
   async function sendBroadcast() {
     const text = broadcastText.trim();
-    if (!text || !members.length) return;
+    if (!text || !activeMembers.length) return;
     setBroadcastSending(true);
     setBroadcastResult(null);
     const gymId = gymBranding?.gymId || "demo-gym";
-    const profileIds = members.map(m => m.id);
+    const profileIds = activeMembers.map(m => m.id);
     const result = await sb.broadcastMessage(gymId, profileIds, text);
     setBroadcastSending(false);
     setBroadcastResult(result);
@@ -238,7 +261,7 @@ function OwnerMembersTab() {
 
   if (loading) return <OwnerSpinner />;
 
-  if (!members.length) {
+  if (!activeMembers.length) {
     return (
       <div className="mq-fade" style={{ background: "#1A2332", borderRadius: 14, padding: "24px 16px", textAlign: "center" }}>
         <div style={{ fontSize: 13, color: "#6B7A8D", lineHeight: 1.6 }}>No members have signed up yet.</div>
@@ -259,7 +282,7 @@ function OwnerMembersTab() {
             <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(0,212,177,0.12)", border: "1px solid rgba(0,212,177,0.25)", display: "flex", alignItems: "center", justifyContent: "center", color: "#00D4B1" }}><Icon name="megaphone" size={13} /></div>
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Message all members</div>
-              <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 1 }}>{members.length} member{members.length !== 1 ? "s" : ""} will receive this</div>
+              <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 1 }}>{activeMembers.length} member{activeMembers.length !== 1 ? "s" : ""} will receive this</div>
             </div>
           </div>
           <div style={{ fontSize: 18, color: "#6B7A8D", transform: broadcastOpen ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
@@ -275,8 +298,8 @@ function OwnerMembersTab() {
                   {m.name.split(" ")[0]}
                 </div>
               ))}
-              {members.length > 8 && (
-                <div style={{ background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "3px 9px", fontSize: 10, color: "#6B7A8D" }}>+{members.length - 8} more</div>
+              {activeMembers.length > 8 && (
+                <div style={{ background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "3px 9px", fontSize: 10, color: "#6B7A8D" }}>+{activeMembers.length - 8} more</div>
               )}
             </div>
 
@@ -310,7 +333,7 @@ function OwnerMembersTab() {
                 disabled={!broadcastText.trim() || broadcastSending || broadcastText.length > 280}
                 style={{ flex: 2, background: broadcastResult?.sent > 0 ? "#003D35" : "#00D4B1", color: broadcastResult?.sent > 0 ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: (!broadcastText.trim() || broadcastSending) ? "default" : "pointer", fontFamily: "inherit", opacity: (!broadcastText.trim() || broadcastSending) ? 0.5 : 1, transition: "all .2s" }}
               >
-                {broadcastSending ? "Sending..." : broadcastResult?.sent > 0 ? <>Sent <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : `Send to all ${members.length} members`}
+                {broadcastSending ? "Sending..." : broadcastResult?.sent > 0 ? <>Sent <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : `Send to all ${activeMembers.length} members`}
               </button>
             </div>
           </div>
@@ -319,8 +342,8 @@ function OwnerMembersTab() {
 
       {/* ── Member list ── */}
       <div style={{ background: "#1A2332", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
-        {members.map((m, i) => (
-          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < members.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+        {activeMembers.map((m, i) => (
+          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < activeMembers.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: m.color, flexShrink: 0 }}>{m.initials}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
@@ -334,9 +357,36 @@ function OwnerMembersTab() {
               style={{ width: 28, height: 28, borderRadius: 8, background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.4-.6 2.6-1.5 3.5L10.5 12H6.5c-2.76 0-5-2.24-5-5z" stroke="#00D4B1" strokeWidth="1" /></svg>
             </button>
+            <button onClick={() => handleRemoveMember(m)} disabled={busyMemberId === m.id} title="Remove member"
+              style={{ width: 28, height: 28, borderRadius: 8, background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 6, opacity: busyMemberId === m.id ? 0.5 : 1 }}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2l-9 9" stroke="#F87171" strokeWidth="1.5" strokeLinecap="round" /></svg>
+            </button>
           </div>
         ))}
       </div>
+
+      {removedMembers.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <button onClick={() => setShowRemoved(v => !v)}
+            style={{ background: "none", border: "none", color: "#6B7A8D", fontSize: 12, cursor: "pointer", padding: "4px 0", fontFamily: "inherit" }}>
+            {showRemoved ? "Hide" : "Show"} removed members ({removedMembers.length})
+          </button>
+          {showRemoved && (
+            <div style={{ background: "#1A2332", borderRadius: 14, overflow: "hidden", marginTop: 8, opacity: 0.6 }}>
+              {removedMembers.map((m, i) => (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < removedMembers.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: m.color, flexShrink: 0 }}>{m.initials}</div>
+                  <div style={{ flex: 1, fontSize: 13, color: "#E8EDF2" }}>{m.name}</div>
+                  <button onClick={() => handleRestoreMember(m)} disabled={busyMemberId === m.id}
+                    style={{ fontSize: 11, fontWeight: 600, color: "#00D4B1", background: "none", border: "1px solid #00D4B1", borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", opacity: busyMemberId === m.id ? 0.5 : 1 }}>
+                    {busyMemberId === m.id ? "..." : "Restore"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Individual compose panel ── */}
       {composeTo && (
