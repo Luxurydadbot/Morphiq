@@ -1833,6 +1833,22 @@ function getWeekStreak(daysPerWeek) {
 }
 
 
+
+// -- Billing / paywall gate --------------------------------------------
+// Central place that decides if a gym's members and owner should be locked
+// out of the app. Internal/beta-exempt gyms (is_beta_exempt) are NEVER
+// blocked, regardless of subscription_status. A manually-suspended gym
+// (is_suspended) is always blocked. Otherwise, block only on subscription
+// statuses that clearly mean "not paying" (past_due / unpaid / canceled).
+// Fails OPEN: a missing/null gym row never blocks access on its own.
+function isGymBlocked(gymRow) {
+  if (!gymRow) return false;
+  if (gymRow.is_beta_exempt) return false;
+  if (gymRow.is_suspended) return true;
+  const blockedStatuses = ["past_due", "unpaid", "canceled"];
+  return blockedStatuses.includes(gymRow.subscription_status);
+}
+
 // ── All shared exports for screen files ─────────────────────────────────────
 export {
   // Auth / DB
@@ -1858,4 +1874,6 @@ export {
   WeightChart, StreakCalendar, getWeekStreak,
   // Admin dashboard sub-components
   MonthlyTrendLineChart,
+  // Billing / paywall
+  isGymBlocked,
 };
