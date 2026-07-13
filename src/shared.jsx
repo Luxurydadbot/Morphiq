@@ -696,12 +696,26 @@ const sb = {
   async getGymMembers(gymId = "demo-gym") {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?gym_id=eq.${encodeURIComponent(gymId)}&select=id,name,goal,weight,updated_at&order=updated_at.desc`,
+        `${SUPABASE_URL}/rest/v1/profiles?gym_id=eq.${encodeURIComponent(gymId)}&select=id,name,goal,weight,updated_at,is_active&order=updated_at.desc`,
         { headers: SB_GET() }
       );
       const rows = await res.json();
       return Array.isArray(rows) ? rows : [];
     } catch { return []; }
+  },
+
+  // Soft-deactivate (or restore) a member. Never deletes their data --
+  // just flips is_active so they stop (or start again) counting toward
+  // the gym's active-member total and monthly billing.
+  async setMemberActive(profileId, isActive) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(profileId)}`, {
+        method: "PATCH",
+        headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
+        body: JSON.stringify({ is_active: isActive, updated_at: new Date().toISOString() }),
+      });
+      return res.ok;
+    } catch { return false; }
   },
 
   // For each profile ID, count workout sessions this calendar month
