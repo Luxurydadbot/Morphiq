@@ -213,7 +213,8 @@ function AppProvider({ children }) {
         supabaseUserIdRef.current = savedSession.uid;
         setScreen("onboarding");
       }
-    }).catch(() => {
+    }).catch((err) => {
+      try { localStorage.setItem("mq_debug_catch", JSON.stringify({ msg: (err && (err.message || String(err))) || "unknown", ts: new Date().toISOString() })); } catch {}
       // Network error on session restore — check local cache first.
       // Fix (June 2026): if there's no cache either, send to auth screen instead of
       // showing the error screen. The error screen was a dead end — the user had no
@@ -231,6 +232,7 @@ function AppProvider({ children }) {
         }
       } catch {}
       // No cache — clear stale session and send to login screen cleanly.
+      try { localStorage.setItem("mq_debug_nocache", "1"); } catch {}
       try { localStorage.removeItem("mq_access_token"); } catch {}
       try { localStorage.removeItem("mq_refresh_token"); } catch {}
       try { localStorage.removeItem(SESSION_KEY); } catch {}
@@ -549,7 +551,7 @@ function AuthScreen() {
         <div style={{ fontSize: 20, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
         <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Hypergentiq</div>
       </div>
-  <div style={{ fontSize: 9, color: "#666", textAlign: "center", padding: "0 20px", wordBreak: "break-all" }}>{(() => { try { return "boot:" + localStorage.getItem("mq_debug_boot") + " | reason:" + localStorage.getItem("mq_debug_reason"); } catch { return ""; } })()}</div>
+  <div style={{ fontSize: 9, color: "#666", textAlign: "center", padding: "0 20px", wordBreak: "break-all" }}>{(() => { try { return "boot:" + localStorage.getItem("mq_debug_boot") + " | reason:" + localStorage.getItem("mq_debug_reason") + " | catch:" + localStorage.getItem("mq_debug_catch") + " | nocache:" + localStorage.getItem("mq_debug_nocache"); } catch { return ""; } })()}</div>
 
       {/* Member / Owner toggle — only shown on idle step */}
       {step === "idle" && (
