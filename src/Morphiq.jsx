@@ -39,7 +39,7 @@ async function getProfileWithRetry(uid, attempts = 3) {
 }
 
 function AppProvider({ children }) {
-  // ââ Restore session from localStorage on first load ââââââââââââââââââââââ
+  // ── Restore session from localStorage on first load ──────────────────────
   const savedSession = (() => {
     try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
   })();
@@ -48,7 +48,7 @@ function AppProvider({ children }) {
   const [user, setUser] = useState(DEFAULT_USER);
   const [plan, setPlan] = useState(null);
   const [supabaseUser, setSupabaseUser] = useState(null);
-  // Ref mirrors supabaseUser.id synchronously â state updates are async so
+  // Ref mirrors supabaseUser.id synchronously — state updates are async so
   // supabaseUser?.id can be null inside onboarding even after setSupabaseUser runs.
   // Fix (June 2026): plan was never saved to Supabase on fresh PC login because
   // supabaseUser?.id was null when the save ran. Use this ref instead.
@@ -56,14 +56,14 @@ function AppProvider({ children }) {
   const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
   const [historicalData, setHistoricalData] = useState(null);
   // Tracks the current exercise + set while WorkoutScreen is active
-  // so ChatScreen can pass exact context to Claude (e.g. "Set 2 of 3 Â· Goblet Squat")
+  // so ChatScreen can pass exact context to Claude (e.g. "Set 2 of 3 · Goblet Squat")
   const [workoutContext, setWorkoutContext] = useState(null);
   // When AI chat suggests swapping an exercise mid-workout, this holds the swap payload.
   // WorkoutScreen watches this and calls doSwap when it's non-null, then clears it.
   const [pendingAISwap, setPendingAISwap] = useState(null);
   const [syncIssue, setSyncIssue] = useState(false);
 
-  // ââ On mount: load gym branding from Supabase ââââââââââââââââââââââââââââ
+  // ── On mount: load gym branding from Supabase ────────────────────────────
   useEffect(() => {
     // Check if a gym ID was passed in the URL (from invite link)
     const urlParams = new URLSearchParams(window.location.search);
@@ -77,7 +77,7 @@ function AppProvider({ children }) {
     });
   }, []);
 
-  // ââ On mount: if we have a saved session, restore it from Supabase ââââââââ
+  // ── On mount: if we have a saved session, restore it from Supabase ────────
   useEffect(() => {
     if (!savedSession?.uid) return;
     // Refresh the auth token before any reads. Supabase access tokens expire after
@@ -89,9 +89,9 @@ function AppProvider({ children }) {
         // false     = no refresh token exists at all (e.g. PC where the user never
         //             completed an OTP login on this device, so nothing was ever stored).
         // In both cases we have no valid auth token, so any Supabase read will use the
-        // anon key and RLS will block it â returning an empty row that looks like "no plan"
+        // anon key and RLS will block it — returning an empty row that looks like "no plan"
         // and sending the user to the error screen. The only safe path is a clean re-login.
-        // Fix (June 2026): previously only "expired" triggered this â "false" fell through
+        // Fix (June 2026): previously only "expired" triggered this — "false" fell through
         // and tried to read the profile with the anon key, always failing on new devices.
         try { localStorage.removeItem("mq_access_token"); } catch {}
         try { localStorage.removeItem("mq_refresh_token"); } catch {}
@@ -99,7 +99,7 @@ function AppProvider({ children }) {
         setScreen("auth");
         return "AUTH_REQUIRED";
       }
-      // Super admin has no gym/profile row — restore straight to the dashboard
+      // Super admin has no gym/profile row  restore straight to the dashboard
       // instead of running it through the member profile-lookup path below.
       if (savedSession.role === "super_admin") {
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
@@ -131,7 +131,7 @@ function AppProvider({ children }) {
       if (resolvedPlan && resolvedUser) {
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
         setUser(resolvedUser);
-        // Patch missing weekStartDate â if the plan was saved without it, fill in today
+        // Patch missing weekStartDate — if the plan was saved without it, fill in today
         // so the 7-day check has something to work from. Save back to Supabase immediately.
         const patchedPlan = resolvedPlan?.weekStartDate
           ? resolvedPlan
@@ -139,11 +139,11 @@ function AppProvider({ children }) {
 
         // Fix (June 2026): previously, if Supabase had NO plan but the browser's local
         // cache did (e.g. an earlier onboarding attempt that built a plan locally but
-        // failed to save it â see the timeout bug from tonight), this code trusted the
+        // failed to save it — see the timeout bug from tonight), this code trusted the
         // cache, showed "home" looking completely normal, and tried to silently re-save
         // the cache up to Supabase in the background with no confirmation. If THAT save
         // also failed, the member would be stuck forever looking logged-in with a real
-        // plan on screen, while the database never actually had their data â and every
+        // plan on screen, while the database never actually had their data — and every
         // future open of the app would repeat this same silent failure. Now, when we're
         // relying on the cache (not a confirmed Supabase plan), we wait for the re-save
         // to genuinely succeed before showing home. If it fails, we show a clear retry
@@ -152,7 +152,7 @@ function AppProvider({ children }) {
 
         if (needsConfirmedResave) {
           // Fix (June 2026): before trying to re-save, do one more Supabase read.
-          // The profile IS in the database (confirmed on other devices) â the first
+          // The profile IS in the database (confirmed on other devices) — the first
           // getProfile() may have returned a partial row due to a timing issue.
           // A second read often succeeds. Only fall back to upsert if it also fails.
           sb.getProfile(savedSession.uid).then(freshProfile => {
@@ -177,7 +177,7 @@ function AppProvider({ children }) {
           return;
         }
 
-        // Plan was already confirmed in Supabase (planSource?.plan was real) â just a
+        // Plan was already confirmed in Supabase (planSource?.plan was real) — just a
         // missing weekStartDate patch, which is low-stakes and fine to fire-and-forget.
         if (!resolvedPlan?.weekStartDate) sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).catch(() => {});
         setPlan(patchedPlan);
@@ -185,16 +185,16 @@ function AppProvider({ children }) {
         checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser).catch(() => {});
         setScreen("home");
       } else {
-        // No plan in Supabase or local cache â go to onboarding. Do NOT wipe the session.
+        // No plan in Supabase or local cache — go to onboarding. Do NOT wipe the session.
         // This prevents OTP being required every time when plan is null.
         setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
         supabaseUserIdRef.current = savedSession.uid;
         setScreen("onboarding");
       }
     }).catch(() => {
-      // Network error on session restore â check local cache first.
+      // Network error on session restore — check local cache first.
       // Fix (June 2026): if there's no cache either, send to auth screen instead of
-      // showing the error screen. The error screen was a dead end â the user had no
+      // showing the error screen. The error screen was a dead end — the user had no
       // way to log in again without knowing to tap "Use a different account".
       // Sending to auth is cleaner: they log in once, tokens get stored, future opens work.
       try {
@@ -208,7 +208,7 @@ function AppProvider({ children }) {
           return;
         }
       } catch {}
-      // No cache â clear stale session and send to login screen cleanly.
+      // No cache — clear stale session and send to login screen cleanly.
       try { localStorage.removeItem("mq_access_token"); } catch {}
       try { localStorage.removeItem("mq_refresh_token"); } catch {}
       try { localStorage.removeItem(SESSION_KEY); } catch {}
@@ -216,13 +216,13 @@ function AppProvider({ children }) {
     });
   }, []);
 
-  // ââ Proactive background token renewal (Thing 2) ââââââââââââââââââââââââââ
+  // ── Proactive background token renewal (Thing 2) ──────────────────────────
   // Access tokens expire after ~1 hour. Refreshing ONLY on app open meant a
-  // member who kept the app open â or left it backgrounded on a phone â could
+  // member who kept the app open — or left it backgrounded on a phone — could
   // cross the 1-hour line mid-use and start silently failing authenticated
   // saves/reads. This renews the token well before it expires: on a 45-minute
   // timer while the app is open, and again whenever the tab/app regains focus
-  // (the common mobile PWA "resume" case). Fire-and-forget â a failed renewal
+  // (the common mobile PWA "resume" case). Fire-and-forget — a failed renewal
   // never logs the member out mid-session; the retry-on-401 net (sbFetchRetry)
   // and the on-open re-login handle a genuinely dead session.
   useEffect(() => {
@@ -240,7 +240,7 @@ function AppProvider({ children }) {
     setSupabaseUser({ email, id: uid });
     supabaseUserIdRef.current = uid;
     if (role === "super_admin") {
-      // No gym to look up â this account sits above every gym, not inside one.
+      // No gym to look up — this account sits above every gym, not inside one.
       // Cache this login on the device so re-opening the admin dashboard
       // does not require signing in again every time (fix: July 2026).
       try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email, role: "super_admin" })); } catch {}
@@ -267,7 +267,7 @@ function AppProvider({ children }) {
     // Production: query profile from Supabase using the real auth UID.
     // Fix (June 2026): we do ONE fetch here and reuse the result directly instead of
     // making two back-to-back fetches (diagnostic + getProfile). Two fetches were
-    // causing the second one to return a row without the plan field â likely a Supabase
+    // causing the second one to return a row without the plan field — likely a Supabase
     // RLS/token timing issue where the first fetch "consumed" something the second needed.
     // Using the single fetch result directly is simpler and eliminates the race entirely.
     setScreen("loading");
@@ -309,7 +309,7 @@ function AppProvider({ children }) {
       if (profile?.plan) {
         const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
         setUser(u);
-        // Patch missing weekStartDate â if the plan was saved without it, fill in today
+        // Patch missing weekStartDate — if the plan was saved without it, fill in today
         // so the 7-day check has something to work from. Save back to Supabase immediately.
         const patchedPlan = profile.plan?.weekStartDate
           ? profile.plan
@@ -319,18 +319,18 @@ function AppProvider({ children }) {
         window._mq_plan_set = true; // flag so outer catch knows plan was set
         // Save session so next open skips login
         try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
-        // Fire-and-forget â errors here must never prevent home screen from showing
+        // Fire-and-forget — errors here must never prevent home screen from showing
         try { loadHistoricalData(uid); } catch {}
         try { checkAndGenerateNextWeek(uid, patchedPlan, u).catch(() => {}); } catch {}
         setScreen("home");
       } else {
         setUser(DEFAULT_USER); setPlan(null);
-        // Save session even with no plan â user stays logged in through onboarding
+        // Save session even with no plan — user stays logged in through onboarding
         try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
         setScreen("onboarding");
       }
     } catch(err) {
-      // Fix (June 2026): outer catch was sending to onboarding on ANY error â including
+      // Fix (June 2026): outer catch was sending to onboarding on ANY error — including
       // errors thrown by loadHistoricalData or checkAndGenerateNextWeek AFTER the plan
       // was already set. Now we check if we already have a plan and go home anyway.
       if (plan || window._mq_plan_set) { setScreen("home"); return; }
@@ -338,7 +338,7 @@ function AppProvider({ children }) {
     }
   }
 
-  // ââ REAL SUPABASE MAGIC-LINK CALLBACK âââââââââââââââââââââââââââââââââââââ
+  // ── REAL SUPABASE MAGIC-LINK CALLBACK ─────────────────────────────────────
   // When Supabase redirects back after clicking the magic link, the URL contains
   // #access_token=...&refresh_token=...  We detect this once on mount and sign in.
   useEffect(() => {
@@ -364,8 +364,8 @@ function AppProvider({ children }) {
 
   // Load historical workout + weight data once we have a real user ID
 
-  // Checks if 7+ days have passed since weekStartDate â if so, silently generates next week.
-  // Week progression â fully code-driven, no API call
+  // Checks if 7+ days have passed since weekStartDate — if so, silently generates next week.
+  // Week progression — fully code-driven, no API call
   // Called when session restores and plan is 7+ days old
   function checkAndGenerateNextWeek(uid, currentPlan, currentUser) {
     try {
@@ -378,7 +378,7 @@ function AppProvider({ children }) {
         const nextPlan = progressPlan(currentPlan, logs || [], currentUser);
         setPlan(nextPlan);
         sb.upsertProfile(uid, currentUser, nextPlan).catch(() => {});
-        console.log("[Morphiq] Week", nextPlan.weekNumber, "generated locally â no API call");
+        console.log("[Morphiq] Week", nextPlan.weekNumber, "generated locally — no API call");
       }).catch(() => {});
     } catch (e) { console.log("[Morphiq] Week progression skipped:", e.message); }
   }
@@ -397,8 +397,8 @@ function AppProvider({ children }) {
       const dates = [...new Set(workoutLogs.map(r => r.workout_date))].sort((a,b) => b.localeCompare(a));
       const totalWorkouts = dates.length;
 
-      // Streak â count consecutive days ending today or yesterday.
-      // Uses localDateStr (local time) â NOT UTC â so the day doesn't roll
+      // Streak — count consecutive days ending today or yesterday.
+      // Uses localDateStr (local time) — NOT UTC — so the day doesn't roll
       // over early for members west of UTC. (Same fix as the meal-day bug.)
       let streak = 0;
       const today = localDateStr();
@@ -454,7 +454,7 @@ function AuthScreen() {
 
   const [mode, setMode] = useState("member");
   const [email, setEmail] = useState("");
-  // steps: idle â sending â code â verifying â done
+  // steps: idle → sending → code → verifying → done
   const [step, setStep] = useState("idle");
   const [code, setCode] = useState(["","","","","",""]);
   const [errorMsg, setErrorMsg] = useState("");
@@ -503,7 +503,7 @@ function AuthScreen() {
     setStep("verifying"); setErrorMsg("");
     const result = await sb.verifyOTP(email, token);
     if (result?.uid) {
-      // The platform admin email always wins â skip the gym-owner lookup entirely.
+      // The platform admin email always wins — skip the gym-owner lookup entirely.
       if (email.trim().toLowerCase() === SUPER_ADMIN_EMAIL) {
         signIn(result.email, "super_admin", result.uid);
         return;
@@ -515,7 +515,7 @@ function AuthScreen() {
     } else {
       setStep("code");
       setCode(["","","","","",""]);
-      setErrorMsg("Incorrect code â check your email and try again.");
+      setErrorMsg("Incorrect code — check your email and try again.");
       setTimeout(() => inputRefs[0]?.current?.focus(), 100);
     }
   }
@@ -531,7 +531,7 @@ function AuthScreen() {
         <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Hypergentiq</div>
       </div>
 
-      {/* Member / Owner toggle â only shown on idle step */}
+      {/* Member / Owner toggle — only shown on idle step */}
       {step === "idle" && (
         <div style={{ display: "flex", margin: "0 20px 20px", background: ob.card, borderRadius: 10, padding: 3 }}>
           {[["member","I'm a Member"],["owner","Gym Owner"]].map(([id, label]) => (
@@ -545,7 +545,7 @@ function AuthScreen() {
 
       <div style={{ flex: 1, padding: "0 20px 20px" }}>
 
-        {/* ââ STEP: Email entry ââ */}
+        {/* ── STEP: Email entry ── */}
         {step === "idle" || step === "sending" ? (
           <div className="mq-fade">
             <div style={{ fontSize: 13, color: ob.body, marginBottom: 16, lineHeight: 1.6 }}>
@@ -563,12 +563,12 @@ function AuthScreen() {
             />
             {errorMsg && <div style={{ fontSize: 11, color: theme.red, marginBottom: 8 }}>{errorMsg}</div>}
             <button onClick={handleSend} style={btn(!email.includes("@") || step === "sending")}>
-              {step === "sending" ? "Sending codeâ¦" : <>Send code <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px" }} /></>}
+              {step === "sending" ? "Sending code…" : <>Send code <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px" }} /></>}
             </button>
           </div>
         ) : null}
 
-        {/* ââ STEP: Code entry ââ */}
+        {/* ── STEP: Code entry ── */}
         {(step === "code" || step === "verifying") ? (
           <div className="mq-fade">
             <div style={{ textAlign: "center", marginBottom: 20 }}>
@@ -613,7 +613,7 @@ function AuthScreen() {
             {step === "verifying" ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "8px 0" }}>
                 <Spinner size={28} color={a} trackColor={ob.card} />
-                <div style={{ fontSize: 12, color: ob.body }}>Verifyingâ¦</div>
+                <div style={{ fontSize: 12, color: ob.body }}>Verifying…</div>
               </div>
             ) : (
               <button
@@ -656,12 +656,12 @@ function PlanOverviewScreen() {
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: a }} />Plan ready
         </div>
         <div style={{ fontSize: 22, fontWeight: 500, color: "#F0F0F0", lineHeight: 1.3, marginBottom: ".4rem" }}>Your 4-week {goalLabel} program is live</div>
-        <div style={{ fontSize: 14, color: theme.textDim }}>{user.daysPerWeek || plan?.daysPerWeek || 3} workouts per week Â· {plan?.workoutType || "Full body"} Â· {user.fitnessLevel || "Intermediate"}</div>
+        <div style={{ fontSize: 14, color: theme.textDim }}>{user.daysPerWeek || plan?.daysPerWeek || 3} workouts per week · {plan?.workoutType || "Full body"} · {user.fitnessLevel || "Intermediate"}</div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Daily targets</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
-          {[[plan?.calories?.toLocaleString() || "â", "Calories", "100%", a], [`${plan?.protein || "â"}g`, "Protein", "72%", "#5DCAA5"], [`${plan?.carbs || "â"}g`, "Carbs", "55%", "#1D9E75"]].map(([v, l, w, c]) => (
+          {[[plan?.calories?.toLocaleString() || "—", "Calories", "100%", a], [`${plan?.protein || "—"}g`, "Protein", "72%", "#5DCAA5"], [`${plan?.carbs || "—"}g`, "Carbs", "55%", "#1D9E75"]].map(([v, l, w, c]) => (
             <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
               <div style={{ fontSize: 20, fontWeight: 500, color: "#F0F0F0" }}>{v}</div>
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
@@ -675,14 +675,14 @@ function PlanOverviewScreen() {
         <div style={sL}>Your first workout</div>
         <div className="mq-fade" style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div style={{ padding: "1rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div><div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>{plan?.workoutType || "Full body"}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{plan?.exercises?.length || 5} exercises Â· ~{plan?.workoutDuration || 40} min</div></div>
+              <div><div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>{plan?.workoutType || "Full body"}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{plan?.exercises?.length || 5} exercises · ~{plan?.workoutDuration || 40} min</div></div>
               <div style={{ background: "#1E1E1E", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: theme.textMuted }}>{plan?.workoutDuration || 40} min</div>
             </div>
             {(plan?.exercises || []).slice(0, 5).map((ex, i, arr) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".8rem 1.25rem", borderBottom: i < arr.length - 1 ? `0.5px solid #1A1A1A` : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 24, height: 24, borderRadius: 6, background: "#1E1E1E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: theme.textDim, fontWeight: 500, flexShrink: 0 }}>{i + 1}</div>
-                  <div><div style={{ fontSize: 14, color: "#D0D0D0" }}>{ex.name}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{ex.weight} lbs Â· {ex.reps} reps</div></div>
+                  <div><div style={{ fontSize: 14, color: "#D0D0D0" }}>{ex.name}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{ex.weight} lbs · {ex.reps} reps</div></div>
                 </div>
                 <div style={{ fontSize: 12, color: theme.textMuted, background: "#1A1A1A", borderRadius: 6, padding: "3px 8px" }}>{ex.sets} sets</div>
               </div>
@@ -715,12 +715,12 @@ function HomeDashboardScreen() {
   const sL = theme.sL;
 
   // With the new freeform meal log, there are no fixed meal slots.
-  // nextMeal is simplified â just a nudge to log food if nothing logged yet.
+  // nextMeal is simplified — just a nudge to log food if nothing logged yet.
   const nextMeal = (() => {
     try {
       const saved = JSON.parse(localStorage.getItem(todayNutritionKey) || "[]");
-      if (saved.length === 0) return { label: "Food log", name: "Nothing logged yet â tap Meals to add", cal: 0, protein: 0 };
-      return null; // already logging â no nudge needed
+      if (saved.length === 0) return { label: "Food log", name: "Nothing logged yet — tap Meals to add", cal: 0, protein: 0 };
+      return null; // already logging — no nudge needed
     } catch { return null; }
   })();
 
@@ -760,16 +760,16 @@ function HomeDashboardScreen() {
   const exerciseCount = upcomingExercises?.length ?? 5;
   const workoutDuration = Math.round(exerciseCount * 8);
 
-  // Real historical values â fall back to placeholders until data loads
-  const streak = historicalData?.streak ?? "â";
-  const totalWorkouts = historicalData?.totalWorkouts ?? "â";
+  // Real historical values — fall back to placeholders until data loads
+  const streak = historicalData?.streak ?? "—";
+  const totalWorkouts = historicalData?.totalWorkouts ?? "—";
   const weightChange = historicalData?.weightChange;
   const lastSession = historicalData?.lastSession;
   const weightChangeLabel = weightChange !== null && weightChange !== undefined
     ? (parseFloat(weightChange) <= 0 ? `${weightChange} lbs` : `+${weightChange} lbs`)
-    : "â";
+    : "—";
 
-  // AI coach message â generated by Claude once per day, cached in localStorage
+  // AI coach message — generated by Claude once per day, cached in localStorage
   // Cache key includes userId + today's date so it refreshes each day automatically
   const coachNoteKey = `morphiq_coach_note_${supabaseUser?.id || "anon"}_${localDateStr()}`;
   const [coachMsg, setCoachMsg] = useState(() => {
@@ -778,7 +778,7 @@ function HomeDashboardScreen() {
       const cached = localStorage.getItem(coachNoteKey);
       if (cached) return cached;
     } catch {}
-    // Fallback while AI loads â plain greeting so card isn't empty
+    // Fallback while AI loads — plain greeting so card isn't empty
     const h2 = new Date().getHours();
     const g = h2 < 12 ? "Good morning" : h2 < 17 ? "Good afternoon" : "Good evening";
     return `${g}, ${user.name || "there"}.`;
@@ -800,7 +800,7 @@ function HomeDashboardScreen() {
       }
     }
     const exSummaryR = Object.values(seenR).map(ex =>
-      ex.weight > 0 ? `${ex.name}: ${ex.weight}lbs Ã ${ex.reps} reps` : `${ex.name}: ${ex.reps} reps`
+      ex.weight > 0 ? `${ex.name}: ${ex.weight}lbs × ${ex.reps} reps` : `${ex.name}: ${ex.reps} reps`
     );
     fetch("/api/coach-note", {
       method: "POST",
@@ -831,7 +831,7 @@ function HomeDashboardScreen() {
     try {
       if (localStorage.getItem(coachNoteKey)) return;
     } catch {}
-    // No cache â call the AI
+    // No cache — call the AI
     setCoachLoading(true);
     // Build a real summary of the last workout session from actual log data
     const allLogs = historicalData?.workoutLogs || [];
@@ -839,7 +839,7 @@ function HomeDashboardScreen() {
     const lastSessionLogs = lastDate
       ? allLogs.filter(r => r.workout_date === lastDate)
       : [];
-    // Summarise: unique exercises with best set (highest weight Ã reps)
+    // Summarise: unique exercises with best set (highest weight × reps)
     const exerciseSummary = [];
     const seen = {};
     for (const row of lastSessionLogs) {
@@ -852,11 +852,11 @@ function HomeDashboardScreen() {
     }
     for (const ex of Object.values(seen)) {
       exerciseSummary.push(ex.weight > 0
-        ? `${ex.name}: ${ex.weight}lbs Ã ${ex.reps} reps`
+        ? `${ex.name}: ${ex.weight}lbs × ${ex.reps} reps`
         : `${ex.name}: ${ex.reps} reps`);
     }
 
-    // Next planned workout â first day in plan that isn't today
+    // Next planned workout — first day in plan that isn't today
     const nextWorkout = plan?.exercises?.slice(0, 3).map(e => e.name).join(", ") || null;
 
     fetch("/api/coach-note", {
@@ -890,7 +890,7 @@ function HomeDashboardScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coachNoteKey]);
 
-  // Gym messages â load once on mount
+  // Gym messages — load once on mount
   const [gymMessages, setGymMessages] = useState([]);
   const [msgExpanded, setMsgExpanded] = useState(false);
   useEffect(() => {
@@ -925,7 +925,7 @@ function HomeDashboardScreen() {
           <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{coachLoading ? "..." : coachMsg}</div>
         </div>
       </div>
-      {/* Gym messages notification card â only shown when there are unread messages */}
+      {/* Gym messages notification card — only shown when there are unread messages */}
       {unreadMessages.length > 0 && (
         <div style={{ margin: "0.75rem 1.25rem 0" }}>
           <div style={{ background: theme.surface, border: `0.5px solid ${a}`, borderRadius: 16, overflow: "hidden" }}>
@@ -938,7 +938,7 @@ function HomeDashboardScreen() {
                 <div style={{ fontSize: 12, color: a, fontWeight: 500 }}>Message from your gym</div>
                 <div style={{ fontSize: 13, color: "#C0C0C0", marginTop: 2 }}>{unreadMessages.length} new message{unreadMessages.length > 1 ? "s" : ""}</div>
               </div>
-              <div style={{ fontSize: 18, color: "#6B7A8D", transform: msgExpanded ? "rotate(90deg)" : "none", transition: "transform .2s" }}>âº</div>
+              <div style={{ fontSize: 18, color: "#6B7A8D", transform: msgExpanded ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
             </div>
             {msgExpanded && unreadMessages.map(msg => (
               <div key={msg.id} style={{ borderTop: "0.5px solid rgba(255,255,255,0.06)", padding: "0.85rem 1.25rem" }}>
@@ -969,8 +969,8 @@ function HomeDashboardScreen() {
             <>
               <div style={{ padding: "1.1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>Week {weekNum} Â· {workoutType}</div>
-                  <div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>{exerciseCount} exercises Â· ~{workoutDuration} min</div>
+                  <div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>Week {weekNum} · {workoutType}</div>
+                  <div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>{exerciseCount} exercises · ~{workoutDuration} min</div>
                 </div>
                 <div style={{ background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>{workoutType}</div>
               </div>
@@ -990,7 +990,7 @@ function HomeDashboardScreen() {
                         <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>{ex.muscle}</div>
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 13, color: a, fontWeight: 500 }}>{ex.sets} Ã {ex.reps}</div>
+                        <div style={{ fontSize: 13, color: a, fontWeight: 500 }}>{ex.sets} × {ex.reps}</div>
                         {ex.weight && <div style={{ fontSize: 11, color: theme.textMuted, marginTop: 1 }}>{ex.weight} lbs</div>}
                       </div>
                     </div>
@@ -1044,7 +1044,7 @@ function HomeDashboardScreen() {
               <div>
                 <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 2 }}>Next suggested meal</div>
                 <div style={{ fontSize: 14, color: "#D0D0D0", fontWeight: 500 }}>{nextMeal.name}</div>
-                <div style={{ fontSize: 12, color: theme.textDim }}>{nextMeal.cal} cal Â· {nextMeal.protein}g protein</div>
+                <div style={{ fontSize: 12, color: theme.textDim }}>{nextMeal.cal} cal · {nextMeal.protein}g protein</div>
               </div>
               <button onClick={() => navigate("meals")} style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>
                 Log meal <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px" }} />
@@ -1075,7 +1075,7 @@ function ProfileScreen() {
   const [saving, setSaving]             = useState(false);
   const [savedMsg, setSavedMsg]         = useState("");
 
-  // Local selections â initialised from live data
+  // Local selections — initialised from live data
   const [selectedGoal,  setSelectedGoal]  = useState(user.goal || "lose_fat");
   const [selectedDays,  setSelectedDays]  = useState(user.daysPerWeek || plan?.daysPerWeek || 3);
   const [selectedEquip, setSelectedEquip] = useState(user.equipment || "dumbbell");
@@ -1083,7 +1083,7 @@ function ProfileScreen() {
   const goalLabel  = GOAL_OPTIONS.find(g => g.id === selectedGoal)?.label  || "Lose fat";
   const equipLabel = EQUIPMENT_OPTIONS.find(e => e.id === selectedEquip)?.label || "Dumbbells";
 
-  // Shared save function â rebuilds plan from scratch, keeps all history/streaks untouched
+  // Shared save function — rebuilds plan from scratch, keeps all history/streaks untouched
   async function saveChanges(newGoal, newDays, newEquip) {
     setSaving(true);
     const updatedUser = { ...user, goal: newGoal, daysPerWeek: newDays, equipment: newEquip };
@@ -1093,7 +1093,7 @@ function ProfileScreen() {
     newPlan.weekStartDate = plan?.weekStartDate || new Date().toISOString().split("T")[0];
     setUser(updatedUser);
     setPlan(newPlan);
-    // Fire-and-forget save to Supabase â never blocks the UI
+    // Fire-and-forget save to Supabase — never blocks the UI
     if (supabaseUser?.id) {
       sb.upsertProfile(supabaseUser.id, updatedUser, newPlan).catch(() => {});
     }
@@ -1120,7 +1120,7 @@ function ProfileScreen() {
     <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
       <button onClick={onCancel} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
       <button onClick={onSave} disabled={saving} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "8px", fontSize: 12, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
-        {saving ? "Savingâ¦" : "Save & rebuild plan"}
+        {saving ? "Saving…" : "Save & rebuild plan"}
       </button>
     </div>
   );
@@ -1135,10 +1135,10 @@ function ProfileScreen() {
           </div>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: theme.text }}>{user.name || "Member"}</div>
-            <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{gymBranding.name} Â· Member</div>
+            <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{gymBranding.name} · Member</div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 20, padding: "2px 8px", marginTop: 4 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: a }} />
-              <span style={{ fontSize: 10, color: a }}>Active plan Â· {goalLabel}</span>
+              <span style={{ fontSize: 10, color: a }}>Active plan · {goalLabel}</span>
             </div>
           </div>
         </div>
@@ -1150,7 +1150,7 @@ function ProfileScreen() {
           </div>
         )}
 
-        {/* ââ Goal ââ */}
+        {/* ── Goal ── */}
         <div style={sL}>Your Goal</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           {!editGoal ? (
@@ -1179,7 +1179,7 @@ function ProfileScreen() {
           )}
         </div>
 
-        {/* ââ Days per week ââ */}
+        {/* ── Days per week ── */}
         <div style={sL}>Workouts per Week</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           {!editDays ? (
@@ -1210,7 +1210,7 @@ function ProfileScreen() {
           )}
         </div>
 
-        {/* ââ Equipment ââ */}
+        {/* ── Equipment ── */}
         <div style={sL}>Equipment</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           {!editEquip ? (
@@ -1239,10 +1239,10 @@ function ProfileScreen() {
           )}
         </div>
 
-        {/* Body stats â read-only */}
+        {/* Body stats — read-only */}
         <div style={sL}>Body Stats</div>
         <div style={{ background: "#1A2332", borderRadius: 14, padding: "0 14px", marginBottom: 16 }}>
-          <StatRow label="Height" value={user.height || "5â² 10â³"} />
+          <StatRow label="Height" value={user.height || "5′ 10″"} />
           <StatRow label="Weight" value={user.weight || "185 lbs"} sub="Starting weight" />
           <StatRow label="Age" value={user.age ? `${user.age} yrs` : "28 yrs"} />
           <div style={{ padding: "10px 0" }}>
@@ -1302,7 +1302,7 @@ function NetworkErrorScreen() {
         <div style={{ display: "flex", justifyContent: "center", color: theme.textMuted }}><Icon name="signal" size={40} /></div>
         <div style={{ fontSize: 18, fontWeight: 700, color: theme.text }}>Connection issue</div>
         <div style={{ fontSize: 14, color: theme.textMuted, lineHeight: 1.6 }}>
-          We couldn't confirm your data saved â could be a connection issue or a brief server hiccup. You're still logged in â just tap retry.
+          We couldn't confirm your data saved — could be a connection issue or a brief server hiccup. You're still logged in — just tap retry.
         </div>
         <button
           onClick={() => window.location.reload()}
