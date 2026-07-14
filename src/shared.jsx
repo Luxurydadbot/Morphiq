@@ -132,6 +132,22 @@ const sb = {
     } catch { return false; }
   },
 
+    // Checks whether the currently stored access token still has real time left,
+    // instead of always calling refreshSession() on every app open. Refresh tokens
+    // are single-use (see note above) -- refreshing on every open rotates the token
+    // every time, which raises the odds of losing the race if the app is closed
+    // mid-rotation. Skipping the refresh when the current token is still good
+    // removes that risk. (Fix: July 2026 -- member sessions not surviving a full
+    // app close, even though the same mechanism worked fine for lower-traffic logins.)
+    isAccessTokenValid() {
+      try {
+        const t = localStorage.getItem("mq_access_token");
+        if (!t) return false;
+        const payload = JSON.parse(atob(t.split(".")[1]));
+        return !!payload.exp && (payload.exp * 1000) > (Date.now() + 3 * 60 * 1000);
+      } catch { return false; }
+    },
+
   // ── PROFILES ──────────────────────────────────────────────────────────────
   async getProfile(supabaseUserId) {
     try {
