@@ -9,6 +9,7 @@ import { ProgressScreen } from "./ProgressScreen.jsx";
 import { ChatScreen } from "./ChatScreen.jsx";
 import {
   sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY, isGymBlocked,
+  setSessionCookie, getSessionCookie, clearSessionCookie,
   localDateStr, buildPlan, progressPlan,
   SUPABASE_URL, SB_GET, getAuthToken,
   MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon,
@@ -41,7 +42,25 @@ async function getProfileWithRetry(uid, attempts = 3) {
 function AppProvider({ children }) {
   // ── Restore session from localStorage on first load ──────────────────────
   const savedSession = (() => {
-    try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
+    try {
+      // Resurrect from cookie backup if localStorage came back empty after a full
+      // app close -- iOS Safari can evict localStorage for a closed tab even though
+      // the data was confirmed written moments earlier. Cookies with an explicit
+      // expiry survive that eviction. (Fix: July 2026.)
+      if (!localStorage.getItem(SESSION_KEY)) {
+        const backup = getSessionCookie(SESSION_KEY);
+        if (backup) localStorage.setItem(SESSION_KEY, backup);
+      }
+      if (!localStorage.getItem("mq_access_token")) {
+        const backup = getSessionCookie("mq_access_token");
+        if (backup) localStorage.setItem("mq_access_token", backup);
+      }
+      if (!localStorage.getItem("mq_refresh_token")) {
+        const backup = getSessionCookie("mq_refresh_token");
+        if (backup) localStorage.setItem("mq_refresh_token", backup);
+      }
+      return JSON.parse(localStorage.getItem(SESSION_KEY));
+    } catch { return null; }
   })();
   try {
     localStorage.setItem("mq_debug_boot", JSON.stringify({
@@ -318,7 +337,7 @@ function AppProvider({ children }) {
         setPlan(patchedPlan);
         window._mq_plan_set = true; // flag so outer catch knows plan was set
         // Save session so next open skips login
-        try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
+        try { const _s = JSON.stringify({ uid, email }); localStorage.setItem(SESSION_KEY, _s); setSessionCookie(SESSION_KEY, _s); } catch {}
         // Fire-and-forget — errors here must never prevent home screen from showing
         try { loadHistoricalData(uid); } catch {}
         try { checkAndGenerateNextWeek(uid, patchedPlan, u).catch(() => {}); } catch {}
@@ -326,7 +345,7 @@ function AppProvider({ children }) {
       } else {
         setUser(DEFAULT_USER); setPlan(null);
         // Save session even with no plan — user stays logged in through onboarding
-        try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email })); } catch {}
+        try { const _s = JSON.stringify({ uid, email }); localStorage.setItem(SESSION_KEY, _s); setSessionCookie(SESSION_KEY, _s); } catch {}
         setScreen("onboarding");
       }
     } catch(err) {
@@ -350,9 +369,9 @@ function AppProvider({ children }) {
     // Save the token so authenticated DB writes work when the user arrives via the
     // magic LINK (not just the typed OTP-code path). Without this, getAuthToken()
     // falls back to the anon key and profile/plan saves can be silently rejected.
-    try { localStorage.setItem("mq_access_token", accessToken); } catch {}
+    try { localStorage.setItem("mq_access_token", accessToken); setSessionCookie("mq_access_token", accessToken); } catch {}
     // Also save the refresh token so the session auto-renews on reopen (tokens expire ~1hr).
-    try { const rt = params.get("refresh_token"); if (rt) localStorage.setItem("mq_refresh_token", rt); } catch {}
+    try { const rt = params.get("refresh_token"); if (rt) { localStorage.setItem("mq_refresh_token", rt); setSessionCookie("mq_refresh_token", rt); } } catch {}
     // Decode the JWT to get the user's Supabase UUID (sub claim)
     try {
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
@@ -427,7 +446,7 @@ function AppProvider({ children }) {
   }
 
   function signOut() {
-    try { localStorage.removeItem(SESSION_KEY); } catch {}
+    try { localStorage.removeItem(SESSION_KEY); clearSessionCookie(SESSION_KEY); } catch {}
     // Also clear the Supabase auth tokens. Without this, "Log Out" left the old
     // (often expired) access/refresh tokens behind, so the next login kept tripping
     // over a dead token and reads returned 401. (Fix: June 2026 stuck-token bug.)
