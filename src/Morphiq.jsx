@@ -43,6 +43,15 @@ function AppProvider({ children }) {
   const savedSession = (() => {
     try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
   })();
+  try {
+    localStorage.setItem("mq_debug_boot", JSON.stringify({
+      hadSavedSession: !!savedSession,
+      savedUid: savedSession && savedSession.uid ? savedSession.uid : null,
+      hadAccessToken: !!localStorage.getItem("mq_access_token"),
+      hadRefreshToken: !!localStorage.getItem("mq_refresh_token"),
+      ts: new Date().toISOString(),
+    }));
+  } catch {}
 
   const [screen, setScreen] = useState(savedSession ? "loading" : (new URLSearchParams(window.location.search).get("join") === "gym" ? "gym_signup" : "auth"));
   const [user, setUser] = useState(DEFAULT_USER);
@@ -93,6 +102,7 @@ function AppProvider({ children }) {
         // and sending the user to the error screen. The only safe path is a clean re-login.
         // Fix (June 2026): previously only "expired" triggered this — "false" fell through
         // and tried to read the profile with the anon key, always failing on new devices.
+  try { localStorage.setItem("mq_debug_reason", JSON.stringify({ renewed, ts: new Date().toISOString() })); } catch {}
         try { localStorage.removeItem("mq_access_token"); } catch {}
         try { localStorage.removeItem("mq_refresh_token"); } catch {}
         try { localStorage.removeItem(SESSION_KEY); } catch {}
@@ -520,6 +530,7 @@ function AuthScreen() {
         <div style={{ fontSize: 20, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
         <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Hypergentiq</div>
       </div>
+  <div style={{ fontSize: 9, color: "#666", textAlign: "center", padding: "0 20px", wordBreak: "break-all" }}>{(() => { try { return "boot:" + localStorage.getItem("mq_debug_boot") + " | reason:" + localStorage.getItem("mq_debug_reason"); } catch { return ""; } })()}</div>
 
       {/* Member / Owner toggle — only shown on idle step */}
       {step === "idle" && (
