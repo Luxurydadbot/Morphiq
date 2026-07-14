@@ -551,7 +551,6 @@ function AuthScreen() {
         <div style={{ fontSize: 20, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
         <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Hypergentiq</div>
       </div>
-  <div style={{ fontSize: 9, color: "#666", textAlign: "center", padding: "0 20px", wordBreak: "break-all" }}>{(() => { try { return "boot:" + localStorage.getItem("mq_debug_boot") + " | reason:" + localStorage.getItem("mq_debug_reason") + " | catch:" + localStorage.getItem("mq_debug_catch") + " | nocache:" + localStorage.getItem("mq_debug_nocache"); } catch { return ""; } })()}</div>
 
       {/* Member / Owner toggle — only shown on idle step */}
       {step === "idle" && (
