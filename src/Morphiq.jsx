@@ -83,7 +83,7 @@ function AppProvider({ children }) {
     // Refresh the auth token before any reads. Supabase access tokens expire after
     // ~1 hour, so reopening the app the next day was using an expired token: RLS
     // rejected the workout reads and Progress/home showed zero. Renew first, then load.
-    sb.refreshSession().then((renewed) => {
+    (sb.isAccessTokenValid() ? Promise.resolve(true) : sb.refreshSession()).then((renewed) => {
       if (renewed === "expired" || renewed === false) {
         // "expired" = Supabase explicitly rejected the refresh token (4xx).
         // false     = no refresh token exists at all (e.g. PC where the user never
@@ -220,7 +220,7 @@ function AppProvider({ children }) {
   // and the on-open re-login handle a genuinely dead session.
   useEffect(() => {
     if (!savedSession?.uid) return;
-    const renew = () => { sb.refreshSession().catch(() => {}); };
+    const renew = () => { if (!sb.isAccessTokenValid()) sb.refreshSession().catch(() => {}); };
     const id = setInterval(renew, 45 * 60 * 1000); // 45 min < ~60 min token life
     const onVisible = () => { if (document.visibilityState === "visible") renew(); };
     document.addEventListener("visibilitychange", onVisible);
