@@ -36,6 +36,29 @@ function localDateStr(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
+// ── SESSION COOKIE BACKUP ────────────────────────────────────────────────
+// iOS Safari can silently evict localStorage for a tab after it is fully
+// closed (confirmed via on-device diagnostics, July 2026) even though the
+// data was written and confirmed present moments earlier. Cookies with an
+// explicit expiry are held much more durably by Safari, so the session key
+// and tokens are mirrored into a cookie backup on every write, and restored
+// from that backup on boot if localStorage comes back empty.
+function setSessionCookie(name, value) {
+  try {
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+    document.cookie = name + "=" + encodeURIComponent(value) + "; expires=" + expires + "; path=/; SameSite=Lax";
+  } catch {}
+}
+function getSessionCookie(name) {
+  try {
+    const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch { return null; }
+}
+function clearSessionCookie(name) {
+  try { document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; } catch {}
+}
+
 const sb = {
   // ── AUTH ──────────────────────────────────────────────────────────────────
   // Sends a 6-digit OTP to email (works inside the PWA — no browser redirect)
@@ -67,9 +90,9 @@ const sb = {
       if (!accessToken) return null;
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
       // Store the access token so authenticated DB writes work (fixes 401 on profile/workout saves)
-      try { localStorage.setItem("mq_access_token", accessToken); } catch {}
+      try { localStorage.setItem("mq_access_token", accessToken); setSessionCookie("mq_access_token", accessToken); } catch {}
       // Store the refresh token so the session can be renewed on reopen (access tokens expire ~1hr).
-      try { if (data.refresh_token) localStorage.setItem("mq_refresh_token", data.refresh_token); } catch {}
+      try { if (data.refresh_token) { localStorage.setItem("mq_refresh_token", data.refresh_token); setSessionCookie("mq_refresh_token", data.refresh_token); } } catch {}
       return { uid: payload.sub, email: payload.email || email };
     } catch { return null; }
   },
@@ -124,8 +147,8 @@ const sb = {
       }
       const data = await res.json();
       if (data?.access_token) {
-        try { localStorage.setItem("mq_access_token", data.access_token); } catch {}
-        if (data.refresh_token) { try { localStorage.setItem("mq_refresh_token", data.refresh_token); } catch {} }
+        try { localStorage.setItem("mq_access_token", data.access_token); setSessionCookie("mq_access_token", data.access_token); } catch {}
+        if (data.refresh_token) { try { localStorage.setItem("mq_refresh_token", data.refresh_token); setSessionCookie("mq_refresh_token", data.refresh_token); } catch {} }
         return true;
       }
       return false;
@@ -1888,7 +1911,7 @@ export {
   // Auth / DB
   sb, SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, getAuthToken, localDateStr,
   // App context
-  AppContext, useApp, DEFAULT_USER, SESSION_KEY,
+  AppContext, useApp, DEFAULT_USER, SESSION_KEY, setSessionCookie, getSessionCookie, clearSessionCookie,
   // Theme
   theme, css,
   // Plan engine
