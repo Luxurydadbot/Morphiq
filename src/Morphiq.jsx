@@ -99,16 +99,9 @@ function AppProvider({ children }) {
         setScreen("auth");
         return "AUTH_REQUIRED";
       }
-      // Super admin has no gym/profile row  restore straight to the dashboard
-      // instead of running it through the member profile-lookup path below.
-      if (savedSession.role === "super_admin") {
-        setSupabaseUser({ email: savedSession.email, id: savedSession.uid });
-        setScreen("super_admin");
-        return "SUPER_ADMIN_HANDLED";
-      }
       return getProfileWithRetry(savedSession.uid);
     }).then(profile => {
-      if (profile === "AUTH_REQUIRED" || profile === "SUPER_ADMIN_HANDLED") return;
+      if (profile === "AUTH_REQUIRED") return;
       // Helper: try localStorage cache if Supabase returns no plan
       // This handles the case where upsert created a duplicate row or Supabase is slow.
       // Fix added: onboarding now writes mq_cached_plan_<uid> so this always finds the plan.
@@ -241,9 +234,6 @@ function AppProvider({ children }) {
     supabaseUserIdRef.current = uid;
     if (role === "super_admin") {
       // No gym to look up — this account sits above every gym, not inside one.
-      // Cache this login on the device so re-opening the admin dashboard
-      // does not require signing in again every time (fix: July 2026).
-      try { localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, email, role: "super_admin" })); } catch {}
       setScreen("super_admin");
       return;
     }
