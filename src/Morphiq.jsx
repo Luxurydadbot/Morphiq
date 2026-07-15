@@ -184,7 +184,7 @@ function AppProvider({ children }) {
                 : { ...freshProfile.plan, weekStartDate: new Date().toISOString().split("T")[0], weekNumber: freshProfile.plan?.weekNumber || 1 };
               setPlan(fp);
               loadHistoricalData(savedSession.uid);
-              checkAndGenerateNextWeek(savedSession.uid, fp, resolvedUser).catch(() => {});
+              checkAndGenerateNextWeek(savedSession.uid, fp, resolvedUser); // Fix (July 2026): was .catch()-chained on a non-promise return, which threw and wiped a valid session on restore.
               setScreen("home");
               return;
             }
@@ -192,7 +192,7 @@ function AppProvider({ children }) {
               if (!ok) { setScreen("network_error"); return; }
               setPlan(patchedPlan);
               loadHistoricalData(savedSession.uid);
-              checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser).catch(() => {});
+              checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser); // Fix (July 2026): see note above (invalid .catch() on non-promise return).
               setScreen("home");
             }).catch(() => setScreen("network_error"));
           }).catch(() => setScreen("network_error"));
@@ -204,7 +204,7 @@ function AppProvider({ children }) {
         if (!resolvedPlan?.weekStartDate) sb.upsertProfile(savedSession.uid, resolvedUser, patchedPlan).catch(() => {});
         setPlan(patchedPlan);
         loadHistoricalData(savedSession.uid);
-        checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser).catch(() => {});
+        checkAndGenerateNextWeek(savedSession.uid, patchedPlan, resolvedUser); // Fix (July 2026): see note above (invalid .catch() on non-promise return).
         setScreen("home");
       } else {
         // No plan in Supabase or local cache — go to onboarding. Do NOT wipe the session.
@@ -342,7 +342,7 @@ function AppProvider({ children }) {
         try { const _s = JSON.stringify({ uid, email }); localStorage.setItem(SESSION_KEY, _s); setSessionCookie(SESSION_KEY, _s); } catch {}
         // Fire-and-forget — errors here must never prevent home screen from showing
         try { loadHistoricalData(uid); } catch {}
-        try { checkAndGenerateNextWeek(uid, patchedPlan, u).catch(() => {}); } catch {}
+        try { checkAndGenerateNextWeek(uid, patchedPlan, u); } catch {} // Fix (July 2026): removed invalid .catch() chain on non-promise return (see other call sites).
         setScreen("home");
       } else {
         setUser(DEFAULT_USER); setPlan(null);
