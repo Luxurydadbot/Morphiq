@@ -550,10 +550,34 @@ function AuthScreen() {
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: 24, fontWeight: 700, color: a }}>M</div>
         <div style={{ fontSize: 20, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
         <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Hypergentiq</div>
-{/* TEMP DEBUG - remove after reading mq_debug_catch, see session handoff */}
-<div style={{ fontSize: 9, color: ob.muted, marginTop: 6, padding: "0 16px", wordBreak: "break-all", textAlign: "center", opacity: 0.7 }}>
-{(() => { try { return "boot:" + (localStorage.getItem("mq_debug_boot")||"none") + " | reason:" + (localStorage.getItem("mq_debug_reason")||"none") + " | catch:" + (localStorage.getItem("mq_debug_catch")||"none") + " | nocache:" + (localStorage.getItem("mq_debug_nocache")||"none"); } catch (e) { return "debug read error: " + e.message; } })()}
-</div>
+{/* TEMP DEBUG BANNER - remove after diagnosing logout bug */}
+{(() => {
+  try {
+    const boot = JSON.parse(localStorage.getItem("mq_debug_boot") || "null");
+    const reason = localStorage.getItem("mq_debug_reason");
+    const catchInfo = localStorage.getItem("mq_debug_catch");
+    const nocache = localStorage.getItem("mq_debug_nocache");
+    const found = !!(boot && (boot.hadSavedSession || boot.hadAccessToken || boot.hadRefreshToken));
+    let msg;
+    if (!boot) {
+      msg = "DEBUG: no boot info yet";
+    } else if (found) {
+      msg = "DEBUG: A SAVED LOGIN WAS FOUND when the app opened.";
+      if (catchInfo) { try { msg += " But then this error happened: " + JSON.parse(catchInfo).msg; } catch { msg += " But then an error happened."; } }
+      else if (reason) { msg += " Token check said: " + reason; }
+      else { msg += " No error recorded (yet)."; }
+    } else {
+      msg = "DEBUG: NO SAVED LOGIN WAS FOUND when the app opened (nothing survived the close).";
+    }
+    return (
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 99999, background: found ? "#0a7a4a" : "#a10e0e", color: "#fff", fontSize: 15, fontWeight: 700, textAlign: "center", padding: "14px 10px", lineHeight: 1.4 }}>
+        {msg}
+      </div>
+    );
+  } catch (e) {
+    return <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 99999, background: "#a10e0e", color: "#fff", fontSize: 15, fontWeight: 700, textAlign: "center", padding: "14px 10px" }}>DEBUG ERROR: {e.message}</div>;
+  }
+})()}
       </div>
 
       {/* Member / Owner toggle — only shown on idle step */}
