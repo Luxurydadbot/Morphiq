@@ -1547,10 +1547,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
       </div>
       {children}
       <div style={{ textAlign: "center", fontSize: 11, color: theme.textFaint, padding: ".6rem", marginBottom: "3.5rem" }}>Powered by Hypergentiq</div>
-{/* TEMP DEBUG live - remove after diagnosing logout bug */}
-<div style={{ fontSize: 8, color: theme.textFaint, opacity: 0.6, textAlign: "center", wordBreak: "break-all", padding: "0 12px 6px" }}>
-{(() => { try { return "mq_live_debug session=" + !!localStorage.getItem(SESSION_KEY) + " access=" + !!localStorage.getItem("mq_access_token") + " refresh=" + !!localStorage.getItem("mq_refresh_token") + " cookieAccess=" + !!getSessionCookie("mq_access_token") + " cookieRefresh=" + !!getSessionCookie("mq_refresh_token"); } catch (e) { return "mq_live_debug error: " + e.message; } })()}
-</div>
+
       <div className="mq-pulse-ring" style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: "rgba(0,212,177,0.18)" }} />
       <button onClick={() => navigate(chatTarget)} style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: a, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2C6.03 2 2 5.8 2 10.5c0 1.8.55 3.5 1.5 4.9L2 20l4.8-1.4A9.2 9.2 0 0011 19c4.97 0 9-3.8 9-8.5S15.97 2 11 2z" fill="#0A1F1D" /><circle cx="7.5" cy="10.5" r="1.2" fill={a} /><circle cx="11" cy="10.5" r="1.2" fill={a} /><circle cx="14.5" cy="10.5" r="1.2" fill={a} /></svg>
