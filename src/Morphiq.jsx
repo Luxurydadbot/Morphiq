@@ -550,6 +550,10 @@ function AuthScreen() {
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: 24, fontWeight: 700, color: a }}>M</div>
         <div style={{ fontSize: 20, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
         <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Hypergentiq</div>
+{/* TEMP DEBUG - remove after reading mq_debug_catch, see session handoff */}
+<div style={{ fontSize: 9, color: ob.muted, marginTop: 6, padding: "0 16px", wordBreak: "break-all", textAlign: "center", opacity: 0.7 }}>
+{(() => { try { return "boot:" + (localStorage.getItem("mq_debug_boot")||"none") + " | reason:" + (localStorage.getItem("mq_debug_reason")||"none") + " | catch:" + (localStorage.getItem("mq_debug_catch")||"none") + " | nocache:" + (localStorage.getItem("mq_debug_nocache")||"none"); } catch (e) { return "debug read error: " + e.message; } })()}
+</div>
       </div>
 
       {/* Member / Owner toggle — only shown on idle step */}
