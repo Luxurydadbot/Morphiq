@@ -1621,7 +1621,7 @@ function CustomPlanScreen() {
   }
 
   function addPending() {
-    if (!pending || !pending.weight) return;
+    if (!pending || dayExercises.length >= 12) return;
     setDayExercises(prev => [...prev, { ...pending, weight: parseFloat(pending.weight) || 20 }]);
     setPending(null);
   }
@@ -1787,7 +1787,7 @@ function CustomPlanScreen() {
                   style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: 8, fontSize: 12, color: ob.muted, cursor: "pointer", fontFamily: ob.font }}>
                   Cancel
                 </button>
-                <button onClick={addPending} disabled={!pending.weight}
+                <button onClick={addPending} disabled={dayExercises.length >= 12}
                   style={{ flex: 2, background: pending.weight ? a : ob.card, color: pending.weight ? ob.tealDk : ob.muted, border: "none", borderRadius: 8, padding: 8, fontSize: 12, fontWeight: 600, cursor: pending.weight ? "pointer" : "default", fontFamily: ob.font }}>
                   Add exercise <Icon name="check" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} />
                 </button>
@@ -1798,6 +1798,9 @@ function CustomPlanScreen() {
             <div style={{ marginBottom: 8 }}>
               <input value={query} onChange={e => setQuery(e.target.value)}
                 placeholder="Search exercise name..." style={{ ...s.input, marginBottom: 4 }} autoComplete="off" />
+              {dayExercises.length >= 12 && (
+                <div style={{ fontSize: 11, color: ob.muted, padding: "6px 4px" }}>Day full — remove an exercise below to add another (max 12 per day).</div>
+              )}
               {query.length >= 2 && suggestions.length === 0 && (
                 <div style={{ fontSize: 11, color: ob.muted, padding: "6px 4px" }}>Searching...</div>
               )}
