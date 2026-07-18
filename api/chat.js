@@ -1,4 +1,5 @@
-export default async function handler(req, res) {
+import { withSentry } from './_sentry.js';
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -254,3 +255,5 @@ After every reply add: <!--CHIPS:["short followup 1","short followup 2","short f
     res.status(200).json({ text: "Sorry, I hit a snag — try again in a moment.", chips: [], error: e.message });
   }
 }
+
+export default withSentry(handler);

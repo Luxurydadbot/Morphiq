@@ -1,3 +1,4 @@
+import { withSentry } from './_sentry.js';
 // api/create-checkout.js — creates a Stripe Checkout Session so a new gym
 // owner can enter payment details and start their 14-day free trial.
 //
@@ -29,7 +30,7 @@ const PLAN_PRICES = {
   },
 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -84,3 +85,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Could not start checkout. Please try again." });
   }
 }
+
+export default withSentry(handler);

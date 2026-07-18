@@ -1,4 +1,5 @@
-export default function handler(req, res) {
+import { withSentry } from './_sentry.js';
+function handler(req, res) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   res.status(200).json({
     ok: true,
@@ -7,3 +8,5 @@ export default function handler(req, res) {
     ts: new Date().toISOString()
   });
 }
+
+export default withSentry(handler);

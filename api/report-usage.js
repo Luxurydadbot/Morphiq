@@ -1,3 +1,4 @@
+import { withSentry } from './_sentry.js';
 // api/report-usage.js — STAGE 2 of automatic per-active-member billing.
 //
 // Reports last month's active-member count to Stripe for ONE gym at a time,
@@ -83,7 +84,7 @@ async function countActiveMembersLastMonth(gymId) {
   return activeSet.size;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const gymId = req.query.gym_id;
   const confirmed = req.query.confirm === "yes";
 
@@ -160,3 +161,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong: " + err.message });
   }
 }
+
+export default withSentry(handler);

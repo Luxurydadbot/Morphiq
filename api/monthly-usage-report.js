@@ -1,3 +1,4 @@
+import { withSentry } from './_sentry.js';
 // api/monthly-usage-report.js — STAGE 1 of automatic per-active-member billing.
 //
 // READ-ONLY. This endpoint does not touch Stripe, does not charge anyone, and
@@ -34,7 +35,7 @@ function previousMonthBounds() {
   return { start, end, label };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const { start, end, label } = previousMonthBounds();
     const startStr = start.toISOString().slice(0, 10);
@@ -96,3 +97,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong generating the report." });
   }
 }
+
+export default withSentry(handler);

@@ -1,3 +1,4 @@
+import { withSentry } from './_sentry.js';
 // api/stripe-webhook.js — keeps the gyms table in sync with Stripe billing events
 //
 // Stripe calls this URL automatically whenever something changes for a gym's
@@ -71,7 +72,7 @@ async function updateGym(filterColumn, filterValue, patch) {
   }
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -156,3 +157,5 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ received: true });
 }
+
+export default withSentry(handler);

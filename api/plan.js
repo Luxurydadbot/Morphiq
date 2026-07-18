@@ -1,7 +1,8 @@
+import { withSentry } from './_sentry.js';
 // api/plan.js — onboarding conversational reveal only
 // Workout plan generation is now handled locally by buildPlan() in Morphiq.jsx
 // This endpoint is only called once per member: the "your plan is ready" reveal moment
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const { prompt } = req.body || {};
   if (!prompt) return res.status(400).json({ error: "Missing prompt" });
@@ -26,3 +27,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Failed", detail: err.message });
   }
 }
+
+export default withSentry(handler);

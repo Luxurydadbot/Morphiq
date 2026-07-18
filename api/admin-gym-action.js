@@ -1,3 +1,4 @@
+import { withSentry } from './_sentry.js';
 // api/admin-gym-action.js — locked-down backend endpoint for the two super-admin
 // gym actions that used to write straight to Supabase from the browser:
 // suspending/unsuspending a gym, and saving the admin's private note about a gym.
@@ -51,7 +52,7 @@ async function getEmailForToken(token) {
   }
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -105,3 +106,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong: " + err.message });
   }
 }
+
+export default withSentry(handler);

@@ -1,4 +1,5 @@
-export default async function handler(req, res) {
+import { withSentry } from './_sentry.js';
+async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -71,3 +72,5 @@ export default async function handler(req, res) {
     res.status(500).json({ error: err.message || "Unknown error" });
   }
 }
+
+export default withSentry(handler);
