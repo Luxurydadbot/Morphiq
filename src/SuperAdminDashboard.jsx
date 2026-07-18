@@ -121,6 +121,7 @@ function SuperAdminDashboard() {
   const [monthlyActive, setMonthlyActive] = useState([]);
   const [monthlyTotal, setMonthlyTotal] = useState([]);
   const [activity, setActivity] = useState({ active7: 0, active30: 0 });
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState("");
@@ -132,13 +133,14 @@ function SuperAdminDashboard() {
     async function load() {
       setLoading(true);
       setLoadError(false);
-      const [gymRows, counts, activitySummary, activeByGym, monthly, monthlyTotalMembers] = await Promise.all([
+      const [gymRows, counts, activitySummary, activeByGym, monthly, monthlyTotalMembers, recentMembers] = await Promise.all([
         sb.getAllGyms(),
         sb.getMemberCountsByGym(),
         sb.getPlatformActivitySummary(),
         sb.getActiveMemberCountsByGym(),
         sb.getMonthlyActiveMembers(),
         sb.getMonthlyTotalMembers(),
+        sb.getRecentMembers(),
       ]);
       if (cancelled) return;
       setGyms(gymRows);
@@ -147,6 +149,7 @@ function SuperAdminDashboard() {
       setActiveCounts(activeByGym);
       setMonthlyActive(monthly);
       setMonthlyTotal(monthlyTotalMembers);
+      setMembers(recentMembers);
       setLoading(false);
     }
     load();
@@ -259,6 +262,34 @@ function SuperAdminDashboard() {
               <div style={{ fontSize: 20, fontWeight: 700, color: "#60A5FA" }}>{activity.active30}</div>
               <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>Logged a workout, last 30 days</div>
             </div>
+          </div>
+
+          {/* Recent signups — every member across every gym, newest first, so
+              you can verify test members actually signed up and see who's
+              come back this week. Counts a logged workout in the last 7
+              days as "active" — meal-only usage isn't reflected here yet. */}
+          <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Recent signups</div>
+          <div style={{ background: "#1A2332", borderRadius: 12, marginBottom: 20, maxHeight: 340, overflowY: "auto" }}>
+            {members.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px 0", color: "#6B7A8D", fontSize: 13 }}>No members yet.</div>
+            ) : (
+              members.map(m => (
+                <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid #0D1623" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>{m.gymName} · joined {m.joined ? new Date(m.joined).toLocaleDateString() : "—"}</div>
+                  </div>
+                  <span style={{
+                    background: m.activeThisWeek ? "#0A1A14" : "#1A2332",
+                    color: m.activeThisWeek ? "#00D4B1" : "#6B7A8D",
+                    border: m.activeThisWeek ? "1px solid rgba(0,212,177,0.2)" : "1px solid #1E2D42",
+                    borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600,
+                  }}>
+                    {m.activeThisWeek ? "Logged a workout this week" : "No workout this week"}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Search / filter / sort controls */}
