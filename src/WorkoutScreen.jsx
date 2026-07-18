@@ -1568,8 +1568,9 @@ function CustomPlanScreen() {
   const a = gymBranding.accent || "#00D4B1";
   const ob = theme.ob;
 
-  const [step, setStep]         = useState(0); // 0=goal, 1=days, 2=exercises, 3=review
+  const [step, setStep]         = useState(-1); // -1=name, 0=goal, 1=days, 2=exercises, 3=review
   const [goal, setGoal]         = useState(null);
+  const [name, setName] = useState(user?.name || "");
   const [daysPerWeek, setDays]  = useState(3);
   const [currentDay, setCurrentDay] = useState(0); // which day we're adding exercises for
   const [dayExercises, setDayExercises] = useState([]); // exercises for the current day being built
@@ -1665,7 +1666,7 @@ function CustomPlanScreen() {
       progressionRule: "Hit the top of your rep range two sessions in a row → add weight next session.",
       warmup: [], cooldown: [], exercises,
     };
-    const userData = { ...user, goal, daysPerWeek, isCustomPlan: true };
+    const userData = { ...user, name, goal, daysPerWeek, isCustomPlan: true };
     const uid = supabaseUserIdRef?.current || supabaseUser?.id;
     if (uid) {
       try { localStorage.setItem("mq_cached_plan_" + uid, JSON.stringify({ plan, user: userData })); } catch {}
@@ -1693,10 +1694,10 @@ function CustomPlanScreen() {
     <div style={s.root}>
       {/* Header */}
       <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-        <button onClick={() => step > 0 ? setStep(step - 1) : navigate("onboarding")}
+        <button onClick={() => step > -1 ? setStep(step - 1) : navigate("onboarding")}
           style={{ background: "transparent", border: "none", color: ob.muted, cursor: "pointer", lineHeight: 1, padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={20} /></button>
         <span style={{ fontSize: 13, fontWeight: 600, color: ob.white }}>Build your own plan</span>
-        <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step + 1} of 4</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step === -1 ? "Name" : `${step + 1} of 4`}</span>
       </div>
       {/* Progress bar */}
       <div style={{ height: 3, background: ob.card, margin: "10px 16px 0", borderRadius: 2, flexShrink: 0 }}>
@@ -1704,6 +1705,24 @@ function CustomPlanScreen() {
       </div>
 
       <div style={s.inner}>
+
+        {/* ── STEP -1: Name ── */}
+        {step === -1 && <div className="mq-fade">
+          <div style={s.hdr}>Your plan</div>
+          <div style={s.title}>What should we call you?</div>
+          <div style={s.sub}>Just your first name is fine — this is how you'll show up in the app.</div>
+          <input
+            style={s.input}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="First name"
+            maxLength={30}
+            autoFocus
+          />
+          <button onClick={() => name.trim().length >= 2 && setStep(0)} disabled={name.trim().length < 2} style={s.tealBtn(name.trim().length < 2)}>
+            Continue
+          </button>
+        </div>}
 
         {/* ── STEP 0: Goal ── */}
         {step === 0 && <div className="mq-fade">
