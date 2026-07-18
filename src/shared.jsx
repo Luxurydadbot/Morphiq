@@ -444,8 +444,18 @@ const sb = {
   // ── GYM BRANDING ─────────────────────────────────────────────────────────
   async getGymBranding(gymId = "demo-gym") {
     try {
+      // Logged-out visitors (no real session yet) only have permission to see
+      // the public branding columns -- asking for anything else here fails
+      // outright, since Postgres requires access to every column touched
+      // when no explicit column list is given. Once someone's actually signed
+      // in, fetch the full row so the paywall/suspension check still works.
+      let hasRealToken = false;
+      try { hasRealToken = !!localStorage.getItem("mq_access_token"); } catch {}
+      const cols = hasRealToken
+        ? "gym_id,name,accent,welcome,logo_url,plan_tier,owner_email,subscription_status,is_suspended,is_beta_exempt,trial_ends_at,admin_notes,stripe_customer_id,stripe_subscription_id,created_at,updated_at"
+        : "gym_id,name,accent,welcome,logo_url";
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1`,
+        `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1&select=${cols}`,
         { headers: SB_GET() }
       );
       const rows = await res.json();
