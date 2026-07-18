@@ -359,6 +359,65 @@ const sb = {
     } catch { return []; }
   },
 
+  // Fetch just the distinct workout dates (no exercise detail) over a lookback
+  // window, for the week-streak calculation in loadHistoricalData(). Deliberately
+  // separate from getWorkoutLogs() above: that one is capped at a small row limit
+  // (each row is a single SET, not a day) which isn't enough rows to reliably see
+  // 52 weeks back. Selecting only workout_date keeps the payload small even over
+  // a full year lookback. Returns an array of "YYYY-MM-DD" strings (may contain
+  // duplicates — one per set logged that day; caller should dedupe with a Set).
+  async getWorkoutDatesForStreak(supabaseUserId, daysBack = 370) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - daysBack);
+      const cutoffStr = localDateStr(cutoff);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&workout_date=gte.${cutoffStr}&select=workout_date&order=workout_date.desc&limit=1000`,
+        { headers: SB_GET() }
+      );
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows.map(r => r.workout_date) : [];
+    } catch { return []; }
+  },
+
+  // ── In-progress workout sync (profiles.workout_progress, jsonb) ──────────
+  // Local-first: WorkoutScreen keeps writing to localStorage for instant,
+  // offline-safe responsiveness (gym wifi can be unreliable), and ALSO fires
+  // this in the background so the SAME progress is resumable from another
+  // device/browser origin, since localStorage never carries over. Uses the
+  // existing fire-and-forget pattern (.catch(() => {})) at the call site --
+  // a failed sync must never interrupt an active workout.
+  async syncWorkoutProgress(supabaseUserId, progress) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${profileId}`, {
+        method: "PATCH",
+        headers: SB_HEADERS(),
+        body: JSON.stringify({ workout_progress: progress }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // Reads back the cloud-saved in-progress workout (or null). Only meaningful
+  // if it matches today's local date -- same staleness rule WorkoutScreen
+  // already applies to the localStorage copy.
+  async getWorkoutProgress(supabaseUserId) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return null;
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${profileId}&select=workout_progress`,
+        { headers: SB_GET() }
+      );
+      const rows = await res.json();
+      return rows?.[0]?.workout_progress || null;
+    } catch { return null; }
+  },
+
   // Fetch the most recent WORKING set for a specific exercise (excludes warm-ups tagged set_number=0).
   // Used to show "Last time: X lbs × Y reps" before each set.
   // Returns { weight, reps, date } or null if no history found.
@@ -1917,20 +1976,34 @@ function StreakCalendar({ accent, workoutDates }) {
   );
 }
 
-// Returns the number of consecutive completed weeks (week streak).
-// A week is "complete" when the morphiq_week_YYYY-MM-DD key in localStorage
-// holds a value >= daysPerWeek. We look back up to 52 weeks.
-function getWeekStreak(daysPerWeek) {
+// Returns the number of consecutive completed weeks (week streak), computed
+// from real workout_logs dates already loaded from Supabase (see
+// historicalData.weekStreak in Morphiq.jsx) — NOT from local device storage.
+// A week is "complete" when at least `daysPerWeek` distinct workout dates
+// fall within it. We look back up to 52 weeks, breaking at the first week
+// that didn't meet the target. `workoutDates` is an array of "YYYY-MM-DD"
+// strings (as stored in workout_logs.workout_date).
+// Replaces the old localStorage-based version (June 2026): that version keyed
+// off "morphiq_week_YYYY-MM-DD" in localStorage, which nothing ever wrote to,
+// so it silently always returned 0. It also didn't survive switching domains
+// (Morphiq -> Hypergentiq) since localStorage doesn't carry over between
+// origins. Deriving from the database fixes both problems at once.
+function getWeekStreakFromDates(workoutDates, daysPerWeek) {
   daysPerWeek = daysPerWeek || 3;
   try {
-    var streak = 0;
-    for (var w = 0; w < 52; w++) {
-      var d = new Date();
-      var day = d.getDay();
-      d.setDate(d.getDate() - (day === 0 ? 6 : day - 1) - w * 7);
-      var key = "morphiq_week_" + d.toISOString().slice(0, 10);
-      var done = parseInt(localStorage.getItem(key) || "0", 10);
-      if (done >= daysPerWeek) {
+    const dateSet = new Set(workoutDates || []);
+    let streak = 0;
+    for (let w = 0; w < 52; w++) {
+      const monday = new Date();
+      const day = monday.getDay();
+      monday.setDate(monday.getDate() - (day === 0 ? 6 : day - 1) - w * 7);
+      let count = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        if (dateSet.has(localDateStr(d))) count++;
+      }
+      if (count >= daysPerWeek) {
         streak++;
       } else {
         break;
@@ -1979,7 +2052,7 @@ export {
   // Utility functions
   getFallbackReply, fetchAIReply,
   // Progress screen sub-components
-  WeightChart, StreakCalendar, getWeekStreak,
+  WeightChart, StreakCalendar, getWeekStreakFromDates,
   // Admin dashboard sub-components
   MonthlyTrendLineChart,
   // Billing / paywall

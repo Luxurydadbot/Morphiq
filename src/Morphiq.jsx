@@ -18,7 +18,7 @@ import {
   FALLBACK_REPLIES, CHAT_SUGGESTIONS,
   WEIGHT_DATA_MOCK, PERSONAL_BESTS,
   getFallbackReply, fetchAIReply,
-  WeightChart, StreakCalendar, getWeekStreak,
+  WeightChart, StreakCalendar, getWeekStreakFromDates,
 } from "./shared.jsx";
 
 const useApp = () => useContext(AppContext);
@@ -407,9 +407,10 @@ function AppProvider({ children }) {
     async function loadHistoricalData(uid) {
     if (!uid || uid.startsWith("sim-") || uid === "dev-001") return;
     try {
-      const [wLogs, wtLogs] = await Promise.all([
+      const [wLogs, wtLogs, streakDates] = await Promise.all([
         sb.getWorkoutLogs(uid, 60),
         sb.getWeightLogs(uid, 12),
+        sb.getWorkoutDatesForStreak(uid, 370),
       ]);
       const workoutLogs = Array.isArray(wLogs) ? wLogs : [];
       const weightLogs  = Array.isArray(wtLogs) ? wtLogs : [];
@@ -417,6 +418,13 @@ function AppProvider({ children }) {
       // Unique workout dates sorted descending
       const dates = [...new Set(workoutLogs.map(r => r.workout_date))].sort((a,b) => b.localeCompare(a));
       const totalWorkouts = dates.length;
+
+      // Week streak — driven by real Supabase workout dates (up to a year
+      // back via the dedicated getWorkoutDatesForStreak query above), not the
+      // small 60-row `dates` set above and not local device storage. Fixes
+      // the old localStorage-based streak, which nothing ever wrote to and
+      // which reset whenever the app moved to a new domain.
+      const weekStreak = getWeekStreakFromDates(streakDates, plan?.daysPerWeek);
 
       // Streak — count consecutive days ending today or yesterday.
       // Uses localDateStr (local time) — NOT UTC — so the day doesn't roll
@@ -443,7 +451,7 @@ function AppProvider({ children }) {
         weightChange = (last - first).toFixed(1);
       }
 
-      setHistoricalData({ workoutLogs, weightLogs, streak, totalWorkouts, lastSession, weightChange });
+      setHistoricalData({ workoutLogs, weightLogs, streak, weekStreak, totalWorkouts, lastSession, weightChange });
     } catch(e) { console.warn("[Morphiq] historicalData load failed:", e); }
   }
 

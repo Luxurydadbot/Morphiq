@@ -335,6 +335,31 @@ function WorkoutScreen() {
     return () => clearTimeout(t);
   }, [showResumeBanner]);
 
+  // If nothing usable was found locally for today, check whether a same-day
+  // in-progress workout is saved in Supabase instead (e.g. resuming from a
+  // different device, or after the Morphiq -> Hypergentiq domain move, since
+  // localStorage never carries over between browser origins). Local progress
+  // always wins if present -- this only runs when there was nothing local.
+  useEffect(() => {
+    if (savedProgress || !supabaseUser?.id) return;
+    let cancelled = false;
+    sb.getWorkoutProgress(supabaseUser.id).then(cloud => {
+      if (cancelled || !cloud || cloud.date !== localDateStr()) return;
+      setPhase(cloud.phase ?? (warmupExercises.length > 0 ? "warmup" : "active"));
+      setWarmupStep(cloud.warmupStep ?? 0);
+      setCooldownStep(cloud.cooldownStep ?? 0);
+      setExIdx(cloud.exIdx ?? 0);
+      setSetIdx((cloud.setIdx ?? 0) + (cloud.state === "rest" ? 1 : 0));
+      setLoggedSets(cloud.loggedSets ?? []);
+      if (cloud.exIdx > 0 || cloud.setIdx > 0 || (cloud.loggedSets || []).length > 0) {
+        setShowResumeBanner(true);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // Mount-only: intentionally does not re-run on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [listening, setListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [repCount, setRepCount] = useState(null); // null = not set yet, number = user typed/adjusted
@@ -374,17 +399,27 @@ function WorkoutScreen() {
   // Persist progress whenever position changes, so reopening resumes here.
   // Fire-and-forget — a storage failure must never crash the workout.
   useEffect(() => {
+    const progressSnapshot = {
+      date: localDateStr(),
+      phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state,
+    };
     try {
-      localStorage.setItem(progressKey, JSON.stringify({
-        date: localDateStr(),
-        phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state,
-      }));
+      localStorage.setItem(progressKey, JSON.stringify(progressSnapshot));
     } catch {}
-  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state, progressKey]);
+    // Background sync to Supabase so this same progress is resumable from a
+    // different device/domain. Fire-and-forget -- a failed sync must never
+    // interrupt an active workout (same pattern used for workout_logs writes).
+    if (supabaseUser?.id) {
+      sb.syncWorkoutProgress(supabaseUser.id, progressSnapshot).catch(() => {});
+    }
+  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state, progressKey, supabaseUser?.id]);
 
   // Clears saved progress — used when the workout finishes or the member
   // chooses to restart. Without this, a completed workout would try to resume.
-  const clearProgress = () => { try { localStorage.removeItem(progressKey); } catch {} };
+  const clearProgress = () => {
+    try { localStorage.removeItem(progressKey); } catch {}
+    if (supabaseUser?.id) { sb.syncWorkoutProgress(supabaseUser.id, null).catch(() => {}); }
+  };
 
   // Restart: wipe saved progress and reset back to the very beginning.
   const restartWorkout = () => {

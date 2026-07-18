@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   useApp, theme, sb,
   Layout, Spinner,
-  WeightChart, StreakCalendar, getWeekStreak,
+  WeightChart, StreakCalendar,
   PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon,
 } from "./shared.jsx";
 
@@ -134,7 +134,7 @@ function ProgressScreen() {
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
           {[
             { val: lost > 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, lbl:"Weight change", color: lost >= 0 ? a : "#F87171" },
-            { val: (() => { var ws = getWeekStreak(plan ? plan.daysPerWeek : 3); return ws > 0 ? <><Icon name="flame" size={14} style={{verticalAlign:"-2px", marginRight:2}} />{ws}</> : "—"; })(), lbl:"Week streak", color:"#F59E0B" },
+            { val: (() => { var ws = historicalData?.weekStreak ?? 0; return ws > 0 ? <><Icon name="flame" size={14} style={{verticalAlign:"-2px", marginRight:2}} />{ws}</> : "—"; })(), lbl:"Week streak", color:"#F59E0B" },
             { val: String(realPBs.length || 0), lbl:"PBs logged", color:"#A78BFA" },
           ].map(({ val, lbl, color }) => (
             <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
