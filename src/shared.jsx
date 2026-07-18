@@ -506,26 +506,31 @@ const sb = {
   },
 
   // Manual lock/unlock switch — sets is_suspended on a gym's row.
-  // Requires the is_suspended column to exist on the gyms table.
+  // Goes through /api/admin-gym-action (not a direct Supabase write) — a
+  // database trigger now rejects direct writes to this column from anyone
+  // but the platform admin, so this backend endpoint is the only path that
+  // still works. (July 2026 security hardening — see admin-gym-action.js
+  // for the full explanation.)
   async setGymSuspended(gymId, suspended) {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}`, {
-        method: "PATCH",
-        headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
-        body: JSON.stringify({ is_suspended: suspended, updated_at: new Date().toISOString() }),
+      const res = await fetch(`/api/admin-gym-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${getAuthToken()}` },
+        body: JSON.stringify({ action: "suspend", gymId, value: suspended }),
       });
       return res.ok;
     } catch { return false; }
   },
 
   // Saves the super admin's private note about a gym.
-  // Requires the admin_notes column to exist on the gyms table.
+  // Same reasoning as setGymSuspended above — routed through the backend
+  // endpoint instead of writing admin_notes directly from the browser.
   async saveGymNotes(gymId, notes) {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}`, {
-        method: "PATCH",
-        headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
-        body: JSON.stringify({ admin_notes: notes, updated_at: new Date().toISOString() }),
+      const res = await fetch(`/api/admin-gym-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${getAuthToken()}` },
+        body: JSON.stringify({ action: "notes", gymId, value: notes }),
       });
       return res.ok;
     } catch { return false; }
