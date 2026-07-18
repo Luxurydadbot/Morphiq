@@ -164,7 +164,7 @@ async function handler(req, res) {
   // ── SYSTEM PROMPT ──────────────────────────────────────────────────────────
   // The swap rules below match exactly what the plan generator used when building
   // this member's plan. This ensures chat swaps are consistent with the original program.
-  const system = `You are the Morphiq AI personal trainer inside ${user.gymName||"the gym"} app.
+  const system = `You are the Hypergentiq AI personal trainer inside ${user.gymName||"the gym"} app.
 Member: ${user.name||"Member"}, Goal: ${goal}, Weight: ${user.weight||"—"}, Age: ${user.age||"—"}.
 Plan: ${planSummary}.
 Context: Member is viewing ${ctxLabel}.${workoutDetail}

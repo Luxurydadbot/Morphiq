@@ -660,7 +660,7 @@ function AuthScreen() {
       </div>
 
 
-      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: ".5px", padding: "4px 0 10px" }}>POWERED BY MORPHIQ</div>
+      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: ".5px", padding: "4px 0 10px" }}>POWERED BY HYPERGENTIQ</div>
     </div>
   );
 }
@@ -1352,7 +1352,7 @@ function BillingBlockedScreen() {
         <div style={{ display: "flex", justifyContent: "center", color: theme.textMuted }}><Icon name="alert" size={40} /></div>
         <div style={{ fontSize: 18, fontWeight: 700, color: theme.text }}>This gym's account needs attention</div>
         <div style={{ fontSize: 14, color: theme.textMuted, lineHeight: 1.6 }}>
-          {gymBranding?.name || "This gym"}'s Morphiq subscription isn't active right now. Please check with your gym owner, or if you're the owner, update your billing to restore access.
+          {gymBranding?.name || "This gym"}'s Hypergentiq subscription isn't active right now. Please check with your gym owner, or if you're the owner, update your billing to restore access.
         </div>
         <button
           onClick={() => window.location.reload()}

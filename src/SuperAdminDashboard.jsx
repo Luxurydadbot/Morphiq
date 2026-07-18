@@ -202,7 +202,7 @@ function SuperAdminDashboard() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Platform Admin</div>
-          <div style={{ fontSize: 11, color: "#6B7A8D" }}>Every gym on Morphiq, in one place</div>
+          <div style={{ fontSize: 11, color: "#6B7A8D" }}>Every gym on Hypergentiq, in one place</div>
         </div>
         <button onClick={signOut} style={{ background: "none", border: "1px solid #1E2D42", borderRadius: 8, padding: "6px 12px", fontSize: 11, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>
           Log out
@@ -335,7 +335,7 @@ function SuperAdminDashboard() {
         </>
       )}
 
-      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", paddingTop: 20 }}>POWERED BY MORPHIQ</div>
+      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", paddingTop: 20 }}>POWERED BY HYPERGENTIQ</div>
     </div>
   );
 }

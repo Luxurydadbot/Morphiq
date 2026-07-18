@@ -155,7 +155,7 @@ function GymSignupScreen() {
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#003D35", border: "2px solid #00D4B1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: "#00D4B1" }}>M</span>
               </div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>Bring Morphiq to your gym</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>Bring Hypergentiq to your gym</div>
               <div style={{ fontSize: 12, color: ob.body, marginTop: 4 }}>Set up your branded AI coaching app in under 5 minutes</div>
             </div>
 

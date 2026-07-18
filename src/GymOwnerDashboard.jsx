@@ -518,7 +518,7 @@ function OwnerInviteTab() {
       <div style={{ background: "#1A2332", borderRadius: 14, padding: "16px 14px", marginBottom: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#E8EDF2", marginBottom: 6 }}>Member invite link</div>
         <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.6, marginBottom: 14 }}>
-          Share this link with new members. When they open it, they'll land directly on your branded gym sign-up — no searching for Morphiq separately.
+          Share this link with new members. When they open it, they'll land directly on your branded gym sign-up — no searching for Hypergentiq separately.
         </div>
         <div style={{ background: "#0D1623", border: "1px solid #1E2D42", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div style={{ flex: 1, fontSize: 11, color: "#9BB3C8", fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.5 }}>{inviteUrl}</div>
@@ -715,7 +715,7 @@ function PricingScreen() {
         </div>
       </div>
 
-      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "8px 0 12px" }}>POWERED BY MORPHIQ</div>
+      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "8px 0 12px" }}>POWERED BY HYPERGENTIQ</div>
     </div>
   );
 }
@@ -827,7 +827,7 @@ function GymOwnerDashboard() {
       <div style={{ padding: "14px 16px", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
         <button onClick={() => navigate("pricing")} style={{ background: "none", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4 }}>Plans & pricing <Icon name="arrow-right" size={12} /></button>
       </div>
-      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "0 0 12px" }}>POWERED BY MORPHIQ</div>
+      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "0 0 12px" }}>POWERED BY HYPERGENTIQ</div>
     </div>
   );
 }
@@ -841,7 +841,7 @@ function LoadingScreen() {
       <div style={{ width: 48, height: 48, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: a }}>M</div>
       <Spinner size={36} color={a} trackColor={ob.card} />
       <div style={{ fontSize: 13, color: ob.body }}>Loading your account…</div>
-      <div style={{ fontSize: 9, color: "#333", letterSpacing: ".5px", marginTop: 20 }}>POWERED BY MORPHIQ</div>
+      <div style={{ fontSize: 9, color: "#333", letterSpacing: ".5px", marginTop: 20 }}>POWERED BY HYPERGENTIQ</div>
     </div>
   );
 }

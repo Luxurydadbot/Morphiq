@@ -460,7 +460,7 @@ function OnboardingScreen() {
             <div style={{ fontSize: 11, color: ob.body, lineHeight: 1.65 }}>
               The fitness and nutrition plans provided by Hypergentiq are for <span style={{ color: ob.white, fontWeight: 600 }}>informational and educational purposes only</span> and do not constitute medical advice.<br /><br />
               Before starting any new exercise or nutrition program, consult a qualified healthcare provider — especially if you have a medical condition, injury, or concern.<br /><br />
-              You agree to exercise within your own limits and accept responsibility for your health and safety during all workouts. Morphiq and its licensees are not liable for any injury, illness, or adverse outcome.<br /><br />
+              You agree to exercise within your own limits and accept responsibility for your health and safety during all workouts. Hypergentiq and its licensees are not liable for any injury, illness, or adverse outcome.<br /><br />
               By tapping "I agree", you confirm you are at least 13 years old and accept these terms.
             </div>
           </div>
@@ -586,7 +586,7 @@ function OnboardingScreen() {
 
         </div>}
       </div>
-      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: "0.5px", padding: "4px 0 6px", flexShrink: 0 }}>POWERED BY MORPHIQ</div>
+      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: "0.5px", padding: "4px 0 6px", flexShrink: 0 }}>POWERED BY HYPERGENTIQ</div>
     </div>
   );
 }
