@@ -656,7 +656,42 @@ const sb = {
     } catch { return []; }
   },
 
-  // ── GYM SELF-SERVE SIGNUP ────────────────────────────────────────────────
+    // Returns every member across all gyms, newest signups first — used for
+  // the super admin dashboard's "Recent signups" list, so you can verify
+  // test members actually signed up and see who's used the app recently.
+  // Tables: profiles (id, name, gym_id, created_at), gyms (gym_id, name),
+  // workout_logs (user_id, workout_date) for the "active this week" flag —
+  // same table/column already used by getPlatformActivitySummary above.
+  async getRecentMembers() {
+    try {
+      const d7 = new Date(); d7.setDate(d7.getDate() - 7);
+      const d7Str = d7.toISOString().slice(0, 10);
+      const [profilesRes, gymsRes, logsRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,name,gym_id,created_at&order=created_at.desc`, { headers: SB_GET() }),
+        fetch(`${SUPABASE_URL}/rest/v1/gyms?select=gym_id,name`, { headers: SB_GET() }),
+        fetch(`${SUPABASE_URL}/rest/v1/workout_logs?workout_date=gte.${d7Str}&select=user_id`, { headers: SB_GET() }),
+      ]);
+      if (!profilesRes.ok) return [];
+      const profiles = await profilesRes.json();
+      const gyms = gymsRes.ok ? await gymsRes.json() : [];
+      const logs = logsRes.ok ? await logsRes.json() : [];
+
+      const gymNameById = {};
+      gyms.forEach(g => { gymNameById[g.gym_id] = g.name || g.gym_id; });
+
+      const activeThisWeek = new Set(logs.map(r => r.user_id));
+
+      return profiles.map(p => ({
+        id: p.id,
+        name: p.name || "(no name)",
+        gymName: gymNameById[p.gym_id] || p.gym_id || "Unknown gym",
+        joined: p.created_at,
+        activeThisWeek: activeThisWeek.has(p.id),
+      }));
+    } catch { return []; }
+  },
+
+// ── GYM SELF-SERVE SIGNUP ────────────────────────────────────────────────
   // Returns true if gymId is free to use, false if it's already taken.
   async isGymIdAvailable(gymId) {
     try {
