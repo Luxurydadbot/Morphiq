@@ -1712,6 +1712,14 @@ function CustomPlanScreen() {
     setQuery("");
   }
 
+  // Guards against an accidental double-tap right after adding an exercise:
+  // the moment an exercise is added, the "Add exercise" button is replaced by
+  // a full-width "Done with day / Review plan" button in roughly the same
+  // screen spot, which on the last day is one tap away from actually saving
+  // the whole plan. A brief cooldown means a fast second tap lands on nothing
+  // instead of accidentally ending the day early.
+  const [justAddedExercise, setJustAddedExercise] = useState(false);
+
   function addPending() {
     if (!pending || dayExercises.length >= 12) return;
     const weight = parseFloat(pending.weight) || 20;
@@ -1722,6 +1730,8 @@ function CustomPlanScreen() {
       : buildSetDetails(pending.sets, pending.reps, weight, pending.loadStyle || "same");
     setDayExercises(prev => [...prev, { ...pending, weight, setDetails, loadStyle: pending.loadStyle || "same" }]);
     setPending(null);
+    setJustAddedExercise(true);
+    setTimeout(() => setJustAddedExercise(false), 600);
   }
 
   function finishDay() {
@@ -2001,7 +2011,7 @@ function CustomPlanScreen() {
 
           <div style={{ marginTop: "auto" }}>
             {dayExercises.length > 0 && !pending && (
-              <button onClick={finishDay} style={s.tealBtn(false)}>
+              <button onClick={finishDay} disabled={justAddedExercise} style={s.tealBtn(justAddedExercise)}>
                 {editDayIndex !== null
                   ? <>Save changes <Icon name="check" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>
                   : currentDay + 1 < daysPerWeek
