@@ -1631,7 +1631,7 @@ function CustomPlanScreen() {
   const a = gymBranding.accent || "#00D4B1";
   const ob = theme.ob;
 
-  const [step, setStep]         = useState(-1); // -1=name, 0=goal, 1=days, 2=exercises, 3=review
+  const [step, setStep]         = useState(-1); // -1=name, 0=goal, 1=stats(optional), 2=days, 3=rest(optional), 4=exercises, 5=review
   const [goal, setGoal]         = useState(null);
   const [name, setName] = useState(user?.name || "");
   const [daysPerWeek, setDays]  = useState(3);
@@ -1645,6 +1645,17 @@ function CustomPlanScreen() {
   const [saveError, setSaveError] = useState("");
   const [dbSuggestions, setDbSuggestions] = useState([]); // live results from Supabase exercises table
 
+  // Optional body-stat + rest-preference fields — mirror the AI onboarding flow
+  // (OnboardingScreen.jsx) so custom plans get the same calorie/protein/carb/fat
+  // calculation and rest-timer choice. Skippable — savePlan() falls back to the
+  // old manual-only behavior if these are left blank.
+  const [sex, setSex] = useState(null);            // 'male' | 'female' | null
+  const [heightFt, setHeightFt] = useState("");
+  const [heightIn, setHeightIn] = useState("");
+  const [bodyWeight, setBodyWeight] = useState(""); // member's body weight — separate from per-exercise weight below
+  const [age, setAge] = useState("");
+  const [restPref, setRestPref] = useState(null);   // seconds; null = skipped, falls back to goal-based default
+
   // Pending exercise being configured before adding to the day
   const [pending, setPending]   = useState(null); // {name, sets, reps, weight, loadStyle, setDetails}
   // Which day (index into allDays) is being edited from the review step, or null
@@ -1652,6 +1663,35 @@ function CustomPlanScreen() {
   const [editDayIndex, setEditDayIndex] = useState(null);
 
   const defaults = GOAL_REP_RANGES[goal] || GOAL_REP_RANGES.general_fitness;
+
+  // Same Mifflin-St Jeor formula as the AI-plan path (OnboardingScreen.jsx
+  // generatePlan()) — kept in sync manually since the two screens don't yet
+  // share a macro-calc helper. Returns null unless sex + height + weight + age
+  // are all present and valid, so the review step can preview it and savePlan()
+  // can use it without duplicating the math in two places.
+  function calcMacros() {
+    const validBody = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && bodyWeight && parseFloat(bodyWeight) > 0;
+    const validAge = age && parseInt(age) >= 13 && parseInt(age) <= 100;
+    if (!sex || !validBody || !validAge) return null;
+    const weightKg = parseFloat(bodyWeight) / 2.205;
+    const heightCm = ((parseInt(heightFt) * 12) + parseInt(heightIn || 0)) * 2.54;
+    const ageNum = parseInt(age);
+    const bmr = sex === "male"
+      ? Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) + 5)
+      : Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) - 161);
+    const activityMult = daysPerWeek >= 4 ? 1.55 : 1.375;
+    const tdee = Math.round(bmr * activityMult);
+    const goalAdj = goal === "build_muscle" ? 250 : goal === "lose_fat" ? -350 : 0;
+    const minCals = sex === "male" ? 1600 : 1400;
+    const cals = Math.max(minCals, tdee + goalAdj);
+    const proteinPer = goal === "general_fitness" ? 0.8 : 1.0;
+    const fatPer = goal === "build_muscle" ? 0.4 : goal === "lose_fat" ? 0.3 : 0.35;
+    const prot = Math.round(parseFloat(bodyWeight) * proteinPer);
+    const ft = Math.round(parseFloat(bodyWeight) * fatPer);
+    const cb = Math.round((cals - (prot * 4) - (ft * 9)) / 4);
+    return { calories: cals, protein: prot, carbs: cb, fat: ft };
+  }
+  const calcPreview = calcMacros();
 
   // Live exercise search — queries Supabase exercises table as member types.
   // Debounced 200ms so we don't fire on every keystroke.
@@ -1720,7 +1760,7 @@ function CustomPlanScreen() {
       setPending(null);
       setQuery("");
       setEditDayIndex(null);
-      setStep(3);
+      setStep(5);
       return;
     }
     const dayLabel = `Day ${currentDay + 1}`;
@@ -1732,7 +1772,7 @@ function CustomPlanScreen() {
     if (currentDay + 1 < daysPerWeek) {
       setCurrentDay(currentDay + 1);
     } else {
-      setStep(3); // all days done — go to review/macros
+      setStep(5); // all days done — go to review/macros
     }
   }
 
@@ -1740,21 +1780,23 @@ function CustomPlanScreen() {
     setSaving(true); setSaveError("");
     // Build plan object in the same shape as buildPlan() so WorkoutScreen works unchanged
     const repDefaults = GOAL_REP_RANGES[goal] || GOAL_REP_RANGES.general_fitness;
+    const calc = calcMacros(); // null unless sex/height/weight/age were all filled in on the optional stats step
+
     // Use exercises from day 1 as the active exercise list (same as AI plan — rotates by day)
     const exercises = (allDays[0]?.exercises || []).map(e => ({
       name: e.name, sets: e.sets, reps: e.reps, repMin: e.reps, repMax: e.reps + 2,
       weight: e.weight, warmupSets: [], muscle: "", pattern: "custom",
-      rpe: 7, restSeconds: repDefaults.rest, weightIncrement: 2.5,
+      rpe: 7, restSeconds: restPref || repDefaults.rest, weightIncrement: 2.5,
       usePyramid: e.loadStyle === "ramp_up" || e.loadStyle === "ramp_down",
       setDetails: e.setDetails || null, loadStyle: e.loadStyle || "same",
     }));
     const plan = {
-      calories: parseInt(calories) || null,
-      protein:  parseInt(protein)  || null,
-      carbs: null, fat: null,
+      calories: parseInt(calories) || calc?.calories || null,
+      protein:  parseInt(protein)  || calc?.protein  || null,
+      carbs: calc?.carbs || null, fat: calc?.fat || null,
       weekNumber: 1, weekStartDate: new Date().toISOString().split("T")[0],
       daysPerWeek, workoutType: "Custom", workoutDuration: 45,
-      restSeconds: repDefaults.rest,
+      restSeconds: restPref || repDefaults.rest,
       customDays: allDays, // store all days for future rotation
       isCustomPlan: true,  // flag so app knows this wasn't AI-generated
       weeklyFocus: "Your plan, your rules. Keep showing up and the results will follow.",
@@ -1762,7 +1804,7 @@ function CustomPlanScreen() {
       progressionRule: "Hit the top of your rep range two sessions in a row → add weight next session.",
       warmup: [], cooldown: [], exercises,
     };
-    const userData = { ...user, name, goal, daysPerWeek, isCustomPlan: true };
+    const userData = { ...user, name, goal, sex: sex || null, height: heightFt ? `${heightFt}′ ${heightIn || "0"}″` : null, weight: bodyWeight ? `${bodyWeight} lbs` : null, age: age || null, daysPerWeek, restPref: restPref || null, isCustomPlan: true };
     const uid = supabaseUserIdRef?.current || supabaseUser?.id;
     if (uid) {
       try { localStorage.setItem("mq_cached_plan_" + uid, JSON.stringify({ plan, user: userData })); } catch {}
@@ -1791,16 +1833,16 @@ function CustomPlanScreen() {
       {/* Header */}
       <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
         <button onClick={() => {
-          if (editDayIndex !== null) { setEditDayIndex(null); setDayExercises([]); setPending(null); setStep(3); return; }
+          if (editDayIndex !== null) { setEditDayIndex(null); setDayExercises([]); setPending(null); setStep(5); return; }
           step > -1 ? setStep(step - 1) : navigate("onboarding");
         }}
           style={{ background: "transparent", border: "none", color: ob.muted, cursor: "pointer", lineHeight: 1, padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={20} /></button>
         <span style={{ fontSize: 13, fontWeight: 600, color: ob.white }}>Build your own plan</span>
-        <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step === -1 ? "Name" : `${step + 1} of 4`}</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step === -1 ? "Name" : `${step + 1} of 6`}</span>
       </div>
       {/* Progress bar */}
       <div style={{ height: 3, background: ob.card, margin: "10px 16px 0", borderRadius: 2, flexShrink: 0 }}>
-        <div style={{ height: 3, background: a, borderRadius: 2, width: `${((step + 1) / 4) * 100}%`, transition: "width .4s ease" }} />
+        <div style={{ height: 3, background: a, borderRadius: 2, width: `${((step + 1) / 6) * 100}%`, transition: "width .4s ease" }} />
       </div>
 
       <div style={s.inner}>
@@ -1841,8 +1883,49 @@ function CustomPlanScreen() {
           ))}
         </div>}
 
-        {/* ── STEP 1: Days per week ── */}
+        {/* ── STEP 1: Body stats (optional) — feeds the same Mifflin-St Jeor calorie/protein/carb/fat formula as the AI plan ── */}
         {step === 1 && <div className="mq-fade">
+          <div style={s.hdr}>About you (optional)</div>
+          <div style={s.title}>Quick body stats</div>
+          <div style={s.sub}>Used to calculate your calorie, protein, carb, and fat targets automatically. Skip if you'd rather set targets manually on the review step.</div>
+
+          <div style={{ fontSize: 10, color: ob.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.8px" }}>Biological sex</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {[["male", "Male"], ["female", "Female"]].map(([id, label]) => (
+              <button key={id} onClick={() => setSex(sex === id ? null : id)}
+                style={{ flex: 1, background: sex === id ? ob.tealDk : ob.card, border: `1.5px solid ${sex === id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 10, padding: "10px 12px", color: sex === id ? a : ob.white, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: ob.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.8px" }}>Height</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="number" value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="ft" style={s.input} min="3" max="8" />
+              <input type="number" value={heightIn} onChange={e => setHeightIn(e.target.value)} placeholder="in" style={s.input} min="0" max="11" />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
+            <div>
+              <div style={{ fontSize: 10, color: ob.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.8px" }}>Weight (lbs)</div>
+              <input type="number" value={bodyWeight} onChange={e => setBodyWeight(e.target.value)} placeholder="e.g. 175" style={s.input} min="80" max="500" />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: ob.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.8px" }}>Age</div>
+              <input type="number" value={age} onChange={e => setAge(e.target.value)} placeholder="e.g. 32" style={s.input} min="13" max="100" />
+            </div>
+          </div>
+
+          <button onClick={() => setStep(2)} style={s.tealBtn(false)}>Continue</button>
+          <button onClick={() => { setSex(null); setHeightFt(""); setHeightIn(""); setBodyWeight(""); setAge(""); setStep(2); }}
+            style={{ background: "transparent", border: "none", color: ob.muted, fontSize: 11, cursor: "pointer", fontFamily: ob.font, padding: "10px 0", textAlign: "center", width: "100%" }}>
+            Skip — I'll set targets manually
+          </button>
+        </div>}
+
+        {/* ── STEP 2: Days per week ── */}
+        {step === 2 && <div className="mq-fade">
           <div style={s.hdr}>Your schedule</div>
           <div style={s.title}>How many days per week?</div>
           <div style={s.sub}>You'll enter exercises for each training day.</div>
@@ -1859,13 +1942,37 @@ function CustomPlanScreen() {
               You'll enter your exercises for each of your <span style={{ color: ob.white, fontWeight: 600 }}>{daysPerWeek} training days</span> next. Takes about 2 minutes.
             </div>
           </div>
-          <button onClick={() => { setCurrentDay(0); setDayExercises([]); setAllDays([]); setStep(2); }} style={s.tealBtn(false)}>
-            Next — add exercises <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} />
+          <button onClick={() => { setCurrentDay(0); setDayExercises([]); setAllDays([]); setStep(3); }} style={s.tealBtn(false)}>
+            Next <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} />
           </button>
         </div>}
 
-        {/* ── STEP 2: Exercises per day ── */}
-        {step === 2 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {/* ── STEP 3: Rest preference (optional) ── */}
+        {step === 3 && <div className="mq-fade">
+          <div style={s.hdr}>Rest preference (optional)</div>
+          <div style={s.title}>How long to rest between sets?</div>
+          <div style={s.sub}>You can always change this mid-workout. Skip to use the recommended default for your goal.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 8 }}>
+            {[[60, "1 minute", "High intensity, keep the burn going", <Icon name="flame" size={20} />], [120, "2 minutes", "Balanced — works for most people", <Icon name="bolt" size={20} />], [180, "3 minutes", "Full recovery, lift heavier", <Icon name="flex" size={20} />]].map(([secs, label, sub, icon]) => (
+              <button key={secs} onClick={() => { setRestPref(secs); setTimeout(() => setStep(4), 180); }}
+                style={{ background: restPref === secs ? ob.tealDk : ob.card, border: `1.5px solid ${restPref === secs ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: restPref === secs ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: restPref === secs ? a : ob.muted }}>{icon}</div>
+                <div style={{ textAlign: "left", flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: restPref === secs ? a : ob.white }}>{label}</div>
+                  <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>{sub}</div>
+                </div>
+                {restPref === secs && <div style={{ width: 18, height: 18, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", color: ob.tealDk, flexShrink: 0 }}><Icon name="check" size={10} /></div>}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setStep(4)}
+            style={{ background: "transparent", border: "none", color: ob.muted, fontSize: 11, cursor: "pointer", fontFamily: ob.font, padding: "10px 0", textAlign: "center", width: "100%" }}>
+            Skip — use recommended default for my goal
+          </button>
+        </div>}
+
+        {/* ── STEP 4: Exercises per day ── */}
+        {step === 4 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={s.hdr}>Day {currentDay + 1} of {daysPerWeek}</div>
           <div style={s.title}>Add your exercises</div>
           <div style={{ fontSize: 11, color: ob.muted, marginBottom: 12 }}>
@@ -2042,21 +2149,26 @@ function CustomPlanScreen() {
           </div>
         </div>}
 
-        {/* ── STEP 3: Macros + review ── */}
-        {step === 3 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* ── STEP 5: Macros + review ── */}
+        {step === 5 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <div style={s.hdr}>Almost done</div>
           <div style={s.title}>Daily targets (optional)</div>
           <div style={{ fontSize: 11, color: ob.muted, marginBottom: 14 }}>
             If you track nutrition, add your targets. Skip if you don't — you can add them later in Profile.
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-            {[["Daily calories", calories, setCalories, "e.g. 2200"], ["Protein (g/day)", protein, setProtein, "e.g. 160"]].map(([lbl, val, set, ph]) => (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            {[["Daily calories", calories, setCalories, calcPreview ? `Auto: ${calcPreview.calories}` : "e.g. 2200"], ["Protein (g/day)", protein, setProtein, calcPreview ? `Auto: ${calcPreview.protein}g` : "e.g. 160"]].map(([lbl, val, set, ph]) => (
               <div key={lbl}>
                 <div style={{ fontSize: 10, color: ob.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.8px" }}>{lbl}</div>
                 <input type="number" value={val} onChange={e => set(e.target.value)} placeholder={ph} style={s.input} />
               </div>
             ))}
           </div>
+          {calcPreview ? (
+            <div style={{ fontSize: 10, color: ob.muted, marginBottom: 16, lineHeight: 1.5 }}>
+              Calculated from your stats: {calcPreview.calories} cal · {calcPreview.protein}g protein · {calcPreview.carbs}g carbs · {calcPreview.fat}g fat. These fill in automatically — override any field above to set your own.
+            </div>
+          ) : <div style={{ marginBottom: 16 }} />}
 
           {/* Plan summary */}
           <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Your plan</div>
@@ -2064,7 +2176,7 @@ function CustomPlanScreen() {
             <div key={di} style={s.card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: ob.white }}>{day.dayLabel}</div>
-                <button onClick={() => { setDayExercises(day.exercises); setCurrentDay(di); setEditDayIndex(di); setStep(2); }}
+                <button onClick={() => { setDayExercises(day.exercises); setCurrentDay(di); setEditDayIndex(di); setStep(4); }}
                   style={{ background: "transparent", border: "none", color: a, fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, padding: 0 }}>
                   Edit
                 </button>
