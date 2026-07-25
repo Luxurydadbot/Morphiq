@@ -1985,7 +1985,7 @@ function CustomPlanScreen() {
             /* Search box */
             <div style={{ marginBottom: 8 }}>
               <input value={query} onChange={e => setQuery(e.target.value)}
-                placeholder="Search exercise name..." style={{ ...s.input, marginBottom: 4 }} autoComplete="off" />
+                placeholder="Search for your next exercise..." style={{ ...s.input, marginBottom: 4 }} autoComplete="off" />
               {dayExercises.length >= 12 && (
                 <div style={{ fontSize: 11, color: ob.muted, padding: "6px 4px" }}>Day full — remove an exercise below to add another (max 12 per day).</div>
               )}
@@ -2021,7 +2021,7 @@ function CustomPlanScreen() {
             )}
             {dayExercises.length === 0 && (
               <div style={{ fontSize: 11, color: ob.muted, textAlign: "center", padding: 8 }}>
-                Search for an exercise above to get started
+                Search for your first exercise above to get started
               </div>
             )}
           </div>
