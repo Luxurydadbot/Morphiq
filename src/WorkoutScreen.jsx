@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan } from "./shared.jsx";
+         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -1621,34 +1621,10 @@ const GOAL_REP_RANGES = {
   general_fitness:{ reps: 12, sets: 3, rest: 90  },
 };
 
-// Generates a per-set {reps, weight} array for a chosen loading style.
-// 'same'      = flat weight/reps every working set (identical to the old behavior).
-// 'ramp_up'   = ascending toward the entered weight as the last/top set.
-// 'ramp_down' = heaviest set first (fresh), easing off on later sets.
-// 'custom'    = seeds flat like 'same' — it just signals the member intends
-//               to hand-edit every row themselves.
-// Every style is always shown as editable rows after this generates them —
-// this is just the starting point, never the final word.
-function buildSetDetails(sets, reps, weight, loadStyle) {
-  const n = Math.max(1, parseInt(sets) || 1);
-  const w = parseFloat(weight) || 0;
-  const r = parseInt(reps) || 8;
-  const round5 = (x) => Math.max(5, Math.round(x / 5) * 5);
-  if (loadStyle === "ramp_up") {
-    return Array.from({ length: n }).map((_, i) => {
-      const pct = n === 1 ? 1 : 0.7 + (0.3 * i) / (n - 1); // 70% of top weight -> 100%
-      return { reps: r, weight: i === n - 1 ? w : round5(w * pct) };
-    });
-  }
-  if (loadStyle === "ramp_down") {
-    return Array.from({ length: n }).map((_, i) => {
-      const pct = n === 1 ? 1 : Math.max(1 - 0.1 * i, 0.5); // 100%, 90%, 80%... floor at 50%
-      return { reps: r, weight: i === 0 ? w : round5(w * pct) };
-    });
-  }
-  // 'same' and 'custom' both start flat — 'custom' just means "edit every row"
-  return Array.from({ length: n }).map(() => ({ reps: r, weight: w }));
-}
+// buildSetDetails (generates the per-set {reps, weight} array for a chosen
+// loading style) now lives in shared.jsx, imported above — moved there so
+// progressPlan() can regenerate per-set tables during week-over-week
+// progression instead of only this builder screen being able to.
 
 function CustomPlanScreen() {
   const { navigate, setUser, setPlan, user, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
@@ -1726,7 +1702,7 @@ function CustomPlanScreen() {
     // identical to how every exercise worked before this feature existed.
     const setDetails = (Array.isArray(pending.setDetails) && pending.setDetails.length === (parseInt(pending.sets) || 1))
       ? pending.setDetails
-      : buildSetDetails(pending.sets, pending.reps, weight, pending.loadStyle || "same");
+      : buildSetDetails(pending.sets, pending.reps, weight, pending.loadStyle || "same", goal);
     setDayExercises(prev => [...prev, { ...pending, weight, setDetails, loadStyle: pending.loadStyle || "same" }]);
     setPending(null);
     setJustAddedExercise(true);
@@ -1904,7 +1880,7 @@ function CustomPlanScreen() {
                 <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>{ex.name}</div>
                 <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>
                   {ex.sets} sets × {ex.reps} reps · {ex.weight} lbs
-                  {ex.loadStyle && ex.loadStyle !== "same" ? ` · ${ex.loadStyle === "ramp_up" ? "ramping up" : ex.loadStyle === "ramp_down" ? "ramping down" : "custom per set"}` : ""}
+                  {ex.loadStyle && ex.loadStyle !== "same" ? ` · ${ex.loadStyle === "ramp_up" ? "ramping up" : ex.loadStyle === "ramp_down" ? "top set + backoff" : "custom per set"}` : ""}
                 </div>
               </div>
               <button onClick={(e) => { e.stopPropagation(); setDayExercises(prev => prev.filter((_,j) => j !== i)); }}
@@ -1917,14 +1893,14 @@ function CustomPlanScreen() {
             <div style={{ background: "#0A1A14", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 12, padding: "12px", marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: a, marginBottom: 10 }}>{pending.name}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-                {[["Sets", "sets"], ["Reps", "reps"], ["Weight (lbs)", "weight"]].map(([lbl, key]) => (
+                {[["Sets", "sets"], ["Reps", "reps"], [pending.loadStyle === "ramp_down" ? "Top set weight (lbs)" : "Weight (lbs)", "weight"]].map(([lbl, key]) => (
                   <div key={key}>
                     <div style={{ fontSize: 9, color: ob.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.8px" }}>{lbl}</div>
                     <input type="number" value={pending[key]} onChange={e => setPending(p => {
                       const updated = { ...p, [key]: e.target.value };
                       // Keep the per-set rows below in sync with the base numbers —
                       // only while a loading style has already been picked.
-                      if (p.loadStyle) updated.setDetails = buildSetDetails(updated.sets, updated.reps, updated.weight, p.loadStyle);
+                      if (p.loadStyle) updated.setDetails = buildSetDetails(updated.sets, updated.reps, updated.weight, p.loadStyle, goal);
                       return updated;
                     })}
                       style={s.smallInput} placeholder={key === "weight" ? "e.g. 45" : ""} />
@@ -1936,14 +1912,21 @@ function CustomPlanScreen() {
               <div style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 9, color: ob.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.8px" }}>Loading style</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {[["same", "Same weight"], ["ramp_up", "Ramp up"], ["ramp_down", "Ramp down"], ["custom", "Set each one"]].map(([id, label]) => (
+                  {[["same", "Same weight"], ["ramp_up", "Ramp up"], ["ramp_down", "Top set + backoff"], ["custom", "Set each one"]].map(([id, label]) => (
                     <button key={id} type="button"
-                      onClick={() => setPending(p => ({ ...p, loadStyle: id, setDetails: buildSetDetails(p.sets, p.reps, p.weight, id) }))}
+                      onClick={() => setPending(p => ({ ...p, loadStyle: id, setDetails: buildSetDetails(p.sets, p.reps, p.weight, id, goal) }))}
                       style={{ background: pending.loadStyle === id ? a : "transparent", color: pending.loadStyle === id ? ob.tealDk : ob.muted, border: `1px solid ${pending.loadStyle === id ? a : "rgba(255,255,255,0.12)"}`, borderRadius: 20, padding: "5px 10px", fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>
                       {label}
                     </button>
                   ))}
                 </div>
+                {/* Plain-English explanation — the member never sees or picks a
+                    percentage, so this is the only place the behavior is spelled out */}
+                {pending.loadStyle === "ramp_down" && (
+                  <div style={{ fontSize: 10, color: ob.muted, marginTop: 6, lineHeight: 1.4 }}>
+                    Enter the heaviest weight for your first set. Every set after that automatically gets lighter, with a few more reps — no extra typing needed.
+                  </div>
+                )}
               </div>
 
               {/* Per-set rows — always editable, however they got here */}
@@ -2067,7 +2050,7 @@ function CustomPlanScreen() {
                   <span style={{ fontSize: 11, color: ob.body }}>{ex.name}</span>
                   <span style={{ fontSize: 10, color: ob.muted }}>
                     {ex.sets}×{ex.reps} · {ex.weight} lbs
-                    {ex.loadStyle && ex.loadStyle !== "same" ? ` (${ex.loadStyle === "ramp_up" ? "ramp up" : ex.loadStyle === "ramp_down" ? "ramp down" : "custom"})` : ""}
+                    {ex.loadStyle && ex.loadStyle !== "same" ? ` (${ex.loadStyle === "ramp_up" ? "ramp up" : ex.loadStyle === "ramp_down" ? "top set + backoff" : "custom"})` : ""}
                   </span>
                 </div>
               ))}
