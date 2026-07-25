@@ -1485,9 +1485,68 @@ function buildPlan(userProfile, existingMacros) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// buildSetDetails — generates a per-set {reps, weight} array for a chosen
+// loading style. Moved here from WorkoutScreen.jsx (session 6) so both the
+// plan builder AND progressPlan() below can call the same logic — previously
+// only the builder had it, so week-over-week progression could bump the flat
+// weight field but never regenerate the actual per-set table.
+//
+// 'same'      = flat weight/reps every working set (identical to the old behavior).
+// 'ramp_up'   = ascending toward the entered weight as the last/top set.
+// 'ramp_down' = "Top set + backoff": the entered weight is the member's
+//               heaviest set (their ~6-rep max), and every set after it drops
+//               to one repeated lighter backoff weight. The drop is picked
+//               automatically from the member's goal — this isn't a guess,
+//               it's the standard range strength coaches use for backoff
+//               sets: ~15% lighter for a pure strength goal, ~25% lighter
+//               for hypertrophy/general-fitness/fat-loss goals (which use
+//               higher reps and tolerate — and benefit from — a bigger drop).
+//               The member never sees or picks a percentage; it's invisible.
+//               Backoff sets also get a few more reps than the top set —
+//               pairing a lighter load with slightly higher reps (e.g. a
+//               5-rep top set followed by ~8-rep backoff sets) is the actual
+//               textbook pattern; repeating the same rep count at a lighter
+//               weight is not. Capped so it never runs away on a high-rep
+//               goal. The member still only ever types one rep number.
+// 'custom'    = seeds flat like 'same' — it just signals the member intends
+//               to hand-edit every row themselves.
+// Every style is always shown as editable rows after this generates them —
+// this is just the starting point, never the final word.
+function buildSetDetails(sets, reps, weight, loadStyle, goal) {
+  const n = Math.max(1, parseInt(sets) || 1);
+  const w = parseFloat(weight) || 0;
+  const r = parseInt(reps) || 8;
+  const round5 = (x) => Math.max(5, Math.round(x / 5) * 5);
+  if (loadStyle === "ramp_up") {
+    return Array.from({ length: n }).map((_, i) => {
+      const pct = n === 1 ? 1 : 0.7 + (0.3 * i) / (n - 1); // 70% of top weight -> 100%
+      return { reps: r, weight: i === n - 1 ? w : round5(w * pct) };
+    });
+  }
+  if (loadStyle === "ramp_down") {
+    const dropPct = goal === "build_strength" ? 0.15 : 0.25;
+    const backoff = round5(w * (1 - dropPct));
+    const backoffReps = Math.min(r + 3, 20); // heavier top set, lighter+higher-rep backoff — capped at 20
+    return Array.from({ length: n }).map((_, i) => ({ reps: i === 0 ? r : backoffReps, weight: i === 0 ? w : backoff }));
+  }
+  // 'same' and 'custom' both start flat — 'custom' just means "edit every row"
+  return Array.from({ length: n }).map(() => ({ reps: r, weight: w }));
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // progressPlan — takes current plan + workout logs, returns next week's plan
 // Applies the 2-for-2 NSCA rule: exceed rep target by 2+ for 2 sessions → add weight
 // No API call. Deterministic.
+//
+// Session 6 fix: this used to only ever read/write the flat currentPlan.exercises
+// mirror. That mirror is only populated from Day 1 of a custom multi-day plan
+// (see savePlan() in WorkoutScreen.jsx) and the live workout screen doesn't even
+// read it once a plan has more than one day — it reads plan.customDays instead.
+// Net effect: every day past Day 1 of a custom plan silently never progressed,
+// and even Day 1 only ever got its flat weight bumped, never its setDetails
+// (the actual per-set table rendered for ramp/pyramid loading styles). Now both
+// the flat mirror and every day inside customDays run through the same
+// progression logic below.
 // ═══════════════════════════════════════════════════════════════════
 function progressPlan(currentPlan, workoutLogs, userProfile) {
   const nextWeekNum = (currentPlan.weekNumber || 1) + 1;
@@ -1497,6 +1556,7 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
     : "experienced";
   const isExperienced = expTier === "experienced";
   const isOver40 = parseInt(userProfile.age || 30) >= 40;
+  const goal = userProfile.goal || "general_fitness";
 
   // ── Deload logic ──────────────────────────────────────────────────
   // Experienced members: deload every 5 weeks
@@ -1504,40 +1564,60 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
   const isDeload = isExperienced && !isOver40 && nextWeekNum % 5 === 0;
   const isPostDeload = isExperienced && !isOver40 && nextWeekNum % 5 === 1 && nextWeekNum > 1;
 
-  if (isDeload) {
-    // Deload week: same exercises, 60% weight, RPE capped at 6
-    return {
-      ...currentPlan,
-      weekNumber: nextWeekNum,
-      weekStartDate: new Date().toISOString().split("T")[0],
-      weeklyFocus: "Recovery week. Lighter weights, same movements. You'll come back stronger.",
-      tip: "This week is supposed to feel easy. That's the point — let your body consolidate the gains.",
-      progressionRule: "Deload: all weights at 60% of last week. RPE 6 max.",
-      exercises: currentPlan.exercises.map(ex => ({
-        ...ex,
-        weight: Math.round(ex.weight * 0.6 / 5) * 5, // round to nearest 5
-        rpe: Math.min(ex.rpe, 6),
-        weeklyFocus: "deload",
-      })),
-    };
-  }
-
   // ── Build log lookup: exerciseName → array of recent sessions ─────
   // workoutLogs is an array of { exercise_name, reps, weight, workout_date }
+  // Shared across the flat mirror AND every day in customDays — an exercise's
+  // log history is the same regardless of which day of the split it lives on.
   const logMap = {};
   (workoutLogs || []).forEach(log => {
     const key = log.exercise_name;
     if (!logMap[key]) logMap[key] = [];
     logMap[key].push({ reps: log.reps, weight: log.weight, date: log.workout_date });
   });
-
-  // Sort each exercise's logs newest first
   Object.keys(logMap).forEach(k => {
     logMap[k].sort((a, b) => new Date(b.date) - new Date(a.date));
   });
 
-  // ── Progress each exercise ────────────────────────────────────────
-  const nextExercises = currentPlan.exercises.map(ex => {
+  // The flat exercises mirror always carries repMin/repMax/weightIncrement/
+  // usePyramid/rpe (set explicitly in savePlan()). Raw customDays exercise
+  // objects never did — they only ever stored {name, sets, reps, weight,
+  // loadStyle, setDetails}. This backfills sensible defaults so the same
+  // progression math works on both without customDays silently no-op'ing.
+  function normalize(ex) {
+    return {
+      ...ex,
+      repMin: ex.repMin ?? ex.reps,
+      repMax: ex.repMax ?? (ex.reps + 2),
+      weightIncrement: ex.weightIncrement ?? (ex.pattern === "squat" || ex.pattern === "hinge" ? 5 : 2.5),
+      usePyramid: ex.usePyramid ?? (ex.loadStyle === "ramp_up" || ex.loadStyle === "ramp_down"),
+      rpe: ex.rpe ?? 7,
+    };
+  }
+
+  // Progresses one exercise, whether it came from the flat mirror or one day
+  // of a custom plan. Regenerates setDetails via buildSetDetails() whenever
+  // the weight changes, for every loading style except 'custom' -- 'custom'
+  // is the one style where the member explicitly hand-typed every row
+  // themselves, so progression leaves those numbers alone rather than
+  // silently overwriting their edits. 'same' also needs regenerating here,
+  // not just 'ramp_up'/'ramp_down': every exercise always gets a populated
+  // setDetails array from the plan builder (buildSetDetails' fallback branch
+  // covers 'same' too), and the workout screen always prefers setDetails
+  // over the flat weight field when it's present -- so without this, a
+  // progressed flat-style exercise would still render its old frozen weight.
+  function progressOne(rawEx) {
+    const ex = normalize(rawEx);
+    const shouldRegenerateSetDetails = ex.loadStyle !== "custom";
+    const withSetDetails = (weight, reps) => shouldRegenerateSetDetails
+      ? buildSetDetails(ex.sets, reps ?? ex.reps, weight, ex.loadStyle, goal)
+      : ex.setDetails;
+
+    if (isDeload) {
+      // Deload week: same exercise, 60% weight, RPE capped at 6
+      const newWeight = Math.round(ex.weight * 0.6 / 5) * 5; // round to nearest 5
+      return { ...ex, weight: newWeight, rpe: Math.min(ex.rpe, 6), weeklyFocus: "deload", setDetails: withSetDetails(newWeight) };
+    }
+
     const logs = logMap[ex.name] || [];
 
     // Post-deload: reset to week 1 weight + 10%, swap to variation exercise
@@ -1546,20 +1626,18 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
       // Even mesocycles use variation, odd mesocycles use primary
       const mesocycle = Math.floor((nextWeekNum - 1) / 5);
       const useVariation = mesocycle % 2 === 1;
-      // Find this exercise's variation from the library
+      // Find this exercise's variation from the library (custom-plan exercise
+      // names typically won't match anything here, so variationName just
+      // stays the original name — harmless no-op for custom exercises)
       const lib = EXERCISE_LIBRARY[userProfile.equipment] || EXERCISE_LIBRARY.dumbbell;
-      let variationName = ex.name; // default: keep same
+      let variationName = ex.name;
       Object.values(lib).forEach(slot => {
         if (slot.name === ex.name && slot.variation) variationName = useVariation ? slot.variation : slot.name;
         if (slot.variation === ex.name && slot.name) variationName = useVariation ? slot.variation : slot.name;
       });
-      return {
-        ...ex,
-        name: variationName,
-        weight: Math.round(ex.weight * 1.1 / 5) * 5,
-        reps: ex.repMin || ex.reps,
-        weekNumber: nextWeekNum,
-      };
+      const newWeight = Math.round(ex.weight * 1.1 / 5) * 5;
+      const newReps = ex.repMin;
+      return { ...ex, name: variationName, weight: newWeight, reps: newReps, weekNumber: nextWeekNum, setDetails: withSetDetails(newWeight, newReps) };
     }
 
     // Not enough log data — keep current weight, same reps
@@ -1567,8 +1645,8 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
       return { ...ex, weekNumber: nextWeekNum };
     }
 
-    const increment = ex.weightIncrement || (ex.pattern === "squat" || ex.pattern === "hinge" ? 5 : 2.5);
-    const repTarget = ex.repMax || (ex.reps + 2);
+    const increment = ex.weightIncrement;
+    const repTarget = ex.repMax;
 
     if (ex.usePyramid) {
       // Pyramid: check if final-set reps hit target two sessions in a row
@@ -1578,8 +1656,8 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
       const hitTwoInARow = session1 >= repTarget && session2 >= repTarget;
 
       if (hitTwoInARow) {
-        const newWorking = ex.weight + increment;
-        return { ...ex, weight: newWorking, weekNumber: nextWeekNum };
+        const newWeight = ex.weight + increment;
+        return { ...ex, weight: newWeight, weekNumber: nextWeekNum, setDetails: withSetDetails(newWeight) };
       }
       // Fatigue detection: if member missed reps two sessions, hold weight
       return { ...ex, weekNumber: nextWeekNum };
@@ -1595,7 +1673,7 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
         return {
           ...ex,
           weight: ex.weight + increment,
-          reps: ex.repMin || ex.reps, // reset reps to bottom of range
+          reps: ex.repMin, // reset reps to bottom of range
           weekNumber: nextWeekNum,
         };
       }
@@ -1603,28 +1681,39 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
       // Fatigue detection: missed target reps two sessions → hold, drop 1 rep
       const session1MinReps = Math.min(...recentSets.slice(0, 3).map(l => l.reps));
       const session2MinReps = Math.min(...recentSets.slice(3, 6).map(l => l.reps));
-      const missedTwice = session1MinReps < (ex.repMin || ex.reps) - 1
-                       && session2MinReps < (ex.repMin || ex.reps) - 1;
+      const missedTwice = session1MinReps < ex.repMin - 1 && session2MinReps < ex.repMin - 1;
       if (missedTwice && ex.reps > (ex.repMin || 6)) {
         return { ...ex, reps: ex.reps - 1, weekNumber: nextWeekNum };
       }
 
       return { ...ex, weekNumber: nextWeekNum };
     }
-  });
+  }
+
+  const nextExercises = (currentPlan.exercises || []).map(progressOne);
+  const nextCustomDays = Array.isArray(currentPlan.customDays)
+    ? currentPlan.customDays.map(day => ({ ...day, exercises: (day.exercises || []).map(progressOne) }))
+    : currentPlan.customDays;
 
   return {
     ...currentPlan,
     weekNumber: nextWeekNum,
     weekStartDate: new Date().toISOString().split("T")[0],
-    weeklyFocus: nextWeekNum % 5 === 4
-      ? "Last hard week before recovery. Leave everything on the floor."
-      : "Progressive overload in action — a little better than last week is all you need.",
-    tip: isExperienced
-      ? "Track your final-set reps carefully — that's what triggers your weight increase."
-      : "Consistency is the variable that matters most right now. Just show up.",
-    progressionRule: "Auto-calculated from your logged reps.",
+    weeklyFocus: isDeload
+      ? "Recovery week. Lighter weights, same movements. You'll come back stronger."
+      : (nextWeekNum % 5 === 4
+          ? "Last hard week before recovery. Leave everything on the floor."
+          : "Progressive overload in action — a little better than last week is all you need."),
+    tip: isDeload
+      ? "This week is supposed to feel easy. That's the point — let your body consolidate the gains."
+      : (isExperienced
+          ? "Track your final-set reps carefully — that's what triggers your weight increase."
+          : "Consistency is the variable that matters most right now. Just show up."),
+    progressionRule: isDeload
+      ? "Deload: all weights at 60% of last week. RPE 6 max."
+      : "Auto-calculated from your logged reps.",
     exercises: nextExercises,
+    customDays: nextCustomDays,
   };
 }
 
@@ -2111,7 +2200,7 @@ export {
   // Theme
   theme, css,
   // Plan engine
-  buildPlan, progressPlan,
+  buildPlan, progressPlan, buildSetDetails,
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components
