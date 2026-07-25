@@ -152,7 +152,7 @@ function AppProvider({ children }) {
       const cachedData = !planSource ? getCachedPlanData() : null;
       const resolvedPlan = planSource?.plan || cachedData?.plan || null;
       const resolvedUser = planSource
-        ? { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" }
+        ? { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial", lastWorkoutDayIndex: profile.last_workout_day_index }
         : cachedData?.user || null;
 
       if (resolvedPlan && resolvedUser) {
@@ -333,7 +333,7 @@ function AppProvider({ children }) {
       }
 
       if (profile?.plan) {
-        const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial" };
+        const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial", lastWorkoutDayIndex: profile.last_workout_day_index };
         setUser(u);
         // Patch missing weekStartDate — if the plan was saved without it, fill in today
         // so the 7-day check has something to work from. Save back to Supabase immediately.
@@ -799,8 +799,14 @@ function HomeDashboardScreen() {
   // If the member manually picked a day (selectedDayOverride), use that instead
   // of the normal auto-pick. The override only ever affects this one card/session.
   const isMultiDayPlan = plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1;
+  // Continue from wherever the member actually last did (their last day + 1,
+  // wrapping) rather than inferring from how many days they've worked out
+  // this week -- that count-based guess drifts once a manual day-pick breaks
+  // the plain 1-2-3-4 sequence (see profiles.last_workout_day_index).
   const activeDayIdx = isMultiDayPlan
-    ? ((selectedDayOverride !== null && selectedDayOverride < plan.customDays.length) ? selectedDayOverride : weeklyDone % plan.customDays.length)
+    ? ((selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
+        ? selectedDayOverride
+        : (typeof user?.lastWorkoutDayIndex === "number" ? (user.lastWorkoutDayIndex + 1) % plan.customDays.length : 0))
     : null;
   const getUpcomingDayData = () => {
     if (isMultiDayPlan) {

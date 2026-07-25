@@ -255,32 +255,27 @@ function WorkoutScreen() {
   const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData, selectedDayOverride, setSelectedDayOverride } = useApp();
   const a = gymBranding.accent;
 
+  // For custom plans with multiple days: which day to load. A manual pick from
+  // the Home screen wins; otherwise continue from wherever the member actually
+  // last did (their last day + 1, wrapping) -- tracked in
+  // profiles.last_workout_day_index, NOT derived from how many workouts
+  // they've done this week (that count-based guess drifts once a manual pick
+  // breaks the plain 1-2-3-4 sequence, e.g. picking Day 2 first would make the
+  // old math suggest Day 2 again next time instead of Day 3).
+  const isMultiDayPlan = plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1;
+  const activeDayIdx = isMultiDayPlan
+    ? ((selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
+        ? selectedDayOverride
+        : (typeof user?.lastWorkoutDayIndex === "number" ? (user.lastWorkoutDayIndex + 1) % plan.customDays.length : 0))
+    : null;
+
   // Use AI-generated exercises if available, else fall back to defaults.
-  // For custom plans with multiple days, rotate by workouts-done-this-week so each
-  // session shows the correct day (Day 1 → Day 2 → Day 3 → back to Day 1...).
   // Stored in state (not const) so swapping an exercise updates it live.
   const [exercises, setExercises] = useState(() => {
-    // Determine which day index to use for custom multi-day plans
     let sourceExercises = plan?.exercises || WORKOUT_EXERCISES;
-    if (plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1) {
-      // How many workouts are done this week -- derived from real logged sets
-      // (same source the home screen uses), not a local-only counter.
+    if (isMultiDayPlan) {
       try {
-        const now = new Date();
-        const day = now.getDay();
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(now.getFullYear(), now.getMonth(), diff);
-        const mondayStr = localDateStr(monday);
-        const weeklyDone = new Set(
-          (historicalData?.workoutLogs || [])
-            .map((l) => l.workout_date)
-            .filter((d) => d >= mondayStr)
-        ).size;
-        // A day manually picked on the Home screen wins over the auto weekly-count pick.
-        const dayIdx = (selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
-          ? selectedDayOverride
-          : weeklyDone % plan.customDays.length;
-        const dayData = plan.customDays[dayIdx];
+        const dayData = plan.customDays[activeDayIdx];
         if (dayData?.exercises?.length > 0) sourceExercises = dayData.exercises;
       } catch { /* fall back to plan.exercises */ }
     }
@@ -300,9 +295,13 @@ function WorkoutScreen() {
 
   // The manual day pick from the Home screen is a one-time nudge — clear it
   // right after this screen has used it, so it never carries over to a future
-  // session or week.
+  // session or week. Also remember which day this session actually used (auto
+  // or override) so the next auto-pick correctly continues from here.
   useEffect(() => {
     if (selectedDayOverride !== null) setSelectedDayOverride(null);
+    if (isMultiDayPlan && activeDayIdx !== null && supabaseUser?.id) {
+      sb.updateLastWorkoutDayIndex(supabaseUser.id, activeDayIdx).catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

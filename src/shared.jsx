@@ -183,6 +183,25 @@ const sb = {
     } catch { return null; }
   },
 
+  // Persists which day index (0-based, into plan.customDays) was actually used
+  // for this custom-plan session -- so the next auto-pick can continue from
+  // here (lastIndex + 1) instead of re-deriving a guess from weekly workout
+  // count, which drifts once a manual day-pick breaks the 1-2-3-4 sequence.
+  // Fire-and-forget: a failed save just means the next auto-pick falls back
+  // to Day 1, never crashes anything.
+  async updateLastWorkoutDayIndex(supabaseUserId, dayIndex) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${profileId}`, {
+        method: "PATCH",
+        headers: SB_HEADERS(),
+        body: JSON.stringify({ last_workout_day_index: dayIndex }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
   async upsertProfile(supabaseUserId, userData, planData, gymId = "demo-gym") {
     try {
       const body = {
