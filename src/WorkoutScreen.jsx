@@ -252,7 +252,7 @@ function getSwapOptions(ex, equipment) {
 }
 
 function WorkoutScreen() {
-  const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData } = useApp();
+  const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData, selectedDayOverride, setSelectedDayOverride } = useApp();
   const a = gymBranding.accent;
 
   // Use AI-generated exercises if available, else fall back to defaults.
@@ -276,7 +276,10 @@ function WorkoutScreen() {
             .map((l) => l.workout_date)
             .filter((d) => d >= mondayStr)
         ).size;
-        const dayIdx = weeklyDone % plan.customDays.length;
+        // A day manually picked on the Home screen wins over the auto weekly-count pick.
+        const dayIdx = (selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
+          ? selectedDayOverride
+          : weeklyDone % plan.customDays.length;
         const dayData = plan.customDays[dayIdx];
         if (dayData?.exercises?.length > 0) sourceExercises = dayData.exercises;
       } catch { /* fall back to plan.exercises */ }
@@ -294,6 +297,14 @@ function WorkoutScreen() {
       loadStyle: e.loadStyle || "same",
     }));
   });
+
+  // The manual day pick from the Home screen is a one-time nudge — clear it
+  // right after this screen has used it, so it never carries over to a future
+  // session or week.
+  useEffect(() => {
+    if (selectedDayOverride !== null) setSelectedDayOverride(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Mid-workout progress persistence ──────────────────────────────
   // Saves where the member is (phase, exercise, set, logged sets) to local

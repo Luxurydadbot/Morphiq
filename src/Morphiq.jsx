@@ -90,6 +90,11 @@ function AppProvider({ children }) {
   // WorkoutScreen watches this and calls doSwap when it's non-null, then clears it.
   const [pendingAISwap, setPendingAISwap] = useState(null);
   const [syncIssue, setSyncIssue] = useState(false);
+  // Lets a member manually pick which day of a custom multi-day split to do next,
+  // overriding the normal auto-pick (which is based on workouts-done-this-week).
+  // Cleared automatically once WorkoutScreen reads it, so it never lingers into
+  // a future session or week — it only affects the very next workout started.
+  const [selectedDayOverride, setSelectedDayOverride] = useState(null);
 
   // ── On mount: load gym branding from Supabase ────────────────────────────
   useEffect(() => {
@@ -470,7 +475,7 @@ function AppProvider({ children }) {
   }
 
   return (
-    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, supabaseUserIdRef, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext, pendingAISwap, setPendingAISwap, syncIssue }}>
+    <AppContext.Provider value={{ screen, navigate: setScreen, user, setUser, plan, setPlan, supabaseUser, supabaseUserIdRef, gymBranding, setGymBranding, signIn, signOut, historicalData, loadHistoricalData, workoutContext, setWorkoutContext, pendingAISwap, setPendingAISwap, syncIssue, selectedDayOverride, setSelectedDayOverride }}>
       {children}
     </AppContext.Provider>
   );
@@ -727,7 +732,7 @@ function PlanOverviewScreen() {
 }
 
 function HomeDashboardScreen() {
-  const { navigate, user, plan, gymBranding, historicalData, supabaseUser, syncIssue } = useApp();
+  const { navigate, user, plan, gymBranding, historicalData, supabaseUser, syncIssue, selectedDayOverride, setSelectedDayOverride } = useApp();
   const a = gymBranding.accent;
   // Read today's logged calories from MealScreen's localStorage (new v2 flat-entry format)
   const calGoal = plan?.calories || 1800;
@@ -774,13 +779,16 @@ function HomeDashboardScreen() {
   ).size;
   const allDone = weeklyDone >= weeklyTarget;
   const weekNum = plan?.weekNumber ?? 1;
-  // For custom multi-day plans, show the upcoming day's name and exercises
+  // For custom multi-day plans, show the upcoming day's name and exercises.
+  // If the member manually picked a day (selectedDayOverride), use that instead
+  // of the normal auto-pick. The override only ever affects this one card/session.
+  const isMultiDayPlan = plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1;
+  const activeDayIdx = isMultiDayPlan
+    ? ((selectedDayOverride !== null && selectedDayOverride < plan.customDays.length) ? selectedDayOverride : weeklyDone % plan.customDays.length)
+    : null;
   const getUpcomingDayData = () => {
-    if (plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1) {
-      try {
-        const dayIdx = weeklyDone % plan.customDays.length;
-        return plan.customDays[dayIdx];
-      } catch { return null; }
+    if (isMultiDayPlan) {
+      try { return plan.customDays[activeDayIdx]; } catch { return null; }
     }
     return null;
   };
@@ -1004,6 +1012,16 @@ function HomeDashboardScreen() {
                 </div>
                 <div style={{ background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>{workoutType}</div>
               </div>
+              {isMultiDayPlan && (
+                <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 6 }}>
+                  {plan.customDays.map((d, idx) => (
+                    <button key={idx} onClick={() => setSelectedDayOverride(idx)}
+                      style={{ flex: 1, background: idx === activeDayIdx ? a : "#1A1A1A", color: idx === activeDayIdx ? "#0A1F1D" : theme.textDim, border: "none", borderRadius: 8, padding: "7px 4px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                      {d.dayLabel || `Day ${idx + 1}`}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div style={{ padding: "0 1.25rem .9rem" }}>
                 <div style={{ height: 4, background: "#1A1A1A", borderRadius: 2, marginBottom: 6 }}>
                   <div style={{ height: 4, borderRadius: 2, background: a, width: `${Math.round((weeklyDone / weeklyTarget) * 100)}%`, transition: "width .5s" }} />
