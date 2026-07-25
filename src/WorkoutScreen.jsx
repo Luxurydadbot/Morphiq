@@ -1908,31 +1908,50 @@ function CustomPlanScreen() {
                 ))}
               </div>
 
-              {/* Loading style — how weight changes (or doesn't) across working sets */}
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 9, color: ob.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.8px" }}>Loading style</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {[["same", "Same every set"], ["ramp_up", "Warm up to top set"], ["ramp_down", "Top set + backoff"], ["custom", "Type in every set"]].map(([id, label]) => (
-                    <button key={id} type="button"
-                      onClick={() => setPending(p => ({ ...p, loadStyle: id, setDetails: buildSetDetails(p.sets, p.reps, p.weight, id, goal) }))}
-                      style={{ background: pending.loadStyle === id ? a : "transparent", color: pending.loadStyle === id ? ob.tealDk : ob.muted, border: `1px solid ${pending.loadStyle === id ? a : "rgba(255,255,255,0.12)"}`, borderRadius: 20, padding: "5px 10px", fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {/* Plain-English explanation for every style, not just one --
-                    a member shouldn't have to guess what tapping a button did.
-                    The member never sees or picks a percentage; this is the
-                    only place any of this behavior is spelled out. */}
-                {pending.loadStyle && (
-                  <div style={{ fontSize: 10, color: ob.muted, marginTop: 6, lineHeight: 1.4 }}>
-                    {pending.loadStyle === "same" && "Every set uses the same weight and rep count above — the simplest option, nothing to auto-fill."}
-                    {pending.loadStyle === "ramp_up" && "Enter your heaviest set's weight above. Earlier sets automatically get lighter — like warm-up sets building up to it."}
-                    {pending.loadStyle === "ramp_down" && "Enter the heaviest weight for your first set. Every set after that automatically gets lighter, with a few more reps — no extra typing needed."}
-                    {pending.loadStyle === "custom" && "Every set below starts at the numbers above — edit any row to set that set's exact weight and reps yourself."}
+              {/* Loading style — how weight changes (or doesn't) across working sets.
+                  Deliberately held back until Sets/Reps/Weight are all filled in:
+                  seeing these buttons (and the per-set table they unlock) before
+                  those three numbers exist tempted people toward manually filling
+                  in the table instead of following the intended one-number-then-pick
+                  flow. Gating on the fields above forces the sequence: enter the
+                  basics, THEN choose how weight changes across sets. */}
+              {(() => {
+                // weight allows "0" (bodyweight exercises) -- only truly blank blocks it
+                const readyForLoadStyle = parseInt(pending.sets) > 0 && parseInt(pending.reps) > 0 && pending.weight !== "" && pending.weight != null;
+                if (!readyForLoadStyle) {
+                  return (
+                    <div style={{ fontSize: 10, color: ob.muted, fontStyle: "italic", marginBottom: 10 }}>
+                      Enter sets, reps, and weight above — then choose how weight changes across your sets.
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 9, color: ob.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.8px" }}>Loading style</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {[["same", "Same every set"], ["ramp_up", "Warm up to top set"], ["ramp_down", "Top set + backoff"], ["custom", "Type in every set"]].map(([id, label]) => (
+                        <button key={id} type="button"
+                          onClick={() => setPending(p => ({ ...p, loadStyle: id, setDetails: buildSetDetails(p.sets, p.reps, p.weight, id, goal) }))}
+                          style={{ background: pending.loadStyle === id ? a : "transparent", color: pending.loadStyle === id ? ob.tealDk : ob.muted, border: `1px solid ${pending.loadStyle === id ? a : "rgba(255,255,255,0.12)"}`, borderRadius: 20, padding: "5px 10px", fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Plain-English explanation for every style, not just one --
+                        a member shouldn't have to guess what tapping a button did.
+                        The member never sees or picks a percentage; this is the
+                        only place any of this behavior is spelled out. */}
+                    {pending.loadStyle && (
+                      <div style={{ fontSize: 10, color: ob.muted, marginTop: 6, lineHeight: 1.4 }}>
+                        {pending.loadStyle === "same" && "Every set uses the same weight and rep count above — the simplest option, nothing to auto-fill."}
+                        {pending.loadStyle === "ramp_up" && "Enter your heaviest set's weight above. Earlier sets automatically get lighter — like warm-up sets building up to it."}
+                        {pending.loadStyle === "ramp_down" && "Enter the heaviest weight for your first set. Every set after that automatically gets lighter, with a few more reps — no extra typing needed."}
+                        {pending.loadStyle === "custom" && "Every set below starts at the numbers above — edit any row to set that set's exact weight and reps yourself."}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Per-set rows — always editable, however they got here */}
               {Array.isArray(pending.setDetails) && pending.setDetails.length > 0 && (
