@@ -412,13 +412,29 @@ function AppProvider({ children }) {
     async function loadHistoricalData(uid) {
     if (!uid || uid.startsWith("sim-") || uid === "dev-001") return;
     try {
-      const [wLogs, wtLogs, streakDates] = await Promise.all([
+      const [wLogs, wtLogs, streakDates, cLogs, cardioStreakDates] = await Promise.all([
         sb.getWorkoutLogs(uid, 60),
         sb.getWeightLogs(uid, 12),
         sb.getWorkoutDatesForStreak(uid, 370),
+        sb.getCardioLogs(uid, 60),
+        sb.getCardioDatesForStreak(uid, 370),
       ]);
-      const workoutLogs = Array.isArray(wLogs) ? wLogs : [];
+      const strengthLogs = Array.isArray(wLogs) ? wLogs : [];
       const weightLogs  = Array.isArray(wtLogs) ? wtLogs : [];
+      const cardioLogs = Array.isArray(cLogs) ? cLogs : [];
+      // Cardio sessions count the same as a strength day toward the weekly
+      // workout target/streak. Rather than duplicating that logic in every
+      // place that already reads workoutLogs (Home screen, WorkoutScreen's
+      // day-rotation, the streak math below), tag each cardio row with a
+      // workout_date so it slots into the exact same array those already
+      // read — is_cardio lets exercise-specific views (personal bests,
+      // volume-by-exercise) filter it back out where it wouldn't make sense.
+      const cardioAsWorkoutRows = cardioLogs.map(c => ({
+        workout_date: c.logged_date, is_cardio: true,
+        activity_type: c.activity_type, duration_minutes: c.duration_minutes, calories: c.calories,
+      }));
+      const workoutLogs = [...strengthLogs, ...cardioAsWorkoutRows];
+      const mergedStreakDates = [...streakDates, ...cardioStreakDates];
 
       // Unique workout dates sorted descending
       const dates = [...new Set(workoutLogs.map(r => r.workout_date))].sort((a,b) => b.localeCompare(a));
@@ -429,7 +445,7 @@ function AppProvider({ children }) {
       // small 60-row `dates` set above and not local device storage. Fixes
       // the old localStorage-based streak, which nothing ever wrote to and
       // which reset whenever the app moved to a new domain.
-      const weekStreak = getWeekStreakFromDates(streakDates, plan?.daysPerWeek);
+      const weekStreak = getWeekStreakFromDates(mergedStreakDates, plan?.daysPerWeek);
 
       // Streak — count consecutive days ending today or yesterday.
       // Uses localDateStr (local time) — NOT UTC — so the day doesn't roll
@@ -456,7 +472,7 @@ function AppProvider({ children }) {
         weightChange = (last - first).toFixed(1);
       }
 
-      setHistoricalData({ workoutLogs, weightLogs, streak, weekStreak, totalWorkouts, lastSession, weightChange });
+      setHistoricalData({ workoutLogs, weightLogs, cardioLogs, streak, weekStreak, totalWorkouts, lastSession, weightChange });
     } catch(e) { console.warn("[Morphiq] historicalData load failed:", e); }
   }
 

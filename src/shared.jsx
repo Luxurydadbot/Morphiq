@@ -440,6 +440,59 @@ const sb = {
     } catch { return null; }
   },
 
+  // ── CARDIO LOGS ───────────────────────────────────────────────────────────
+  async insertCardioLog(supabaseUserId, { activityType, durationMinutes, calories }) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/cardio_logs`, () => ({
+        method: "POST",
+        headers: SB_HEADERS(),
+        body: JSON.stringify({
+          user_id: profileId,
+          activity_type: activityType,
+          duration_minutes: durationMinutes,
+          calories: calories ?? null,
+          logged_date: localDateStr(),
+        }),
+      }));
+      return res.ok;
+    } catch { return false; }
+  },
+
+  // Fetch recent cardio sessions for the Progress screen.
+  async getCardioLogs(supabaseUserId, limit = 20) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/cardio_logs?user_id=eq.${profileId}&order=logged_at.desc&limit=${limit}`,
+        { headers: SB_GET() }
+      );
+      return await res.json();
+    } catch { return []; }
+  },
+
+  // Distinct cardio dates over a lookback window, for merging into the same
+  // week-streak calculation workout_logs already uses (mirrors
+  // getWorkoutDatesForStreak above). Returns "YYYY-MM-DD" strings, may contain
+  // duplicates if multiple cardio sessions were logged the same day.
+  async getCardioDatesForStreak(supabaseUserId, daysBack = 370) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - daysBack);
+      const cutoffStr = localDateStr(cutoff);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/cardio_logs?user_id=eq.${profileId}&logged_date=gte.${cutoffStr}&select=logged_date&order=logged_date.desc&limit=1000`,
+        { headers: SB_GET() }
+      );
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows.map(r => r.logged_date) : [];
+    } catch { return []; }
+  },
+
   // ── MEAL LOGS ─────────────────────────────────────────────────────────────
   async insertMealLog(supabaseUserId, { mealId, status, loggedName, loggedCal, loggedProtein, loggedCarbs, loggedFat }) {
     try {

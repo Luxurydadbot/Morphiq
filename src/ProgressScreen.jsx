@@ -1,10 +1,138 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useApp, theme, sb,
   Layout, Spinner,
   WeightChart, StreakCalendar,
-  PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon,
+  PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon, MicIcon,
 } from "./shared.jsx";
+
+// ─── CardioQuickLog — voice + text quick-add for cardio sessions ────────────
+// Mirrors the voice/text pattern already used for meal logging (LogInput in
+// MealScreen.jsx): say or type what you did, AI fills in type/duration/an
+// estimated calorie burn, you confirm. No GPS/heart-rate -- that needs a
+// connected wearable this app doesn't integrate with yet.
+function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
+  const [phase, setPhase] = useState("idle"); // idle | listening | processing | confirming | error
+  const [textVal, setTextVal] = useState("");
+  const [parsed, setParsed] = useState(null);
+  const [errMsg, setErrMsg] = useState("");
+  const [saved, setSaved] = useState(false);
+  const recognitionRef = useRef(null);
+
+  function reset() {
+    recognitionRef.current?.abort();
+    setPhase("idle"); setTextVal(""); setParsed(null); setErrMsg("");
+  }
+
+  function startVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setErrMsg("Microphone not available on this browser -- type instead."); setPhase("error"); return; }
+    const rec = new SR();
+    rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
+    recognitionRef.current = rec;
+    rec.onresult = (e) => { const text = e.results[0][0].transcript; setTextVal(text); parseText(text); };
+    rec.onerror = () => { setErrMsg("Microphone error -- try typing instead."); setPhase("error"); };
+    setPhase("listening");
+    rec.start();
+  }
+
+  function submitText() {
+    if (!textVal.trim()) return;
+    parseText(textVal.trim());
+  }
+
+  async function parseText(text) {
+    setPhase("processing");
+    try {
+      const res = await fetch("/api/parse-cardio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.activityType) { setErrMsg(data?.error || "Couldn't log that -- try again."); setPhase("error"); return; }
+      setParsed(data);
+      setPhase("confirming");
+    } catch {
+      setErrMsg("Network error -- check your connection."); setPhase("error");
+    }
+  }
+
+  async function confirmLog() {
+    if (!parsed) return;
+    setPhase("processing");
+    const ok = await sb.insertCardioLog(supabaseUserId, {
+      activityType: parsed.activityType,
+      durationMinutes: parsed.durationMinutes,
+      calories: parsed.calories,
+    });
+    if (!ok) { setErrMsg("Couldn't save -- try again."); setPhase("error"); return; }
+    reset();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+    onLogged?.();
+  }
+
+  return (
+    <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 14, padding: "14px", marginBottom: 12 }}>
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <button onClick={startVoice}
+              style={{ flex: 1, background: "#111827", border: "1px solid rgba(0,212,177,0.25)", borderRadius: 10, padding: "10px 6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", fontFamily: "inherit" }}>
+              <MicIcon size={14} color={accent} /> <span style={{ fontSize: 12, color: accent, fontWeight: 600 }}>Voice</span>
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={textVal}
+              onChange={e => setTextVal(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submitText()}
+              placeholder="e.g. 30 minutes of running"
+              style={{ flex: 1, background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }}
+            />
+            <button onClick={submitText} disabled={!textVal.trim()}
+              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4 }}>Log</button>
+          </div>
+        </>
+      )}
+      {phase === "listening" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 10 }}>Listening... say what cardio you did</div>
+          <button onClick={reset} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+        </div>
+      )}
+      {phase === "processing" && (
+        <div style={{ textAlign: "center", padding: "8px 0" }}>
+          <Spinner size={22} color={accent} />
+        </div>
+      )}
+      {phase === "confirming" && parsed && (
+        <>
+          <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 8 }}>Does this look right?</div>
+          <div style={{ background: "#111827", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#E8EDF2", marginBottom: 6 }}>{parsed.activityType}</div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <span style={{ fontSize: 13, color: accent, fontWeight: 600 }}>{parsed.durationMinutes} min</span>
+              <span style={{ fontSize: 13, color: "#6B7A8D" }}>~{parsed.calories} cal</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "8px", fontSize: 11, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
+            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log this session</button>
+          </div>
+        </>
+      )}
+      {phase === "error" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8 }}>{errMsg}</div>
+          <button onClick={reset} style={{ background: accent, border: "none", borderRadius: 9, padding: "7px 20px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
+        </div>
+      )}
+      {saved && <div style={{ textAlign: "center", fontSize: 11, color: accent, marginTop: 8 }}>Saved <Icon name="check" size={11} style={{ verticalAlign: "-1px" }} /></div>}
+    </div>
+  );
+}
 
 function ProgressScreen() {
   const { gymBranding, supabaseUser, user, plan, historicalData, loadHistoricalData } = useApp();
@@ -29,10 +157,15 @@ function ProgressScreen() {
   const realLogs = historicalData?.workoutLogs ?? null;
   // hasData = logs loaded AND at least one row exists
   const useRealWorkoutData = Array.isArray(realLogs) && realLogs.length > 0;
+  // Strength-only view of the same logs, for anywhere that groups by exercise
+  // name or sums weight x reps -- cardio rows (tagged is_cardio) carry neither,
+  // so they'd otherwise show up as a bogus "0 lbs" exercise/personal best.
+  const strengthLogs = realLogs ? realLogs.filter(r => !r.is_cardio) : null;
+  const cardioLogs = historicalData?.cardioLogs ?? [];
 
   const realSessions = useRealWorkoutData ? (() => {
     const byDate = {};
-    realLogs.forEach(row => {
+    strengthLogs.forEach(row => {
       if (!byDate[row.workout_date]) byDate[row.workout_date] = { date: row.workout_date, sets: 0, exercises: new Set(), totalVol: 0 };
       byDate[row.workout_date].sets++;
       byDate[row.workout_date].exercises.add(row.exercise_name);
@@ -45,12 +178,12 @@ function ProgressScreen() {
     }));
   })() : [];
 
-  // Count ALL unique workout dates, not just the 5 shown in the recent list
+  // Count ALL unique workout dates (strength OR cardio), not just the 5 shown in the recent list
   const totalWorkouts = useRealWorkoutData ? new Set(realLogs.map(r => r.workout_date)).size : 0;
 
   const realPBs = useRealWorkoutData ? (() => {
     const best = {};
-    realLogs.forEach(row => {
+    strengthLogs.forEach(row => {
       const key = row.exercise_name;
       if (!best[key] || row.weight > best[key].weight) {
         best[key] = { exercise: key, weight: `${row.weight} lbs`, reps: row.reps, date: row.workout_date };
@@ -263,7 +396,7 @@ function ProgressScreen() {
             {(() => {
               // Total volume = sum of weight × reps across all working sets (exclude warm-ups: set_number > 0)
               const totalVol = useRealWorkoutData
-                ? realLogs.filter(r => r.set_number > 0).reduce((acc, r) => acc + (r.weight || 0) * (r.reps || 0), 0)
+                ? strengthLogs.filter(r => r.set_number > 0).reduce((acc, r) => acc + (r.weight || 0) * (r.reps || 0), 0)
                 : null;
               const volDisplay = logsLoading ? "..." : totalVol !== null ? totalVol.toLocaleString() + " lbs" : "—";
               const workoutsDisplay = logsLoading ? "..." : totalWorkouts > 0 ? String(totalWorkouts) : "0";
@@ -303,6 +436,29 @@ function ProgressScreen() {
                 </div>
               ))}
             </div>
+
+            <div style={{ ...sL, marginTop: 18 }}>Log cardio</div>
+            <CardioQuickLog accent={a} supabaseUserId={supabaseUser?.id} onLogged={() => loadHistoricalData(supabaseUser.id)} />
+
+            {cardioLogs.length > 0 && (
+              <>
+                <div style={sL}>Recent cardio</div>
+                <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden" }}>
+                  {cardioLogs.slice(0, 5).map((c, i, arr) => (
+                    <div key={c.id} style={{ padding:"10px 14px", borderBottom: i < arr.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{c.activity_type}</div>
+                        <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{new Date(c.logged_date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" })}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontSize:13, color:a, fontWeight:600 }}>{c.duration_minutes} min</div>
+                        {c.calories ? <div style={{ fontSize:11, color:"#6B7A8D" }}>~{c.calories} cal</div> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -312,7 +468,7 @@ function ProgressScreen() {
           const volColors = [a, "#818cf8", "#F59E0B", "#f472b6", "#60A5FA", "#34D399"];
           const realVolBars = useRealWorkoutData ? (() => {
             const vol = {};
-            realLogs.forEach(row => {
+            strengthLogs.forEach(row => {
               if (!row.workout_date?.startsWith(thisMonth)) return;
               const k = row.exercise_name;
               if (!vol[k]) vol[k] = 0;
