@@ -1880,7 +1880,7 @@ function CustomPlanScreen() {
                 <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>{ex.name}</div>
                 <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>
                   {ex.sets} sets × {ex.reps} reps · {ex.weight} lbs
-                  {ex.loadStyle && ex.loadStyle !== "same" ? ` · ${ex.loadStyle === "ramp_up" ? "ramping up" : ex.loadStyle === "ramp_down" ? "top set + backoff" : "custom per set"}` : ""}
+                  {ex.loadStyle && ex.loadStyle !== "same" ? ` · ${ex.loadStyle === "ramp_up" ? "warm-up ramp" : ex.loadStyle === "ramp_down" ? "top set + backoff" : "manual per set"}` : ""}
                 </div>
               </div>
               <button onClick={(e) => { e.stopPropagation(); setDayExercises(prev => prev.filter((_,j) => j !== i)); }}
@@ -1912,7 +1912,7 @@ function CustomPlanScreen() {
               <div style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 9, color: ob.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.8px" }}>Loading style</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {[["same", "Same weight"], ["ramp_up", "Ramp up"], ["ramp_down", "Top set + backoff"], ["custom", "Set each one"]].map(([id, label]) => (
+                  {[["same", "Same every set"], ["ramp_up", "Warm up to top set"], ["ramp_down", "Top set + backoff"], ["custom", "Type in every set"]].map(([id, label]) => (
                     <button key={id} type="button"
                       onClick={() => setPending(p => ({ ...p, loadStyle: id, setDetails: buildSetDetails(p.sets, p.reps, p.weight, id, goal) }))}
                       style={{ background: pending.loadStyle === id ? a : "transparent", color: pending.loadStyle === id ? ob.tealDk : ob.muted, border: `1px solid ${pending.loadStyle === id ? a : "rgba(255,255,255,0.12)"}`, borderRadius: 20, padding: "5px 10px", fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>
@@ -1920,11 +1920,16 @@ function CustomPlanScreen() {
                     </button>
                   ))}
                 </div>
-                {/* Plain-English explanation — the member never sees or picks a
-                    percentage, so this is the only place the behavior is spelled out */}
-                {pending.loadStyle === "ramp_down" && (
+                {/* Plain-English explanation for every style, not just one --
+                    a member shouldn't have to guess what tapping a button did.
+                    The member never sees or picks a percentage; this is the
+                    only place any of this behavior is spelled out. */}
+                {pending.loadStyle && (
                   <div style={{ fontSize: 10, color: ob.muted, marginTop: 6, lineHeight: 1.4 }}>
-                    Enter the heaviest weight for your first set. Every set after that automatically gets lighter, with a few more reps — no extra typing needed.
+                    {pending.loadStyle === "same" && "Every set uses the same weight and rep count above — the simplest option, nothing to auto-fill."}
+                    {pending.loadStyle === "ramp_up" && "Enter your heaviest set's weight above. Earlier sets automatically get lighter — like warm-up sets building up to it."}
+                    {pending.loadStyle === "ramp_down" && "Enter the heaviest weight for your first set. Every set after that automatically gets lighter, with a few more reps — no extra typing needed."}
+                    {pending.loadStyle === "custom" && "Every set below starts at the numbers above — edit any row to set that set's exact weight and reps yourself."}
                   </div>
                 )}
               </div>
@@ -2050,7 +2055,7 @@ function CustomPlanScreen() {
                   <span style={{ fontSize: 11, color: ob.body }}>{ex.name}</span>
                   <span style={{ fontSize: 10, color: ob.muted }}>
                     {ex.sets}×{ex.reps} · {ex.weight} lbs
-                    {ex.loadStyle && ex.loadStyle !== "same" ? ` (${ex.loadStyle === "ramp_up" ? "ramp up" : ex.loadStyle === "ramp_down" ? "top set + backoff" : "custom"})` : ""}
+                    {ex.loadStyle && ex.loadStyle !== "same" ? ` (${ex.loadStyle === "ramp_up" ? "warm-up ramp" : ex.loadStyle === "ramp_down" ? "top set + backoff" : "manual per set"})` : ""}
                   </span>
                 </div>
               ))}
