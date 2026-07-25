@@ -287,6 +287,11 @@ function WorkoutScreen() {
       rpe: e.rpe || 8, alternative: e.alternative || null,
       restSeconds: e.restSeconds || null,
       warmupSets: Array.isArray(e.warmupSets) ? e.warmupSets : null, // keep ramp data; null lets the fallback compute it
+      // Per-set weight/reps override (custom-built plans with a loading style
+      // like ramp up/down) — null means every working set just uses the flat
+      // weight/targetReps above, same as before this feature existed.
+      setDetails: Array.isArray(e.setDetails) ? e.setDetails : null,
+      loadStyle: e.loadStyle || "same",
     }));
   });
 
@@ -468,12 +473,20 @@ function WorkoutScreen() {
       targetReps: ws.reps,
       label: `Warm-up ${i + 1}`,
     })),
-    ...Array.from({ length: workingCount }).map((_, i) => ({
-      kind: "working",
-      weight: ex.weight,
-      targetReps: ex.targetReps,
-      label: `Working set ${i + 1}`,
-    })),
+    ...Array.from({ length: workingCount }).map((_, i) => {
+      // Use this set's own weight/reps if the plan has per-set detail
+      // (loading styles like ramp up/down); otherwise fall back to the flat
+      // exercise weight/reps exactly like before.
+      const detail = Array.isArray(ex.setDetails) ? ex.setDetails[i] : null;
+      const dWeight = detail && detail.weight !== "" && detail.weight != null ? parseFloat(detail.weight) : null;
+      const dReps = detail && detail.reps !== "" && detail.reps != null ? parseInt(detail.reps) : null;
+      return {
+        kind: "working",
+        weight: dWeight != null && !isNaN(dWeight) ? dWeight : ex.weight,
+        targetReps: dReps != null && !isNaN(dReps) ? dReps : ex.targetReps,
+        label: `Working set ${i + 1}`,
+      };
+    }),
   ];
   const totalSetsInPlan = setPlan.length;
   // Guard setIdx within range (older saved progress may exceed new plan length)
@@ -485,7 +498,7 @@ function WorkoutScreen() {
 
   // Weight for the current set: warm-ups use their own weight; working sets use
   // the working weight, with any progressive-overload nudge applied.
-  const currentWeight = isWarmupSet ? currentSpec.weight : (nudgedWeight ?? ex.weight);
+  const currentWeight = isWarmupSet ? currentSpec.weight : (nudgedWeight ?? currentSpec.weight);
   // Target reps for the current set (warm-up reps differ from working reps).
   const currentTargetReps = currentSpec?.targetReps ?? ex.targetReps;
 
@@ -1293,10 +1306,10 @@ function WorkoutScreen() {
         {state === "nudge" && nudgedWeight && (
           <AINudgeCard
             exercise={ex}
-            oldWeight={ex.weight}
+            oldWeight={currentSpec.weight}
             newWeight={nudgedWeight}
             onAccept={() => { nudgeAcceptedRef.current = true; setState("rest"); }}
-            onKeep={() => { setNudgedWeight(ex.weight); nudgeAcceptedRef.current = true; setState("rest"); }}
+            onKeep={() => { setNudgedWeight(currentSpec.weight); nudgeAcceptedRef.current = true; setState("rest"); }}
           />
         )}
 
@@ -1310,7 +1323,7 @@ function WorkoutScreen() {
             ) : nudgeAcceptedRef.current ? (
               <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
             ) : (
-              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === ex.weight ? "Today's target" : `+${currentWeight - ex.weight} lbs from plan`}</div>
+              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === currentSpec.weight ? "Today's target" : `+${currentWeight - currentSpec.weight} lbs from plan`}</div>
             )}
           </div>
           <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
@@ -1598,6 +1611,35 @@ const GOAL_REP_RANGES = {
   general_fitness:{ reps: 12, sets: 3, rest: 90  },
 };
 
+// Generates a per-set {reps, weight} array for a chosen loading style.
+// 'same'      = flat weight/reps every working set (identical to the old behavior).
+// 'ramp_up'   = ascending toward the entered weight as the last/top set.
+// 'ramp_down' = heaviest set first (fresh), easing off on later sets.
+// 'custom'    = seeds flat like 'same' — it just signals the member intends
+//               to hand-edit every row themselves.
+// Every style is always shown as editable rows after this generates them —
+// this is just the starting point, never the final word.
+function buildSetDetails(sets, reps, weight, loadStyle) {
+  const n = Math.max(1, parseInt(sets) || 1);
+  const w = parseFloat(weight) || 0;
+  const r = parseInt(reps) || 8;
+  const round5 = (x) => Math.max(5, Math.round(x / 5) * 5);
+  if (loadStyle === "ramp_up") {
+    return Array.from({ length: n }).map((_, i) => {
+      const pct = n === 1 ? 1 : 0.7 + (0.3 * i) / (n - 1); // 70% of top weight -> 100%
+      return { reps: r, weight: i === n - 1 ? w : round5(w * pct) };
+    });
+  }
+  if (loadStyle === "ramp_down") {
+    return Array.from({ length: n }).map((_, i) => {
+      const pct = n === 1 ? 1 : Math.max(1 - 0.1 * i, 0.5); // 100%, 90%, 80%... floor at 50%
+      return { reps: r, weight: i === 0 ? w : round5(w * pct) };
+    });
+  }
+  // 'same' and 'custom' both start flat — 'custom' just means "edit every row"
+  return Array.from({ length: n }).map(() => ({ reps: r, weight: w }));
+}
+
 function CustomPlanScreen() {
   const { navigate, setUser, setPlan, user, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
   const a = gymBranding.accent || "#00D4B1";
@@ -1618,7 +1660,10 @@ function CustomPlanScreen() {
   const [dbSuggestions, setDbSuggestions] = useState([]); // live results from Supabase exercises table
 
   // Pending exercise being configured before adding to the day
-  const [pending, setPending]   = useState(null); // {name, sets, reps, weight}
+  const [pending, setPending]   = useState(null); // {name, sets, reps, weight, loadStyle, setDetails}
+  // Which day (index into allDays) is being edited from the review step, or null
+  // if we're just adding days in order for the first time.
+  const [editDayIndex, setEditDayIndex] = useState(null);
 
   const defaults = GOAL_REP_RANGES[goal] || GOAL_REP_RANGES.general_fitness;
 
@@ -1652,18 +1697,36 @@ function CustomPlanScreen() {
   const suggestions = dbSuggestions;
 
   function selectExercise(name) {
-    setPending({ name, sets: defaults.sets, reps: defaults.reps, weight: "" });
+    setPending({ name, sets: defaults.sets, reps: defaults.reps, weight: "", loadStyle: null, setDetails: null });
     setQuery("");
   }
 
   function addPending() {
     if (!pending || dayExercises.length >= 12) return;
-    setDayExercises(prev => [...prev, { ...pending, weight: parseFloat(pending.weight) || 20 }]);
+    const weight = parseFloat(pending.weight) || 20;
+    // If the member never tapped a loading style, default to flat/"same" —
+    // identical to how every exercise worked before this feature existed.
+    const setDetails = (Array.isArray(pending.setDetails) && pending.setDetails.length === (parseInt(pending.sets) || 1))
+      ? pending.setDetails
+      : buildSetDetails(pending.sets, pending.reps, weight, pending.loadStyle || "same");
+    setDayExercises(prev => [...prev, { ...pending, weight, setDetails, loadStyle: pending.loadStyle || "same" }]);
     setPending(null);
   }
 
   function finishDay() {
     if (dayExercises.length === 0) return;
+    // Editing an existing day from the review step — replace it in place and
+    // go straight back to review, instead of advancing through the wizard.
+    if (editDayIndex !== null) {
+      const idx = editDayIndex;
+      setAllDays(prev => prev.map((d, i) => (i === idx ? { dayLabel: d.dayLabel, exercises: dayExercises } : d)));
+      setDayExercises([]);
+      setPending(null);
+      setQuery("");
+      setEditDayIndex(null);
+      setStep(3);
+      return;
+    }
     const dayLabel = `Day ${currentDay + 1}`;
     const newAll = [...allDays, { dayLabel, exercises: dayExercises }];
     setAllDays(newAll);
@@ -1685,7 +1748,9 @@ function CustomPlanScreen() {
     const exercises = (allDays[0]?.exercises || []).map(e => ({
       name: e.name, sets: e.sets, reps: e.reps, repMin: e.reps, repMax: e.reps + 2,
       weight: e.weight, warmupSets: [], muscle: "", pattern: "custom",
-      rpe: 7, restSeconds: repDefaults.rest, weightIncrement: 2.5, usePyramid: false,
+      rpe: 7, restSeconds: repDefaults.rest, weightIncrement: 2.5,
+      usePyramid: e.loadStyle === "ramp_up" || e.loadStyle === "ramp_down",
+      setDetails: e.setDetails || null, loadStyle: e.loadStyle || "same",
     }));
     const plan = {
       calories: parseInt(calories) || null,
@@ -1729,7 +1794,10 @@ function CustomPlanScreen() {
     <div style={s.root}>
       {/* Header */}
       <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-        <button onClick={() => step > -1 ? setStep(step - 1) : navigate("onboarding")}
+        <button onClick={() => {
+          if (editDayIndex !== null) { setEditDayIndex(null); setDayExercises([]); setPending(null); setStep(3); return; }
+          step > -1 ? setStep(step - 1) : navigate("onboarding");
+        }}
           style={{ background: "transparent", border: "none", color: ob.muted, cursor: "pointer", lineHeight: 1, padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={20} /></button>
         <span style={{ fontSize: 13, fontWeight: 600, color: ob.white }}>Build your own plan</span>
         <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step === -1 ? "Name" : `${step + 1} of 4`}</span>
@@ -1808,14 +1876,18 @@ function CustomPlanScreen() {
             Default: <span style={{ color: ob.white }}>{defaults.sets} sets × {defaults.reps} reps</span> based on your goal. Edit each exercise as needed.
           </div>
 
-          {/* Already-added exercises for this day */}
+          {/* Already-added exercises for this day — tap the row to edit it */}
           {dayExercises.map((ex, i) => (
-            <div key={i} style={{ ...s.card, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div key={i} onClick={() => { setPending(ex); setDayExercises(prev => prev.filter((_,j) => j !== i)); }}
+              style={{ ...s.card, display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: ob.white }}>{ex.name}</div>
-                <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>{ex.sets} sets × {ex.reps} reps · {ex.weight} lbs</div>
+                <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>
+                  {ex.sets} sets × {ex.reps} reps · {ex.weight} lbs
+                  {ex.loadStyle && ex.loadStyle !== "same" ? ` · ${ex.loadStyle === "ramp_up" ? "ramping up" : ex.loadStyle === "ramp_down" ? "ramping down" : "custom per set"}` : ""}
+                </div>
               </div>
-              <button onClick={() => setDayExercises(prev => prev.filter((_,j) => j !== i))}
+              <button onClick={(e) => { e.stopPropagation(); setDayExercises(prev => prev.filter((_,j) => j !== i)); }}
                 style={{ background: "transparent", border: "none", color: ob.muted, cursor: "pointer" }}><Icon name="x" size={15} /></button>
             </div>
           ))}
@@ -1828,11 +1900,52 @@ function CustomPlanScreen() {
                 {[["Sets", "sets"], ["Reps", "reps"], ["Weight (lbs)", "weight"]].map(([lbl, key]) => (
                   <div key={key}>
                     <div style={{ fontSize: 9, color: ob.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.8px" }}>{lbl}</div>
-                    <input type="number" value={pending[key]} onChange={e => setPending(p => ({ ...p, [key]: e.target.value }))}
+                    <input type="number" value={pending[key]} onChange={e => setPending(p => {
+                      const updated = { ...p, [key]: e.target.value };
+                      // Keep the per-set rows below in sync with the base numbers —
+                      // only while a loading style has already been picked.
+                      if (p.loadStyle) updated.setDetails = buildSetDetails(updated.sets, updated.reps, updated.weight, p.loadStyle);
+                      return updated;
+                    })}
                       style={s.smallInput} placeholder={key === "weight" ? "e.g. 45" : ""} />
                   </div>
                 ))}
               </div>
+
+              {/* Loading style — how weight changes (or doesn't) across working sets */}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 9, color: ob.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.8px" }}>Loading style</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[["same", "Same weight"], ["ramp_up", "Ramp up"], ["ramp_down", "Ramp down"], ["custom", "Set each one"]].map(([id, label]) => (
+                    <button key={id} type="button"
+                      onClick={() => setPending(p => ({ ...p, loadStyle: id, setDetails: buildSetDetails(p.sets, p.reps, p.weight, id) }))}
+                      style={{ background: pending.loadStyle === id ? a : "transparent", color: pending.loadStyle === id ? ob.tealDk : ob.muted, border: `1px solid ${pending.loadStyle === id ? a : "rgba(255,255,255,0.12)"}`, borderRadius: 20, padding: "5px 10px", fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Per-set rows — always editable, however they got here */}
+              {Array.isArray(pending.setDetails) && pending.setDetails.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 9, color: ob.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.8px" }}>Each set (edit any number)</div>
+                  {pending.setDetails.map((sd, si) => (
+                    <div key={si} style={{ display: "grid", gridTemplateColumns: "44px 1fr 1fr", gap: 8, marginBottom: 6, alignItems: "center" }}>
+                      <div style={{ fontSize: 11, color: ob.muted }}>Set {si + 1}</div>
+                      <input type="number" value={sd.reps} placeholder="reps"
+                        onChange={e => setPending(p => {
+                          const next = [...p.setDetails]; next[si] = { ...next[si], reps: e.target.value }; return { ...p, setDetails: next };
+                        })} style={s.smallInput} />
+                      <input type="number" value={sd.weight} placeholder="lbs"
+                        onChange={e => setPending(p => {
+                          const next = [...p.setDetails]; next[si] = { ...next[si], weight: e.target.value }; return { ...p, setDetails: next };
+                        })} style={s.smallInput} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div style={{ fontSize: 9, color: ob.muted, marginBottom: 8 }}>
                 We'll adjust this automatically as you progress each week.
               </div>
@@ -1878,9 +1991,11 @@ function CustomPlanScreen() {
           <div style={{ marginTop: "auto" }}>
             {dayExercises.length > 0 && !pending && (
               <button onClick={finishDay} style={s.tealBtn(false)}>
-                {currentDay + 1 < daysPerWeek
-                  ? <>Done with Day {currentDay + 1} <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", margin: "0 3px" }} /> add Day {currentDay + 2}</>
-                  : <>Review plan <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>}
+                {editDayIndex !== null
+                  ? <>Save changes <Icon name="check" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>
+                  : currentDay + 1 < daysPerWeek
+                    ? <>Done with Day {currentDay + 1} <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", margin: "0 3px" }} /> add Day {currentDay + 2}</>
+                    : <>Review plan <Icon name="arrow-right" size={14} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>}
               </button>
             )}
             {dayExercises.length === 0 && (
@@ -1911,11 +2026,20 @@ function CustomPlanScreen() {
           <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Your plan</div>
           {allDays.map((day, di) => (
             <div key={di} style={s.card}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: ob.white, marginBottom: 6 }}>{day.dayLabel}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: ob.white }}>{day.dayLabel}</div>
+                <button onClick={() => { setDayExercises(day.exercises); setCurrentDay(di); setEditDayIndex(di); setStep(2); }}
+                  style={{ background: "transparent", border: "none", color: a, fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, padding: 0 }}>
+                  Edit
+                </button>
+              </div>
               {day.exercises.map((ex, ei) => (
                 <div key={ei} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderTop: ei > 0 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <span style={{ fontSize: 11, color: ob.body }}>{ex.name}</span>
-                  <span style={{ fontSize: 10, color: ob.muted }}>{ex.sets}×{ex.reps} · {ex.weight} lbs</span>
+                  <span style={{ fontSize: 10, color: ob.muted }}>
+                    {ex.sets}×{ex.reps} · {ex.weight} lbs
+                    {ex.loadStyle && ex.loadStyle !== "same" ? ` (${ex.loadStyle === "ramp_up" ? "ramp up" : ex.loadStyle === "ramp_down" ? "ramp down" : "custom"})` : ""}
+                  </span>
                 </div>
               ))}
             </div>
