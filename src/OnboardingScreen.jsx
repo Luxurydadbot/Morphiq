@@ -216,7 +216,7 @@ function OnboardingScreen() {
               <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>AI creates a personalised program from scratch based on your goal and level</div>
             </div>
           </button>
-          <button onClick={() => navigate("custom_plan")}
+          <button onClick={() => { setUser(prev => ({ ...prev, name })); navigate("custom_plan"); }}
             style={{ background: ob.card, border: "1.5px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", width: "100%" }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: ob.muted }}><Icon name="clipboard" size={22} /></div>
             <div style={{ textAlign: "left" }}>
