@@ -59,13 +59,21 @@ function OnboardingScreen() {
       const weightKg = parseFloat(weight) / 2.205;
       const heightCm = ((parseInt(heightFt) * 12) + parseInt(heightIn || 0)) * 2.54;
       const ageNum = parseInt(age);
-      const bmrCalc = sex === "male"
+      // Bug fix (July 2026): the sex-selection buttons below setSex(label) with
+      // capitalized "Male"/"Female", but this comparison checked lowercase
+      // "male" — always false, so every member (regardless of selection) was
+      // silently getting the female BMR formula and calorie floor. Normalizing
+      // case here fixes it for new AND existing saved profiles, no data
+      // migration needed. Don't remove the .toLowerCase() even if the button
+      // code changes later — keep this comparison case-insensitive.
+      const isMale = (sex || "").toLowerCase() === "male";
+      const bmrCalc = isMale
         ? Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) + 5)
         : Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) - 161);
       const activityMult = daysPerWeek >= 4 ? 1.55 : 1.375;
       const tdeeCalc = Math.round(bmrCalc * activityMult);
       const goalAdj = goal === "build_muscle" ? 250 : goal === "lose_fat" ? -350 : 0; // Research: 350 cal deficit = ~0.7lb/week loss, maximizes fat loss while preserving muscle
-      const minCals = sex === "male" ? 1600 : 1400;
+      const minCals = isMale ? 1600 : 1400;
       const targetCals = Math.max(minCals, tdeeCalc + goalAdj);
 
       const proteinPer = goal === "general_fitness" ? 0.8 : 1.0; // Research: 0.7g/lb is minimum; 0.8-1.0g/lb optimal for body recomposition at any goal

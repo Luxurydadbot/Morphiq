@@ -1266,7 +1266,11 @@ function buildPlan(userProfile, existingMacros) {
 
   const ageNum = parseInt(age) || 30;
   const isOver40 = ageNum >= 40;
-  const isFemale = sex === "female";
+  // Bug fix (July 2026): same case-mismatch bug as OnboardingScreen.jsx's BMR
+  // calc — the sex value coming through from onboarding is capitalized
+  // ("Male"/"Female"), so a bare === "female" check was always false. Keep
+  // this case-insensitive even if the source casing changes later.
+  const isFemale = (sex || "").toLowerCase() === "female";
   const injuryLower = (injuries || "none").toLowerCase();
   const hasKnee = injuryLower.includes("knee");
   const hasBack = injuryLower.includes("back");
