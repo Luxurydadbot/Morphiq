@@ -1,91 +1,89 @@
-MORPHIQ — MASTER HANDOFF — July 18, 2026 (session 4, Sentry error monitoring)
+HYPERGENTIQ — MASTER HANDOFF — July 25, 2026 (session 5: multi-day plan UX + cardio tracking)
 
-## 1. File state (line counts, verified fresh from GitHub via `git clone`)
+## 1. File state (line counts, verified fresh from GitHub via git clone)
 
-**src/:** Morphiq.jsx — 1,403 · shared.jsx — 1,987 · WorkoutScreen.jsx — 1,902 · MealScreen.jsx — 713 · OnboardingScreen.jsx — 595 · ProgressScreen.jsx — 424 · ChatScreen.jsx — 293 · GymOwnerDashboard.jsx — 849 · GymSignupScreen.jsx — 269 · SuperAdminDashboard.jsx — 343 · index.js — 57 (changed this session, was 6)
+src/: Morphiq.jsx — 1,451 · shared.jsx — 2,132 · WorkoutScreen.jsx — 2,090 · MealScreen.jsx — 713 · OnboardingScreen.jsx — 595 · ProgressScreen.jsx — 580 · ChatScreen.jsx — 293 · GymOwnerDashboard.jsx — 849 · GymSignupScreen.jsx — 269 · SuperAdminDashboard.jsx — 343 · index.js — 57
 
-**api/:** _sentry.js — 32 (NEW this session) · admin-gym-action.js — 110 (was 107) · chat.js — 259 (was 256) · coach-note.js — 108 (was 105) · create-checkout.js — 89 (was 86) · monthly-usage-report.js — 101 (was 98) · parse-meal.js — 62 (was 58) · photo-meal.js — 76 (was 73) · ping.js — 12 (was 9) · plan.js — 31 (was 28) · report-usage.js — 165 (was 162) · stripe-webhook.js — 161 (was 158)
+api/: _sentry.js — 32 · admin-gym-action.js — 110 · chat.js — 259 · coach-note.js — 108 · create-checkout.js — 89 · monthly-usage-report.js — 101 · parse-cardio.js — 62 (NEW this session) · parse-meal.js — 62 · photo-meal.js — 76 · ping.js — 12 · plan.js — 31 · report-usage.js — 165 · stripe-webhook.js — 161
 
-Nothing near the 3,800-line limit. Every api/ file grew by only 2-3 lines (just the Sentry import + export wrap) — no accidental deletions. `package.json` also changed: added `@sentry/react` and `@sentry/node` (both ^10.66.0) as dependencies.
+Nothing near the 3,800-line limit. All files healthy.
 
-Files touched this session: all 11 files in api/, plus the new api/_sentry.js, plus src/index.js, plus package.json / package-lock.json. Nothing in src/Morphiq.jsx, shared.jsx, or any other screen file was touched — those are exactly as they were at the end of session 3.
+Note: between session 4 (Sentry, July 18) and this session, three commits landed that were never written up in a handoff — the rename from Morphiq to Hypergentiq across user-facing screens, and moving weekly-streak/in-progress-workout state from local storage into Supabase. Those are done and live, just not documented in detail anywhere. Flagging so nobody assumes they're still open.
 
 ## 2. What was built this session, in order
 
-**Sentry account and project created.** Bryant already had a Sentry account under GitHub login with an existing org called "hypergentiq" (matches the admin@hypergentiq.com email domain). Created a new project inside it: platform React, slug `morphiq`. Default alert settings kept (alert on high-priority issues, email notifications on). This gives a DSN (a public-safe key, not a secret — Sentry DSNs are meant to be embedded in browser bundles) that both the frontend and backend now use to report errors:
-`https://7811704e1155a293d134d6061a15c948@o4511757569425408.ingest.us.sentry.io/4511757583450112`
+Manual day picker for multi-day custom plans. Problem: onboarding mid-week always defaulted to Day 1 of a custom split, with no way to jump to Day 2/3/4. Fix: added a row of day-pills on the home screen's "next workout" card (Home screen only, per Bryant's choice over also adding it to the workout screen). Tapping a pill sets selectedDayOverride for that one workout only — it does not change any weekly/database structure.
 
-**Backend: one shared wrapper instead of 11 copies of the same code.** Built `api/_sentry.js`, which initializes Sentry once (guarded so it only runs once per cold start) and exports `withSentry(handler)`. Every one of the 11 files in api/ now imports this and wraps its existing handler: `export default withSentry(handler);` (or `module.exports = withSentry(handler);` for the one file, parse-meal.js, that used CommonJS instead of ES module syntax). The wrapper catches any error the handler doesn't already handle itself, sends it to Sentry, waits for the send to actually complete (`Sentry.flush(2000)` — serverless functions can otherwise exit before the error report finishes sending), and returns a clean `500 { error: "Something went wrong. Our team has been notified." }` instead of a raw crash. Existing internal error handling in each file (files that already catch their own errors and return specific messages) is untouched — the wrapper only catches what would otherwise escape uncaught.
+Day-rotation bug found and fixed the same day. Bryant asked whether overriding to Day 2 would correctly auto-suggest Day 3 the next day. Traced the math — it did not, it would have repeated Day 2 forever. Fixed by adding a real profiles.last_workout_day_index column that persists which day was actually done, and changing the auto-pick formula to (lastWorkoutDayIndex + 1) % totalDays instead of the old weeklyDone % totalDays.
 
-**Frontend: Sentry.init plus a real fallback screen.** `src/index.js` now calls `Sentry.init()` before rendering, using `REACT_APP_SENTRY_DSN` (Create React App requires that exact prefix for a variable to be embedded in the browser build). The whole app is wrapped in `<Sentry.ErrorBoundary>` with a fallback component styled to match the app (dark background, teal accent, DM Sans) showing "Something went wrong" and a Reload button, instead of a blank white screen if the app crashes completely.
+Cardio session tracking — new feature, built end-to-end. Voice or text quick-log mirroring the existing Meals tab UX, AI-estimated calories from free text (new api/parse-cardio.js, Claude haiku, same pattern as parse-meal.js), a new cardio_logs Supabase table (own RLS policies), and cardio sessions counting toward the weekly streak alongside strength workouts.
 
-**Verified locally before pushing anything.** Ran `npm install` and a full `react-scripts build` in a clean clone — succeeded (only pre-existing lint warnings unrelated to this change, no new errors). Ran `node --check` on all 11 api/ files to confirm valid syntax. Tested the `withSentry` wrapper directly in Node for both code paths: a normal handler response passes through untouched, and a thrown error gets caught, reported, and turned into the clean 500 — confirmed both before deploying.
+Custom-plan builder bug fixed: accidental early exit. On a 4-day plan, after adding the 3rd exercise on day 4 it "automatically" tried to save the plan instead of letting a 4th be added. Root cause: not an exercise-count limit (cap is 12/day, no weekly cap) — an accidental-double-tap trap, because the "Add exercise" button is replaced by a full-width "Done with day" button in the exact same screen position right after each add. Fixed with a 600ms cooldown disabling that button right after an add.
 
-**Pushed and deployed.** Commit `bfde672` — "Feature: add Sentry error monitoring (frontend + all API functions)" — pushed to `main`, built successfully on Vercel, reached Ready.
+Confusing copy fixed. "Search exercise name" → "Search for your next exercise..."
 
-**Bryant added the two environment variables in Vercel** (`REACT_APP_SENTRY_DSN` and `SENTRY_DSN`, same value) and triggered a redeploy, since the frontend key needs to be baked in at build time and the first deploy went out before the variable existed.
+Per-set editor table labeled. Added a persistent "Reps / Weight (lbs)" header row above the editable Set 1-4 grid.
 
-**Live end-to-end verification, not just local tests.** After the redeploy went Ready, threw a real test error in the live site's browser console (not just locally) and confirmed via the Chrome network panel that it posted successfully (`200`) to Sentry's ingest endpoint. Confirmed it landed in the Sentry dashboard as issue MORPHIQ-1 within seconds, then resolved that test issue so it doesn't clutter the feed. Backend error path was tested locally/at the unit level only — did not intentionally force an error on a live endpoint like the Stripe webhook or admin action endpoint, since those are sensitive; the code is identical to what was unit-tested, so risk is low, but it hasn't been fired for real in production.
+Bonus fix, unrelated to the above. Found sync_issues had RLS enabled with zero policies (a standing 403 error). Added an insert policy (anyone can log a sync issue) and an admin-only select policy.
 
-## 3. Confirmed working (tested live this session)
+Test profile reset. Fully reset cafe75designs@gmail.com (profile id 67db3a9a-3d48-414a-a975-2d28ab52172f) to a clean slate — name, goal, sex, height, weight, age, plan, week number, and workout-day tracking all cleared. Preserved historical data: 143 of 145 workout_log rows and all 11 weight_logs kept (only deleted 2 recent test-noise workout logs). Note: this profile's gym_id is demo-gym, not bryant-s-gym — flagged, not fixed.
 
-Frontend Sentry: confirmed end-to-end — a real error thrown in the live browser reached the Sentry dashboard within seconds, correctly tagged with the "morphiq" project. Error boundary fallback screen exists in code but has not been visually confirmed live (would require an actual render-breaking bug to trigger it, which wasn't deliberately caused).
+## 3. Confirmed working
 
-Backend Sentry: wrapper logic confirmed correct in local Node tests (both success and failure paths) and the deployed code is identical. Not yet fired for real on a live serverless function — reasonable confidence but genuinely unverified in production.
+Day picker and rotation fix: logic traced by hand for both cases; not yet clicked through live since the test profile was reset afterward. Cardio logging: built and pushed, builds clean, not yet tested live end-to-end. Double-tap fix, copy fix, column-header fix: small isolated UI changes, each verified with a clean build before pushing. Every commit this session built clean and deployed via git push to main → Vercel auto-deploy.
 
-Build/deploy: local build succeeded, live Vercel deployment reached Ready twice (once on push, once on redeploy after the env vars were added).
+Not yet spot-checked live: none of this session's shipped features have been walked through in the live app yet. Recommended first step next session: log into the reset cafe75designs@gmail.com account and walk the new onboarding → day picker → cardio log path once, live.
 
-Noticed but not investigated: while checking network traffic on the live site, a call to Supabase's `sync_issues` table returned a 403. Unrelated to this session's work, not looked into — flagging for next session.
+## 4. Standing technical notes
 
-Nothing else in the app was touched — no regressions expected, but the usual member-login / workout-logging / meal-logging / admin-dashboard spot-checks were not re-run since no code affecting those paths changed.
+GitHub REST API and raw.githubusercontent.com are both blocked from the sandboxed shell — git clone/git push over an authenticated HTTPS URL is the reliable path. profiles.supabase_user_id (text) is the auth link; profiles.id is the FK target everywhere else — don't confuse them. Fire-and-forget write pattern (.catch(() => {})) used for every new Supabase write. New Supabase objects this session: table cardio_logs (3 RLS policies), 2 new RLS policies on sync_issues, new column profiles.last_workout_day_index.
 
-## 4. Standing technical notes (new this session)
+## 5. Not yet done — prioritized
 
-Sentry org: **hypergentiq**. Project: **morphiq**. Dashboard: hypergentiq.sentry.io/issues/. Alerts go to Bryant's email by default (email notification was left on during project creation).
+PRIORITY 1 — decided this session, build first next session: progressive overload for custom multi-day plans.
 
-The DSN is not a secret — it's designed to be public (Sentry docs confirm a DSN can only send events in, it can't be used to read data out), so its presence in the browser bundle is expected and fine, unlike the Supabase or Stripe keys.
+Current state, confirmed by reading the code: progressPlan() in shared.jsx (the function that auto-advances weight/reps week over week) only ever reads plan.exercises — a flat list used by the old single-day plan type. It has zero awareness of plan.customDays, the structure used by every multi-day custom plan. Separately, even where progressPlan() does run, it only ever adjusts the flat ex.weight field — it never touches ex.setDetails, the actual per-set table the live workout screen renders for anyone using a loading style (ramp up/down/custom). Net effect: progressive overload is currently a silent no-op for every custom multi-day plan, which is now most plans, including anyone using the pyramid/loading-style feature.
 
-Backend pattern going forward: any new file added to api/ should follow the same pattern as the other 11 — `import { withSentry } from './_sentry.js';`, define the handler as a plain (non-exported) function, and end the file with `export default withSentry(handler);`. Don't duplicate Sentry.init anywhere else.
+Bryant's proposed fix: let the member enter their 6-rep max for an exercise, then back-calculate a full descending pyramid of lighter sets below it using standard strength-training percentage increments (example: 225 lbs @ 6 reps → back-calculated to roughly 200 / 185 / 135 for the lighter sets).
 
-CRA env var rule reconfirmed: any frontend env var must start with `REACT_APP_` or Create React App won't embed it in the build at all — silently, with no error. This bit nothing this session (got it right), but worth remembering for any future frontend env var.
+My assessment (owed before this session ended, recorded here): this is a sound idea, worth building. First, it solves a real gap the log-based approach can't — a brand-new custom exercise has no history yet, so pure log-inference can't generate a sensible starting pyramid, but a 6RM input can, immediately. Second, percentage-of-max-based descending pyramids are a standard, well-understood convention in strength programming, so the numbers will look normal to anyone who's lifted before. It should be a complement to, not a replacement for, fixing progressPlan() itself — 6RM back-calculation solves "what numbers do we start with," but ongoing week-over-week progression still needs progressPlan() to understand customDays and regenerate setDetails. Building only the 6RM piece without fixing progressPlan() would leave custom plans generating a good pyramid once, then freezing forever.
 
-## 5. Not yet done — full path to shipping this for real gyms
+Concrete next-session scope (not yet started, no code touched):
+1. Add an optional "what's your 6-rep max?" input to the per-exercise setup step in CustomPlanScreen (WorkoutScreen.jsx, the pending exercise config, alongside the existing loadStyle picker).
+2. Pick and document a standard percentage table for back-calculating a pyramid from a 6RM (needs a deliberate decision, not a guess).
+3. Wire that into buildSetDetails() (WorkoutScreen.jsx, ~line 1632) as a new generation path alongside same/ramp-up/ramp-down/custom.
+4. Extend progressPlan() in shared.jsx to walk plan.customDays (not just flat plan.exercises), and to regenerate setDetails on progression, not just bump the flat weight field.
+5. Test against the freshly-reset cafe75designs@gmail.com profile once onboarding is redone.
 
-**Must-do before onboarding real (non-test) gyms:**
-- Privacy policy / terms of service — still not started, still nowhere in the codebase. This is the single biggest remaining gap given the app now handles real health data (workouts, meals, body stats) through a fully-secured, monitored database. Needed before any gym beyond the two test/beta accounts signs up for real.
-- Decide whether to turn on real per-member Stripe billing enforcement for test-gym-1. Right now `plan_tier` exists as a column but nothing in the app actually blocks a gym from using the product without paying — no paywall is enforced anywhere. This is a product/business decision waiting on Bryant, not a coding task, but it needs a decision before this can be called "billing-live" rather than "billing-wired-but-not-enforced."
-- Gym invite-link self-serve signup flow — still needs an actual real-world test (a real second gym owner going through morphiq-nine.vercel.app/?join=gym end to end). Waiting on Bryant to run this.
+Other open items, roughly in priority order:
+- Aesthetics/visual redesign — app "doesn't look like a modern app," wants top-1%-app polish, clean not busy. Explicitly deferred, needs its own session with Bryant sharing screenshots first.
+- Live spot-check of everything shipped this session (section 3) — do this before new feature work.
+- Confirm identity of duplicate/legacy test rows in profiles (TestUser, VerifyFix, an ambiguous lowercase "bryant" row) — still unresolved from earlier sessions.
+- demo-gym vs bryant-s-gym gym_id discrepancy on the cafe75designs@gmail.com profile — flagged this session, not investigated.
+- Privacy policy / terms of service — still not started, blocked on Bryant contacting a lawyer.
+- Stripe live account activation / decide whether to enforce the paywall (currently wired but not enforced anywhere).
+- Fire one real, controlled error on a live backend endpoint to confirm the Sentry backend path works in production (carried forward from session 4).
 
-**Should-do soon, lower urgency than the above:**
-- Confirm whether the two old test profiles (TestUser, VerifyFix) mentioned back in session 2 still exist in the `profiles` table. Never confirmed either way — as of session 2's check there were only 3 rows and neither name was among them, but it was never explicitly ruled out that they exist under different names or were added since.
-- Fire a real (intentional, controlled) error on a live backend endpoint to confirm the Sentry backend path works in production, not just locally. Pick a low-stakes endpoint (not the Stripe webhook or admin-gym-action) for this test.
+## 6. Database snapshot
 
-**Cosmetic/polish, no urgency:**
-- Two small wording bugs on the plan-ready confirmation screen: singular/plural issue ("1 exercises" instead of "1 exercise"), and a duration estimate that looks like a placeholder rather than a real calculated number.
-- Admin dashboard login persistence — deliberately on hold per Bryant's earlier decision. Do not touch without him raising it first.
+profiles: cafe75designs@gmail.com (id 67db3a9a-3d48-414a-a975-2d28ab52172f) fully reset this session — clean slate for onboarding, 143 workout_log rows and all 11 weight_logs preserved. gym_id on this profile is demo-gym (flagged, not resolved).
 
-**Longer-term product backlog (lowest priority, untouched across all sessions):**
-- Permanent plan changes (letting a member's workout plan evolve rather than stay fixed after onboarding)
-- PR (personal record) detection and celebration moments
-- Per-exercise strength chart over time
+New table: cardio_logs — id, user_id (→profiles.id), activity_type, duration_minutes, calories, logged_date, logged_at, RLS enabled, 3 policies (member-owns, gym-owner-views, admin-views).
 
-## 6. Database snapshot (carried forward from session 3, unchanged this session — no database work happened in session 4)
+sync_issues: RLS gap closed — added insert (anyone) and select (admin-only) policies.
 
-`gyms`: exactly two real gyms — test-gym-1 and bryant-s-gym (beta-exempt). test-gym-1.is_suspended is false.
-`profiles`: 3 rows as of last check (Bryant, bryant lowercase, one unnamed profile from July 17). TestUser/VerifyFix status still unconfirmed — see section 5.
-`workout_sessions`: 0 rows, RLS enforced with the standard 3-policy pattern (closed in session 3).
-`workout_logs`: real, actively written to, unchanged.
+profiles: new column last_workout_day_index (integer).
+
+Carried forward, unconfirmed: whether old TestUser/VerifyFix rows still exist under any name.
 
 ## 7. Paste this at the start of your next session
 
-Continuing Morphiq. Session 4 added Sentry error monitoring across the entire app, closing out the "error monitoring" item that was the top priority coming out of the July 18 security audit (sessions 2-3, which had already closed every RLS gap and locked down gym suspend/admin-notes writes at both the API and database level).
+Continuing Hypergentiq. Session 5 shipped: a manual day picker for multi-day custom workout plans (home screen only), a fix for the day-rotation math so it correctly advances after a manual override (added profiles.last_workout_day_index), a full new cardio-tracking feature (voice/text quick-log, AI calorie estimate via new api/parse-cardio.js, new cardio_logs table with RLS, counts toward weekly streak), a fix for an accidental-double-tap bug that was cutting custom-plan building short, clearer search-field copy, and labeled columns on the per-set reps/weight editor. Also closed a pre-existing sync_issues RLS gap (was silently 403ing) and did a full clean-slate reset of the cafe75designs@gmail.com test profile (kept all historical workout/weight logs, cleared everything else) so it's ready for fresh onboarding testing.
 
-What's live now: a new shared helper, `api/_sentry.js`, wraps all 11 backend functions in api/ so any uncaught error gets reported to Sentry and turned into a clean 500 instead of a raw crash — verified with local unit tests (both success and failure paths) before deploying, but not yet fired for real on a live production endpoint. The frontend (`src/index.js`) now initializes Sentry and wraps the whole app in an error boundary with a branded fallback screen instead of blank white on a fatal crash — verified fully live: a real browser error reached the Sentry dashboard (org "hypergentiq", project "morphiq") within seconds. Two Vercel env vars were added (`REACT_APP_SENTRY_DSN`, `SENTRY_DSN`, same DSN value) and a redeploy picked them up.
+Nothing shipped this session has been spot-checked live yet — do that first next session, using the reset cafe75designs@gmail.com account, before starting new work.
 
-Everything from the security audit (sessions 2-3) remains fully closed: every table's RLS policies were checked and fixed, and gym suspend/admin-notes writes are hard-enforced both at the API layer (a locked-down endpoint that verifies the caller via Supabase's own auth API) and at the Postgres level (a fail-closed trigger on the gyms table).
+Top priority for next session, already scoped, not yet built: progressive overload does not work at all for custom multi-day plans — progressPlan() in shared.jsx only reads the old flat plan.exercises structure and only adjusts the flat weight field, never plan.customDays or the per-set setDetails table the live workout screen actually renders. Bryant proposed adding an optional 6-rep-max input per exercise that back-calculates a full descending pyramid using standard percentage increments (e.g. 225 lbs @ 6 reps → ~200/~185/~135) — assessed as a good, standard-practice idea, to be built as a complement to (not instead of) fixing progressPlan() itself, since the 6RM input only solves the starting numbers, not ongoing week-over-week progression. Four-part scope: (1) add the 6RM input to the CustomPlanScreen per-exercise setup step, (2) pick and document a standard percentage table for the back-calculation, (3) wire it into buildSetDetails() in WorkoutScreen.jsx as a new generation path, (4) extend progressPlan() to walk customDays and regenerate setDetails on progression, not just bump flat weight.
 
-Top priority now: privacy policy / terms of service — still nowhere in the codebase, and now the clearest remaining gap given real health data flows through a secured, monitored database. After that: decide on enforcing real per-member Stripe billing for test-gym-1 (billing is wired but nothing currently blocks unpaid use), and get the gym invite-link signup flow tested end-to-end with a real second gym (both waiting on Bryant). Also worth doing: fire one real, controlled error on a live (low-stakes) backend endpoint to confirm the Sentry backend path works in production, not just in local tests. Still open, unconfirmed, low urgency: whether the old TestUser/VerifyFix test profiles still exist, two cosmetic wording bugs on the plan-ready screen, and admin-dashboard login persistence (deliberately on hold, don't touch without Bryant raising it).
+After that: the aesthetics/modernization pass (deferred, needs Bryant to share screenshots first — do not start without that), confirming old duplicate test profile rows, the demo-gym vs bryant-s-gym mismatch on the reset test profile, privacy policy/terms (blocked on Bryant/lawyer), Stripe live activation and paywall enforcement decision, and firing one real controlled backend error to confirm Sentry's backend path in production.
 
-Noticed but not investigated this session: a `sync_issues` Supabase call returned a 403 on the live site during unrelated network-traffic checking — worth a look.
-
-Technical notes carried forward: GitHub REST API is blocked from the sandboxed shell — use `git clone`/`git push` over an authenticated HTTPS URL instead. Double-check Name vs Value fields when adding any new Vercel secret. Any new api/ file should follow the withSentry(handler) pattern already used in the other 11 files rather than reinitializing Sentry separately.
+Technical notes carried forward: GitHub API/raw content is blocked from the sandbox — always use git clone/git push over authenticated HTTPS. profiles.supabase_user_id is the auth link, profiles.id is the FK used everywhere else — don't confuse them. Use the fire-and-forget .catch(() => {}) pattern for all new Supabase writes.
