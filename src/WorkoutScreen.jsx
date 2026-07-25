@@ -1950,6 +1950,15 @@ function CustomPlanScreen() {
               {Array.isArray(pending.setDetails) && pending.setDetails.length > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 9, color: ob.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.8px" }}>Each set (edit any number)</div>
+                  {/* Column labels — the inputs below are pre-filled with real numbers,
+                      so their placeholder text (which only shows on an EMPTY field) is
+                      never actually visible. This header is what makes "10" and "5"
+                      readable as reps vs. weight. */}
+                  <div style={{ display: "grid", gridTemplateColumns: "44px 1fr 1fr", gap: 8, marginBottom: 4 }}>
+                    <div />
+                    <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Reps</div>
+                    <div style={{ fontSize: 9, color: ob.muted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Weight (lbs)</div>
+                  </div>
                   {pending.setDetails.map((sd, si) => (
                     <div key={si} style={{ display: "grid", gridTemplateColumns: "44px 1fr 1fr", gap: 8, marginBottom: 6, alignItems: "center" }}>
                       <div style={{ fontSize: 11, color: ob.muted }}>Set {si + 1}</div>
