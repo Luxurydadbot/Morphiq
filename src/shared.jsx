@@ -1245,6 +1245,41 @@ const STARTING_WEIGHTS = {
 };
 const DEFAULT_WEIGHT = 20; // fallback if exercise not in table
 
+// ── Warm-up ramp generator ──────────────────────────────────────────────────
+// Shared by buildPlan() (bakes a ramp into AI-generated plans at creation
+// time) and WorkoutScreen's live fallback (computes one on the fly for
+// custom plans and any older plan that never stored a warmupSets array --
+// custom plans NEVER store one, so this is the path they always hit).
+// Fix (session 9): these used to be two separate copies of this same function
+// that quietly drifted out of sync -- one got updated to round to a flat 5 lb
+// increment, the other didn't, so upper-body warm-ups could land on a
+// fractional weight like 87.5 lbs. On top of that, neither copy told the
+// difference between a heavy compound lift and a single-joint isolation
+// exercise, so isolation work (curls, leg curls, calf raises, tricep
+// pushdowns) got the exact same 3-set ramp as a barbell squat -- not how
+// anyone actually trains. Now there's one function: compound/multi-joint
+// lifts get the full 50/70/85% ramp, everything else gets a single lighter
+// warm-up set (or none, if the working weight is already light).
+const COMPOUND_LIFT_PATTERN = /squat|lunge|step-up|leg press|deadlift|\brdl\b|romanian|hip thrust|\brow\b|pull-?up|pulldown|chin-?up|bench press|incline press|shoulder press|overhead press|push press|floor press|landmine press|chest press|thruster/i;
+
+function buildWarmupRamp(workingWeight, exerciseName) {
+  // Skip ramp for bodyweight or light accessory loads — not needed.
+  if (!workingWeight || workingWeight < 65) return [];
+  const roundTo = 5; // what's actually loadable on barbell/dumbbell/machine gear, not a body-region guess
+  const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
+  const isCompound = COMPOUND_LIFT_PATTERN.test(exerciseName || "");
+  // Compound lifts ramp up over 3 sets; isolation/single-joint work gets one
+  // lighter set just to get the joint moving, matching how people actually warm up.
+  const pcts = isCompound ? [0.5, 0.7, 0.85] : [0.6];
+  return pcts
+    .map((p, i) => ({
+      weight: round(workingWeight * p),
+      reps: isCompound ? (i === 0 ? 8 : i === 1 ? 5 : 3) : 10, // fewer reps as it gets heavier
+    }))
+    // Drop any warm-up that lands at/above the working weight (very light lifts)
+    .filter((s) => s.weight < workingWeight);
+}
+
 function buildPlan(userProfile, existingMacros) {
   const {
     goal = "get_fit",
@@ -1369,33 +1404,6 @@ function buildPlan(userProfile, existingMacros) {
     return row[expTier] || row.some || DEFAULT_WEIGHT;
   };
 
-  // ── Warm-up ramp generator ────────────────────────────────────────
-  // Best-practice hypertrophy setup: working sets stay at one weight (equal
-  // volume drives growth), but the lifter ramps UP to it with non-fatiguing
-  // warm-up sets first. These do NOT count as working sets and aren't logged.
-  // Returns [] for light/bodyweight lifts that don't need a ramp.
-  const buildWarmups = (workingWeight, isLower) => {
-    // Skip ramp for bodyweight or light accessory loads — not needed.
-    if (!workingWeight || workingWeight < 65) return [];
-    // Fix (session 9): this used to round to 5s for lower-body lifts but 2.5s
-    // for everything else -- the same body-region guess session 8 already
-    // replaced with a flat 5 lb increment for working sets (see weightIncrement
-    // below), because a 2.5 lb jump isn't actually loadable on barbell/dumbbell/
-    // machine equipment. This warm-up ramp was never updated to match, so an
-    // upper-body warm-up could land on a fractional weight like 87.5 lbs.
-    const roundTo = 5;
-    const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
-    // Ramp percentages of the working weight: ~50%, ~70%, ~85%
-    const pcts = [0.5, 0.7, 0.85];
-    return pcts
-      .map((p, i) => ({
-        weight: round(workingWeight * p),
-        reps: i === 0 ? 8 : i === 1 ? 5 : 3, // fewer reps as it gets heavier
-      }))
-      // Drop any warm-up that lands at/above the working weight (very light lifts)
-      .filter((s) => s.weight < workingWeight);
-  };
-
   // ── Build exercise objects ────────────────────────────────────────
   const makeEx = (exObj, isLower) => {
     if (!exObj) return null;
@@ -1407,7 +1415,7 @@ function buildPlan(userProfile, existingMacros) {
       repMin,
       repMax,
       weight: w,
-      warmupSets: buildWarmups(w, isLower), // ramp-up sets shown before working sets
+      warmupSets: buildWarmupRamp(w, exObj.name), // ramp-up sets shown before working sets
       muscle: exObj.muscle,
       pattern: exObj.pattern,
       rpe,
@@ -2248,7 +2256,7 @@ export {
   // Theme
   theme, css,
   // Plan engine
-  buildPlan, progressPlan, buildSetDetails,
+  buildPlan, progressPlan, buildSetDetails, buildWarmupRamp,
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails } from "./shared.jsx";
+         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -452,29 +452,17 @@ function WorkoutScreen() {
     setState("active");
   };
 
-  // Fallback: older saved plans don't have warmupSets on each exercise.
-  // Compute a ramp on the fly so existing members see warm-ups immediately,
-  // without needing to regenerate their plan. Mirrors buildWarmups() in Morphiq.jsx.
-  // Use stored warm-ups only if they're a non-empty array; otherwise compute
-  // them on the fly (covers older saved plans and any that lost the field).
+  // Fallback: older saved plans don't have warmupSets on each exercise, and
+  // custom plans NEVER do (CustomPlanScreen doesn't generate one) -- so this
+  // is the path custom multi-day plans always hit. Compute the ramp on the
+  // fly with the same shared buildWarmupRamp() used at AI-plan creation time,
+  // instead of a second local copy of the logic. That second copy is exactly
+  // what caused the 87.5 lb warm-up bug: it quietly drifted out of sync with
+  // the version in shared.jsx and never got the flat-5-lb-increment or
+  // compound-vs-isolation fixes. One shared function now, used everywhere.
   const exWarmups = (Array.isArray(ex.warmupSets) && ex.warmupSets.length > 0)
     ? ex.warmupSets
-    : (() => {
-    const w = ex.weight;
-    if (!w || w < 65) return [];
-    // Fix (session 9): this was a second, separate copy of the ramp-rounding
-    // logic in shared.jsx's buildWarmups(), and had the same bug -- rounding
-    // non-lower-body lifts to 2.5 lb steps instead of what's actually loadable
-    // (a flat 5 lb jump on barbell/dumbbell/machine gear). This is the path
-    // custom multi-day plans always hit, since they never store a baked-in
-    // warmupSets array -- so this copy, not the one in shared.jsx, was the
-    // actual source of the 87.5 lb warm-up bug.
-    const roundTo = 5;
-    const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
-    return [0.5, 0.7, 0.85]
-      .map((p, i) => ({ weight: round(w * p), reps: i === 0 ? 8 : i === 1 ? 5 : 3 }))
-      .filter((s) => s.weight < w);
-  })();
+    : buildWarmupRamp(ex.weight, ex.name);
 
   // ── Combined set plan: warm-ups THEN working sets ─────────────────
   // setIdx now walks this whole list. Each entry is tagged kind:"warmup" or
