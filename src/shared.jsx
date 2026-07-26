@@ -1660,17 +1660,24 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
       const session2 = logs[3] ? Math.max(...logs.slice(3, 6).filter(l => l.weight >= ex.weight * 0.9).map(l => l.reps)) : 0;
       const hitTwoInARow = session1 >= repTarget && session2 >= repTarget;
 
+      // Top weight the member has actually been using recently — whether
+      // that's above or below the plan's stored number (manual adjustment
+      // via the weight stepper, time off, injury, etc). If a big drop means
+      // nothing cleared the "near top weight" filter above, fall back to
+      // whatever was logged at all before finally falling back to the plan.
+      const recentTop = Math.max(...qualifyingLogs.map(l => l.weight || 0));
+      const anyRecentTop = Math.max(...logs.slice(0, 6).map(l => l.weight || 0));
+      const actualWeightLifted = recentTop > 0 ? recentTop : (anyRecentTop > 0 ? anyRecentTop : ex.weight);
+
       if (hitTwoInARow) {
-        // Base the bump on the heaviest weight actually logged during these two
-        // sessions, not the plan's stored number — covers members who manually
-        // raised (or lowered) their weight mid-workout via the weight stepper.
-        // Falls back to the plan weight if nothing heavier was ever logged.
-        const actualWeightLifted = Math.max(ex.weight, ...qualifyingLogs.map(l => l.weight || 0));
         const newWeight = actualWeightLifted + increment;
         return { ...ex, weight: newWeight, weekNumber: nextWeekNum, setDetails: withSetDetails(newWeight) };
       }
-      // Fatigue detection: if member missed reps two sessions, hold weight
-      return { ...ex, weekNumber: nextWeekNum };
+      // Fatigue detection: missed reps two sessions → hold at the weight
+      // actually lifted, not the stale plan number. Also regenerates
+      // setDetails — the workout screen renders that table, not this flat
+      // field, so without this the held weight would never actually show up.
+      return { ...ex, weight: actualWeightLifted, weekNumber: nextWeekNum, setDetails: withSetDetails(actualWeightLifted) };
 
     } else {
       // Straight sets: 2-for-2 rule — exceed rep target by 2+ reps, two sessions in a row
@@ -1679,29 +1686,40 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
       const session2MaxReps = Math.max(...recentSets.slice(3, 6).map(l => l.reps));
       const twoForTwo = session1MaxReps >= repTarget + 2 && session2MaxReps >= repTarget + 2;
 
+      // What the member has actually been training at recently — the real
+      // starting point for next week, whether that's heavier (manually
+      // bumped mid-set) or lighter (time off, injury, etc). The rep-based
+      // rules below only decide whether to add to this, hold it, or step
+      // it back further — the number itself always comes from what was
+      // actually lifted, not the plan's original stored figure.
+      const loggedWeight = Math.max(...recentSets.map(l => l.weight || 0));
+      const actualWeightLifted = loggedWeight > 0 ? loggedWeight : ex.weight;
+
       if (twoForTwo) {
-        // Base the bump on the heaviest weight actually logged across these two
-        // sessions, not the plan's stored number — covers members who manually
-        // raised (or lowered) their weight mid-workout via the weight stepper.
-        // Falls back to the plan weight if nothing heavier was ever logged.
-        const actualWeightLifted = Math.max(ex.weight, ...recentSets.map(l => l.weight || 0));
+        const newWeight = actualWeightLifted + increment;
         return {
           ...ex,
-          weight: actualWeightLifted + increment,
+          weight: newWeight,
           reps: ex.repMin, // reset reps to bottom of range
           weekNumber: nextWeekNum,
+          setDetails: withSetDetails(newWeight, ex.repMin),
         };
       }
 
-      // Fatigue detection: missed target reps two sessions → hold, drop 1 rep
+      // Fatigue detection: missed target reps two sessions → hold at the
+      // weight actually lifted (not the stale plan number) and drop 1 rep
       const session1MinReps = Math.min(...recentSets.slice(0, 3).map(l => l.reps));
       const session2MinReps = Math.min(...recentSets.slice(3, 6).map(l => l.reps));
       const missedTwice = session1MinReps < ex.repMin - 1 && session2MinReps < ex.repMin - 1;
       if (missedTwice && ex.reps > (ex.repMin || 6)) {
-        return { ...ex, reps: ex.reps - 1, weekNumber: nextWeekNum };
+        const newReps = ex.reps - 1;
+        return { ...ex, weight: actualWeightLifted, reps: newReps, weekNumber: nextWeekNum, setDetails: withSetDetails(actualWeightLifted, newReps) };
       }
 
-      return { ...ex, weekNumber: nextWeekNum };
+      // Steady state — neither a clear win nor a clear miss. Still sync the
+      // weight/setDetails to what was actually lifted so the plan tracks
+      // reality even when the 2-for-2 rule hasn't fired either way.
+      return { ...ex, weight: actualWeightLifted, weekNumber: nextWeekNum, setDetails: withSetDetails(actualWeightLifted) };
     }
   }
 
