@@ -580,7 +580,7 @@ function WorkoutScreen() {
     const exceededCount = workingSetsForEx.filter(l => l.reps > (ex.targetReps || 10)).length;
     // "Last set" = last entry in the whole plan (warm-ups + working)
     const isLastSet = safeSetIdx >= totalSetsInPlan - 1;
-    const increment = plan?.progressionRule?.weightIncrementLbs || 5;
+    const increment = ex.weightIncrement || 5;
     // Never nudge on a warm-up. Trigger only when 2+ working sets beat target.
     if (!isWarmupSet && exceededCount >= 2 && !isLastSet && !nudgeAcceptedRef.current) {
       setNudgedWeight((nudgedWeight ?? ex.weight) + increment);
@@ -1338,11 +1338,11 @@ function WorkoutScreen() {
             <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               {/* Minus — lets a member drop the weight for this set without touching the plan */}
-              <button onClick={() => setWeightOverride(Math.max(0, displayWeight - (plan?.progressionRule?.weightIncrementLbs || 5)))}
+              <button onClick={() => setWeightOverride(Math.max(0, displayWeight - (ex.weightIncrement || 5)))}
                 style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>−</button>
               <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
               {/* Plus — bump the weight for this set only; logged as-is, plan target is untouched */}
-              <button onClick={() => setWeightOverride(displayWeight + (plan?.progressionRule?.weightIncrementLbs || 5))}
+              <button onClick={() => setWeightOverride(displayWeight + (ex.weightIncrement || 5))}
                 style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>+</button>
             </div>
             {isWarmupSet ? (
