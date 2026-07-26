@@ -1408,7 +1408,14 @@ function buildPlan(userProfile, existingMacros) {
       restSeconds: isLower ? effectiveRestCompound : (exObj.pattern === "accessory" ? effectiveRestAccessory : effectiveRestCompound),
       alternative: "", // filled by alternative lookup below
       usePyramid,
-      weightIncrement: isLower ? 5 : 2.5,
+      // What's actually loadable, not a body-region guess. A barbell needs a
+      // 2.5 lb plate on EACH side to add weight at all -- that's a 5 lb jump,
+      // with no smaller real option -- and commercial dumbbells/machine pins
+      // jump in 5s too. 2.5 lb total jumps aren't something most gyms offer,
+      // which is exactly why barbell incline press couldn't land on 135.
+      // Kettlebells are a separate, coarser problem (fixed sizes, ~9-13 lb
+      // gaps between them) -- left at 5 here as a placeholder, not a real fix.
+      weightIncrement: 5,
     };
   };
 
@@ -1592,7 +1599,9 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
       ...ex,
       repMin: ex.repMin ?? ex.reps,
       repMax: ex.repMax ?? (ex.reps + 2),
-      weightIncrement: ex.weightIncrement ?? (ex.pattern === "squat" || ex.pattern === "hinge" ? 5 : 2.5),
+      // Same fix as buildPlan()'s makeEx() -- only used as a fallback for
+      // plans saved before every exercise carried its own weightIncrement.
+      weightIncrement: ex.weightIncrement ?? 5,
       usePyramid: ex.usePyramid ?? (ex.loadStyle === "ramp_up" || ex.loadStyle === "ramp_down"),
       rpe: ex.rpe ?? 7,
     };
