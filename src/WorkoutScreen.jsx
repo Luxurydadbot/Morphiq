@@ -462,8 +462,14 @@ function WorkoutScreen() {
     : (() => {
     const w = ex.weight;
     if (!w || w < 65) return [];
-    const lower = /squat|deadlift|lunge|hip thrust|leg press|rdl|good morning/i.test(ex.name || "");
-    const roundTo = lower ? 5 : 2.5;
+    // Fix (session 9): this was a second, separate copy of the ramp-rounding
+    // logic in shared.jsx's buildWarmups(), and had the same bug -- rounding
+    // non-lower-body lifts to 2.5 lb steps instead of what's actually loadable
+    // (a flat 5 lb jump on barbell/dumbbell/machine gear). This is the path
+    // custom multi-day plans always hit, since they never store a baked-in
+    // warmupSets array -- so this copy, not the one in shared.jsx, was the
+    // actual source of the 87.5 lb warm-up bug.
+    const roundTo = 5;
     const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
     return [0.5, 0.7, 0.85]
       .map((p, i) => ({ weight: round(w * p), reps: i === 0 ? 8 : i === 1 ? 5 : 3 }))
