@@ -378,6 +378,7 @@ function WorkoutScreen() {
   const [listening, setListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [repCount, setRepCount] = useState(null); // null = not set yet, number = user typed/adjusted
+  const [weightOverride, setWeightOverride] = useState(null); // null = use plan/nudge weight, number = member manually adjusted this set's weight
 
   const REST_SECS = plan?.restSeconds || 120;
   const [restSecs, setRestSecs] = useState(REST_SECS);
@@ -512,6 +513,11 @@ function WorkoutScreen() {
   // Target reps for the current set (warm-up reps differ from working reps).
   const currentTargetReps = currentSpec?.targetReps ?? ex.targetReps;
 
+  // Weight actually shown and logged for this set: the plan/nudge weight,
+  // unless the member manually adjusted it with the +/- stepper below.
+  // Mirrors how displayReps overrides currentTargetReps for reps.
+  const displayWeight = weightOverride !== null ? weightOverride : currentWeight;
+
   // Keep shared context updated so ChatScreen always knows exactly where we are
   useEffect(() => {
     setWorkoutContext({
@@ -519,13 +525,13 @@ function WorkoutScreen() {
       setNumber: isWarmupSet ? `warm-up ${safeSetIdx + 1}` : workingIdx,
       totalSets: workingCount,
       targetReps: currentTargetReps,
-      weight: currentWeight,
+      weight: displayWeight,
       isWarmup: isWarmupSet,
     });
     // Clear context when workout screen unmounts
     return () => setWorkoutContext(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exIdx, setIdx, currentWeight, isWarmupSet]);
+  }, [exIdx, setIdx, displayWeight, isWarmupSet]);
 
   // Fetch last working set for the current exercise whenever exIdx changes.
   // This powers the "Last time: X lbs × Y reps" display below the weight card.
@@ -604,7 +610,7 @@ function WorkoutScreen() {
   function logSet(reps = currentTargetReps + 1) {
     setIsPR(false); // reset before each set — new PR check will re-set if needed
     setLastLoggedRowId(null); // reset until the new row's id comes back, so a correction can't accidentally target the previous set
-    const entry = { exIdx, setIdx: safeSetIdx, reps, weight: currentWeight, kind: currentSpec.kind };
+    const entry = { exIdx, setIdx: safeSetIdx, reps, weight: displayWeight, kind: currentSpec.kind };
     const newLogs = [...loggedSets, entry];
     setLoggedSets(newLogs);
     loggedSetsRef.current = newLogs;
@@ -623,7 +629,7 @@ function WorkoutScreen() {
         exerciseName: ex.name,
         setNumber: currentSpec.kind === "warmup" ? 0 : workingIdx,
         reps,
-        weight: currentWeight,
+        weight: displayWeight,
       }).then(result => {
         setSavingToCloud(false);
         const ok = result?.ok === true;
@@ -635,10 +641,10 @@ function WorkoutScreen() {
           setSaveFailReason(result?.reason || "UNKNOWN");
         }
         // PR check: only for working sets (not warm-ups) with a real weight value
-        if (ok && currentSpec.kind !== "warmup" && currentWeight > 0) {
+        if (ok && currentSpec.kind !== "warmup" && displayWeight > 0) {
           sb.getPersonalRecord(supabaseUser.id, ex.name).then(prevBest => {
             // If no previous record exists OR current weight beats it → it's a PR
-            if (prevBest === null || currentWeight > prevBest) setIsPR(true);
+            if (prevBest === null || displayWeight > prevBest) setIsPR(true);
           }).catch(() => {});
         }
       }).catch((e) => { setSavingToCloud(false); setSaveFailReason("THROW:" + (e?.message || e)); });
@@ -653,6 +659,7 @@ function WorkoutScreen() {
 
   function advanceSet() {
     setRepCount(null);
+    setWeightOverride(null);
     if (safeSetIdx < totalSetsInPlan - 1) {
       // Same exercise, next set in the plan (warm-up or working) — keep nudge
       setSetIdx(safeSetIdx + 1);
@@ -697,6 +704,7 @@ function WorkoutScreen() {
     setSetIdx(0);
     setNudgedWeight(null);
     setRepCount(null);
+    setWeightOverride(null);
     setState("active");
     setShowSwapSheet(false);
     // Show a brief "Swapped in X ✓" confirmation banner for 2.5 seconds
@@ -792,6 +800,7 @@ function WorkoutScreen() {
     setSetIdx(0);
     setNudgedWeight(null);
     setRepCount(null);
+    setWeightOverride(null);
     setPendingAISwap(null);
     // Show confirmation banner so member knows the AI swap happened
     const swapLabel = _type === "injury" ? `${area} exercises swapped out`
@@ -1156,7 +1165,7 @@ function WorkoutScreen() {
             <div className="mq-fade" style={{ background: "linear-gradient(135deg, #2D1A00 0%, #1A1200 100%)", border: "2px solid #F59E0B", borderRadius: 14, padding: "10px 16px", width: "100%", textAlign: "center", boxShadow: "0 0 30px rgba(245,158,11,0.2)", marginBottom: 12 }}>
               <span style={{ marginRight: 6, color: "#F59E0B", verticalAlign: "-3px", display: "inline-block" }}><Icon name="trophy" size={18} /></span>
               <span style={{ fontSize: 14, fontWeight: 700, color: "#F59E0B" }}>New personal record!</span>
-              <span style={{ fontSize: 13, color: "#E8C97A", marginLeft: 6 }}>{currentWeight} lbs on {ex.name}</span>
+              <span style={{ fontSize: 13, color: "#E8C97A", marginLeft: 6 }}>{displayWeight} lbs on {ex.name}</span>
             </div>
           )}
 
@@ -1327,13 +1336,23 @@ function WorkoutScreen() {
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
             <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
-            <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{currentWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              {/* Minus — lets a member drop the weight for this set without touching the plan */}
+              <button onClick={() => setWeightOverride(Math.max(0, displayWeight - (plan?.progressionRule?.weightIncrementLbs || 5)))}
+                style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>−</button>
+              <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
+              {/* Plus — bump the weight for this set only; logged as-is, plan target is untouched */}
+              <button onClick={() => setWeightOverride(displayWeight + (plan?.progressionRule?.weightIncrementLbs || 5))}
+                style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>+</button>
+            </div>
             {isWarmupSet ? (
               <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
             ) : nudgeAcceptedRef.current ? (
               <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
+            ) : weightOverride !== null ? (
+              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>Adjusted{displayWeight !== currentSpec.weight ? ` · ${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan` : ""}</div>
             ) : (
-              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{currentWeight === currentSpec.weight ? "Today's target" : `+${currentWeight - currentSpec.weight} lbs from plan`}</div>
+              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{displayWeight === currentSpec.weight ? "Today's target" : `${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan`}</div>
             )}
           </div>
           <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
