@@ -1377,7 +1377,13 @@ function buildPlan(userProfile, existingMacros) {
   const buildWarmups = (workingWeight, isLower) => {
     // Skip ramp for bodyweight or light accessory loads — not needed.
     if (!workingWeight || workingWeight < 65) return [];
-    const roundTo = isLower ? 5 : 2.5; // barbell/lower rounds to 5s, upper to 2.5s
+    // Fix (session 9): this used to round to 5s for lower-body lifts but 2.5s
+    // for everything else -- the same body-region guess session 8 already
+    // replaced with a flat 5 lb increment for working sets (see weightIncrement
+    // below), because a 2.5 lb jump isn't actually loadable on barbell/dumbbell/
+    // machine equipment. This warm-up ramp was never updated to match, so an
+    // upper-body warm-up could land on a fractional weight like 87.5 lbs.
+    const roundTo = 5;
     const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
     // Ramp percentages of the working weight: ~50%, ~70%, ~85%
     const pcts = [0.5, 0.7, 0.85];
