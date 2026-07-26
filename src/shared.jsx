@@ -1655,12 +1655,18 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
     if (ex.usePyramid) {
       // Pyramid: check if final-set reps hit target two sessions in a row
       // Use the highest reps logged per session as a proxy for the final set
+      const qualifyingLogs = logs.slice(0, 6).filter(l => l.weight >= ex.weight * 0.9);
       const session1 = logs[0] ? Math.max(...logs.slice(0, 3).filter(l => l.weight >= ex.weight * 0.9).map(l => l.reps)) : 0;
       const session2 = logs[3] ? Math.max(...logs.slice(3, 6).filter(l => l.weight >= ex.weight * 0.9).map(l => l.reps)) : 0;
       const hitTwoInARow = session1 >= repTarget && session2 >= repTarget;
 
       if (hitTwoInARow) {
-        const newWeight = ex.weight + increment;
+        // Base the bump on the heaviest weight actually logged during these two
+        // sessions, not the plan's stored number — covers members who manually
+        // raised (or lowered) their weight mid-workout via the weight stepper.
+        // Falls back to the plan weight if nothing heavier was ever logged.
+        const actualWeightLifted = Math.max(ex.weight, ...qualifyingLogs.map(l => l.weight || 0));
+        const newWeight = actualWeightLifted + increment;
         return { ...ex, weight: newWeight, weekNumber: nextWeekNum, setDetails: withSetDetails(newWeight) };
       }
       // Fatigue detection: if member missed reps two sessions, hold weight
@@ -1674,9 +1680,14 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
       const twoForTwo = session1MaxReps >= repTarget + 2 && session2MaxReps >= repTarget + 2;
 
       if (twoForTwo) {
+        // Base the bump on the heaviest weight actually logged across these two
+        // sessions, not the plan's stored number — covers members who manually
+        // raised (or lowered) their weight mid-workout via the weight stepper.
+        // Falls back to the plan weight if nothing heavier was ever logged.
+        const actualWeightLifted = Math.max(ex.weight, ...recentSets.map(l => l.weight || 0));
         return {
           ...ex,
-          weight: ex.weight + increment,
+          weight: actualWeightLifted + increment,
           reps: ex.repMin, // reset reps to bottom of range
           weekNumber: nextWeekNum,
         };
@@ -1715,7 +1726,7 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
           : "Consistency is the variable that matters most right now. Just show up."),
     progressionRule: isDeload
       ? "Deload: all weights at 60% of last week. RPE 6 max."
-      : "Auto-calculated from your logged reps.",
+      : "Auto-calculated from your logged weight and reps.",
     exercises: nextExercises,
     customDays: nextCustomDays,
   };
