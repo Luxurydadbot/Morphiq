@@ -136,6 +136,19 @@ function AppProvider({ children }) {
       return getProfileWithRetry(savedSession.uid);
     }).then(profile => {
       if (profile === "AUTH_REQUIRED") return;
+      // Fix (session 9): gym branding was only ever refreshed during a fresh
+      // sign-in (see signIn() below). Reopening the app with an existing saved
+      // session restored the plan/profile here but never re-fetched branding,
+      // so it silently fell back to the hardcoded "IronForge Gym" default on
+      // every reopen. Fire-and-forget -- branding is cosmetic, never block the
+      // home screen on it.
+      if (profile?.gym_id) {
+        sb.getGymBranding(profile.gym_id).then(gymRow => {
+          if (gymRow) {
+            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: gymRow.accent || prev.accent, welcome: gymRow.welcome || prev.welcome }));
+          }
+        }).catch(() => {});
+      }
       // Helper: try localStorage cache if Supabase returns no plan
       // This handles the case where upsert created a duplicate row or Supabase is slow.
       // Fix added: onboarding now writes mq_cached_plan_<uid> so this always finds the plan.
