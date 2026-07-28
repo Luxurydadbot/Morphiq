@@ -301,6 +301,30 @@ function WorkoutScreen() {
         : (typeof user?.lastWorkoutDayIndex === "number" ? (user.lastWorkoutDayIndex + 1) % plan.customDays.length : 0))
     : null;
 
+  // Shared by the initial load below and the cross-device cloud-resume
+  // rebuild further down -- used to be two separate copies of the same
+  // mapping (the exact duplication pattern that caused the warm-up bug
+  // earlier this session), collapsed into one function here instead.
+  // repMin/repMax mirror the same fallback convention as normalize() in
+  // shared.jsx's progressPlan(): custom-plan exercises only ever store a
+  // single target rep count, so a +2 range is backfilled around it.
+  function normalizeExercise(e) {
+    const singleReps = e.reps ?? e.targetReps;
+    return {
+      name: e.name, muscle: e.muscle || "", sets: e.sets,
+      targetReps: singleReps, weight: e.weight,
+      repMin: e.repMin ?? singleReps, repMax: e.repMax ?? (singleReps + 2),
+      rpe: e.rpe || 8, alternative: e.alternative || null,
+      restSeconds: e.restSeconds || null,
+      warmupSets: Array.isArray(e.warmupSets) ? e.warmupSets : null, // keep ramp data; null lets the fallback compute it
+      // Per-set weight/reps override (custom-built plans with a loading style
+      // like ramp up/down) — null means every working set just uses the flat
+      // weight/targetReps above, same as before this feature existed.
+      setDetails: Array.isArray(e.setDetails) ? e.setDetails : null,
+      loadStyle: e.loadStyle || "same",
+    };
+  }
+
   // Use AI-generated exercises if available, else fall back to defaults.
   // Stored in state (not const) so swapping an exercise updates it live.
   const [exercises, setExercises] = useState(() => {
@@ -311,18 +335,7 @@ function WorkoutScreen() {
         if (dayData?.exercises?.length > 0) sourceExercises = dayData.exercises;
       } catch { /* fall back to plan.exercises */ }
     }
-    return sourceExercises.map(e => ({
-      name: e.name, muscle: e.muscle || "", sets: e.sets,
-      targetReps: e.reps || e.targetReps, weight: e.weight,
-      rpe: e.rpe || 8, alternative: e.alternative || null,
-      restSeconds: e.restSeconds || null,
-      warmupSets: Array.isArray(e.warmupSets) ? e.warmupSets : null, // keep ramp data; null lets the fallback compute it
-      // Per-set weight/reps override (custom-built plans with a loading style
-      // like ramp up/down) — null means every working set just uses the flat
-      // weight/targetReps above, same as before this feature existed.
-      setDetails: Array.isArray(e.setDetails) ? e.setDetails : null,
-      loadStyle: e.loadStyle || "same",
-    }));
+    return sourceExercises.map(normalizeExercise);
   });
 
   // The manual day pick from the Home screen is a one-time nudge — clear it
@@ -387,15 +400,7 @@ function WorkoutScreen() {
       if (isMultiDayPlan && typeof cloud.dayIndex === "number" && cloud.dayIndex !== activeDayIdx && cloud.dayIndex < plan.customDays.length) {
         const dayData = plan.customDays[cloud.dayIndex];
         if (dayData?.exercises?.length > 0) {
-          setExercises(dayData.exercises.map(e => ({
-            name: e.name, muscle: e.muscle || "", sets: e.sets,
-            targetReps: e.reps || e.targetReps, weight: e.weight,
-            rpe: e.rpe || 8, alternative: e.alternative || null,
-            restSeconds: e.restSeconds || null,
-            warmupSets: Array.isArray(e.warmupSets) ? e.warmupSets : null,
-            setDetails: Array.isArray(e.setDetails) ? e.setDetails : null,
-            loadStyle: e.loadStyle || "same",
-          })));
+          setExercises(dayData.exercises.map(normalizeExercise));
         }
       }
       if (cloud.exIdx > 0 || cloud.setIdx > 0 || (cloud.loggedSets || []).length > 0) {
@@ -509,22 +514,45 @@ function WorkoutScreen() {
   // Warm-ups are logged (so the flow is seamless) but tagged so progressive
   // overload, PBs and volume totals can exclude them.
   const workingCount = ex.sets;
-  // Fix (session 9): a manually-raised weight on one working set (via the
-  // +/- stepper) used to only apply to that single set -- the next set fell
-  // straight back to the plan's original static number, even if that number
-  // was well below what the member just proved they could lift. Carry the
-  // highest weight actually logged so far THIS exercise, THIS session forward
-  // as a floor for the remaining sets, so the app never has them regress
-  // below a weight they already hit. Only for loading styles where sets are
-  // supposed to stay level or increase by design ("same", "ramp_up") --
-  // "ramp_down" (top set + backoff) and "custom" (member hand-typed every
-  // row) are intentionally allowed to go lighter on later sets, so this floor
-  // would fight the design rather than fix a bug.
-  const carriesForward = ex.loadStyle === "same" || ex.loadStyle === "ramp_up";
-  const loggedWorkingWeights = loggedSets
+  // ── Live autoregulation ─────────────────────────────────────────────
+  // Fix (session 9): the next working set's weight now reacts to what the
+  // member ACTUALLY did on the previous working set of this exercise --
+  // both reps and weight -- instead of just replaying the plan's static
+  // number. Too many reps (well past the top of the rep range) -> the next
+  // set goes up, since it clearly wasn't a real challenge. Too few reps
+  // (well short of the range, or down to just 1-2) -> the next set goes
+  // down, so the member still gets quality volume in range instead of
+  // grinding out singles. Reps landing inside the range -> hold, at
+  // whichever is higher between the plan's own number and what was just
+  // lifted (so this still never silently regresses on a normal set).
+  // repMin/repMax are already goal-aware (buildPlan sets a tighter range for
+  // strength-style goals, the standard 8-12ish range for hypertrophy/fat
+  // loss), so this applies everywhere without hard-coding a specific goal.
+  // Only for "same"/"ramp_up" load styles -- "ramp_down" (top set + backoff)
+  // and "custom" (member hand-typed every row) are intentionally pre-planned
+  // and a live override would fight that design rather than fix anything.
+  const autoregulates = ex.loadStyle === "same" || ex.loadStyle === "ramp_up";
+  const increment = ex.weightIncrement || 5;
+  const loggedWorkingForEx = loggedSets
     .filter(l => l.exIdx === exIdx && l.kind === "working" && typeof l.weight === "number" && l.weight > 0)
-    .map(l => l.weight);
-  const carryForwardFloor = carriesForward && loggedWorkingWeights.length > 0 ? Math.max(...loggedWorkingWeights) : null;
+    .sort((a, b) => a.setIdx - b.setIdx);
+  const lastLoggedWorking = loggedWorkingForEx[loggedWorkingForEx.length - 1] || null;
+
+  function autoregulatedWeight(plannedWeight) {
+    if (!autoregulates || !lastLoggedWorking || typeof lastLoggedWorking.reps !== "number") return plannedWeight;
+    const overshoot = lastLoggedWorking.reps - ex.repMax; // positive = beat the top of the range
+    const undershoot = ex.repMin - lastLoggedWorking.reps; // positive = fell short of the bottom
+    if (overshoot > 0) {
+      const delta = overshoot >= 3 ? 2 * increment : increment;
+      return Math.max(plannedWeight, lastLoggedWorking.weight + delta);
+    }
+    if (undershoot > 0) {
+      const delta = (undershoot >= 4 || lastLoggedWorking.reps <= 2) ? 2 * increment : increment;
+      return Math.max(0, lastLoggedWorking.weight - delta); // intentionally allowed to drop below the plan's number
+    }
+    return Math.max(plannedWeight, lastLoggedWorking.weight); // in range: hold, never silently regress
+  }
+
   const setPlan = [
     ...exWarmups.map((ws, i) => ({
       kind: "warmup",
@@ -542,7 +570,7 @@ function WorkoutScreen() {
       const plannedWeight = dWeight != null && !isNaN(dWeight) ? dWeight : ex.weight;
       return {
         kind: "working",
-        weight: carryForwardFloor != null ? Math.max(plannedWeight, carryForwardFloor) : plannedWeight,
+        weight: autoregulatedWeight(plannedWeight),
         targetReps: dReps != null && !isNaN(dReps) ? dReps : ex.targetReps,
         label: `Working set ${i + 1}`,
       };
