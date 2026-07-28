@@ -255,8 +255,38 @@ function WorkoutScreen() {
   const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData, selectedDayOverride, setSelectedDayOverride } = useApp();
   const a = gymBranding.accent;
 
-  // For custom plans with multiple days: which day to load. A manual pick from
-  // the Home screen wins; otherwise continue from wherever the member actually
+  // ── Mid-workout progress persistence ──────────────────────────────
+  // Saves where the member is (phase, exercise, set, logged sets, AND which
+  // day of a multi-day plan) to local storage so closing/reopening the app
+  // resumes exactly where they left off. Keyed by local date so a stale
+  // workout from a previous day is ignored and they start fresh. Computed
+  // BEFORE activeDayIdx below (moved up in session 9) so a same-day resume
+  // can pin the day it already started on, instead of re-deriving a fresh one.
+  const progressKey = `morphiq_workout_progress_${supabaseUser?.id || "anon"}`;
+  const savedProgress = (() => {
+    try {
+      const raw = localStorage.getItem(progressKey);
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      // Only restore if it was saved TODAY (local date). Otherwise discard.
+      if (p && p.date === localDateStr()) return p;
+      // Stale (previous day) — clear it so it never silently reappears.
+      localStorage.removeItem(progressKey);
+      return null;
+    } catch { return null; }
+  })();
+
+  // For custom plans with multiple days: which day to load.
+  // Fix (session 9): a same-day in-progress workout now wins over everything
+  // else. Previously this was recomputed fresh from lastWorkoutDayIndex on
+  // every mount, with no memory of which day the CURRENT unfinished workout
+  // actually started on -- so if WorkoutScreen ever remounted mid-workout
+  // (backgrounding the app, the "continue where you left off" flow itself is
+  // a fresh mount, a token refresh causing a re-render), it could silently
+  // recompute a DIFFERENT day while the saved exIdx/setIdx from localStorage
+  // still applied, landing the member on the wrong day's exercise at the same
+  // set position. A manual pick from the Home screen wins if there's no
+  // same-day progress; otherwise continue from wherever the member actually
   // last did (their last day + 1, wrapping) -- tracked in
   // profiles.last_workout_day_index, NOT derived from how many workouts
   // they've done this week (that count-based guess drifts once a manual pick
@@ -264,7 +294,9 @@ function WorkoutScreen() {
   // old math suggest Day 2 again next time instead of Day 3).
   const isMultiDayPlan = plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1;
   const activeDayIdx = isMultiDayPlan
-    ? ((selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
+    ? (typeof savedProgress?.dayIndex === "number" && savedProgress.dayIndex < plan.customDays.length
+        ? savedProgress.dayIndex
+        : (selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
         ? selectedDayOverride
         : (typeof user?.lastWorkoutDayIndex === "number" ? (user.lastWorkoutDayIndex + 1) % plan.customDays.length : 0))
     : null;
@@ -296,7 +328,9 @@ function WorkoutScreen() {
   // The manual day pick from the Home screen is a one-time nudge — clear it
   // right after this screen has used it, so it never carries over to a future
   // session or week. Also remember which day this session actually used (auto
-  // or override) so the next auto-pick correctly continues from here.
+  // or override) so the next auto-pick correctly continues from here. Safe to
+  // re-run on a resumed session too -- activeDayIdx is now pinned by
+  // savedProgress.dayIndex above, so this just re-writes the same value.
   useEffect(() => {
     if (selectedDayOverride !== null) setSelectedDayOverride(null);
     if (isMultiDayPlan && activeDayIdx !== null && supabaseUser?.id) {
@@ -304,26 +338,6 @@ function WorkoutScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Mid-workout progress persistence ──────────────────────────────
-  // Saves where the member is (phase, exercise, set, logged sets) to local
-  // storage so closing/reopening the app resumes exactly where they left off.
-  // Keyed by local date so a stale workout from a previous day is ignored and
-  // they start fresh — matches what top-tier lifting apps do (silent same-day
-  // auto-resume, no "resume?" modal in the common case).
-  const progressKey = `morphiq_workout_progress_${supabaseUser?.id || "anon"}`;
-  const savedProgress = (() => {
-    try {
-      const raw = localStorage.getItem(progressKey);
-      if (!raw) return null;
-      const p = JSON.parse(raw);
-      // Only restore if it was saved TODAY (local date). Otherwise discard.
-      if (p && p.date === localDateStr()) return p;
-      // Stale (previous day) — clear it so it never silently reappears.
-      localStorage.removeItem(progressKey);
-      return null;
-    } catch { return null; }
-  })();
 
   // Workout phase: "warmup" | "active" | "cooldown"
   const warmupExercises = plan?.warmup || [];
@@ -366,6 +380,24 @@ function WorkoutScreen() {
       setExIdx(cloud.exIdx ?? 0);
       setSetIdx((cloud.setIdx ?? 0) + (cloud.state === "rest" ? 1 : 0));
       setLoggedSets(cloud.loggedSets ?? []);
+      // Fix (session 9): if this cloud progress belongs to a different day
+      // than the one this device guessed at mount, rebuild the exercise list
+      // from the correct day -- otherwise exIdx/setIdx above would point into
+      // the wrong day's exercises (same bug as the local-storage resume path).
+      if (isMultiDayPlan && typeof cloud.dayIndex === "number" && cloud.dayIndex !== activeDayIdx && cloud.dayIndex < plan.customDays.length) {
+        const dayData = plan.customDays[cloud.dayIndex];
+        if (dayData?.exercises?.length > 0) {
+          setExercises(dayData.exercises.map(e => ({
+            name: e.name, muscle: e.muscle || "", sets: e.sets,
+            targetReps: e.reps || e.targetReps, weight: e.weight,
+            rpe: e.rpe || 8, alternative: e.alternative || null,
+            restSeconds: e.restSeconds || null,
+            warmupSets: Array.isArray(e.warmupSets) ? e.warmupSets : null,
+            setDetails: Array.isArray(e.setDetails) ? e.setDetails : null,
+            loadStyle: e.loadStyle || "same",
+          })));
+        }
+      }
       if (cloud.exIdx > 0 || cloud.setIdx > 0 || (cloud.loggedSets || []).length > 0) {
         setShowResumeBanner(true);
       }
@@ -418,6 +450,12 @@ function WorkoutScreen() {
     const progressSnapshot = {
       date: localDateStr(),
       phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state,
+      // Fix (session 9): pin which day of a multi-day custom plan this
+      // in-progress workout belongs to, so a remount mid-workout (or the
+      // "continue where you left off" flow) restores the SAME day instead of
+      // silently re-deriving a different one while reapplying the old
+      // exIdx/setIdx to it.
+      dayIndex: activeDayIdx,
     };
     try {
       localStorage.setItem(progressKey, JSON.stringify(progressSnapshot));
@@ -471,6 +509,22 @@ function WorkoutScreen() {
   // Warm-ups are logged (so the flow is seamless) but tagged so progressive
   // overload, PBs and volume totals can exclude them.
   const workingCount = ex.sets;
+  // Fix (session 9): a manually-raised weight on one working set (via the
+  // +/- stepper) used to only apply to that single set -- the next set fell
+  // straight back to the plan's original static number, even if that number
+  // was well below what the member just proved they could lift. Carry the
+  // highest weight actually logged so far THIS exercise, THIS session forward
+  // as a floor for the remaining sets, so the app never has them regress
+  // below a weight they already hit. Only for loading styles where sets are
+  // supposed to stay level or increase by design ("same", "ramp_up") --
+  // "ramp_down" (top set + backoff) and "custom" (member hand-typed every
+  // row) are intentionally allowed to go lighter on later sets, so this floor
+  // would fight the design rather than fix a bug.
+  const carriesForward = ex.loadStyle === "same" || ex.loadStyle === "ramp_up";
+  const loggedWorkingWeights = loggedSets
+    .filter(l => l.exIdx === exIdx && l.kind === "working" && typeof l.weight === "number" && l.weight > 0)
+    .map(l => l.weight);
+  const carryForwardFloor = carriesForward && loggedWorkingWeights.length > 0 ? Math.max(...loggedWorkingWeights) : null;
   const setPlan = [
     ...exWarmups.map((ws, i) => ({
       kind: "warmup",
@@ -485,9 +539,10 @@ function WorkoutScreen() {
       const detail = Array.isArray(ex.setDetails) ? ex.setDetails[i] : null;
       const dWeight = detail && detail.weight !== "" && detail.weight != null ? parseFloat(detail.weight) : null;
       const dReps = detail && detail.reps !== "" && detail.reps != null ? parseInt(detail.reps) : null;
+      const plannedWeight = dWeight != null && !isNaN(dWeight) ? dWeight : ex.weight;
       return {
         kind: "working",
-        weight: dWeight != null && !isNaN(dWeight) ? dWeight : ex.weight,
+        weight: carryForwardFloor != null ? Math.max(plannedWeight, carryForwardFloor) : plannedWeight,
         targetReps: dReps != null && !isNaN(dReps) ? dReps : ex.targetReps,
         label: `Working set ${i + 1}`,
       };
