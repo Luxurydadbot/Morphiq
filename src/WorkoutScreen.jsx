@@ -515,22 +515,26 @@ function WorkoutScreen() {
   // overload, PBs and volume totals can exclude them.
   const workingCount = ex.sets;
   // ── Live autoregulation ─────────────────────────────────────────────
-  // Fix (session 9): the next working set's weight now reacts to what the
-  // member ACTUALLY did on the previous working set of this exercise --
-  // both reps and weight -- instead of just replaying the plan's static
-  // number. Too many reps (well past the top of the rep range) -> the next
-  // set goes up, since it clearly wasn't a real challenge. Too few reps
-  // (well short of the range, or down to just 1-2) -> the next set goes
-  // down, so the member still gets quality volume in range instead of
-  // grinding out singles. Reps landing inside the range -> hold, at
-  // whichever is higher between the plan's own number and what was just
-  // lifted (so this still never silently regresses on a normal set).
-  // repMin/repMax are already goal-aware (buildPlan sets a tighter range for
-  // strength-style goals, the standard 8-12ish range for hypertrophy/fat
-  // loss), so this applies everywhere without hard-coding a specific goal.
-  // Only for "same"/"ramp_up" load styles -- "ramp_down" (top set + backoff)
-  // and "custom" (member hand-typed every row) are intentionally pre-planned
-  // and a live override would fight that design rather than fix anything.
+  // The next working set's weight reacts to what the member ACTUALLY did on
+  // the previous working set of this exercise -- both reps and weight --
+  // instead of just replaying the plan's static number. Reps landing inside
+  // the rep range -> hold, at whichever is higher between the plan's own
+  // number and what was just lifted (so this never silently regresses on a
+  // normal set). Only for "same"/"ramp_up" load styles -- "ramp_down" (top
+  // set + backoff) and "custom" (member hand-typed every row) are
+  // intentionally pre-planned and a live override would fight that design
+  // rather than fix anything.
+  //
+  // Fix (session 9): strength-goal plans ("Get stronger, hit PRs") get their
+  // own, separately-tuned thresholds instead of reusing the hypertrophy
+  // ones. A hypertrophy rep range (8-12ish) has room for a rep or two of
+  // slack either side; a strength rep range (3-6) doesn't -- missing by even
+  // 1-2 reps on a near-max strength set is a real signal, not noise, and
+  // overshooting by a couple of reps means the weight is meaningfully too
+  // light for a true strength stimulus. So strength reacts sooner (smaller
+  // overshoot/undershoot thresholds) than hypertrophy/fat-loss/general
+  // fitness plans, which keep the original, more forgiving thresholds.
+  const isStrengthGoal = user?.goal === "strength";
   const autoregulates = ex.loadStyle === "same" || ex.loadStyle === "ramp_up";
   const increment = ex.weightIncrement || 5;
   const loggedWorkingForEx = loggedSets
@@ -543,11 +547,17 @@ function WorkoutScreen() {
     const overshoot = lastLoggedWorking.reps - ex.repMax; // positive = beat the top of the range
     const undershoot = ex.repMin - lastLoggedWorking.reps; // positive = fell short of the bottom
     if (overshoot > 0) {
-      const delta = overshoot >= 3 ? 2 * increment : increment;
+      const bigJumpAt = isStrengthGoal ? 2 : 3; // strength reacts to a smaller overshoot
+      const delta = overshoot >= bigJumpAt ? 2 * increment : increment;
       return Math.max(plannedWeight, lastLoggedWorking.weight + delta);
     }
     if (undershoot > 0) {
-      const delta = (undershoot >= 4 || lastLoggedWorking.reps <= 2) ? 2 * increment : increment;
+      // Strength treats any miss as a real signal (a missed near-max rep is
+      // a failed attempt, not "a bit short"); hypertrophy tolerates being a
+      // little short of the range before reacting.
+      const bigDropAt = isStrengthGoal ? 2 : 4; // strength's range is narrower (~3 reps wide vs ~4), so proportionally smaller miss still counts as a real fail
+      const failThreshold = isStrengthGoal ? 1 : 2; // absolute reps this low = drop hard regardless of the target range
+      const delta = (undershoot >= bigDropAt || lastLoggedWorking.reps <= failThreshold) ? 2 * increment : increment;
       return Math.max(0, lastLoggedWorking.weight - delta); // intentionally allowed to drop below the plan's number
     }
     return Math.max(plannedWeight, lastLoggedWorking.weight); // in range: hold, never silently regress

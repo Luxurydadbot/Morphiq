@@ -1322,8 +1322,20 @@ function buildPlan(userProfile, existingMacros) {
 
   // ── Rep ranges ────────────────────────────────────────────────────
   // [min, max] — upper body uses +2.5lb increments, lower body +5lb
+  // Fix (session 9): "strength" ("Get stronger, hit PRs") is a real,
+  // selectable goal in onboarding, but was never actually branched here --
+  // it silently fell through to the same bucket as "get_fit", producing the
+  // exact same 10-15/10-12 rep range as general fitness. That's a
+  // hypertrophy/endurance rep range, not a strength one, so a member who
+  // picked "get stronger" was getting a plan indistinguishable from "get
+  // fit". Now uses a real low-rep strength range: 5-8 while still building
+  // technique as a beginner, 3-6 (the standard strength-training range) once
+  // experienced.
   let repMin, repMax;
-  if (goal === "build_muscle") {
+  if (goal === "strength") {
+    repMin = isBeginner ? 5 : 3;
+    repMax = isBeginner ? 8 : 6;
+  } else if (goal === "build_muscle") {
     repMin = isFemale ? 10 : (isBeginner ? 10 : 8);
     repMax = isFemale ? 14 : (isBeginner ? 12 : 10);
   } else if (goal === "lose_fat") {
@@ -1333,10 +1345,17 @@ function buildPlan(userProfile, existingMacros) {
   }
 
   // ── Rest periods ──────────────────────────────────────────────────
-  const restCompound = isOver40
+  // Same gap as the rep range above -- "strength" fell through to the same
+  // rest periods as general fitness. Heavy low-rep work needs full ATP-PC
+  // recovery between sets, so strength gets its own, longer, flat rest
+  // regardless of age (under-recovering a heavy set is the wrong place to
+  // cut time for an older lifter, not a place to shorten it).
+  const restCompound = goal === "strength" ? 180
+    : isOver40
     ? (goal === "lose_fat" ? 90 : goal === "build_muscle" ? 150 : 105)
     : (goal === "lose_fat" ? 60 : goal === "build_muscle" ? 120 : 75);
-  const restAccessory = isOver40
+  const restAccessory = goal === "strength" ? 120
+    : isOver40
     ? (goal === "lose_fat" ? 75 : 90)
     : (goal === "lose_fat" ? 45 : 60);
   // If the user explicitly picked a rest preference in onboarding, honour it
@@ -1347,8 +1366,14 @@ function buildPlan(userProfile, existingMacros) {
     : restAccessory;
 
   // ── RPE ───────────────────────────────────────────────────────────
+  // Same gap again -- strength work is meant to be pushed closer to true
+  // near-max effort than general fitness, so it gets a higher RPE target at
+  // every experience tier (still capped by the same age-based rpeMax safety
+  // ceiling as everyone else).
   const rpeMax = isOver40 ? 8 : 9;
-  const rpe = isBeginner ? 6
+  const rpe = goal === "strength"
+    ? (isBeginner ? 7 : Math.min(9, rpeMax))
+    : isBeginner ? 6
     : expTier === "some" ? 7
     : expTier === "returning" ? 7
     : Math.min(8, rpeMax);
