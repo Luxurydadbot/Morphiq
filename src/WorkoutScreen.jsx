@@ -1484,10 +1484,9 @@ function WorkoutScreen() {
           <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: isWarmupSet ? "#212429" : "#0B1E3D", border: `1.5px solid ${isWarmupSet ? "rgba(110,116,128,0.35)" : "rgba(76,141,255,0.35)"}`, borderRadius: 20, padding: "7px 18px", fontSize: 19, fontWeight: 700, color: isWarmupSet ? theme.text : a }}>
             {isWarmupSet ? <>Warm-up · {currentTargetReps} reps</> : <>Target: {currentTargetReps} reps</>}
           </div>
-          {!isWarmupSet && (isLastSet || ex.rpe) && (
+          {!isWarmupSet && isLastSet && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 }}>
-              {isLastSet && <Pill variant="amber">Final set</Pill>}
-              {ex.rpe && <div style={{ background: "#212429", border: "1px solid rgba(110,116,128,0.3)", borderRadius: 20, padding: "2px 8px", fontSize: 10, color: "#6E7480" }}>RPE {ex.rpe}</div>}
+              <Pill variant="amber">Final set</Pill>
             </div>
           )}
         </div>
@@ -1546,7 +1545,7 @@ function WorkoutScreen() {
         </div>
         {/* ── LAST TIME display — shown when we have history for this exercise ── */}
         {!isWarmupSet && lastSetHistory && (
-          <div style={{ background: "#0A1A14", border: "1px solid rgba(76,141,255,0.15)", borderRadius: 10, padding: "8px 14px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ background: "#212429", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 14px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ fontSize: 11, color: "#6E7480" }}>Last time on this exercise</div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "#EDEEF0" }}>{lastSetHistory.weight} lbs × {lastSetHistory.reps} reps</span>
