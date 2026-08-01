@@ -1280,6 +1280,37 @@ function buildWarmupRamp(workingWeight, exerciseName) {
     .filter((s) => s.weight < workingWeight);
 }
 
+// Re-ramp the remaining warm-up sets when a member manually raises an
+// earlier warm-up's weight (e.g. it felt too light). Bug this fixes: the
+// live workout screen let you bump a warm-up set's weight with the +/-
+// stepper, but every warm-up after it kept using the original plan's
+// numbers -- so raising set 1 from 95 to 135 could be followed by a
+// "next" warm-up of 125, lower than what you just lifted. That's because
+// warm-ups were a fixed, pre-computed ramp that never looked at what
+// actually got logged, unlike working sets (see autoregulatedWeight() in
+// WorkoutScreen.jsx), which already carry a manual adjustment forward.
+//
+// Fix: back out an "implied" working weight from the member's own number
+// (their weight divided by that step's normal percentage), then rebuild
+// every step AFTER the overridden one off that implied weight -- so the
+// ramp keeps climbing in the same shape instead of just flat-copying one
+// number forward, which could otherwise flatten or even invert the ramp
+// if the plan's next step was originally lower than what was just typed.
+// Steps at/before the overridden index are left alone (already lifted).
+function reRampWarmups(workingWeight, exerciseName, overriddenIndex, overriddenWeight) {
+  if (!workingWeight || !overriddenWeight || overriddenIndex == null) return null;
+  const isCompound = COMPOUND_LIFT_PATTERN.test(exerciseName || "");
+  const pcts = isCompound ? [0.5, 0.7, 0.85] : [0.6];
+  if (!pcts[overriddenIndex]) return null; // nothing after this step to re-ramp
+  const roundTo = 5;
+  const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
+  const impliedWorkingWeight = overriddenWeight / pcts[overriddenIndex];
+  return pcts.map((p, i) => ({
+    weight: i === overriddenIndex ? overriddenWeight : round(impliedWorkingWeight * p),
+    reps: isCompound ? (i === 0 ? 8 : i === 1 ? 5 : 3) : 10,
+  }));
+}
+
 function buildPlan(userProfile, existingMacros) {
   const {
     goal = "get_fit",
@@ -2281,7 +2312,7 @@ export {
   // Theme
   theme, css,
   // Plan engine
-  buildPlan, progressPlan, buildSetDetails, buildWarmupRamp,
+  buildPlan, progressPlan, buildSetDetails, buildWarmupRamp, reRampWarmups,
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components

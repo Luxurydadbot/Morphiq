@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp } from "./shared.jsx";
+         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -507,6 +507,29 @@ function WorkoutScreen() {
     ? ex.warmupSets
     : buildWarmupRamp(ex.weight, ex.name);
 
+  // Bug fix: manually raising a warm-up set's weight with the +/- stepper
+  // used to log correctly for that one set, then get completely ignored --
+  // the next warm-up just replayed the original plan's number, which could
+  // even be LOWER than what was just lifted. Now, if the most recently
+  // logged warm-up for this exercise doesn't match the plan's number for
+  // that step, treat it as a manual override and re-ramp every warm-up
+  // AFTER it proportionally from that new number (see reRampWarmups() in
+  // shared.jsx). Steps already lifted are left untouched.
+  const loggedWarmupForEx = loggedSets
+    .filter(l => l.exIdx === exIdx && l.kind === "warmup" && typeof l.weight === "number" && l.weight > 0)
+    .sort((a, b) => a.setIdx - b.setIdx);
+  const lastLoggedWarmup = loggedWarmupForEx[loggedWarmupForEx.length - 1] || null;
+  let effectiveWarmups = exWarmups;
+  if (lastLoggedWarmup) {
+    const originalStep = exWarmups[lastLoggedWarmup.setIdx];
+    if (originalStep && lastLoggedWarmup.weight !== originalStep.weight) {
+      const reRamped = reRampWarmups(ex.weight, ex.name, lastLoggedWarmup.setIdx, lastLoggedWarmup.weight);
+      if (reRamped) {
+        effectiveWarmups = exWarmups.map((s, i) => (i > lastLoggedWarmup.setIdx ? reRamped[i] : s));
+      }
+    }
+  }
+
   // ── Combined set plan: warm-ups THEN working sets ─────────────────
   // setIdx now walks this whole list. Each entry is tagged kind:"warmup" or
   // "working" so logging, analytics, the rest timer and the UI can treat them
@@ -564,7 +587,7 @@ function WorkoutScreen() {
   }
 
   const setPlan = [
-    ...exWarmups.map((ws, i) => ({
+    ...effectiveWarmups.map((ws, i) => ({
       kind: "warmup",
       weight: ws.weight,
       targetReps: ws.reps,
