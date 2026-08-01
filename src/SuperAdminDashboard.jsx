@@ -198,7 +198,7 @@ function SuperAdminDashboard() {
   const selectStyle = { background: "#212429", border: "1px solid #2B2E34", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "#EDEEF0", fontFamily: "inherit" };
 
   return (
-    <div style={{ background: "#121316", borderRadius: 20, color: "#EDEEF0", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", padding: "16px 16px 40px" }}>
+    <div style={{ background: "#121316", borderRadius: 20, color: "#EDEEF0", fontFamily: "'Inter', system-ui, sans-serif", minHeight: "100dvh", padding: "16px 16px 40px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Platform Admin</div>

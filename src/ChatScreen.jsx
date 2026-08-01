@@ -195,8 +195,15 @@ function ChatScreen({ fromScreen = "home" }) {
         </div>
       </div>
 
-      {/* Messages */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0", display: "flex", flexDirection: "column", gap: 4 }}>
+      {/* Messages -- justifyContent: flex-end is the fix here: this container
+      is already flex:1 (fills all leftover vertical space between the header
+      and the input bar), but its children default to stacking from the TOP,
+      which is what left a big empty void below a short conversation instead
+      of the messages sitting right above the input like every chat UI worth
+      copying (ChatGPT, Whoop's coach). flex-end bottom-anchors the messages;
+      once there are enough of them to fill the space, normal top-to-bottom
+      scrolling takes over exactly as before. */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 4 }}>
         {messages.map(msg => (
           <div key={msg.id} className="mq-fade" style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 6 }}>
             {msg.role === "ai" && (

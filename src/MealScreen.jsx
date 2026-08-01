@@ -141,7 +141,7 @@ function HungryButton({ calsLeft, proteinLeft, goal }) {
 
   if (calledOut) return (
     <div style={{ background: "#0F1922", border: "1px solid rgba(76,141,255,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: "#9BA0AA", lineHeight: 1.5, display: "flex", alignItems: "center", gap: 5 }}>You've hit your calorie goal today — great work. Stay hydrated and your body will take care of the rest. <Icon name="droplet" size={12} color="#60A5FA" /></div>
+      <div style={{ fontSize: 12, color: "#9BA0AA", lineHeight: 1.5, display: "flex", alignItems: "center", gap: 5 }}>You've hit your calorie goal today — great work. Stay hydrated and your body will take care of the rest. <Icon name="droplet" size={12} color={theme.accent} /></div>
     </div>
   );
 
@@ -454,64 +454,71 @@ function WaterTracker({ userId }) {
   const goalGlasses = WATER_GOAL_OZ / 8;
   const done = oz >= WATER_GOAL_OZ;
 
+  // Session 11: demoted from a full hero card (same visual weight as the
+  // calorie/macro summary above it) to a compact secondary row -- water
+  // shouldn't compete for primary attention on this screen. Also switched
+  // off its own separate "#60A5FA" blue identity onto the app's single
+  // unified accent, so it doesn't read as a third, unrelated color next to
+  // the redesign. Same features (3 quick-add amounts, custom entry, undo),
+  // just sized to match its actual importance.
   return (
-    <div style={{ background: "#0D1E35", border: `1px solid ${done ? "rgba(76,141,255,0.4)" : "rgba(96,165,250,0.25)"}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
+    <div style={{ background: theme.surface, border: `1px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "10px 12px", marginBottom: 14 }}>
       {/* Header row */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C12 2 5 10 5 15a7 7 0 0 0 14 0c0-5-7-13-7-13z" fill="rgba(96,165,250,0.3)" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2C12 2 5 10 5 15a7 7 0 0 0 14 0c0-5-7-13-7-13z" fill="rgba(76,141,255,0.2)" stroke={a} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0" }}>Water</div>
-          {done && <div style={{ fontSize: 10, background: "rgba(76,141,255,0.15)", color: a, borderRadius: 6, padding: "2px 7px", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>Goal hit <Icon name="check" size={9} /></div>}
+          <div style={{ fontSize: 12, fontWeight: 600, color: theme.textDim }}>Water</div>
+          {done && <Icon name="check" size={11} style={{ color: a }} />}
         </div>
-        <div style={{ textAlign: "right" }}>
-          <span style={{ fontSize: 22, fontWeight: 700, color: done ? a : "#60A5FA" }}>{glasses}</span>
-          <span style={{ fontSize: 12, color: "#6E7480" }}>/{goalGlasses} glasses</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {justAdded && (
-            <div style={{ fontSize: 11, color: a, fontWeight: 600, animation: "mqFadeOut 1.5s forwards" }}>{justAdded}</div>
+            <span style={{ fontSize: 10, color: a, fontWeight: 600, animation: "mqFadeOut 1.5s forwards" }}>{justAdded}</span>
           )}
+          <span style={{ fontSize: 13, fontWeight: 600, color: done ? a : theme.text }}>{glasses}</span>
+          <span style={{ fontSize: 11, color: theme.textDim }}>/{goalGlasses} glasses</span>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div style={{ height: 6, background: "#0F1922", borderRadius: 3, marginBottom: 12 }}>
-        <div style={{ height: 6, borderRadius: 3, background: done ? a : "#60A5FA", width: `${pct}%`, transition: "width .4s" }} />
+      <div style={{ height: 4, background: theme.borderSubtle, borderRadius: 2, marginBottom: 8 }}>
+        <div style={{ height: 4, borderRadius: 2, background: a, width: `${pct}%`, transition: "width .4s" }} />
       </div>
 
-      {/* Quick add buttons */}
+      {/* Quick add buttons -- compact pills instead of tall labeled tiles */}
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {QUICK_AMOUNTS.map((amt, i) => (
+        {QUICK_AMOUNTS.map(amt => (
           <button key={amt} onClick={() => addWater(amt)}
-            style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 9, padding: "8px 4px", fontSize: 11, fontWeight: 600, color: "#60A5FA", cursor: "pointer", fontFamily: "inherit", lineHeight: 1.3 }}>
-            {QUICK_LABELS[i]}<br/><span style={{ fontSize: 9, fontWeight: 400, color: "#6E7480" }}>{amt}oz</span>
+            style={{ flex: 1, background: "#171920", border: `1px solid ${theme.borderSubtle}`, borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 600, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+            +{amt}oz
           </button>
         ))}
         <button onClick={() => setShowCustom(!showCustom)}
-          style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, padding: "8px 4px", fontSize: 12, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>
+          style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", padding: "4px 6px", fontSize: 11, fontFamily: "inherit" }}>
           Custom
         </button>
         {oz > 0 && (
           <button onClick={() => removeWater(8)}
-            style={{ background: "none", border: "none", color: "#6E7480", cursor: "pointer", padding: "4px 6px", lineHeight: 1, display: "flex", alignItems: "center" }} title="Remove 8oz">
-            <Icon name="arrow-left" size={14} />
+            style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", padding: "4px 4px", lineHeight: 1, display: "flex", alignItems: "center" }} title="Remove 8oz">
+            <Icon name="arrow-left" size={12} />
           </button>
         )}
       </div>
 
       {/* Custom input */}
       {showCustom && (
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <input
             value={customInput}
             onChange={e => setCustomInput(e.target.value.replace(/\D/g, ""))}
             onKeyDown={e => e.key === "Enter" && submitCustom()}
             placeholder="oz amount"
             type="number"
-            style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: "#EDEEF0", outline: "none", fontFamily: "inherit" }}
+            style={{ flex: 1, background: "#171920", border: `1px solid ${theme.borderSubtle}`, borderRadius: 8, padding: "7px 10px", fontSize: 13, color: theme.text, outline: "none", fontFamily: "inherit" }}
           />
           <button onClick={submitCustom}
-            style={{ background: "#60A5FA", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: "#0D1E35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            style={{ background: a, border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, color: "#0B1E3D", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
             Add
           </button>
         </div>

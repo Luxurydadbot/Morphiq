@@ -1156,7 +1156,7 @@ const theme = {
     bg: "#121316", surface: "#1B1D21", card: "#212429", card2: "#171920",
     teal: "#4C8DFF", tealDk: "#0B1E3D", border: "#2B2E34",
     white: "#EDEEF0", body: "#9BA0AA", muted: "#6E7480",
-    font: "'DM Sans', system-ui, sans-serif",
+    font: "'Inter', system-ui, sans-serif",
   },
   sL: { fontSize: 11, color: "#9BA0AA", letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" },
 };
@@ -2042,7 +2042,7 @@ const SESSION_KEY = "morphiq_session";
 
 
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
   .mq-fade{animation:mqFade .3s ease;}
   @keyframes mqFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
@@ -2052,6 +2052,12 @@ const css = `
   @keyframes mqSpin{to{transform:rotate(360deg);}}
   .mq-pulse-ring{animation:mqPulse 2s ease-out infinite;pointer-events:none;}
   @keyframes mqPulse{0%{transform:scale(1);opacity:.5;}100%{transform:scale(1.7);opacity:0;}}
+  /* Loading placeholder for stat values that come from an async fetch (e.g.
+     Home screen's Total workouts / Since you started tiles) -- a soft pulse
+     instead of a static "-" so a still-loading number doesn't read as "no
+     data" for the half-second before historicalData resolves. */
+  .mq-skeleton{display:inline-block;background:rgba(255,255,255,0.09);border-radius:5px;animation:mqSkeletonPulse 1.3s ease-in-out infinite;}
+  @keyframes mqSkeletonPulse{0%,100%{opacity:.45;}50%{opacity:.9;}}
   .mq-mic-pulse{animation:micPulse 1.2s infinite;}
   @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(76,141,255,0.4);}70%{box-shadow:0 0 0 14px rgba(76,141,255,0);}100%{box-shadow:0 0 0 0 rgba(76,141,255,0);}}
   .mq-wave span{display:inline-block;width:3px;border-radius:2px;background:#4C8DFF;animation:wv .9s infinite ease-in-out;}
@@ -2141,7 +2147,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 
       <div className="mq-pulse-ring" style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: "rgba(76,141,255,0.18)" }} />
       <button onClick={() => navigate(chatTarget)} style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: a, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2C6.03 2 2 5.8 2 10.5c0 1.8.55 3.5 1.5 4.9L2 20l4.8-1.4A9.2 9.2 0 0011 19c4.97 0 9-3.8 9-8.5S15.97 2 11 2z" fill="#0A1F1D" /><circle cx="7.5" cy="10.5" r="1.2" fill={a} /><circle cx="11" cy="10.5" r="1.2" fill={a} /><circle cx="14.5" cy="10.5" r="1.2" fill={a} /></svg>
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2C6.03 2 2 5.8 2 10.5c0 1.8.55 3.5 1.5 4.9L2 20l4.8-1.4A9.2 9.2 0 0011 19c4.97 0 9-3.8 9-8.5S15.97 2 11 2z" fill="#0B1E3D" /><circle cx="7.5" cy="10.5" r="1.2" fill={a} /><circle cx="11" cy="10.5" r="1.2" fill={a} /><circle cx="14.5" cy="10.5" r="1.2" fill={a} /></svg>
       </button>
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "#111", borderTop: `0.5px solid ${theme.borderSubtle}`, borderRadius: "0 0 20px 20px", display: "flex" }}>
         {[["home", "Home"], ["workout", "Workout"], ["meals", "Meals"], ["progress", "Progress"]].map(([id, label]) => (
@@ -2366,9 +2372,9 @@ function WeightChart({ data, accent }) {
           fill={i === points.length - 1 ? accent : "#212429"} stroke={accent} strokeWidth="1.5" />
       ))}
       {chartData.map((d, i) => (
-        <text key={i} x={points[i][0]} y={H} textAnchor="middle" fontSize="8" fill="#6E7480">{d.week}</text>
+        <text key={i} x={points[i][0]} y={H} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
       ))}
-      <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
+      <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
     </svg>
   );
 }
@@ -2399,7 +2405,7 @@ function MonthlyTrendLineChart({ series }) {
           );
         })}
         {months.map((m, i) => (
-          <text key={i} x={PAD + i * xStep} y={H - 4} textAnchor="middle" fontSize="9" fill="#6E7480">{m.label}</text>
+          <text key={i} x={PAD + i * xStep} y={H - 4} textAnchor="middle" fontSize="10" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{m.label}</text>
         ))}
       </svg>
       <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>

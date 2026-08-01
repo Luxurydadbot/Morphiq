@@ -632,7 +632,7 @@ function PricingScreen() {
   ];
 
   return (
-    <div style={{ background: "#121316", borderRadius: 20, color: "#EDEEF0", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
+    <div style={{ background: "#121316", borderRadius: 20, color: "#EDEEF0", fontFamily: "'Inter', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
       <div style={{ background: "#171920", borderBottom: "1px solid #2B2E34", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
         <button onClick={() => navigate("owner")} style={{ background: "none", border: "none", color: "#6E7480", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={18} /></button>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#EDEEF0" }}>Pricing Plans</div>
@@ -790,7 +790,7 @@ function GymOwnerDashboard() {
   const tabs = [["overview","Overview"],["members","Members"],["invite","Invite"],["branding","Branding"],["usage","AI Usage"]];
 
   return (
-    <div style={{ background: "#121316", borderRadius: 20, color: "#EDEEF0", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
+    <div style={{ background: "#121316", borderRadius: 20, color: "#EDEEF0", fontFamily: "'Inter', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
       {/* Header */}
       <div style={{ background: "#171920", borderBottom: "1px solid #2B2E34", padding: "14px 16px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>

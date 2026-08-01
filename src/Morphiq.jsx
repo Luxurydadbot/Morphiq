@@ -730,7 +730,7 @@ function PlanOverviewScreen() {
         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(76,141,255,0.1)", border: "0.5px solid rgba(76,141,255,0.25)", borderRadius: 20, padding: "4px 12px", fontSize: 12, color: a, fontWeight: 500, marginBottom: ".75rem" }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: a }} />Plan ready
         </div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: "#F0F0F0", lineHeight: 1.3, marginBottom: ".4rem" }}>Your 4-week {goalLabel} program is live</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: "#EDEEF0", lineHeight: 1.3, marginBottom: ".4rem" }}>Your 4-week {goalLabel} program is live</div>
         <div style={{ fontSize: 14, color: theme.textDim }}>{user.daysPerWeek || plan?.daysPerWeek || 3} workouts per week · {plan?.workoutType || "Full body"} · {user.fitnessLevel || "Intermediate"}</div>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
@@ -738,7 +738,7 @@ function PlanOverviewScreen() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
           {[[plan?.calories?.toLocaleString() || "—", "Calories", "100%", a], [`${plan?.protein || "—"}g`, "Protein", "72%", "#5DCAA5"], [`${plan?.carbs || "—"}g`, "Carbs", "55%", "#1D9E75"]].map(([v, l, w, c]) => (
             <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
-              <div style={{ fontSize: 20, fontWeight: 500, color: "#F0F0F0" }}>{v}</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: "#EDEEF0" }}>{v}</div>
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
               <div style={{ height: 3, background: "#222", borderRadius: 2, marginTop: 6 }}><div style={{ height: 3, borderRadius: 2, background: c, width: w }} /></div>
             </div>
@@ -750,7 +750,7 @@ function PlanOverviewScreen() {
         <div style={sL}>Your first workout</div>
         <div className="mq-fade" style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div style={{ padding: "1rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div><div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>{plan?.workoutType || "Full body"}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{plan?.exercises?.length || 5} exercises · ~{plan?.workoutDuration || 40} min</div></div>
+              <div><div style={{ fontSize: 15, fontWeight: 500, color: "#EDEEF0" }}>{plan?.workoutType || "Full body"}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{plan?.exercises?.length || 5} exercises · ~{plan?.workoutDuration || 40} min</div></div>
               <div style={{ background: "#242730", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: theme.textMuted }}>{plan?.workoutDuration || 40} min</div>
             </div>
             {(plan?.exercises || []).slice(0, 5).map((ex, i, arr) => (
@@ -765,7 +765,7 @@ function PlanOverviewScreen() {
         </div>
       </div>
       <div style={{ padding: "1.25rem" }}>
-        <button onClick={() => navigate("home")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 16, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Go to dashboard <Icon name="arrow-right" size={15} /></button>
+        <button onClick={() => navigate("home")} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 16, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Go to dashboard <Icon name="arrow-right" size={15} /></button>
       </div>
     </Layout>
   );
@@ -1053,7 +1053,7 @@ function HomeDashboardScreen() {
             <>
               <div style={{ padding: "1.1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>Week {weekNum} · {workoutType}</div>
+                  <div style={{ fontSize: 18, fontWeight: 500, color: "#EDEEF0" }}>Week {weekNum} · {workoutType}</div>
                   <div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>{exerciseCount} exercises · ~{workoutDuration} min</div>
                 </div>
                 <div style={{ background: "rgba(76,141,255,0.1)", border: "0.5px solid rgba(76,141,255,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>{workoutType}</div>
@@ -1062,7 +1062,7 @@ function HomeDashboardScreen() {
                 <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 6 }}>
                   {plan.customDays.map((d, idx) => (
                     <button key={idx} onClick={() => setSelectedDayOverride(idx)}
-                      style={{ flex: 1, background: idx === activeDayIdx ? a : "#1A1A1A", color: idx === activeDayIdx ? "#0A1F1D" : theme.textDim, border: "none", borderRadius: 8, padding: "7px 4px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                      style={{ flex: 1, background: idx === activeDayIdx ? a : "#1A1A1A", color: idx === activeDayIdx ? "#0B1E3D" : theme.textDim, border: "none", borderRadius: 8, padding: "7px 4px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
                       {d.dayLabel || `Day ${idx + 1}`}
                     </button>
                   ))}
@@ -1080,7 +1080,7 @@ function HomeDashboardScreen() {
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(76,141,255,0.1)", border: `0.5px solid rgba(76,141,255,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0 }}>{idx + 1}</div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: "#F0F0F0" }}>{ex.name}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "#EDEEF0" }}>{ex.name}</div>
                         <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>{ex.muscle}</div>
                       </div>
                       <div style={{ textAlign: "right" }}>
@@ -1095,7 +1095,7 @@ function HomeDashboardScreen() {
                 </div>
               )}
               <div style={{ padding: "0 1.25rem 1.25rem" }}>
-                <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0A1F1D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
                   Start workout <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px" }} />
                 </button>
               </div>
@@ -1112,7 +1112,13 @@ function HomeDashboardScreen() {
             [weightChangeLabel, "Since you started", parseFloat(weightChange) <= 0 ? a : "#F87171"],
           ].map(([v, l, c]) => (
             <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: ".85rem .75rem" }}>
-              <div style={{ fontSize: 18, fontWeight: 500, color: c || "#F0F0F0" }}>{v}</div>
+              {/* historicalData is still null while its fetch is in flight --
+                  show a pulsing placeholder bar instead of a static "-" for
+                  that brief window, so a loading number doesn't look like a
+                  missing/broken one (this was the "4 then -" flicker). */}
+              {historicalData
+                ? <div style={{ fontSize: 18, fontWeight: 500, color: c || "#EDEEF0" }}>{v}</div>
+                : <div className="mq-skeleton" style={{ width: 28, height: 18, marginTop: 2 }} />}
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>{l}</div>
             </div>
           ))}
@@ -1122,7 +1128,7 @@ function HomeDashboardScreen() {
         <div style={sL}>Nutrition today</div>
         <div style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: ".9rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>Calories</div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "#EDEEF0" }}>Calories</div>
             <div style={{ fontSize: 13, color: a, fontWeight: 500 }}>{calGoal - cals} remaining</div>
           </div>
           <div style={{ padding: ".75rem 1.25rem" }}>
