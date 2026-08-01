@@ -1,3 +1,47 @@
+# Hypergentiq — Session 15 master handoff (real per-day AI plan variation, shipped)
+
+This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
+
+## Housekeeping note first: a documentation gap
+
+Six commits landed after the Session 14 handoff below was written but were never written up: gym-branding fallback placeholder text change (`00628aa`), a contrast boost on WorkoutScreen's weight/target-reps/reps-entered numbers (`ec9b10e`), consolidating the duplicate target-reps display into one badge (`c5dde93`), enlarging the "Weight this set" tile text (`ba2c8c1`), removing the RPE badge and a stray green tint from the "Last time on this exercise" card (`3a04027`), and a fix to the week-complete banner double-counting a single logged set as a full workout day (`bfbf7e2`). All six are small, self-contained UI/logic fixes — commit messages are descriptive and each stands alone in `git log`, but there's no narrative "why" captured here the way other sessions have one. Flagging so this doesn't look like it fell through the cracks.
+
+## Session 15 — punch-list item FIFTH: misleading multi-day AI plan structure, FIXED
+
+Bryant asked to go through the standing punch list by priority and check off what was already done — that pass surfaced that `buildPlan()` had been generating the exact same 5-exercise full-body list every single day regardless of `daysPerWeek`, while `workoutType` confidently labeled it "Upper / Lower" or "Push / Pull / Legs" depending on day count. The label was lying; every day was full body underneath. Bryant chose the real fix (build actual per-day variation) over the cheaper one (just remove the misleading label).
+
+**What changed in `buildPlan()` (`shared.jsx`):**
+
+- **4 days/week** now builds a real **Lower day** (squat + hinge, each paired with its library `variation` exercise as a second movement for volume, plus the core/carry slot for experienced members) and a real **Upper day** (push + pull + their variations, plus slot 5/accessory).
+- **5+ days/week** now builds real **Push**, **Pull**, and **Legs** days. Push and Pull each get their pattern's `variation` exercise as a second movement (the exercise library only has one named exercise per pattern per equipment type, so `variation` — already used by `progressPlan()`'s week-to-week post-deload alternation — doubles as the second exercise here). Legs carries squat + hinge + their variations + core.
+- **Below 4 days/week is completely unchanged** — still the original single full-body list, verified byte-for-byte identical via a regression test.
+- New `makeVariationEx()` and `buildCoreEx()` helpers factor out logic that used to be inlined once; now reused across the full-body, Upper/Lower, and Push/Pull/Legs branches instead of copy-pasted three times.
+- Split plans are stored in `plan.customDays` — the **exact same shape** `CustomPlanScreen` already uses for hand-built multi-day plans. This was deliberate: the existing day-rotation UI (Home screen day picker, WorkoutScreen's day-continuation logic), `progressPlan()`'s per-exercise weight progression, and the Session 11 plateau/deload detector all already read `customDays` generically — none of them needed a single change to support AI-generated splits.
+
+**Bug caught and fixed while wiring this up:** `isMultiDayPlan` was duplicated inline in both `Morphiq.jsx` and `WorkoutScreen.jsx` as `plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1`. The `isCustomPlan` flag only ever meant "a member hand-built this in CustomPlanScreen" — gating on it meant AI-generated split plans would have populated `customDays` correctly but the day-rotation UI would never have activated, silently showing only Day 1 forever. Collapsed to one shared `isMultiDayPlan(plan)` function in `shared.jsx` (checks `customDays.length > 1` directly, drops the irrelevant `isCustomPlan` check) and imported it in both files instead of leaving two copies to drift apart — same lesson as the session-10 warm-up bug, explicitly called out in this file's "recurring root cause" note below.
+
+**Design decision worth knowing about:** the exercise library only has one named exercise per pattern (squat/hinge/push/pull) per equipment type, plus one `variation`. That's enough for a correct, honest split — Push day never gets a leg exercise, Legs day never gets a press — but it means Push and Pull days currently have only 2 exercises each (primary + variation), while Legs/Lower days have 4–5. The accessory/slot-5 exercise was deliberately left out of the Push/Pull/Legs split entirely: its target muscle is inconsistent across equipment types (e.g. kettlebell's "accessory" slot is actually a leg-pattern exercise mislabeled generically), so auto-routing it to a specific day risked landing it on the wrong one for some equipment. It's still used normally in the full-body path and the Upper day of the 4-day split. If you want fuller Push/Pull days, the real fix is adding proper secondary push/pull library entries per equipment — deliberately out of scope for this pass.
+
+**Verification done this session:** all three changed files pass an `esbuild` parse check. Built a Node test harness that runs the real `buildPlan()` (extracted straight from the pushed `shared.jsx` via esbuild bundle, not a rewritten copy) across 6 scenarios: 3/4/5/6 days per week, all 4 equipment types, a knee-injury substitution case, and beginner vs. experienced. Confirmed in every case that squat/hinge never appear on an Upper or Push/Pull day and push/pull never appear on a Lower or Legs day, injury swaps correctly flow into whichever day the substituted pattern lands on, and the daysPerWeek ≤ 3 full-body path produces the identical exercise list as before this change. Also ran the real `progressPlan()` against two weeks of synthetic logs across both days of a generated 4-day Upper/Lower plan — every exercise on both days progressed correctly, confirming the customDays-based progression fix from Session 6/11 extends cleanly to AI-generated splits with no separate work needed. Router/component-name safety checklist intact.
+
+**Punch-list audit done this session, for reference (checked against real code, not memory):** plateau/deload trigger, color palette, cardio logging redesign, Stripe paywall enforcement, and Sentry backend monitoring were all confirmed already shipped in earlier sessions. Still open: the custom-plan flat 2.5lb weight increment (SIXTH), the edit-plan macro-wipe bug on ProfileScreen's save (part of SEVENTH — confirmed still live: `buildPlan(updatedUser)` is called there without passing existing macros, silently zeroing calorie/protein/carb/fat targets), kettlebell weight increments and exercise diagrams (both still deferred, EIGHTH), the session-8 live spot-checks (weight stepper math, full custom multi-day plan walkthrough — can't be verified from code, needs Bryant to actually run through it), naming cleanup for internal-only references (file names, console log tags, localStorage key prefixes still say "morphiq" — cosmetic, invisible to users, not touched), and the 2 stray test profile rows in `profiles` (`WarmupTest`, kept on purpose; one blank-named row still unidentified).
+
+**Still NOT done:** no live/browser verification of the new split UI — everything above was verified by extracting and running the real functions in Node, not by actually opening the app and looking at a rendered Upper/Lower or Push/Pull/Legs plan on screen. Worth a real look whenever Bryant has a few minutes, ideally by running through onboarding with 4 and 5+ days/week selected.
+
+## Files touched this session
+
+- `src/shared.jsx`: 2,563 → 2,649 (+86) — real per-day exercise building in `buildPlan()`, new `isMultiDayPlan()` shared helper
+- `src/Morphiq.jsx`: 1,506 → 1,507 (+1) — import + use shared `isMultiDayPlan()` instead of inline duplicate
+- `src/WorkoutScreen.jsx`: 2,432 → 2,433 (+1) — same
+
+All three well under the 3,800-line hard limit.
+
+## Latest commit
+
+`a653fb1` on `main` — Session 15's real per-day AI plan variation. `bfbf7e2` (the undocumented week-complete-banner fix) is the commit before it.
+
+---
+
 # Hypergentiq — Session 14 master handoff (recurring gym-branding bug, FIXED — root-caused, not yet live-verified)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
