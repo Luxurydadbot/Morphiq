@@ -74,12 +74,12 @@ function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
   }
 
   return (
-    <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 14, padding: "14px", marginBottom: 12 }}>
+    <div style={{ background: "#0A1628", border: "1px solid rgba(76,141,255,0.15)", borderRadius: 14, padding: "14px", marginBottom: 12 }}>
       {phase === "idle" && (
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <button onClick={startVoice}
-              style={{ flex: 1, background: "#111827", border: "1px solid rgba(0,212,177,0.25)", borderRadius: 10, padding: "10px 6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", fontFamily: "inherit" }}>
+              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(76,141,255,0.25)", borderRadius: 10, padding: "10px 6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", fontFamily: "inherit" }}>
               <MicIcon size={14} color={accent} /> <span style={{ fontSize: 12, color: accent, fontWeight: 600 }}>Voice</span>
             </button>
           </div>
@@ -89,17 +89,17 @@ function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
               onChange={e => setTextVal(e.target.value)}
               onKeyDown={e => e.key === "Enter" && submitText()}
               placeholder="e.g. 30 minutes of running"
-              style={{ flex: 1, background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }}
+              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#EDEEF0", outline: "none", fontFamily: "inherit" }}
             />
             <button onClick={submitText} disabled={!textVal.trim()}
-              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4 }}>Log</button>
+              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", color: "#0B1E3D", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4 }}>Log</button>
           </div>
         </>
       )}
       {phase === "listening" && (
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 10 }}>Listening... say what cardio you did</div>
-          <button onClick={reset} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 10 }}>Listening... say what cardio you did</div>
+          <button onClick={reset} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
         </div>
       )}
       {phase === "processing" && (
@@ -109,24 +109,24 @@ function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
       )}
       {phase === "confirming" && parsed && (
         <>
-          <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 8 }}>Does this look right?</div>
-          <div style={{ background: "#111827", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#E8EDF2", marginBottom: 6 }}>{parsed.activityType}</div>
+          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 8 }}>Does this look right?</div>
+          <div style={{ background: "#1B1D21", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#EDEEF0", marginBottom: 6 }}>{parsed.activityType}</div>
             <div style={{ display: "flex", gap: 12 }}>
               <span style={{ fontSize: 13, color: accent, fontWeight: 600 }}>{parsed.durationMinutes} min</span>
-              <span style={{ fontSize: 13, color: "#6B7A8D" }}>~{parsed.calories} cal</span>
+              <span style={{ fontSize: 13, color: "#6E7480" }}>~{parsed.calories} cal</span>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "8px", fontSize: 11, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
-            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log this session</button>
+            <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "8px", fontSize: 11, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
+            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log this session</button>
           </div>
         </>
       )}
       {phase === "error" && (
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8 }}>{errMsg}</div>
-          <button onClick={reset} style={{ background: accent, border: "none", borderRadius: 9, padding: "7px 20px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
+          <button onClick={reset} style={{ background: accent, border: "none", borderRadius: 9, padding: "7px 20px", fontSize: 11, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
         </div>
       )}
       {saved && <div style={{ textAlign: "center", fontSize: 11, color: accent, marginTop: 8 }}>Saved <Icon name="check" size={11} style={{ verticalAlign: "-1px" }} /></div>}
@@ -270,17 +270,17 @@ function ProgressScreen() {
             { val: (() => { var ws = historicalData?.weekStreak ?? 0; return ws > 0 ? <><Icon name="flame" size={14} style={{verticalAlign:"-2px", marginRight:2}} />{ws}</> : "—"; })(), lbl:"Week streak", color:"#F59E0B" },
             { val: String(realPBs.length || 0), lbl:"PBs logged", color:"#A78BFA" },
           ].map(({ val, lbl, color }) => (
-            <div key={lbl} style={{ background:"#1A2332", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
+            <div key={lbl} style={{ background:"#212429", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
               <div style={{ fontSize:18, fontWeight:700, color }}>{val}</div>
-              <div style={{ fontSize:10, color:"#6B7A8D", marginTop:3, lineHeight:1.3 }}>{lbl}</div>
+              <div style={{ fontSize:10, color:"#6E7480", marginTop:3, lineHeight:1.3 }}>{lbl}</div>
             </div>
           ))}
         </div>
 
-        <div style={{ display:"flex", background:"#1A2332", borderRadius:10, padding:3, marginBottom:16 }}>
+        <div style={{ display:"flex", background:"#212429", borderRadius:10, padding:3, marginBottom:16 }}>
           {[["body","Body"],["workouts","Workouts"],["bests","Bests"]].map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
-              style={{ flex:1, padding:"7px 6px", background:tab===t ? a : "transparent", border:"none", borderRadius:8, fontSize:12, fontWeight:500, color:tab===t ? "#003D35" : theme.textDim, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
+              style={{ flex:1, padding:"7px 6px", background:tab===t ? a : "transparent", border:"none", borderRadius:8, fontSize:12, fontWeight:500, color:tab===t ? "#0B1E3D" : theme.textDim, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
               {label}
             </button>
           ))}
@@ -289,7 +289,7 @@ function ProgressScreen() {
         {tab === "body" && (
           <div className="mq-fade">
             {/* Weight chart card */}
-            <div style={{ background:"#1A2332", borderRadius:14, padding:"14px 14px 10px", marginBottom:12 }}>
+            <div style={{ background:"#212429", borderRadius:14, padding:"14px 14px 10px", marginBottom:12 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
                 <div>
                   <div style={sL}>
@@ -297,14 +297,14 @@ function ProgressScreen() {
                     {!useRealWeightData && <span style={{ color:"#2D3A4A", marginLeft:6, fontStyle:"italic" }}>(sample)</span>}
                   </div>
                   <div style={{ fontSize:26, fontWeight:700, color:theme.text, lineHeight:1 }}>
-                    {curr} <span style={{ fontSize:13, color:"#6B7A8D", fontWeight:400 }}>lbs</span>
+                    {curr} <span style={{ fontSize:13, color:"#6E7480", fontWeight:400 }}>lbs</span>
                   </div>
                   <div style={{ fontSize:12, color: lost >= 0 ? a : "#F87171", marginTop:2 }}>
                     {lost >= 0 ? <><Icon name="arrow-down" size={12} style={{verticalAlign:"-1px", marginRight:2}} />{lost} lbs since day 1</> : <><Icon name="arrow-up" size={12} style={{verticalAlign:"-1px", marginRight:2}} />{Math.abs(lost)} lbs since day 1</>}
                   </div>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                  <div style={{ background: weightError ? "#1F1010" : "#003D35", borderRadius:8, padding:"4px 10px", fontSize:11, color: weightError ? "#F87171" : a, fontWeight:500 }}>
+                  <div style={{ background: weightError ? "#1F1010" : "#0B1E3D", borderRadius:8, padding:"4px 10px", fontSize:11, color: weightError ? "#F87171" : a, fontWeight:500 }}>
                     {weightError ? "Save failed — try again" : weightSaved ? <><Icon name="check" size={12} style={{verticalAlign:"-1px", marginRight:2}} />Saved</> : <><Icon name="check" size={12} style={{verticalAlign:"-1px", marginRight:2}} />On track</>}
                   </div>
                 </div>
@@ -312,14 +312,14 @@ function ProgressScreen() {
 
               {/* Log weight button — large and prominent */}
               <button onClick={() => setShowLogWeight(!showLogWeight)}
-                style={{ width:"100%", background: showLogWeight ? "transparent" : a, border: showLogWeight ? "1px solid rgba(255,255,255,0.12)" : "none", borderRadius:12, padding:"13px", fontSize:15, fontWeight:600, color: showLogWeight ? "#6B7A8D" : "#003D35", cursor:"pointer", fontFamily:"inherit", marginBottom:10 }}>
+                style={{ width:"100%", background: showLogWeight ? "transparent" : a, border: showLogWeight ? "1px solid rgba(255,255,255,0.12)" : "none", borderRadius:12, padding:"13px", fontSize:15, fontWeight:600, color: showLogWeight ? "#6E7480" : "#0B1E3D", cursor:"pointer", fontFamily:"inherit", marginBottom:10 }}>
                 {showLogWeight ? "Cancel" : "＋ Log today's weight"}
               </button>
 
               {/* Log weight inline form */}
               {showLogWeight && (
                 <div className="mq-fade" style={{ background:"#0A1628", borderRadius:12, padding:"14px", marginBottom:10 }}>
-                  <div style={{ fontSize:13, color:"#9BB3C8", marginBottom:10, fontWeight:500 }}>What's your weight today?</div>
+                  <div style={{ fontSize:13, color:"#9BA0AA", marginBottom:10, fontWeight:500 }}>What's your weight today?</div>
                   <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                     <input
                       type="number"
@@ -328,11 +328,11 @@ function ProgressScreen() {
                       onKeyDown={e => e.key === "Enter" && saveWeight()}
                       placeholder="e.g. 182.5"
                       autoFocus
-                      style={{ flex:1, background:"#111827", border:"1px solid rgba(255,255,255,0.12)", borderRadius:10, padding:"12px 14px", fontSize:16, color:"#E8EDF2", outline:"none", fontFamily:"inherit" }}
+                      style={{ flex:1, background:"#1B1D21", border:"1px solid rgba(255,255,255,0.12)", borderRadius:10, padding:"12px 14px", fontSize:16, color:"#EDEEF0", outline:"none", fontFamily:"inherit" }}
                     />
-                    <div style={{ fontSize:13, color:"#6B7A8D", flexShrink:0 }}>lbs</div>
+                    <div style={{ fontSize:13, color:"#6E7480", flexShrink:0 }}>lbs</div>
                     <button onClick={saveWeight} disabled={savingWeight || !newWeightInput}
-                      style={{ background: newWeightInput ? a : "#1A2332", border:"none", borderRadius:10, padding:"12px 18px", fontSize:14, color: newWeightInput ? "#003D35" : "#6B7A8D", fontWeight:600, cursor: newWeightInput ? "pointer" : "default", fontFamily:"inherit", flexShrink:0 }}>
+                      style={{ background: newWeightInput ? a : "#212429", border:"none", borderRadius:10, padding:"12px 18px", fontSize:14, color: newWeightInput ? "#0B1E3D" : "#6E7480", fontWeight:600, cursor: newWeightInput ? "pointer" : "default", fontFamily:"inherit", flexShrink:0 }}>
                       {savingWeight ? "..." : "Save"}
                     </button>
                   </div>
@@ -356,7 +356,7 @@ function ProgressScreen() {
 
             {/* Measurements */}
             <div style={sL}>Measurements</div>
-            <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden", marginBottom:12 }}>
+            <div style={{ background:"#212429", borderRadius:14, overflow:"hidden", marginBottom:12 }}>
               {[
                 { label:"Starting weight", start:"", current:`${startWeight} lbs`, delta:"", dColor:a },
                 { label:"Current weight",  start:"", current:`${curr} lbs`,        delta: lost >= 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, dColor: lost >= 0 ? a : "#F87171" },
@@ -371,7 +371,7 @@ function ProgressScreen() {
             </div>
 
             <div style={sL}>Workout streak</div>
-            <div style={{ background:"#1A2332", borderRadius:14, padding:"14px" }}>
+            <div style={{ background:"#212429", borderRadius:14, padding:"14px" }}>
               <StreakCalendar accent={a} workoutDates={
                 useRealWorkoutData
                   ? [...new Set(realLogs.map(r => r.workout_date))]
@@ -380,11 +380,11 @@ function ProgressScreen() {
               <div style={{ display:"flex", gap:14, marginTop:10 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:5 }}>
                   <div style={{ width:10, height:10, borderRadius:3, background:a }} />
-                  <span style={{ fontSize:10, color:"#6B7A8D" }}>Workout done</span>
+                  <span style={{ fontSize:10, color:"#6E7480" }}>Workout done</span>
                 </div>
                 <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                  <div style={{ width:10, height:10, borderRadius:3, background:"#1A2332", border:"1px solid #1E2D42" }} />
-                  <span style={{ fontSize:10, color:"#6B7A8D" }}>Rest day</span>
+                  <div style={{ width:10, height:10, borderRadius:3, background:"#212429", border:"1px solid #2B2E34" }} />
+                  <span style={{ fontSize:10, color:"#6E7480" }}>Rest day</span>
                 </div>
               </div>
             </div>
@@ -402,30 +402,30 @@ function ProgressScreen() {
               const workoutsDisplay = logsLoading ? "..." : totalWorkouts > 0 ? String(totalWorkouts) : "0";
               return (
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
-                  <div style={{ background:"#1A2332", borderRadius:12, padding:"10px 12px" }}>
+                  <div style={{ background:"#212429", borderRadius:12, padding:"10px 12px" }}>
                     <div style={{ fontSize:20, fontWeight:700, color:a }}>{workoutsDisplay}</div>
-                    <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2 }}>Sessions logged</div>
+                    <div style={{ fontSize:10, color:"#6E7480", marginTop:2 }}>Sessions logged</div>
                   </div>
-                  <div style={{ background:"#1A2332", borderRadius:12, padding:"10px 12px" }}>
+                  <div style={{ background:"#212429", borderRadius:12, padding:"10px 12px" }}>
                     <div style={{ fontSize:20, fontWeight:700, color:"#F59E0B" }}>{volDisplay}</div>
-                    <div style={{ fontSize:10, color:"#6B7A8D", marginTop:2 }}>Total volume lifted</div>
+                    <div style={{ fontSize:10, color:"#6E7480", marginTop:2 }}>Total volume lifted</div>
                   </div>
                 </div>
               );
             })()}
             <div style={sL}>Recent sessions</div>
-            <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden" }}>
+            <div style={{ background:"#212429", borderRadius:14, overflow:"hidden" }}>
               {realSessions.length === 0 ? (
                 <div style={{ padding:"18px 14px", textAlign:"center" }}>
                   <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{logsLoading ? "Loading..." : "No sessions yet"}</div>
-                  <div style={{ fontSize:11, color:"#6B7A8D", marginTop:4 }}>{logsLoading ? "Fetching your workout history." : "Log a set in the workout screen and it'll appear here."}</div>
+                  <div style={{ fontSize:11, color:"#6E7480", marginTop:4 }}>{logsLoading ? "Fetching your workout history." : "Log a set in the workout screen and it'll appear here."}</div>
                 </div>
               ) : realSessions.map((w, i) => (
                 <div key={w.date} style={{ padding:"10px 14px", borderBottom: i < realSessions.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                     <div>
                       <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{w.name}</div>
-                      <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{w.date} · {w.sets} sets · {w.vol}</div>
+                      <div style={{ fontSize:11, color:"#6E7480", marginTop:2 }}>{w.date} · {w.sets} sets · {w.vol}</div>
                     </div>
                     {w.pbs > 0 && (
                       <span style={{ background:"#2D1A00", color:"#F59E0B", borderRadius:20, padding:"2px 8px", fontSize:10, fontWeight:500, flexShrink:0 }}>
@@ -443,16 +443,16 @@ function ProgressScreen() {
             {cardioLogs.length > 0 && (
               <>
                 <div style={sL}>Recent cardio</div>
-                <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden" }}>
+                <div style={{ background:"#212429", borderRadius:14, overflow:"hidden" }}>
                   {cardioLogs.slice(0, 5).map((c, i, arr) => (
                     <div key={c.id} style={{ padding:"10px 14px", borderBottom: i < arr.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <div>
                         <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{c.activity_type}</div>
-                        <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>{new Date(c.logged_date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" })}</div>
+                        <div style={{ fontSize:11, color:"#6E7480", marginTop:2 }}>{new Date(c.logged_date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" })}</div>
                       </div>
                       <div style={{ textAlign:"right" }}>
                         <div style={{ fontSize:13, color:a, fontWeight:600 }}>{c.duration_minutes} min</div>
-                        {c.calories ? <div style={{ fontSize:11, color:"#6B7A8D" }}>~{c.calories} cal</div> : null}
+                        {c.calories ? <div style={{ fontSize:11, color:"#6E7480" }}>~{c.calories} cal</div> : null}
                       </div>
                     </div>
                   ))}
@@ -492,13 +492,13 @@ function ProgressScreen() {
 
           return (
             <div className="mq-fade">
-              <div style={{ background:"#0A1628", borderLeft:"2px solid #00D4B1", borderRadius:"0 10px 10px 0", padding:"8px 12px", marginBottom:14 }}>
-                <div style={{ fontSize:12, color:"#9BB3C8", lineHeight:1.5 }}>{pbMsg}</div>
+              <div style={{ background:"#0A1628", borderLeft:"2px solid #4C8DFF", borderRadius:"0 10px 10px 0", padding:"8px 12px", marginBottom:14 }}>
+                <div style={{ fontSize:12, color:"#9BA0AA", lineHeight:1.5 }}>{pbMsg}</div>
               </div>
               {realPBs.length > 0 && (
                 <>
                   <div style={sL}>Current bests</div>
-                  <div style={{ background:"#1A2332", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
+                  <div style={{ background:"#212429", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
                     {realPBs.map((pb, i) => {
                       const isOpen = selectedExercise === pb.exercise;
                       return (
@@ -518,16 +518,16 @@ function ProgressScreen() {
                           >
                             <div>
                               <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
-                              <div style={{ fontSize:11, color:"#6B7A8D", marginTop:2 }}>
+                              <div style={{ fontSize:11, color:"#6E7480", marginTop:2 }}>
                                 {pb.date ? new Date(pb.date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "—"}
                               </div>
                             </div>
                             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                               <div style={{ textAlign:"right" }}>
                                 <div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div>
-                                <div style={{ fontSize:11, color:"#6B7A8D" }}>{pb.reps} reps</div>
+                                <div style={{ fontSize:11, color:"#6E7480" }}>{pb.reps} reps</div>
                               </div>
-                              <div style={{ fontSize:14, color:"#6B7A8D", transition:"transform .2s", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</div>
+                              <div style={{ fontSize:14, color:"#6E7480", transition:"transform .2s", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</div>
                             </div>
                           </div>
                           {/* Inline strength chart — shown when this exercise is selected */}
@@ -537,7 +537,7 @@ function ProgressScreen() {
                               {exerciseHistoryLoading ? (
                                 <div style={{ display:"flex", justifyContent:"center", padding:"12px 0" }}><Spinner size={20} color={a} /></div>
                               ) : exerciseHistory.length < 2 ? (
-                                <div style={{ fontSize:12, color:"#6B7A8D", textAlign:"center", padding:"10px 0" }}>
+                                <div style={{ fontSize:12, color:"#6E7480", textAlign:"center", padding:"10px 0" }}>
                                   {exerciseHistory.length === 1 ? "Log one more session to see your trend" : "No history found for this exercise"}
                                 </div>
                               ) : (
@@ -552,8 +552,8 @@ function ProgressScreen() {
                 </>
               )}
               {realVolBars && (
-                <div style={{ background:"#1A2332", borderRadius:14, padding:"12px 14px" }}>
-                  <div style={{ fontSize:11, color:"#6B7A8D", textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Volume this month</div>
+                <div style={{ background:"#212429", borderRadius:14, padding:"12px 14px" }}>
+                  <div style={{ fontSize:11, color:"#6E7480", textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Volume this month</div>
                   {realVolBars.map(bar => (
                     <div key={bar.label} style={{ marginBottom:8 }}>
                       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>

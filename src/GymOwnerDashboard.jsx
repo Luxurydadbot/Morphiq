@@ -3,7 +3,7 @@ import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon, SU
 
 function buildMemberRow(profile, sessions, lastDate, weightDelta) {
   const initials = (profile.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  const avatarColors = ["#003D35/#00D4B1","#2D1A00/#F59E0B","#1A1040/#A78BFA","#1F1010/#F87171","#0A1628/#60A5FA"];
+  const avatarColors = ["#0B1E3D/#4C8DFF","#2D1A00/#F59E0B","#1A1040/#A78BFA","#1F1010/#F87171","#0A1628/#60A5FA"];
   const [bg, color] = (avatarColors[initials.charCodeAt(0) % avatarColors.length]).split("/");
 
   const today = new Date();
@@ -17,10 +17,10 @@ function buildMemberRow(profile, sessions, lastDate, weightDelta) {
     statusColor = "#F87171";
   } else if (sessions >= 10) {
     status = `${sessions} sessions · ahead of plan`;
-    statusColor = "#00D4B1";
+    statusColor = "#4C8DFF";
   } else if (sessions >= 5) {
     status = `${sessions} sessions · on track`;
-    statusColor = "#6B7A8D";
+    statusColor = "#6E7480";
   } else {
     status = `${sessions} sessions · needs nudge`;
     statusColor = "#F59E0B";
@@ -30,8 +30,8 @@ function buildMemberRow(profile, sessions, lastDate, weightDelta) {
     ? (parseFloat(weightDelta) > 0 ? `+${weightDelta}lb` : `${weightDelta}lb`)
     : "—";
   const deltaColor = weightDelta !== undefined
-    ? (parseFloat(weightDelta) < 0 ? "#00D4B1" : "#F87171")
-    : "#6B7A8D";
+    ? (parseFloat(weightDelta) < 0 ? "#4C8DFF" : "#F87171")
+    : "#6E7480";
 
   return { id: profile.id, name: profile.name || "Member", initials, bg, color, sessions: sessions || 0, status, statusColor, delta, deltaColor, atRisk: daysSince === null || daysSince > 7, isActive: profile.is_active !== false };
 }
@@ -76,10 +76,10 @@ function useOwnerData() {
 
 function OwnerStatCard({ value, label, sub, color }) {
   return (
-    <div style={{ background: "#1A2332", borderRadius: 12, padding: "12px 14px" }}>
-      <div style={{ fontSize: 22, fontWeight: 700, color: color || "#E8EDF2" }}>{value}</div>
-      <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 2 }}>{label}</div>
-      {sub && <div style={{ fontSize: 11, color: "#00D4B1", marginTop: 4 }}>{sub}</div>}
+    <div style={{ background: "#212429", borderRadius: 12, padding: "12px 14px" }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color: color || "#EDEEF0" }}>{value}</div>
+      <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: "#4C8DFF", marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
@@ -88,7 +88,7 @@ function OwnerSpinner() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "32px 0" }}>
       <Spinner />
-      <div style={{ fontSize: 12, color: "#6B7A8D" }}>Loading member data…</div>
+      <div style={{ fontSize: 12, color: "#6E7480" }}>Loading member data…</div>
     </div>
   );
 }
@@ -128,34 +128,34 @@ function OwnerOverviewTab() {
     <div className="mq-fade">
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
         <OwnerStatCard value={total || "0"} label="Total members" />
-        <OwnerStatCard value={`${activePct}%`} label="Active this month" color="#00D4B1" />
+        <OwnerStatCard value={`${activePct}%`} label="Active this month" color="#4C8DFF" />
         <OwnerStatCard value={totalSessions.toLocaleString()} label="Sessions this month" color="#F59E0B" />
         <OwnerStatCard value={avgLoss ? `${avgLoss}lb` : "—"} label="Avg weight change" color="#818cf8" />
       </div>
 
-      <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Activity breakdown</div>
+      <div style={{ fontSize: 11, color: "#6E7480", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Activity breakdown</div>
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
         {[
-          [`${activePct}%`, "Active members", "#00D4B1"],
+          [`${activePct}%`, "Active members", "#4C8DFF"],
           [`${members.filter(m => m.sessions >= 8).length}`, "On track", "#F59E0B"],
           [`${atRisk.length}`, "At risk", "#F87171"],
         ].map(([v, l, c]) => (
-          <div key={l} style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "10px 8px", textAlign: "center" }}>
+          <div key={l} style={{ flex: 1, background: "#212429", borderRadius: 12, padding: "10px 8px", textAlign: "center" }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: c }}>{v}</div>
-            <div style={{ fontSize: 10, color: "#6B7A8D", marginTop: 3, lineHeight: 1.3 }}>{l}</div>
+            <div style={{ fontSize: 10, color: "#6E7480", marginTop: 3, lineHeight: 1.3 }}>{l}</div>
           </div>
         ))}
       </div>
 
       {atRisk.length > 0 && (
         <>
-          <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Needs attention</div>
+          <div style={{ fontSize: 11, color: "#6E7480", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Needs attention</div>
           {atRisk.slice(0, 3).map(m => (
             <div key={m.id} style={{ background: "#1F1010", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#1F1010", border: "1px solid #F87171", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#F87171", fontWeight: 600, flexShrink: 0 }}>{m.initials}</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{m.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0" }}>{m.name}</div>
                   <div style={{ fontSize: 11, color: "#F87171" }}>{m.status}</div>
                 </div>
                 <Pill variant="red">At risk</Pill>
@@ -165,7 +165,7 @@ function OwnerOverviewTab() {
 
           {/* Nudge button — sends a pre-written re-engagement message to all at-risk members only */}
           {nudgeResult ? (
-            <div style={{ background: "#0A1A14", border: "1px solid rgba(0,212,177,0.3)", borderRadius: 10, padding: "10px 14px", textAlign: "center", fontSize: 12, color: "#00D4B1", marginTop: 4 }}>
+            <div style={{ background: "#0A1A14", border: "1px solid rgba(76,141,255,0.3)", borderRadius: 10, padding: "10px 14px", textAlign: "center", fontSize: 12, color: "#4C8DFF", marginTop: 4 }}>
               <Icon name="check" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Nudge sent to {nudgeResult.sent} member{nudgeResult.sent !== 1 ? "s" : ""}
               {nudgeResult.failed > 0 && <span style={{ color: "#F87171", marginLeft: 6 }}>({nudgeResult.failed} failed)</span>}
             </div>
@@ -173,7 +173,7 @@ function OwnerOverviewTab() {
             <button
               onClick={sendNudge}
               disabled={nudgeSending}
-              style={{ width: "100%", marginTop: 4, background: nudgeSending ? "#1A2332" : "transparent", border: "1px solid rgba(248,113,113,0.35)", borderRadius: 10, padding: "10px 14px", fontSize: 12, fontWeight: 600, color: nudgeSending ? "#6B7A8D" : "#F87171", cursor: nudgeSending ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+              style={{ width: "100%", marginTop: 4, background: nudgeSending ? "#212429" : "transparent", border: "1px solid rgba(248,113,113,0.35)", borderRadius: 10, padding: "10px 14px", fontSize: 12, fontWeight: 600, color: nudgeSending ? "#6E7480" : "#F87171", cursor: nudgeSending ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
             >
               {nudgeSending ? "Sending nudges..." : <><Icon name="chat" size={12} /> Nudge {atRisk.length} at-risk member{atRisk.length !== 1 ? "s" : ""}</>}
             </button>
@@ -182,8 +182,8 @@ function OwnerOverviewTab() {
       )}
 
       {total === 0 && (
-        <div style={{ background: "#1A2332", borderRadius: 12, padding: "20px 16px", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#6B7A8D", lineHeight: 1.6 }}>No members yet. Share your gym's sign-up link to get started.</div>
+        <div style={{ background: "#212429", borderRadius: 12, padding: "20px 16px", textAlign: "center" }}>
+          <div style={{ fontSize: 13, color: "#6E7480", lineHeight: 1.6 }}>No members yet. Share your gym's sign-up link to get started.</div>
         </div>
       )}
     </div>
@@ -263,8 +263,8 @@ function OwnerMembersTab() {
 
   if (!activeMembers.length) {
     return (
-      <div className="mq-fade" style={{ background: "#1A2332", borderRadius: 14, padding: "24px 16px", textAlign: "center" }}>
-        <div style={{ fontSize: 13, color: "#6B7A8D", lineHeight: 1.6 }}>No members have signed up yet.</div>
+      <div className="mq-fade" style={{ background: "#212429", borderRadius: 14, padding: "24px 16px", textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: "#6E7480", lineHeight: 1.6 }}>No members have signed up yet.</div>
       </div>
     );
   }
@@ -276,30 +276,30 @@ function OwnerMembersTab() {
       <div style={{ marginBottom: 14 }}>
         <button
           onClick={() => { setBroadcastOpen(v => !v); setBroadcastResult(null); }}
-          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: broadcastOpen ? "#1A2E2B" : "#1A2332", border: `1px solid ${broadcastOpen ? "rgba(0,212,177,0.35)" : "rgba(255,255,255,0.06)"}`, borderRadius: broadcastOpen ? "14px 14px 0 0" : 14, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}
+          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: broadcastOpen ? "#1A2E2B" : "#212429", border: `1px solid ${broadcastOpen ? "rgba(76,141,255,0.35)" : "rgba(255,255,255,0.06)"}`, borderRadius: broadcastOpen ? "14px 14px 0 0" : 14, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(0,212,177,0.12)", border: "1px solid rgba(0,212,177,0.25)", display: "flex", alignItems: "center", justifyContent: "center", color: "#00D4B1" }}><Icon name="megaphone" size={13} /></div>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(76,141,255,0.12)", border: "1px solid rgba(76,141,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", color: "#4C8DFF" }}><Icon name="megaphone" size={13} /></div>
             <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Message all members</div>
-              <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 1 }}>{activeMembers.length} member{activeMembers.length !== 1 ? "s" : ""} will receive this</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0" }}>Message all members</div>
+              <div style={{ fontSize: 11, color: "#6E7480", marginTop: 1 }}>{activeMembers.length} member{activeMembers.length !== 1 ? "s" : ""} will receive this</div>
             </div>
           </div>
-          <div style={{ fontSize: 18, color: "#6B7A8D", transform: broadcastOpen ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
+          <div style={{ fontSize: 18, color: "#6E7480", transform: broadcastOpen ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
         </button>
 
         {broadcastOpen && (
-          <div className="mq-fade" style={{ background: "#1A2E2B", border: "1px solid rgba(0,212,177,0.35)", borderTop: "none", borderRadius: "0 0 14px 14px", padding: "14px" }}>
+          <div className="mq-fade" style={{ background: "#1A2E2B", border: "1px solid rgba(76,141,255,0.35)", borderTop: "none", borderRadius: "0 0 14px 14px", padding: "14px" }}>
             {/* Recipient preview chips */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
               {members.slice(0, 8).map(m => (
-                <div key={m.id} style={{ background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "3px 9px", fontSize: 10, color: "#9BB3C8", display: "flex", alignItems: "center", gap: 5 }}>
+                <div key={m.id} style={{ background: "#171920", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "3px 9px", fontSize: 10, color: "#9BA0AA", display: "flex", alignItems: "center", gap: 5 }}>
                   <div style={{ width: 14, height: 14, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: m.color, fontWeight: 700 }}>{m.initials}</div>
                   {m.name.split(" ")[0]}
                 </div>
               ))}
               {activeMembers.length > 8 && (
-                <div style={{ background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "3px 9px", fontSize: 10, color: "#6B7A8D" }}>+{activeMembers.length - 8} more</div>
+                <div style={{ background: "#171920", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "3px 9px", fontSize: 10, color: "#6E7480" }}>+{activeMembers.length - 8} more</div>
               )}
             </div>
 
@@ -307,16 +307,16 @@ function OwnerMembersTab() {
               value={broadcastText}
               onChange={e => setBroadcastText(e.target.value)}
               placeholder={`Hey everyone at ${gymBranding?.name || "the gym"} — just a quick update from your coach...`}
-              style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 88, lineHeight: 1.55, marginBottom: 10, boxSizing: "border-box" }}
+              style={{ width: "100%", background: "#171920", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#9BA0AA", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 88, lineHeight: 1.55, marginBottom: 10, boxSizing: "border-box" }}
             />
 
             {/* Character count */}
-            <div style={{ fontSize: 10, color: broadcastText.length > 280 ? "#F87171" : "#6B7A8D", textAlign: "right", marginTop: -6, marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: broadcastText.length > 280 ? "#F87171" : "#6E7480", textAlign: "right", marginTop: -6, marginBottom: 10 }}>
               {broadcastText.length} / 280 characters
             </div>
 
             {broadcastResult && (
-              <div style={{ background: broadcastResult.failed === 0 ? "#003D35" : "#1F1010", border: `1px solid ${broadcastResult.failed === 0 ? "rgba(0,212,177,0.4)" : "rgba(248,113,113,0.3)"}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: broadcastResult.failed === 0 ? "#00D4B1" : "#F87171" }}>
+              <div style={{ background: broadcastResult.failed === 0 ? "#0B1E3D" : "#1F1010", border: `1px solid ${broadcastResult.failed === 0 ? "rgba(76,141,255,0.4)" : "rgba(248,113,113,0.3)"}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: broadcastResult.failed === 0 ? "#4C8DFF" : "#F87171" }}>
                 {broadcastResult.failed === 0
                   ? <><Icon name="check" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Sent to all {broadcastResult.sent} member{broadcastResult.sent !== 1 ? "s" : ""} — they'll see it next time they open the app.</>
                   : `Sent to ${broadcastResult.sent}, failed for ${broadcastResult.failed}. Check your connection and try again.`}
@@ -325,13 +325,13 @@ function OwnerMembersTab() {
 
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => { setBroadcastOpen(false); setBroadcastText(""); setBroadcastResult(null); }}
-                style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>
+                style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>
                 Cancel
               </button>
               <button
                 onClick={sendBroadcast}
                 disabled={!broadcastText.trim() || broadcastSending || broadcastText.length > 280}
-                style={{ flex: 2, background: broadcastResult?.sent > 0 ? "#003D35" : "#00D4B1", color: broadcastResult?.sent > 0 ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: (!broadcastText.trim() || broadcastSending) ? "default" : "pointer", fontFamily: "inherit", opacity: (!broadcastText.trim() || broadcastSending) ? 0.5 : 1, transition: "all .2s" }}
+                style={{ flex: 2, background: broadcastResult?.sent > 0 ? "#0B1E3D" : "#4C8DFF", color: broadcastResult?.sent > 0 ? "#4C8DFF" : "#0B1E3D", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: (!broadcastText.trim() || broadcastSending) ? "default" : "pointer", fontFamily: "inherit", opacity: (!broadcastText.trim() || broadcastSending) ? 0.5 : 1, transition: "all .2s" }}
               >
                 {broadcastSending ? "Sending..." : broadcastResult?.sent > 0 ? <>Sent <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : `Send to all ${activeMembers.length} members`}
               </button>
@@ -341,24 +341,24 @@ function OwnerMembersTab() {
       </div>
 
       {/* ── Member list ── */}
-      <div style={{ background: "#1A2332", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
+      <div style={{ background: "#212429", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
         {activeMembers.map((m, i) => (
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < activeMembers.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: m.color, flexShrink: 0 }}>{m.initials}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
               <div style={{ fontSize: 11, color: m.statusColor }}>{m.status}</div>
             </div>
             <div style={{ textAlign: "right", marginRight: 8, flexShrink: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: m.deltaColor }}>{m.delta}</div>
-              <div style={{ fontSize: 10, color: "#6B7A8D" }}>weight</div>
+              <div style={{ fontSize: 10, color: "#6E7480" }}>weight</div>
             </div>
             <button onClick={() => { setComposeTo(m); setSent(false); setMsgText(""); setBroadcastOpen(false); }}
-              style={{ width: 28, height: 28, borderRadius: 8, background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.4-.6 2.6-1.5 3.5L10.5 12H6.5c-2.76 0-5-2.24-5-5z" stroke="#00D4B1" strokeWidth="1" /></svg>
+              style={{ width: 28, height: 28, borderRadius: 8, background: "#171920", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.4-.6 2.6-1.5 3.5L10.5 12H6.5c-2.76 0-5-2.24-5-5z" stroke="#4C8DFF" strokeWidth="1" /></svg>
             </button>
             <button onClick={() => handleRemoveMember(m)} disabled={busyMemberId === m.id} title="Remove member"
-              style={{ width: 28, height: 28, borderRadius: 8, background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 6, opacity: busyMemberId === m.id ? 0.5 : 1 }}>
+              style={{ width: 28, height: 28, borderRadius: 8, background: "#171920", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 6, opacity: busyMemberId === m.id ? 0.5 : 1 }}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2l-9 9" stroke="#F87171" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </button>
           </div>
@@ -368,17 +368,17 @@ function OwnerMembersTab() {
       {removedMembers.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <button onClick={() => setShowRemoved(v => !v)}
-            style={{ background: "none", border: "none", color: "#6B7A8D", fontSize: 12, cursor: "pointer", padding: "4px 0", fontFamily: "inherit" }}>
+            style={{ background: "none", border: "none", color: "#6E7480", fontSize: 12, cursor: "pointer", padding: "4px 0", fontFamily: "inherit" }}>
             {showRemoved ? "Hide" : "Show"} removed members ({removedMembers.length})
           </button>
           {showRemoved && (
-            <div style={{ background: "#1A2332", borderRadius: 14, overflow: "hidden", marginTop: 8, opacity: 0.6 }}>
+            <div style={{ background: "#212429", borderRadius: 14, overflow: "hidden", marginTop: 8, opacity: 0.6 }}>
               {removedMembers.map((m, i) => (
                 <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: i < removedMembers.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: m.color, flexShrink: 0 }}>{m.initials}</div>
-                  <div style={{ flex: 1, fontSize: 13, color: "#E8EDF2" }}>{m.name}</div>
+                  <div style={{ flex: 1, fontSize: 13, color: "#EDEEF0" }}>{m.name}</div>
                   <button onClick={() => handleRestoreMember(m)} disabled={busyMemberId === m.id}
-                    style={{ fontSize: 11, fontWeight: 600, color: "#00D4B1", background: "none", border: "1px solid #00D4B1", borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", opacity: busyMemberId === m.id ? 0.5 : 1 }}>
+                    style={{ fontSize: 11, fontWeight: 600, color: "#4C8DFF", background: "none", border: "1px solid #4C8DFF", borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", opacity: busyMemberId === m.id ? 0.5 : 1 }}>
                     {busyMemberId === m.id ? "..." : "Restore"}
                   </button>
                 </div>
@@ -390,19 +390,19 @@ function OwnerMembersTab() {
 
       {/* ── Individual compose panel ── */}
       {composeTo && (
-        <div className="mq-fade" style={{ background: "#1A2332", borderRadius: 14, padding: "14px" }}>
-          <div style={{ fontSize: 12, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Message</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D1623", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
-            <span style={{ fontSize: 11, color: "#6B7A8D" }}>To:</span>
+        <div className="mq-fade" style={{ background: "#212429", borderRadius: 14, padding: "14px" }}>
+          <div style={{ fontSize: 12, color: "#6E7480", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Message</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#171920", borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
+            <span style={{ fontSize: 11, color: "#6E7480" }}>To:</span>
             <div style={{ width: 22, height: 22, borderRadius: "50%", background: composeTo.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: composeTo.color, fontWeight: 600 }}>{composeTo.initials}</div>
-            <span style={{ fontSize: 12, color: "#E8EDF2" }}>{composeTo.name}</span>
-            <button onClick={() => setComposeTo(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#6B7A8D", cursor: "pointer", fontSize: 14 }}>×</button>
+            <span style={{ fontSize: 12, color: "#EDEEF0" }}>{composeTo.name}</span>
+            <button onClick={() => setComposeTo(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#6E7480", cursor: "pointer", fontSize: 14 }}>×</button>
           </div>
           <textarea value={msgText} onChange={e => setMsgText(e.target.value)}
             placeholder={`Hey ${composeTo.name.split(" ")[0]} — we noticed you haven't logged in for a while. How's everything going? We're here if you need support 💪`}
-            style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 80, lineHeight: 1.5, marginBottom: 10 }} />
+            style={{ width: "100%", background: "#171920", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#9BA0AA", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 80, lineHeight: 1.5, marginBottom: 10 }} />
           {sendError && <div style={{ fontSize: 12, color: "#F87171", marginBottom: 8 }}>{sendError}</div>}
-          <button onClick={sendMsg} disabled={sending} style={{ width: "100%", background: sent ? "#003D35" : "#00D4B1", color: sent ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: sending ? "default" : "pointer", fontFamily: "inherit", opacity: sending ? 0.7 : 1 }}>
+          <button onClick={sendMsg} disabled={sending} style={{ width: "100%", background: sent ? "#0B1E3D" : "#4C8DFF", color: sent ? "#4C8DFF" : "#0B1E3D", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: sending ? "default" : "pointer", fontFamily: "inherit", opacity: sending ? 0.7 : 1 }}>
             {sent ? <>Sent <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : sending ? "Sending..." : "Send message"}
           </button>
         </div>
@@ -414,21 +414,27 @@ function OwnerMembersTab() {
 function OwnerBrandingTab() {
   const { gymBranding, setGymBranding } = useApp();
   const [gymName, setGymName] = useState(gymBranding.name);
-  const [brandColor, setBrandColor] = useState(gymBranding.accent);
   const [welcome, setWelcome] = useState(gymBranding.welcome || `Welcome to ${gymBranding.name}. Your personal AI trainer is ready. Let's get to work.`);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  // Session 11: accent is fixed app-wide now, no longer a per-gym setting --
+  // this used to be an editable "Brand color" swatch picker here, removed
+  // since it would otherwise silently do nothing (misleading, not just
+  // inert). Still passed through to saveGymBranding() below so the DB row
+  // stays consistent, but it's a constant, not something read from state.
+  const FIXED_ACCENT = "#4C8DFF";
 
   async function save() {
     setSaving(true);
     setError(null);
     // Use the real gym ID stored in context when the owner signed in
     const gymId = gymBranding?.gymId || "demo-gym";
-    const ok = await sb.saveGymBranding(gymId, { name: gymName, accent: brandColor, welcome });
+    const ok = await sb.saveGymBranding(gymId, { name: gymName, accent: FIXED_ACCENT, welcome });
     setSaving(false);
     if (ok) {
-      setGymBranding({ name: gymName, accent: brandColor, welcome, units: gymBranding.units });
+      setGymBranding({ name: gymName, accent: FIXED_ACCENT, welcome, units: gymBranding.units });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } else {
@@ -438,53 +444,43 @@ function OwnerBrandingTab() {
 
   return (
     <div className="mq-fade">
-      <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px", marginBottom: 16 }}>
+      <div style={{ background: "#212429", borderRadius: 14, padding: "14px", marginBottom: 16 }}>
         {/* Gym name */}
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 6 }}>Gym name</div>
+          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 6 }}>Gym name</div>
           <input value={gymName} onChange={e => setGymName(e.target.value)}
-            style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }} />
-        </div>
-        {/* Brand color */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 6 }}>Brand color</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {["#00D4B1","#7C3AED","#EF4444","#F59E0B","#3B82F6"].map(c => (
-              <button key={c} onClick={() => setBrandColor(c)} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: brandColor === c ? "3px solid #E8EDF2" : "2px solid transparent", cursor: "pointer", flexShrink: 0 }} />
-            ))}
-            <div style={{ fontSize: 12, color: "#9BB3C8", marginLeft: 4, fontFamily: "monospace" }}>{brandColor}</div>
-          </div>
+            style={{ width: "100%", background: "#171920", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#EDEEF0", outline: "none", fontFamily: "inherit" }} />
         </div>
         {/* Welcome message */}
         <div>
-          <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 6 }}>Welcome message</div>
+          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 6 }}>Welcome message</div>
           <textarea value={welcome} onChange={e => setWelcome(e.target.value)}
-            style={{ width: "100%", background: "#0D1623", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#9BB3C8", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 60, lineHeight: 1.5 }} />
+            style={{ width: "100%", background: "#171920", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#9BA0AA", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 60, lineHeight: 1.5 }} />
         </div>
       </div>
 
       {/* Live preview */}
-      <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Live member preview</div>
-      <div style={{ background: "#111827", borderRadius: 14, overflow: "hidden", marginBottom: 16, border: "1px solid #1E2D42" }}>
-        <div style={{ background: "#111827", padding: "10px 14px", borderBottom: "1px solid #1E2D42", display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `2px solid ${brandColor}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: brandColor }}>M</div>
+      <div style={{ fontSize: 11, color: "#6E7480", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Live member preview</div>
+      <div style={{ background: "#1B1D21", borderRadius: 14, overflow: "hidden", marginBottom: 16, border: "1px solid #2B2E34" }}>
+        <div style={{ background: "#1B1D21", padding: "10px 14px", borderBottom: "1px solid #2B2E34", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#0B1E3D", border: `2px solid ${FIXED_ACCENT}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: FIXED_ACCENT }}>M</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>{gymName}</div>
-            <div style={{ fontSize: 10, color: "#6B7A8D" }}>Powered by Hypergentiq</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0" }}>{gymName}</div>
+            <div style={{ fontSize: 10, color: "#6E7480" }}>Powered by Hypergentiq</div>
           </div>
         </div>
         <div style={{ padding: "14px" }}>
-          <div style={{ fontSize: 12, color: "#9BB3C8", marginBottom: 12, lineHeight: 1.5 }}>"{welcome}"</div>
-          <div style={{ background: brandColor, borderRadius: 10, padding: "9px", fontSize: 12, fontWeight: 600, color: "#003D35", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Build my plan <Icon name="arrow-right" size={12} /></div>
+          <div style={{ fontSize: 12, color: "#9BA0AA", marginBottom: 12, lineHeight: 1.5 }}>"{welcome}"</div>
+          <div style={{ background: FIXED_ACCENT, borderRadius: 10, padding: "9px", fontSize: 12, fontWeight: 600, color: "#0B1E3D", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Build my plan <Icon name="arrow-right" size={12} /></div>
         </div>
       </div>
 
       {error && <div style={{ fontSize: 12, color: "#F87171", marginBottom: 8, padding: "8px 12px", background: "#1F1010", borderRadius: 8 }}>{error}</div>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={save} disabled={saving} style={{ flex: 2, background: saved ? "#003D35" : "#00D4B1", color: saved ? "#00D4B1" : "#003D35", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+        <button onClick={save} disabled={saving} style={{ flex: 2, background: saved ? "#0B1E3D" : "#4C8DFF", color: saved ? "#4C8DFF" : "#0B1E3D", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
           {saving ? "Saving…" : saved ? <>Saved <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : "Save changes"}
         </button>
-        <button onClick={() => { setGymName(gymBranding.name); setBrandColor(gymBranding.accent); setWelcome(gymBranding.welcome || ""); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
+        <button onClick={() => { setGymName(gymBranding.name); setWelcome(gymBranding.welcome || ""); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
       </div>
     </div>
   );
@@ -515,24 +511,24 @@ function OwnerInviteTab() {
 
   return (
     <div className="mq-fade">
-      <div style={{ background: "#1A2332", borderRadius: 14, padding: "16px 14px", marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#E8EDF2", marginBottom: 6 }}>Member invite link</div>
-        <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.6, marginBottom: 14 }}>
+      <div style={{ background: "#212429", borderRadius: 14, padding: "16px 14px", marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#EDEEF0", marginBottom: 6 }}>Member invite link</div>
+        <div style={{ fontSize: 12, color: "#9BA0AA", lineHeight: 1.6, marginBottom: 14 }}>
           Share this link with new members. When they open it, they'll land directly on your branded gym sign-up — no searching for Hypergentiq separately.
         </div>
-        <div style={{ background: "#0D1623", border: "1px solid #1E2D42", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{ flex: 1, fontSize: 11, color: "#9BB3C8", fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.5 }}>{inviteUrl}</div>
-          <button onClick={copyLink} style={{ flexShrink: 0, background: copied ? "#003D35" : "#00D4B1", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: copied ? "#00D4B1" : "#003D35", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
+        <div style={{ background: "#171920", border: "1px solid #2B2E34", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: 1, fontSize: 11, color: "#9BA0AA", fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.5 }}>{inviteUrl}</div>
+          <button onClick={copyLink} style={{ flexShrink: 0, background: copied ? "#0B1E3D" : "#4C8DFF", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: copied ? "#4C8DFF" : "#0B1E3D", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
             {copied ? <>Copied <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : "Copy"}
           </button>
         </div>
-        <div style={{ fontSize: 10, color: "#6B7A8D", lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color: "#6E7480", lineHeight: 1.6 }}>
           Members who sign up via this link are automatically assigned to your gym. Their plan will show your branding.
         </div>
       </div>
 
-      <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px", marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>How it works</div>
+      <div style={{ background: "#212429", borderRadius: 14, padding: "14px", marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: "#6E7480", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>How it works</div>
         {[
           ["1", "Copy the link above and share it via text, email, or your gym's social media."],
           ["2", "Member opens the link → sees your gym name and branding on the sign-in screen."],
@@ -540,15 +536,15 @@ function OwnerInviteTab() {
           ["4", "Their plan is built by Hypergentiq AI and appears in the Members tab of your dashboard."],
         ].map(([num, text]) => (
           <div key={num} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
-            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: "1px solid rgba(0,212,177,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#00D4B1", flexShrink: 0 }}>{num}</div>
-            <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.6 }}>{text}</div>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#0B1E3D", border: "1px solid rgba(76,141,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#4C8DFF", flexShrink: 0 }}>{num}</div>
+            <div style={{ fontSize: 12, color: "#9BA0AA", lineHeight: 1.6 }}>{text}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px" }}>
-        <div style={{ fontSize: 11, color: "#00D4B1", fontWeight: 600, marginBottom: 4 }}>Tip: QR code</div>
-        <div style={{ fontSize: 11, color: "#6B7A8D", lineHeight: 1.6 }}>
+      <div style={{ background: "#0F1922", border: "1px solid rgba(76,141,255,0.1)", borderRadius: 12, padding: "12px 14px" }}>
+        <div style={{ fontSize: 11, color: "#4C8DFF", fontWeight: 600, marginBottom: 4 }}>Tip: QR code</div>
+        <div style={{ fontSize: 11, color: "#6E7480", lineHeight: 1.6 }}>
           Go to qr-code-generator.com, paste your link, and print the QR code to display at your front desk or on your website.
         </div>
       </div>
@@ -583,9 +579,9 @@ function PricingScreen() {
       name: "Starter",
       price: "$99",
       perMember: "$2",
-      color: "#00D4B1",
-      bg: "#003D35",
-      border: "rgba(0,212,177,0.3)",
+      color: "#4C8DFF",
+      bg: "#0B1E3D",
+      border: "rgba(76,141,255,0.3)",
       badge: null,
       features: [
         "Up to 100 active members",
@@ -636,18 +632,18 @@ function PricingScreen() {
   ];
 
   return (
-    <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
-      <div style={{ background: "#0D1623", borderBottom: "1px solid #1E2D42", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-        <button onClick={() => navigate("owner")} style={{ background: "none", border: "none", color: "#6B7A8D", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={18} /></button>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF2" }}>Pricing Plans</div>
+    <div style={{ background: "#121316", borderRadius: 20, color: "#EDEEF0", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
+      <div style={{ background: "#171920", borderBottom: "1px solid #2B2E34", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+        <button onClick={() => navigate("owner")} style={{ background: "none", border: "none", color: "#6E7480", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={18} /></button>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#EDEEF0" }}>Pricing Plans</div>
       </div>
 
       <div style={{ padding: "16px 16px 80px", overflowY: "auto" }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 13, color: "#9BB3C8", lineHeight: 1.6 }}>
-            All plans include a <span style={{ color: "#00D4B1", fontWeight: 600 }}>14-day free trial</span>. No credit card required to start.
+          <div style={{ fontSize: 13, color: "#9BA0AA", lineHeight: 1.6 }}>
+            All plans include a <span style={{ color: "#4C8DFF", fontWeight: 600 }}>14-day free trial</span>. No credit card required to start.
           </div>
-          <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: "#6E7480", marginTop: 4 }}>
             Billing is monthly. "Active member" = logged at least one workout that month.
           </div>
         </div>
@@ -662,17 +658,17 @@ function PricingScreen() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: plan.color }}>{plan.name}</div>
-                <div style={{ fontSize: 11, color: "#9BB3C8", marginTop: 2 }}>Base monthly fee</div>
+                <div style={{ fontSize: 11, color: "#9BA0AA", marginTop: 2 }}>Base monthly fee</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "#E8EDF2", lineHeight: 1 }}>{plan.price}<span style={{ fontSize: 12, color: "#9BB3C8", fontWeight: 400 }}>/mo</span></div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: "#EDEEF0", lineHeight: 1 }}>{plan.price}<span style={{ fontSize: 12, color: "#9BA0AA", fontWeight: 400 }}>/mo</span></div>
                 <div style={{ fontSize: 11, color: plan.color, marginTop: 2 }}>+ {plan.perMember} per active member</div>
               </div>
             </div>
             <div style={{ borderTop: `1px solid rgba(255,255,255,0.06)`, paddingTop: 10 }}>
               {plan.features.map(f => (
                 <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
-                  <div style={{ width: 14, height: 14, borderRadius: "50%", background: plan.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#080E1A", flexShrink: 0 }}><Icon name="check" size={9} /></div>
+                  <div style={{ width: 14, height: 14, borderRadius: "50%", background: plan.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#121316", flexShrink: 0 }}><Icon name="check" size={9} /></div>
                   <span style={{ fontSize: 12, color: "#C0C0C0" }}>{f}</span>
                 </div>
               ))}
@@ -684,11 +680,11 @@ function PricingScreen() {
                   value={leadEmail}
                   onChange={e => setLeadEmail(e.target.value)}
                   placeholder="Your email address"
-                  style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: `1px solid ${plan.color}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#E8EDF2", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                  style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: `1px solid ${plan.color}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#EDEEF0", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                 />
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <button onClick={() => setLeadPlan(null)} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px", fontSize: 12, color: "#9BB3C8", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                  <button onClick={submitLead} disabled={!leadEmail.includes("@") || leadSaving} style={{ flex: 2, background: plan.color, color: "#080E1A", border: "none", borderRadius: 10, padding: "9px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: leadSaving ? 0.6 : 1 }}>
+                  <button onClick={() => setLeadPlan(null)} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, padding: "9px", fontSize: 12, color: "#9BA0AA", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  <button onClick={submitLead} disabled={!leadEmail.includes("@") || leadSaving} style={{ flex: 2, background: plan.color, color: "#121316", border: "none", borderRadius: 10, padding: "9px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: leadSaving ? 0.6 : 1 }}>
                     {leadSaving ? "Saving..." : <>Start free trial <Icon name="arrow-right" size={12} /></>}
                   </button>
                 </div>
@@ -696,22 +692,22 @@ function PricingScreen() {
             ) : leadPlan === plan.name && leadSent ? (
               <div style={{ marginTop: 14, background: "rgba(0,0,0,0.3)", border: `1px solid ${plan.color}`, borderRadius: 10, padding: "12px", textAlign: "center" }}>
                 <div style={{ fontSize: 14, color: plan.color, fontWeight: 700, marginBottom: 4 }}><Icon name="check" size={13} style={{ verticalAlign: "-2px", marginRight: 3 }} /> You're on the list!</div>
-                <div style={{ fontSize: 11, color: "#9BB3C8" }}>We'll reach out to {leadEmail} within 24 hours to get you set up.</div>
+                <div style={{ fontSize: 11, color: "#9BA0AA" }}>We'll reach out to {leadEmail} within 24 hours to get you set up.</div>
               </div>
             ) : (
-              <button onClick={() => { setLeadPlan(plan.name); setLeadEmail(""); setLeadSent(false); }} style={{ width: "100%", background: plan.color, color: "#080E1A", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 14 }}>
+              <button onClick={() => { setLeadPlan(plan.name); setLeadEmail(""); setLeadSent(false); }} style={{ width: "100%", background: plan.color, color: "#121316", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 14 }}>
                 Start {plan.name} trial <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px" }} />
               </button>
             )}
           </div>
         ))}
 
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px", textAlign: "center" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", marginBottom: 6 }}>Need something custom?</div>
-          <div style={{ fontSize: 12, color: "#9BB3C8", marginBottom: 10, lineHeight: 1.6 }}>
+        <div style={{ background: "#212429", borderRadius: 14, padding: "14px", textAlign: "center" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0", marginBottom: 6 }}>Need something custom?</div>
+          <div style={{ fontSize: 12, color: "#9BA0AA", marginBottom: 10, lineHeight: 1.6 }}>
             Enterprise plans available for gym chains, franchises, and large studios. Let's talk.
           </div>
-          <div style={{ fontSize: 12, color: "#00D4B1" }}>hello@hypergentiq.com</div>
+          <div style={{ fontSize: 12, color: "#4C8DFF" }}>hello@hypergentiq.com</div>
         </div>
       </div>
 
@@ -723,7 +719,7 @@ function PricingScreen() {
 
 function OwnerUsageTab() {
   const { gymBranding } = useApp();
-  const a = "#00D4B1";
+  const a = "#4C8DFF";
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const month = new Date().toISOString().slice(0, 7);
@@ -749,38 +745,38 @@ function OwnerUsageTab() {
   const chatCalls = rows.filter(r => r.feature === "chat").length;
   const mealCalls = rows.filter(r => r.feature === "meal_parse").length;
 
-  const card = { background: "#1A2332", borderRadius: 12, padding: "12px 14px", marginBottom: 10 };
-  const dim = { fontSize: 11, color: "#6B7A8D" };
+  const card = { background: "#212429", borderRadius: 12, padding: "12px 14px", marginBottom: 10 };
+  const dim = { fontSize: 11, color: "#6E7480" };
   const big = { fontSize: 22, fontWeight: 700, color: a };
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", marginBottom: 14 }}>AI Usage — {month}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0", marginBottom: 14 }}>AI Usage — {month}</div>
       {loading ? <div style={{ ...dim, textAlign: "center", padding: 20 }}>Loading...</div> : (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
             <div style={card}><div style={big}>{totalCalls}</div><div style={dim}>Total AI calls</div></div>
-            <div style={{ ...card, background: "#0A1A14", border: "1px solid rgba(0,212,177,0.2)" }}><div style={big}>${estCost}</div><div style={dim}>Est. cost this month</div></div>
+            <div style={{ ...card, background: "#0A1A14", border: "1px solid rgba(76,141,255,0.2)" }}><div style={big}>${estCost}</div><div style={dim}>Est. cost this month</div></div>
             <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#A78BFA" }}>{totalTokens.toLocaleString()}</div><div style={dim}>Tokens used</div></div>
             <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#F59E0B" }}>{chatCalls}</div><div style={dim}>Chat messages</div></div>
           </div>
           <div style={card}>
-            <div style={{ fontSize: 11, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Usage by feature</div>
+            <div style={{ fontSize: 11, color: "#6E7480", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Usage by feature</div>
             {[["AI Chat", chatCalls, a], ["Meal parsing", mealCalls, "#F59E0B"], ["Plan generation", totalCalls - chatCalls - mealCalls, "#A78BFA"]].map(([label, count, color]) => (
               <div key={label} style={{ marginBottom: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9BB3C8", marginBottom: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9BA0AA", marginBottom: 4 }}>
                   <span>{label}</span><span style={{ color }}>{count} calls</span>
                 </div>
-                <div style={{ height: 4, background: "#0D1623", borderRadius: 2 }}>
+                <div style={{ height: 4, background: "#171920", borderRadius: 2 }}>
                   <div style={{ height: 4, borderRadius: 2, background: color, width: totalCalls ? `${Math.round((count/totalCalls)*100)}%` : "0%", transition: "width .5s" }} />
                 </div>
               </div>
             ))}
           </div>
-          <div style={{ ...card, background: "#0D1623" }}>
-            <div style={{ fontSize: 11, color: "#6B7A8D", marginBottom: 4 }}>Member limit</div>
-            <div style={{ fontSize: 13, color: "#E8EDF2" }}>50 AI chat messages per member per month</div>
-            <div style={{ fontSize: 11, color: "#6B7A8D", marginTop: 4 }}>Resets on the 1st of each month</div>
+          <div style={{ ...card, background: "#171920" }}>
+            <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 4 }}>Member limit</div>
+            <div style={{ fontSize: 13, color: "#EDEEF0" }}>50 AI chat messages per member per month</div>
+            <div style={{ fontSize: 11, color: "#6E7480", marginTop: 4 }}>Resets on the 1st of each month</div>
           </div>
         </>
       )}
@@ -794,21 +790,21 @@ function GymOwnerDashboard() {
   const tabs = [["overview","Overview"],["members","Members"],["invite","Invite"],["branding","Branding"],["usage","AI Usage"]];
 
   return (
-    <div style={{ background: "#080E1A", borderRadius: 20, color: "#E8EDF2", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
+    <div style={{ background: "#121316", borderRadius: 20, color: "#EDEEF0", fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ background: "#0D1623", borderBottom: "1px solid #1E2D42", padding: "14px 16px 0" }}>
+      <div style={{ background: "#171920", borderBottom: "1px solid #2B2E34", padding: "14px 16px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF2" }}>Gym Dashboard</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#EDEEF0" }}>Gym Dashboard</div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00D4B1" }} />
-            <span style={{ fontSize: 11, color: "#6B7A8D" }}>Admin</span>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4C8DFF" }} />
+            <span style={{ fontSize: 11, color: "#6E7480" }}>Admin</span>
           </div>
         </div>
         {/* Tab bar */}
         <div style={{ display: "flex", gap: 0 }}>
           {tabs.map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)}
-              style={{ flex: 1, padding: "8px 4px", background: "none", border: "none", borderBottom: `2px solid ${tab === id ? "#00D4B1" : "transparent"}`, fontSize: 12, fontWeight: tab === id ? 600 : 400, color: tab === id ? "#00D4B1" : "#6B7A8D", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
+              style={{ flex: 1, padding: "8px 4px", background: "none", border: "none", borderBottom: `2px solid ${tab === id ? "#4C8DFF" : "transparent"}`, fontSize: 12, fontWeight: tab === id ? 600 : 400, color: tab === id ? "#4C8DFF" : "#6E7480", cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
               {label}
             </button>
           ))}

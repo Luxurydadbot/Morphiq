@@ -5,7 +5,7 @@ import { useApp, sb, Pill, Spinner, VoiceBtn, Layout, theme, GROCERY_DATA, local
 function MacroBar({ label, current, goal, color }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));
   return (
-    <div style={{ flex: 1, background: "#1A2332", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+    <div style={{ flex: 1, background: "#212429", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
       <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
       <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{current}</div>
       <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>of {goal}g</div>
@@ -29,17 +29,17 @@ function GroceryList({ groceries, onToggle }) {
         <div style={{ fontSize: 16, fontWeight: 600, color: theme.text }}>Grocery List</div>
         <Pill variant="teal">{done} of {total} <Icon name="check" size={10} style={{ verticalAlign: "-1px" }} /></Pill>
       </div>
-      <div style={{ fontSize: 11, color: theme.textDim, fontStyle: "italic", marginBottom: 14, lineHeight: 1.5, background: "#0D1623", borderRadius: 8, padding: "8px 10px", borderLeft: "2px solid rgba(0,212,177,0.3)" }}>
+      <div style={{ fontSize: 11, color: theme.textDim, fontStyle: "italic", marginBottom: 14, lineHeight: 1.5, background: "#171920", borderRadius: 8, padding: "8px 10px", borderLeft: "2px solid rgba(76,141,255,0.3)" }}>
         These are smart choices based on your goal — not a strict meal plan. Buy what works for you and your family.
       </div>
       {groceries.map(cat => (
         <div key={cat.category} style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>{cat.emoji} {cat.category}</div>
-          <div style={{ background: "#1A2332", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: "#212429", borderRadius: 12, overflow: "hidden" }}>
             {cat.items.map((item, i) => (
               <button key={item.name} onClick={() => onToggle(cat.category, i)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "none", border: "none", borderBottom: i < cat.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
-                <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${item.done ? a : "rgba(0,212,177,0.3)"}`, background: item.done ? "#003D35" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 9, color: a }}>
+                <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${item.done ? a : "rgba(76,141,255,0.3)"}`, background: item.done ? "#0B1E3D" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 9, color: a }}>
                   {item.done ? <Icon name="check" size={10} /> : ""}
                 </div>
                 <span style={{ flex: 1, fontSize: 13, color: item.done ? theme.textDim : theme.text, textDecoration: item.done ? "line-through" : "none" }}>{item.name}</span>
@@ -140,39 +140,39 @@ function HungryButton({ calsLeft, proteinLeft, goal }) {
   }
 
   if (calledOut) return (
-    <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: "#9BB3C8", lineHeight: 1.5, display: "flex", alignItems: "center", gap: 5 }}>You've hit your calorie goal today — great work. Stay hydrated and your body will take care of the rest. <Icon name="droplet" size={12} color="#60A5FA" /></div>
+    <div style={{ background: "#0F1922", border: "1px solid rgba(76,141,255,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: "#9BA0AA", lineHeight: 1.5, display: "flex", alignItems: "center", gap: 5 }}>You've hit your calorie goal today — great work. Stay hydrated and your body will take care of the rest. <Icon name="droplet" size={12} color="#60A5FA" /></div>
     </div>
   );
 
   return (
-    <div style={{ background: "#0F1922", border: "1px solid rgba(0,212,177,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+    <div style={{ background: "#0F1922", border: "1px solid rgba(76,141,255,0.1)", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: state === "idle" ? 0 : 10 }}>
         <div>
           <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>Remaining today</div>
           <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
-            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#E8EDF2" }}>{calsLeft}</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>cal</span></div>
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#EDEEF0" }}>{calsLeft}</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>cal</span></div>
             <div><span style={{ fontSize: 24, fontWeight: 700, color: "#F59E0B" }}>{proteinLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>protein</span></div>
           </div>
         </div>
         {state === "idle" && (
-          <button onClick={getSuggestions} style={{ background: a, border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>I'm Hungry</button>
+          <button onClick={getSuggestions} style={{ background: a, border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 600, color: "#0B1E3D", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>I'm Hungry</button>
         )}
         {state === "loading" && <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: a }}><Spinner size={12} /> Finding ideas...</div>}
       </div>
       {state === "done" && suggestions.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ fontSize: 10, color: "#6B7A8D", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Ideas that fit</div>
+          <div style={{ fontSize: 10, color: "#6E7480", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Ideas that fit</div>
           {suggestions.map((s, i) => (
-            <div key={i} style={{ background: "#1A2332", borderRadius: 9, padding: "8px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 12, color: "#E8EDF2", fontWeight: 500 }}>{s.name}</div>
+            <div key={i} style={{ background: "#212429", borderRadius: 9, padding: "8px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 12, color: "#EDEEF0", fontWeight: 500 }}>{s.name}</div>
               <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
                 <div style={{ fontSize: 11, color: a, fontWeight: 600 }}>{s.cal} cal</div>
-                <div style={{ fontSize: 10, color: "#6B7A8D" }}>{s.protein}g protein</div>
+                <div style={{ fontSize: 10, color: "#6E7480" }}>{s.protein}g protein</div>
               </div>
             </div>
           ))}
-          <button onClick={() => { setState("idle"); setSuggestions([]); }} style={{ background: "transparent", border: "none", fontSize: 10, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}><Icon name="refresh" size={10} /> Get different ideas</button>
+          <button onClick={() => { setState("idle"); setSuggestions([]); }} style={{ background: "transparent", border: "none", fontSize: 10, color: "#6E7480", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}><Icon name="refresh" size={10} /> Get different ideas</button>
         </div>
       )}
     </div>
@@ -188,7 +188,7 @@ function LogEntryRow({ entry, onDelete, accent }) {
         <span style={{ flexShrink: 0, display: "flex" }}><Icon name="camera" size={14} /></span>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.name}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.name}</div>
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
           <span style={{ fontSize: 10, color: accent, fontWeight: 600 }}>{entry.cal} cal</span>
           <span style={{ fontSize: 10, color: theme.textDim }}>{entry.protein}g pro</span>
@@ -297,7 +297,7 @@ function LogInput({ onLog, accent }) {
   }
 
   return (
-    <div style={{ background: "#0A1628", border: "1px solid rgba(0,212,177,0.15)", borderRadius: 14, padding: "14px", marginBottom: 12 }}>
+    <div style={{ background: "#0A1628", border: "1px solid rgba(76,141,255,0.15)", borderRadius: 14, padding: "14px", marginBottom: 12 }}>
 
       {/* Hidden file input for camera */}
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
@@ -309,7 +309,7 @@ function LogInput({ onLog, accent }) {
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             {/* Voice */}
             <button onClick={startVoice}
-              style={{ flex: 1, background: "#111827", border: "1px solid rgba(0,212,177,0.25)", borderRadius: 12, padding: "14px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer", fontFamily: "inherit" }}>
+              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(76,141,255,0.25)", borderRadius: 12, padding: "14px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer", fontFamily: "inherit" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                 <rect x="8" y="2" width="8" height="12" rx="4" fill={accent} opacity="0.9"/>
                 <path d="M5 11c0 3.866 3.134 7 7 7s7-3.134 7-7" stroke={accent} strokeWidth="2" strokeLinecap="round"/>
@@ -320,7 +320,7 @@ function LogInput({ onLog, accent }) {
             </button>
             {/* Photo */}
             <button onClick={openCamera}
-              style={{ flex: 1, background: "#111827", border: "1px solid rgba(0,212,177,0.25)", borderRadius: 12, padding: "14px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer", fontFamily: "inherit" }}>
+              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(76,141,255,0.25)", borderRadius: 12, padding: "14px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer", fontFamily: "inherit" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <circle cx="12" cy="13" r="4" stroke={accent} strokeWidth="2"/>
@@ -341,10 +341,10 @@ function LogInput({ onLog, accent }) {
               onChange={e => setTextVal(e.target.value)}
               onKeyDown={e => e.key === "Enter" && submitText()}
               placeholder="Type what you ate…"
-              style={{ flex: 1, background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }}
+              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#EDEEF0", outline: "none", fontFamily: "inherit" }}
             />
             <button onClick={submitText} disabled={!textVal.trim()}
-              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4, display: "flex", alignItems: "center" }}><Icon name="arrow-right" size={14} /></button>
+              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", color: "#0B1E3D", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4, display: "flex", alignItems: "center" }}><Icon name="arrow-right" size={14} /></button>
           </div>
         </>
       )}
@@ -373,8 +373,8 @@ function LogInput({ onLog, accent }) {
       {phase === "confirming" && parsed && (
         <>
           <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>Does this look right?</div>
-          <div style={{ background: "#111827", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#E8EDF2", marginBottom: 6 }}>
+          <div style={{ background: "#1B1D21", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#EDEEF0", marginBottom: 6 }}>
               {parsed.name}
               {parsed.isPhotoEstimate && <span style={{ fontSize: 10, color: theme.textDim, fontWeight: 400, marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 3 }}><Icon name="camera" size={10} /> photo estimate</span>}
             </div>
@@ -387,7 +387,7 @@ function LogInput({ onLog, accent }) {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "8px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
-            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Log this <Icon name="check" size={12} /></button>
+            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Log this <Icon name="check" size={12} /></button>
           </div>
         </>
       )}
@@ -396,7 +396,7 @@ function LogInput({ onLog, accent }) {
       {phase === "error" && (
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8 }}>{errMsg}</div>
-          <button onClick={reset} style={{ background: accent, border: "none", borderRadius: 9, padding: "7px 20px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
+          <button onClick={reset} style={{ background: accent, border: "none", borderRadius: 9, padding: "7px 20px", fontSize: 11, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
         </div>
       )}
     </div>
@@ -455,19 +455,19 @@ function WaterTracker({ userId }) {
   const done = oz >= WATER_GOAL_OZ;
 
   return (
-    <div style={{ background: "#0D1E35", border: `1px solid ${done ? "rgba(0,212,177,0.4)" : "rgba(96,165,250,0.25)"}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
+    <div style={{ background: "#0D1E35", border: `1px solid ${done ? "rgba(76,141,255,0.4)" : "rgba(96,165,250,0.25)"}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
       {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path d="M12 2C12 2 5 10 5 15a7 7 0 0 0 14 0c0-5-7-13-7-13z" fill="rgba(96,165,250,0.3)" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF2" }}>Water</div>
-          {done && <div style={{ fontSize: 10, background: "rgba(0,212,177,0.15)", color: a, borderRadius: 6, padding: "2px 7px", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>Goal hit <Icon name="check" size={9} /></div>}
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0" }}>Water</div>
+          {done && <div style={{ fontSize: 10, background: "rgba(76,141,255,0.15)", color: a, borderRadius: 6, padding: "2px 7px", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>Goal hit <Icon name="check" size={9} /></div>}
         </div>
         <div style={{ textAlign: "right" }}>
           <span style={{ fontSize: 22, fontWeight: 700, color: done ? a : "#60A5FA" }}>{glasses}</span>
-          <span style={{ fontSize: 12, color: "#6B7A8D" }}>/{goalGlasses} glasses</span>
+          <span style={{ fontSize: 12, color: "#6E7480" }}>/{goalGlasses} glasses</span>
           {justAdded && (
             <div style={{ fontSize: 11, color: a, fontWeight: 600, animation: "mqFadeOut 1.5s forwards" }}>{justAdded}</div>
           )}
@@ -483,17 +483,17 @@ function WaterTracker({ userId }) {
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         {QUICK_AMOUNTS.map((amt, i) => (
           <button key={amt} onClick={() => addWater(amt)}
-            style={{ flex: 1, background: "#111827", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 9, padding: "8px 4px", fontSize: 11, fontWeight: 600, color: "#60A5FA", cursor: "pointer", fontFamily: "inherit", lineHeight: 1.3 }}>
-            {QUICK_LABELS[i]}<br/><span style={{ fontSize: 9, fontWeight: 400, color: "#6B7A8D" }}>{amt}oz</span>
+            style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 9, padding: "8px 4px", fontSize: 11, fontWeight: 600, color: "#60A5FA", cursor: "pointer", fontFamily: "inherit", lineHeight: 1.3 }}>
+            {QUICK_LABELS[i]}<br/><span style={{ fontSize: 9, fontWeight: 400, color: "#6E7480" }}>{amt}oz</span>
           </button>
         ))}
         <button onClick={() => setShowCustom(!showCustom)}
-          style={{ flex: 1, background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, padding: "8px 4px", fontSize: 12, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>
+          style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, padding: "8px 4px", fontSize: 12, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>
           Custom
         </button>
         {oz > 0 && (
           <button onClick={() => removeWater(8)}
-            style={{ background: "none", border: "none", color: "#6B7A8D", cursor: "pointer", padding: "4px 6px", lineHeight: 1, display: "flex", alignItems: "center" }} title="Remove 8oz">
+            style={{ background: "none", border: "none", color: "#6E7480", cursor: "pointer", padding: "4px 6px", lineHeight: 1, display: "flex", alignItems: "center" }} title="Remove 8oz">
             <Icon name="arrow-left" size={14} />
           </button>
         )}
@@ -508,7 +508,7 @@ function WaterTracker({ userId }) {
             onKeyDown={e => e.key === "Enter" && submitCustom()}
             placeholder="oz amount"
             type="number"
-            style={{ flex: 1, background: "#111827", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: "#E8EDF2", outline: "none", fontFamily: "inherit" }}
+            style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(96,165,250,0.3)", borderRadius: 8, padding: "8px 10px", fontSize: 13, color: "#EDEEF0", outline: "none", fontFamily: "inherit" }}
           />
           <button onClick={submitCustom}
             style={{ background: "#60A5FA", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: "#0D1E35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
@@ -617,7 +617,7 @@ function MealPlanScreen() {
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
 
         {/* ── Calorie header ── */}
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
+        <div style={{ background: "#212429", borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 3 }}>Today's Food</div>
@@ -639,10 +639,10 @@ function MealPlanScreen() {
         <WaterTracker userId={supabaseUser?.id} />
 
         {/* ── Tab bar ── */}
-        <div style={{ display: "flex", background: "#1A2332", borderRadius: 10, padding: 3, marginBottom: 16 }}>
+        <div style={{ display: "flex", background: "#212429", borderRadius: 10, padding: 3, marginBottom: 16 }}>
           {[["today", "Food Log"], ["grocery", "Grocery List"]].map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
-              style={{ flex: 1, padding: "7px 6px", background: tab === t ? a : "transparent", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, color: tab === t ? "#003D35" : theme.textDim, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
+              style={{ flex: 1, padding: "7px 6px", background: tab === t ? a : "transparent", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, color: tab === t ? "#0B1E3D" : theme.textDim, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
               {label}
             </button>
           ))}
@@ -657,7 +657,7 @@ function MealPlanScreen() {
 
             {/* Logged entries */}
             {entries.length > 0 ? (
-              <div style={{ background: "#1A2332", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+              <div style={{ background: "#212429", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
                 <div style={{ padding: "8px 12px 6px", fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px" }}>
                   {entries.length} item{entries.length !== 1 ? "s" : ""} logged today
                 </div>

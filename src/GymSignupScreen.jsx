@@ -147,13 +147,13 @@ function GymSignupScreen() {
 
   return (
     <div style={{ background: ob.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ob.font, color: ob.white, padding: "24px 16px" }}>
-      <div style={{ width: "100%", maxWidth: 420, background: "#0D1623", border: "1px solid #1E2D42", borderRadius: 16, padding: "32px 28px" }}>
+      <div style={{ width: "100%", maxWidth: 420, background: "#171920", border: "1px solid #2B2E34", borderRadius: 16, padding: "32px 28px" }}>
 
         {step === 1 && (
           <>
             <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#003D35", border: "2px solid #00D4B1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
-                <span style={{ fontSize: 18, fontWeight: 700, color: "#00D4B1" }}>M</span>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#0B1E3D", border: "2px solid #4C8DFF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: "#4C8DFF" }}>M</span>
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>Bring Hypergentiq to your gym</div>
               <div style={{ fontSize: 12, color: ob.body, marginTop: 4 }}>Set up your branded AI coaching app in under 5 minutes</div>
@@ -182,7 +182,7 @@ function GymSignupScreen() {
                       onClick={() => setPlanTier(p.id)}
                       style={{
                         background: ob.card,
-                        border: planTier === p.id ? "1.5px solid #00D4B1" : "1px solid #1E2D42",
+                        border: planTier === p.id ? "1.5px solid #4C8DFF" : "1px solid #2B2E34",
                         borderRadius: 10, padding: "10px 12px", display: "flex",
                         justifyContent: "space-between", alignItems: "center", cursor: "pointer",
                       }}
@@ -192,7 +192,7 @@ function GymSignupScreen() {
                         <div style={{ fontSize: 10, color: ob.muted }}>{p.price}</div>
                       </div>
                       {planTier === p.id && (
-                        <div style={{ background: "#003D35", color: "#00D4B1", fontSize: 9, padding: "3px 8px", borderRadius: 12 }}>14-day free trial</div>
+                        <div style={{ background: "#0B1E3D", color: "#4C8DFF", fontSize: 9, padding: "3px 8px", borderRadius: 12 }}>14-day free trial</div>
                       )}
                     </div>
                   ))}
@@ -208,8 +208,8 @@ function GymSignupScreen() {
               onClick={handleSubmit}
               disabled={status === "checking" || status === "redirecting"}
               style={{
-                width: "100%", background: (status === "checking" || status === "redirecting") ? "#1A2332" : "#00D4B1",
-                color: (status === "checking" || status === "redirecting") ? ob.muted : "#003D35", border: "none",
+                width: "100%", background: (status === "checking" || status === "redirecting") ? "#212429" : "#4C8DFF",
+                color: (status === "checking" || status === "redirecting") ? ob.muted : "#0B1E3D", border: "none",
                 borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600,
                 marginTop: 22, cursor: (status === "checking" || status === "redirecting") ? "default" : "pointer",
                 fontFamily: ob.font,
@@ -220,21 +220,21 @@ function GymSignupScreen() {
 
             <div style={{ textAlign: "center", fontSize: 10, color: ob.muted, marginTop: 14 }}>
               Already have an account?{" "}
-              <span style={{ color: "#00D4B1", cursor: "pointer" }} onClick={() => navigate("auth")}>Sign in</span>
+              <span style={{ color: "#4C8DFF", cursor: "pointer" }} onClick={() => navigate("auth")}>Sign in</span>
             </div>
           </>
         )}
 
         {step === 2 && (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#003D35", border: "2px solid #00D4B1", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: "#00D4B1" }}><Icon name="check" size={26} /></div>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#0B1E3D", border: "2px solid #4C8DFF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: "#4C8DFF" }}><Icon name="check" size={26} /></div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white, marginBottom: 8 }}>{gymName || "Your gym"} is ready</div>
             <div style={{ fontSize: 12, color: ob.body, lineHeight: 1.6, marginBottom: 22 }}>
               Your 14-day free trial has started. Sign in below with <span style={{ color: ob.white }}>{email}</span> — we'll email you a one-time code, no password needed.
             </div>
             <button
               onClick={() => navigate("auth")}
-              style={{ width: "100%", background: "#00D4B1", color: "#003D35", border: "none", borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}
+              style={{ width: "100%", background: "#4C8DFF", color: "#0B1E3D", border: "none", borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: ob.font }}
             >
               Go to sign in <Icon name="arrow-right" size={14} style={{verticalAlign:"-2px", marginLeft:2}} />
             </button>
@@ -254,7 +254,7 @@ function GymSignupScreen() {
             <button
               onClick={handleResumeCheckout}
               disabled={status === "redirecting"}
-              style={{ width: "100%", background: status === "redirecting" ? "#1A2332" : "#00D4B1", color: status === "redirecting" ? ob.muted : "#003D35", border: "none", borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600, cursor: status === "redirecting" ? "default" : "pointer", fontFamily: ob.font }}
+              style={{ width: "100%", background: status === "redirecting" ? "#212429" : "#4C8DFF", color: status === "redirecting" ? ob.muted : "#0B1E3D", border: "none", borderRadius: 10, padding: 13, fontSize: 13, fontWeight: 600, cursor: status === "redirecting" ? "default" : "pointer", fontFamily: ob.font }}
             >
               {status === "redirecting" ? "Taking you to payment..." : <>Resume checkout <Icon name="arrow-right" size={14} style={{verticalAlign:"-2px", marginLeft:2}} /></>}
             </button>

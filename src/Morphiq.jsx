@@ -81,7 +81,7 @@ function AppProvider({ children }) {
   // Fix (June 2026): plan was never saved to Supabase on fresh PC login because
   // supabaseUser?.id was null when the save ran. Use this ref instead.
   const supabaseUserIdRef = useRef(null);
-  const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#00D4B1", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
+  const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#4C8DFF", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
   const [historicalData, setHistoricalData] = useState(null);
   // Tracks the current exercise + set while WorkoutScreen is active
   // so ChatScreen can pass exact context to Claude (e.g. "Set 2 of 3 · Goblet Squat")
@@ -105,7 +105,10 @@ function AppProvider({ children }) {
 
     sb.getGymBranding(gymToLoad).then(row => {
       if (row?.name) {
-        setGymBranding({ name: row.name, accent: row.accent || "#00D4B1", welcome: row.welcome || "", units: "imperial", gymId: gymToLoad });
+        // Session 11: accent is now fixed app-wide -- gyms no longer customize
+        // this, branding is logo + name + welcome message only (confirmed
+        // low-risk, no real gym had ever set a custom accent).
+        setGymBranding({ name: row.name, accent: "#4C8DFF", welcome: row.welcome || "", units: "imperial", gymId: gymToLoad });
       }
     });
   }, []);
@@ -145,7 +148,7 @@ function AppProvider({ children }) {
       if (profile?.gym_id) {
         sb.getGymBranding(profile.gym_id).then(gymRow => {
           if (gymRow) {
-            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: gymRow.accent || prev.accent, welcome: gymRow.welcome || prev.welcome }));
+            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome }));
           }
         }).catch(() => {});
       }
@@ -291,7 +294,7 @@ function AppProvider({ children }) {
       // so GymOwnerDashboard can query real member data
       const gymRow = await sb.getGymByOwnerEmail(email);
       if (gymRow?.gym_id) {
-        setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: gymRow.accent || prev.accent, welcome: gymRow.welcome || prev.welcome }));
+        setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome }));
       }
       // Paywall gate: owners get locked out the same way members do if their
       // gym's subscription has lapsed -- unless it's an internal/beta-exempt gym.
@@ -334,7 +337,7 @@ function AppProvider({ children }) {
         try {
           const gymRow = await sb.getGymBranding(profile.gym_id);
           if (gymRow) {
-            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: gymRow.accent || prev.accent, welcome: gymRow.welcome || prev.welcome }));
+            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome }));
             if (isGymBlocked(gymRow)) {
               setScreen("billing_blocked");
               return;
@@ -532,7 +535,7 @@ function AuthScreen() {
   const inputRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
 
   const inp = { width: "100%", background: ob.card, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: ob.white, outline: "none", fontFamily: ob.font, marginBottom: 10 };
-  const btn = (dis) => ({ width: "100%", background: dis ? "#1A2332" : a, color: dis ? ob.muted : ob.tealDk, border: "none", borderRadius: 10, padding: "11px", fontSize: 13, fontWeight: 600, cursor: dis ? "default" : "pointer", fontFamily: ob.font, marginTop: 4 });
+  const btn = (dis) => ({ width: "100%", background: dis ? "#212429" : a, color: dis ? ob.muted : ob.tealDk, border: "none", borderRadius: 10, padding: "11px", fontSize: 13, fontWeight: 600, cursor: dis ? "default" : "pointer", fontFamily: ob.font, marginTop: 4 });
 
   async function handleSend() {
     if (!email.includes("@")) { setErrorMsg("Please enter a valid email."); return; }
@@ -724,7 +727,7 @@ function PlanOverviewScreen() {
   return (
     <Layout activeNav="home">
       <div style={{ padding: "1.75rem 1.25rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}` }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 20, padding: "4px 12px", fontSize: 12, color: a, fontWeight: 500, marginBottom: ".75rem" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(76,141,255,0.1)", border: "0.5px solid rgba(76,141,255,0.25)", borderRadius: 20, padding: "4px 12px", fontSize: 12, color: a, fontWeight: 500, marginBottom: ".75rem" }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: a }} />Plan ready
         </div>
         <div style={{ fontSize: 22, fontWeight: 500, color: "#F0F0F0", lineHeight: 1.3, marginBottom: ".4rem" }}>Your 4-week {goalLabel} program is live</div>
@@ -748,12 +751,12 @@ function PlanOverviewScreen() {
         <div className="mq-fade" style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div style={{ padding: "1rem 1.25rem", borderBottom: `0.5px solid ${theme.borderSubtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div><div style={{ fontSize: 15, fontWeight: 500, color: "#F0F0F0" }}>{plan?.workoutType || "Full body"}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{plan?.exercises?.length || 5} exercises · ~{plan?.workoutDuration || 40} min</div></div>
-              <div style={{ background: "#1E1E1E", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: theme.textMuted }}>{plan?.workoutDuration || 40} min</div>
+              <div style={{ background: "#242730", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: theme.textMuted }}>{plan?.workoutDuration || 40} min</div>
             </div>
             {(plan?.exercises || []).slice(0, 5).map((ex, i, arr) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".8rem 1.25rem", borderBottom: i < arr.length - 1 ? `0.5px solid #1A1A1A` : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 24, height: 24, borderRadius: 6, background: "#1E1E1E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: theme.textDim, fontWeight: 500, flexShrink: 0 }}>{i + 1}</div>
+                  <div style={{ width: 24, height: 24, borderRadius: 6, background: "#242730", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: theme.textDim, fontWeight: 500, flexShrink: 0 }}>{i + 1}</div>
                   <div><div style={{ fontSize: 14, color: "#D0D0D0" }}>{ex.name}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{ex.weight} lbs · {ex.reps} reps</div></div>
                 </div>
                 <div style={{ fontSize: 12, color: theme.textMuted, background: "#1A1A1A", borderRadius: 6, padding: "3px 8px" }}>{ex.sets} sets</div>
@@ -1000,7 +1003,7 @@ function HomeDashboardScreen() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <div style={{ fontSize: 12, color: a, fontWeight: 500 }}>Your coach</div>
             <button onClick={refreshCoachNote} disabled={coachLoading}
-              style={{ background: "none", border: "none", cursor: coachLoading ? "default" : "pointer", fontSize: 13, color: coachLoading ? "transparent" : "#6B7A8D", padding: 0, lineHeight: 1 }}
+              style={{ background: "none", border: "none", cursor: coachLoading ? "default" : "pointer", fontSize: 13, color: coachLoading ? "transparent" : "#6E7480", padding: 0, lineHeight: 1 }}
               title="Get a new message"><Icon name="refresh" size={16} /></button>
           </div>
           <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{coachLoading ? "..." : coachMsg}</div>
@@ -1014,18 +1017,18 @@ function HomeDashboardScreen() {
               onClick={() => setMsgExpanded(v => !v)}
               style={{ padding: "0.85rem 1.25rem", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
             >
-              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(0,212,177,0.12)", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="chat" size={15} /></div>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(76,141,255,0.12)", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="chat" size={15} /></div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, color: a, fontWeight: 500 }}>Message from your gym</div>
                 <div style={{ fontSize: 13, color: "#C0C0C0", marginTop: 2 }}>{unreadMessages.length} new message{unreadMessages.length > 1 ? "s" : ""}</div>
               </div>
-              <div style={{ fontSize: 18, color: "#6B7A8D", transform: msgExpanded ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
+              <div style={{ fontSize: 18, color: "#6E7480", transform: msgExpanded ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
             </div>
             {msgExpanded && unreadMessages.map(msg => (
               <div key={msg.id} style={{ borderTop: "0.5px solid rgba(255,255,255,0.06)", padding: "0.85rem 1.25rem" }}>
                 <div style={{ fontSize: 13, color: "#D0D0D0", lineHeight: 1.55, marginBottom: 10 }}>{msg.message}</div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 11, color: "#6B7A8D" }}>{new Date(msg.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                  <div style={{ fontSize: 11, color: "#6E7480" }}>{new Date(msg.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                   <button
                     onClick={() => dismissMessage(msg)}
                     style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "4px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}
@@ -1053,7 +1056,7 @@ function HomeDashboardScreen() {
                   <div style={{ fontSize: 18, fontWeight: 500, color: "#F0F0F0" }}>Week {weekNum} · {workoutType}</div>
                   <div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>{exerciseCount} exercises · ~{workoutDuration} min</div>
                 </div>
-                <div style={{ background: "rgba(0,212,177,0.1)", border: "0.5px solid rgba(0,212,177,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>{workoutType}</div>
+                <div style={{ background: "rgba(76,141,255,0.1)", border: "0.5px solid rgba(76,141,255,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>{workoutType}</div>
               </div>
               {isMultiDayPlan && (
                 <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 6 }}>
@@ -1075,7 +1078,7 @@ function HomeDashboardScreen() {
                 <div style={{ padding: "0 1.25rem .75rem", display: "flex", flexDirection: "column", gap: 6 }}>
                   {upcomingExercises.slice(0, 5).map((ex, idx) => (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(0,212,177,0.1)", border: `0.5px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0 }}>{idx + 1}</div>
+                      <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(76,141,255,0.1)", border: `0.5px solid rgba(76,141,255,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0 }}>{idx + 1}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: "#F0F0F0" }}>{ex.name}</div>
                         <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>{ex.muscle}</div>
@@ -1126,7 +1129,7 @@ function HomeDashboardScreen() {
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: theme.textDim, marginBottom: 6 }}>
               <span>{cals.toLocaleString()} eaten</span><span>{calGoal.toLocaleString()} goal</span>
             </div>
-            <div style={{ height: 6, background: "#1E1E1E", borderRadius: 3 }}>
+            <div style={{ height: 6, background: "#242730", borderRadius: 3 }}>
               <div style={{ height: 6, borderRadius: 3, background: a, width: `${Math.round((cals / calGoal) * 100)}%`, transition: "width .5s" }} />
             </div>
           </div>
@@ -1204,13 +1207,13 @@ function ProfileScreen() {
   );
 
   const EditBtn = ({ onClick }) => (
-    <button onClick={onClick} style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 8, padding: "5px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
+    <button onClick={onClick} style={{ background: "#0B1E3D", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 8, padding: "5px 12px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
   );
 
   const SaveCancelRow = ({ onSave, onCancel }) => (
     <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
       <button onClick={onCancel} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-      <button onClick={onSave} disabled={saving} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "8px", fontSize: 12, fontWeight: 600, color: "#003D35", cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+      <button onClick={onSave} disabled={saving} style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "8px", fontSize: 12, fontWeight: 600, color: "#0B1E3D", cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
         {saving ? "Saving…" : "Save & rebuild plan"}
       </button>
     </div>
@@ -1221,13 +1224,13 @@ function ProfileScreen() {
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         {/* Avatar + Name */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#003D35", border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: a, flexShrink: 0 }}>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#0B1E3D", border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: a, flexShrink: 0 }}>
             {(user.name || "?")[0].toUpperCase()}
           </div>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: theme.text }}>{user.name || "Member"}</div>
             <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{gymBranding.name} · Member</div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#003D35", border: `1px solid rgba(0,212,177,0.25)`, borderRadius: 20, padding: "2px 8px", marginTop: 4 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#0B1E3D", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 20, padding: "2px 8px", marginTop: 4 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: a }} />
               <span style={{ fontSize: 10, color: a }}>Active plan · {goalLabel}</span>
             </div>
@@ -1236,14 +1239,14 @@ function ProfileScreen() {
 
         {/* Saved confirmation banner */}
         {savedMsg && (
-          <div style={{ background: "#003D35", border: `1px solid rgba(0,212,177,0.4)`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: a, textAlign: "center" }}>
+          <div style={{ background: "#0B1E3D", border: `1px solid rgba(76,141,255,0.4)`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: a, textAlign: "center" }}>
             <Icon name="check" size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} />{savedMsg}
           </div>
         )}
 
         {/* ── Goal ── */}
         <div style={sL}>Your Goal</div>
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+        <div style={{ background: "#212429", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           {!editGoal ? (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
@@ -1257,7 +1260,7 @@ function ProfileScreen() {
               <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Choose new goal:</div>
               {GOAL_OPTIONS.map(g => (
                 <button key={g.id} onClick={() => setSelectedGoal(g.id)}
-                  style={{ width: "100%", background: selectedGoal === g.id ? "#003D35" : "transparent", border: `1px solid ${selectedGoal === g.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "9px 10px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6, fontFamily: "inherit", textAlign: "left" }}>
+                  style={{ width: "100%", background: selectedGoal === g.id ? "#0B1E3D" : "transparent", border: `1px solid ${selectedGoal === g.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "9px 10px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6, fontFamily: "inherit", textAlign: "left" }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: selectedGoal === g.id ? a : theme.text }}>{g.label}</span>
                   {g.sub && <span style={{ fontSize: 11, color: theme.textDim, marginLeft: "auto" }}>{g.sub}</span>}
                 </button>
@@ -1272,7 +1275,7 @@ function ProfileScreen() {
 
         {/* ── Days per week ── */}
         <div style={sL}>Workouts per Week</div>
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+        <div style={{ background: "#212429", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           {!editDays ? (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
@@ -1287,7 +1290,7 @@ function ProfileScreen() {
               <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
                 {[2, 3, 4, 5].map(d => (
                   <button key={d} onClick={() => setSelectedDays(d)}
-                    style={{ flex: 1, background: selectedDays === d ? "#003D35" : "transparent", border: `1px solid ${selectedDays === d ? a : "rgba(255,255,255,0.1)"}`, borderRadius: 10, padding: "10px 4px", fontSize: 16, fontWeight: 700, color: selectedDays === d ? a : theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+                    style={{ flex: 1, background: selectedDays === d ? "#0B1E3D" : "transparent", border: `1px solid ${selectedDays === d ? a : "rgba(255,255,255,0.1)"}`, borderRadius: 10, padding: "10px 4px", fontSize: 16, fontWeight: 700, color: selectedDays === d ? a : theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
                     {d}
                   </button>
                 ))}
@@ -1303,7 +1306,7 @@ function ProfileScreen() {
 
         {/* ── Equipment ── */}
         <div style={sL}>Equipment</div>
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+        <div style={{ background: "#212429", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           {!editEquip ? (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
@@ -1317,7 +1320,7 @@ function ProfileScreen() {
               <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>What equipment do you have?</div>
               {EQUIPMENT_OPTIONS.map(e => (
                 <button key={e.id} onClick={() => setSelectedEquip(e.id)}
-                  style={{ width: "100%", background: selectedEquip === e.id ? "#003D35" : "transparent", border: `1px solid ${selectedEquip === e.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "9px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", marginBottom: 6, fontFamily: "inherit" }}>
+                  style={{ width: "100%", background: selectedEquip === e.id ? "#0B1E3D" : "transparent", border: `1px solid ${selectedEquip === e.id ? a : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "9px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", marginBottom: 6, fontFamily: "inherit" }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: selectedEquip === e.id ? a : theme.text }}>{e.label}</span>
                   <span style={{ fontSize: 11, color: theme.textDim }}>{e.sub}</span>
                 </button>
@@ -1332,7 +1335,7 @@ function ProfileScreen() {
 
         {/* Body stats — read-only */}
         <div style={sL}>Body Stats</div>
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "0 14px", marginBottom: 16 }}>
+        <div style={{ background: "#212429", borderRadius: 14, padding: "0 14px", marginBottom: 16 }}>
           <StatRow label="Height" value={user.height || "5′ 10″"} />
           <StatRow label="Weight" value={user.weight || "185 lbs"} sub="Starting weight" />
           <StatRow label="Age" value={user.age ? `${user.age} yrs` : "28 yrs"} />
@@ -1348,7 +1351,7 @@ function ProfileScreen() {
         <div style={sL}>Daily Targets</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
           {[[(plan?.calories?.toLocaleString() || "1,800"), "Calories", a], [(plan?.protein ? plan.protein + "g" : "140g"), "Protein", "#F59E0B"], [(plan?.carbs ? plan.carbs + "g" : "160g"), "Carbs", "#818cf8"], [(plan?.fat ? plan.fat + "g" : "55g"), "Fat", "#f472b6"]].map(([v, l, c]) => (
-            <div key={l} style={{ background: "#1A2332", borderRadius: 12, padding: "10px 12px" }}>
+            <div key={l} style={{ background: "#212429", borderRadius: 12, padding: "10px 12px" }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: c }}>{v}</div>
               <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{l}</div>
             </div>
@@ -1357,7 +1360,7 @@ function ProfileScreen() {
 
         {/* Injuries */}
         <div style={sL}>Injuries / Notes</div>
-        <div style={{ background: "#1A2332", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+        <div style={{ background: "#212429", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: user.injuries ? theme.text : theme.textDim }}>{user.injuries || "None noted"}</div>
           <div style={{ fontSize: 11, color: theme.textDim, marginTop: 4 }}>Tell the AI trainer in chat to update these</div>
         </div>
@@ -1397,7 +1400,7 @@ function NetworkErrorScreen() {
         </div>
         <button
           onClick={() => window.location.reload()}
-          style={{ background: theme.accent, color: "#003D35", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8 }}
+          style={{ background: theme.accent, color: "#0B1E3D", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8 }}
         >
           Retry
         </button>
@@ -1425,7 +1428,7 @@ function BillingBlockedScreen() {
         </div>
         <button
           onClick={() => window.location.reload()}
-          style={{ background: theme.accent, color: "#003D35", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8 }}
+          style={{ background: theme.accent, color: "#0B1E3D", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8 }}
         >
           Try again
         </button>

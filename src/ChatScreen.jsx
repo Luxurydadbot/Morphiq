@@ -169,7 +169,7 @@ function ChatScreen({ fromScreen = "home" }) {
       <div style={{ background: "#0D1117", borderBottom: `1px solid ${theme.borderSubtle}`, padding: "14px 16px 12px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={() => navigate(fromScreen === "chat" ? "home" : fromScreen)} style={{ background: "none", border: "none", color: theme.textDim, cursor: "pointer", padding: 0, lineHeight: 1, marginRight: 2, display:"flex", alignItems:"center" }}><Icon name="arrow-left" size={20} /></button>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#003D35", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: a, flexShrink: 0 }}>AI</div>
+          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#0B1E3D", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: a, flexShrink: 0 }}>AI</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Hypergentiq Trainer</div>
             <div style={{ fontSize: 11, color: a }}>Knows your full plan</div>
@@ -180,8 +180,8 @@ function ChatScreen({ fromScreen = "home" }) {
               <span style={{ fontSize: 11, color: theme.textDim }}>Online</span>
             </div>
             {msgUsage && (
-              <div style={{ background: msgUsage.count >= 45 ? "#1F1010" : "#0D1623", border: "1px solid " + (msgUsage.count >= 45 ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.08)"), borderRadius: 10, padding: "2px 7px" }}>
-                <span style={{ fontSize: 10, color: msgUsage.count >= msgUsage.limit ? "#F87171" : msgUsage.count >= 45 ? "#F59E0B" : "#6B7A8D", fontWeight: 500 }}>
+              <div style={{ background: msgUsage.count >= 45 ? "#1F1010" : "#171920", border: "1px solid " + (msgUsage.count >= 45 ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.08)"), borderRadius: 10, padding: "2px 7px" }}>
+                <span style={{ fontSize: 10, color: msgUsage.count >= msgUsage.limit ? "#F87171" : msgUsage.count >= 45 ? "#F59E0B" : "#6E7480", fontWeight: 500 }}>
                   {msgUsage.count >= msgUsage.limit ? "Limit reached" : (msgUsage.limit - msgUsage.count) + " left this month"}
                 </span>
               </div>
@@ -189,9 +189,9 @@ function ChatScreen({ fromScreen = "home" }) {
           </div>
         </div>
         {/* Context chip */}
-        <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 5, background: "#0A1628", border: `1px solid rgba(0,212,177,0.15)`, borderRadius: 20, padding: "4px 10px" }}>
+        <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 5, background: "#0A1628", border: `1px solid rgba(76,141,255,0.15)`, borderRadius: 20, padding: "4px 10px" }}>
           <span style={{ fontSize: 10, color: a }}>⏱</span>
-          <span style={{ fontSize: 10, color: "#9BB3C8" }}>{ctx} · {gymBranding.name}</span>
+          <span style={{ fontSize: 10, color: "#9BA0AA" }}>{ctx} · {gymBranding.name}</span>
         </div>
       </div>
 
@@ -201,19 +201,19 @@ function ChatScreen({ fromScreen = "home" }) {
           <div key={msg.id} className="mq-fade" style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 6 }}>
             {msg.role === "ai" && (
               <div style={{ display: "flex", alignItems: "flex-start", gap: 7, maxWidth: "90%" }}>
-                <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `1px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: a, flexShrink: 0, marginTop: 2 }}>AI</div>
-                <div style={{ background: "#1A2332", borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 13, lineHeight: 1.55, color: "#9BB3C8" }}>{msg.text}</div>
+                <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#0B1E3D", border: `1px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: a, flexShrink: 0, marginTop: 2 }}>AI</div>
+                <div style={{ background: "#212429", borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 13, lineHeight: 1.55, color: "#9BA0AA" }}>{msg.text}</div>
               </div>
             )}
             {msg.role === "user" && (
-              <div style={{ background: a, borderRadius: "12px 12px 4px 12px", padding: "9px 12px", fontSize: 13, color: "#003D35", fontWeight: 500, maxWidth: "82%" }}>{msg.text}</div>
+              <div style={{ background: a, borderRadius: "12px 12px 4px 12px", padding: "9px 12px", fontSize: 13, color: "#0B1E3D", fontWeight: 500, maxWidth: "82%" }}>{msg.text}</div>
             )}
           </div>
         ))}
         {thinking && (
           <div className="mq-fade" style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#003D35", border: `1px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: a, flexShrink: 0 }}>AI</div>
-            <div style={{ background: "#1A2332", borderRadius: "12px 12px 12px 4px", padding: "9px 14px" }}>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#0B1E3D", border: `1px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: a, flexShrink: 0 }}>AI</div>
+            <div style={{ background: "#212429", borderRadius: "12px 12px 12px 4px", padding: "9px 14px" }}>
               <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                 {[0, 0.2, 0.4].map(d => <div key={d} style={{ width: 6, height: 6, borderRadius: "50%", background: a, animation: "mqPulse 1.2s infinite", animationDelay: `${d}s`, opacity: 0.7 }} />)}
               </div>
@@ -235,7 +235,7 @@ function ChatScreen({ fromScreen = "home" }) {
         <div style={{ padding: "8px 14px 0", display: "flex", flexWrap: "wrap", gap: 6, flexShrink: 0 }}>
           {visibleChips.map(s => (
             <button key={s} onClick={() => sendMessage(s)}
-              style={{ background: "#1A2332", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 20, padding: "5px 10px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>
+              style={{ background: "#212429", border: `1px solid rgba(76,141,255,0.2)`, borderRadius: 20, padding: "5px 10px", fontSize: 11, color: a, cursor: "pointer", fontFamily: "inherit" }}>
               {s}
             </button>
           ))}
@@ -244,7 +244,7 @@ function ChatScreen({ fromScreen = "home" }) {
 
       {/* Voice overlay */}
       {voicePhase !== "idle" && (
-        <div className="mq-fade" style={{ margin: "8px 14px 0", background: "#0A1628", border: `1px solid rgba(0,212,177,0.2)`, borderRadius: 14, padding: "12px", textAlign: "center", flexShrink: 0 }}>
+        <div className="mq-fade" style={{ margin: "8px 14px 0", background: "#0A1628", border: `1px solid rgba(76,141,255,0.2)`, borderRadius: 14, padding: "12px", textAlign: "center", flexShrink: 0 }}>
           {voicePhase === "listening" && <>
             <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 6 }}>Listening...</div>
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 3, height: 28, marginBottom: 6 }} className="mq-wave">
@@ -255,10 +255,10 @@ function ChatScreen({ fromScreen = "home" }) {
           </>}
           {voicePhase === "heard" && <>
             <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 7 }}>Heard you — does this look right?</div>
-            <div style={{ background: "#111827", borderRadius: 8, padding: "7px 12px", fontSize: 12, color: "#9BB3C8", fontStyle: "italic", marginBottom: 10 }}>"{voiceText}"</div>
+            <div style={{ background: "#1B1D21", borderRadius: 8, padding: "7px 12px", fontSize: 12, color: "#9BA0AA", fontStyle: "italic", marginBottom: 10 }}>"{voiceText}"</div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={cancelVoice} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "7px", fontSize: 11, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
-              <button onClick={confirmVoice} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px", fontSize: 11, color: "#003D35", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:4 }}>Send <Icon name="check" size={12} /></button>
+              <button onClick={confirmVoice} style={{ flex: 2, background: a, border: "none", borderRadius: 9, padding: "7px", fontSize: 11, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:4 }}>Send <Icon name="check" size={12} /></button>
             </div>
           </>}
         </div>
@@ -269,18 +269,18 @@ function ChatScreen({ fromScreen = "home" }) {
       {/* Input bar */}
       <div style={{ padding: "10px 14px 14px", background: "#0D1117", borderTop: `1px solid ${theme.borderSubtle}`, display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
         <button onClick={startVoice} disabled={voicePhase !== "idle"}
-          style={{ width: 36, height: 36, borderRadius: "50%", background: voicePhase !== "idle" ? a : "#1A2332", border: `1px solid ${voicePhase !== "idle" ? a : "rgba(255,255,255,0.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-          <MicIcon size={14} color={voicePhase !== "idle" ? "#003D35" : "#6B7A8D"} />
+          style={{ width: 36, height: 36, borderRadius: "50%", background: voicePhase !== "idle" ? a : "#212429", border: `1px solid ${voicePhase !== "idle" ? a : "rgba(255,255,255,0.1)"}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+          <MicIcon size={14} color={voicePhase !== "idle" ? "#0B1E3D" : "#6E7480"} />
         </button>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && sendMessage(input)}
           placeholder="Ask anything..."
-          style={{ flex: 1, background: "#1A2332", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "8px 12px", fontSize: 13, color: theme.text, outline: "none", fontFamily: "inherit" }}
+          style={{ flex: 1, background: "#212429", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "8px 12px", fontSize: 13, color: theme.text, outline: "none", fontFamily: "inherit" }}
         />
         <button onClick={() => sendMessage(input)} disabled={!input.trim()}
-          style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() ? a : "#1A2332", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", flexShrink: 0, color: input.trim() ? "#003D35" : theme.textFaint }}><Icon name="arrow-right" size={16} /></button>
+          style={{ width: 36, height: 36, borderRadius: "50%", background: input.trim() ? a : "#212429", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", flexShrink: 0, color: input.trim() ? "#0B1E3D" : theme.textFaint }}><Icon name="arrow-right" size={16} /></button>
       </div>
 
       {/* Bottom text */}

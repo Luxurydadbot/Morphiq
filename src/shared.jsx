@@ -895,7 +895,7 @@ const sb = {
           name,
           owner_email: ownerEmail.toLowerCase(),
           plan_tier: planTier,
-          accent: "#00D4B1",
+          accent: "#4C8DFF",
           welcome: `Welcome to ${name}. Your personal AI trainer is ready. Let's get to work.`,
           logo_url: null,
           created_at: new Date().toISOString(),
@@ -1147,18 +1147,18 @@ const sb = {
 };
 
 const theme = {
-  accent: "#00D4B1", accentDim: "rgba(0,212,177,0.10)", accentBorder: "rgba(0,212,177,0.25)",
-  bg: "#0F0F0F", surface: "#161616", border: "#242424", borderSubtle: "#1E1E1E",
-  text: "#E8E8E8", textMuted: "#888", textDim: "#555", textFaint: "#333",
+  accent: "#4C8DFF", accentDim: "rgba(76,141,255,0.10)", accentBorder: "rgba(76,141,255,0.25)",
+  bg: "#121316", surface: "#1B1D21", border: "#2B2E34", borderSubtle: "#242730",
+  text: "#EDEEF0", textMuted: "#9BA0AA", textDim: "#6E7480", textFaint: "#3A3D44",
   success: "#1D9E75", amber: "#F59E0B", amberDim: "rgba(245,158,11,0.12)",
-  red: "#F87171", card: "#1A2332", card2: "#0D1623",
+  red: "#F87171", card: "#212429", card2: "#171920",
   ob: {
-    bg: "#080E1A", surface: "#111827", card: "#1A2332", card2: "#0D1623",
-    teal: "#00D4B1", tealDk: "#003D35", border: "#1E2D42",
-    white: "#E8EDF2", body: "#9BB3C8", muted: "#6B7A8D",
+    bg: "#121316", surface: "#1B1D21", card: "#212429", card2: "#171920",
+    teal: "#4C8DFF", tealDk: "#0B1E3D", border: "#2B2E34",
+    white: "#EDEEF0", body: "#9BA0AA", muted: "#6E7480",
     font: "'DM Sans', system-ui, sans-serif",
   },
-  sL: { fontSize: 11, color: "#888", letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" },
+  sL: { fontSize: 11, color: "#9BA0AA", letterSpacing: ".08em", textTransform: "uppercase", marginBottom: ".65rem" },
 };
 
 const AppContext = createContext(null);
@@ -2053,8 +2053,8 @@ const css = `
   .mq-pulse-ring{animation:mqPulse 2s ease-out infinite;pointer-events:none;}
   @keyframes mqPulse{0%{transform:scale(1);opacity:.5;}100%{transform:scale(1.7);opacity:0;}}
   .mq-mic-pulse{animation:micPulse 1.2s infinite;}
-  @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(0,212,177,0.4);}70%{box-shadow:0 0 0 14px rgba(0,212,177,0);}100%{box-shadow:0 0 0 0 rgba(0,212,177,0);}}
-  .mq-wave span{display:inline-block;width:3px;border-radius:2px;background:#00D4B1;animation:wv .9s infinite ease-in-out;}
+  @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(76,141,255,0.4);}70%{box-shadow:0 0 0 14px rgba(76,141,255,0);}100%{box-shadow:0 0 0 0 rgba(76,141,255,0);}}
+  .mq-wave span{display:inline-block;width:3px;border-radius:2px;background:#4C8DFF;animation:wv .9s infinite ease-in-out;}
   .mq-wave span:nth-child(1){height:5px;animation-delay:0s}
   .mq-wave span:nth-child(2){height:12px;animation-delay:.1s}
   .mq-wave span:nth-child(3){height:20px;animation-delay:.2s}
@@ -2080,7 +2080,7 @@ const css = `
   }
 `;
 
-function MicIcon({ size = 22, color = "#003D35" }) {
+function MicIcon({ size = 22, color = "#0B1E3D" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <rect x="8" y="2" width="8" height="12" rx="4" fill={color} />
@@ -2097,16 +2097,16 @@ function VoiceBtn({ listening = false, onPress, size = 56 }) {
   return (
     <button onClick={onPress} className={listening ? "mq-mic-pulse" : ""}
       style={{ width: size, height: size, borderRadius: "50%", background: a, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-      <MicIcon size={Math.round(size * 0.4)} color="#003D35" />
+      <MicIcon size={Math.round(size * 0.4)} color="#0B1E3D" />
     </button>
   );
 }
 
 function Pill({ children, variant = "teal" }) {
   const colors = {
-    teal: { bg: "#003D35", color: "#00D4B1" },
+    teal: { bg: "#0B1E3D", color: "#4C8DFF" },
     amber: { bg: "#2D1A00", color: "#F59E0B" },
-    gray: { bg: "#1A2332", color: "#6B7A8D" },
+    gray: { bg: "#212429", color: "#6E7480" },
     red: { bg: "#1F1010", color: "#F87171" },
   };
   const c = colors[variant] || colors.teal;
@@ -2116,7 +2116,7 @@ function Pill({ children, variant = "teal" }) {
     </span>
   );
 }
-function Spinner({ size = 28, color = "#00D4B1", trackColor = "#1A2332" }) {
+function Spinner({ size = 28, color = "#4C8DFF", trackColor = "#212429" }) {
   return <div style={{ width: size, height: size, border: `3px solid ${trackColor}`, borderTopColor: color, borderRadius: "50%", animation: "spin .9s linear infinite", flexShrink: 0 }} />;
 }
 
@@ -2139,7 +2139,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
       {children}
       <div style={{ textAlign: "center", fontSize: 11, color: theme.textFaint, padding: ".6rem", marginBottom: "3.5rem" }}>Powered by Hypergentiq</div>
 
-      <div className="mq-pulse-ring" style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: "rgba(0,212,177,0.18)" }} />
+      <div className="mq-pulse-ring" style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: "rgba(76,141,255,0.18)" }} />
       <button onClick={() => navigate(chatTarget)} style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: a, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2C6.03 2 2 5.8 2 10.5c0 1.8.55 3.5 1.5 4.9L2 20l4.8-1.4A9.2 9.2 0 0011 19c4.97 0 9-3.8 9-8.5S15.97 2 11 2z" fill="#0A1F1D" /><circle cx="7.5" cy="10.5" r="1.2" fill={a} /><circle cx="11" cy="10.5" r="1.2" fill={a} /><circle cx="14.5" cy="10.5" r="1.2" fill={a} /></svg>
       </button>
@@ -2363,10 +2363,10 @@ function WeightChart({ data, accent }) {
       <path d={linePath} fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       {points.map((p, i) => (
         <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
-          fill={i === points.length - 1 ? accent : "#1A2332"} stroke={accent} strokeWidth="1.5" />
+          fill={i === points.length - 1 ? accent : "#212429"} stroke={accent} strokeWidth="1.5" />
       ))}
       {chartData.map((d, i) => (
-        <text key={i} x={points[i][0]} y={H} textAnchor="middle" fontSize="8" fill="#6B7A8D">{d.week}</text>
+        <text key={i} x={points[i][0]} y={H} textAnchor="middle" fontSize="8" fill="#6E7480">{d.week}</text>
       ))}
       <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
     </svg>
@@ -2399,12 +2399,12 @@ function MonthlyTrendLineChart({ series }) {
           );
         })}
         {months.map((m, i) => (
-          <text key={i} x={PAD + i * xStep} y={H - 4} textAnchor="middle" fontSize="9" fill="#6B7A8D">{m.label}</text>
+          <text key={i} x={PAD + i * xStep} y={H - 4} textAnchor="middle" fontSize="9" fill="#6E7480">{m.label}</text>
         ))}
       </svg>
       <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
         {series.map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#9BB3C8" }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#9BA0AA" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
             {s.label}
           </div>
@@ -2441,15 +2441,15 @@ function StreakCalendar({ accent, workoutDates }) {
   return (
     <div>
       <div style={{ display:"flex", gap:4, marginBottom:5 }}>
-        {days.map((d,i) => <div key={i} style={{ flex:1, textAlign:"center", fontSize:9, color:"#6B7A8D" }}>{d}</div>)}
+        {days.map((d,i) => <div key={i} style={{ flex:1, textAlign:"center", fontSize:9, color:"#6E7480" }}>{d}</div>)}
       </div>
       {grid.map((row, ri) => (
         <div key={ri} style={{ display:"flex", gap:4, marginBottom:4 }}>
           {row.map((v, ci) => (
             <div key={ci} style={{
               flex:1, height:20, borderRadius:4,
-              background: v === 1 ? accent : v === 0 ? "#1A2332" : "transparent",
-              border: v === 0 ? "1px solid #1E2D42" : "none",
+              background: v === 1 ? accent : v === 0 ? "#212429" : "transparent",
+              border: v === 0 ? "1px solid #2B2E34" : "none",
             }} />
           ))}
         </div>

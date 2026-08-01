@@ -218,7 +218,7 @@ function OnboardingScreen() {
           </div>
           <button onClick={() => { setRouteChoice("ai"); setStep(1); }}
             style={{ background: ob.tealDk, border: `1.5px solid ${a}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", marginBottom: 10, width: "100%" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(0,212,177,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="bot" size={22} /></div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(76,141,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="bot" size={22} /></div>
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: a }}>Build my plan for me</div>
               <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>AI creates a personalised program from scratch based on your goal and level</div>
@@ -244,7 +244,7 @@ function OnboardingScreen() {
             {GOAL_OPTIONS.map(g => (
               <button key={g.id} onClick={() => { setGoal(g.id); setTimeout(() => setStep(2), 180); }}
                 style={{ background: goal === g.id ? ob.tealDk : ob.card, border: `1.5px solid ${goal === g.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: goal === g.id ? `rgba(0,212,177,0.15)` : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: goal === g.id ? a : ob.muted }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: goal === g.id ? `rgba(76,141,255,0.15)` : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: goal === g.id ? a : ob.muted }}>
                   {GOAL_ICONS[g.id]}
                 </div>
                 <div style={{ textAlign: "left" }}>
@@ -272,7 +272,7 @@ function OnboardingScreen() {
             ].map(opt => (
               <button key={opt.id} onClick={() => { setTrainingHistory(opt.id); setTimeout(() => setStep(3), 180); }}
                 style={{ background: trainingHistory === opt.id ? ob.tealDk : ob.card, border: `1.5px solid ${trainingHistory === opt.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: trainingHistory === opt.id ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20 }}>{opt.icon}</div>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: trainingHistory === opt.id ? "rgba(76,141,255,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20 }}>{opt.icon}</div>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: trainingHistory === opt.id ? a : ob.white }}>{opt.label}</div>
                   <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{opt.sub}</div>
@@ -297,7 +297,7 @@ function OnboardingScreen() {
             ].map(opt => (
               <button key={opt.id} onClick={() => { setRecentActivity(opt.id); setTimeout(() => setStep(4), 180); }}
                 style={{ background: recentActivity === opt.id ? ob.tealDk : ob.card, border: `1.5px solid ${recentActivity === opt.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: recentActivity === opt.id ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20 }}>{opt.icon}</div>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: recentActivity === opt.id ? "rgba(76,141,255,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20 }}>{opt.icon}</div>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: recentActivity === opt.id ? a : ob.white }}>{opt.label}</div>
                   <div style={{ fontSize: 10, color: ob.muted, marginTop: 1 }}>{opt.sub}</div>
@@ -376,7 +376,7 @@ function OnboardingScreen() {
             <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
               <button onClick={() => setDaysPerWeek(d => Math.max(2, d - 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.card, border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: ob.muted, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>−</button>
               <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
-              <button onClick={() => setDaysPerWeek(d => Math.min(7, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(0,212,177,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
+              <button onClick={() => setDaysPerWeek(d => Math.min(7, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(76,141,255,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
             </div>
             <div style={{ fontSize: 11, color: ob.muted, marginTop: 4, textAlign: "center", lineHeight: 1.5 }}>Do them any day that works for you — the app always shows your next workout.</div>
           </div>
@@ -394,7 +394,7 @@ function OnboardingScreen() {
             {[[60, "1 minute", "High intensity, keep the burn going", <Icon name="flame" size={22} />], [120, "2 minutes", "Balanced — works for most people", <Icon name="bolt" size={22} />], [180, "3 minutes", "Full recovery, lift heavier", <Icon name="flex" size={22} />]].map(([secs, label, sub, icon]) => (
               <button key={secs} onClick={() => { setRestPref(secs); setTimeout(() => setStep(8), 180); }}
                 style={{ background: restPref === secs ? ob.tealDk : ob.card, border: `2px solid ${restPref === secs ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "all .15s" }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: restPref === secs ? "rgba(0,212,177,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: restPref === secs ? a : ob.muted }}>{icon}</div>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: restPref === secs ? "rgba(76,141,255,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: restPref === secs ? a : ob.muted }}>{icon}</div>
                 <div style={{ textAlign: "left", flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: restPref === secs ? a : ob.white }}>{label}</div>
                   <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>{sub}</div>
@@ -448,7 +448,7 @@ function OnboardingScreen() {
             ].map(eq => (
               <button key={eq.id} onClick={() => { setEquipment(eq.id); setTimeout(() => setStep(10), 180); }}
                 style={{ background: equipment === eq.id ? ob.tealDk : ob.card, border: `1.5px solid ${equipment === eq.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: equipment === eq.id ? `rgba(0,212,177,0.15)` : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: equipment === eq.id ? a : ob.muted }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: equipment === eq.id ? `rgba(76,141,255,0.15)` : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: equipment === eq.id ? a : ob.muted }}>
                   {eq.icon}
                 </div>
                 <div style={{ textAlign: "left" }}>
@@ -585,7 +585,7 @@ function OnboardingScreen() {
           <div style={{ opacity: revealStep >= 5 ? 1 : 0, transform: revealStep >= 5 ? "translateY(0)" : "translateY(10px)", transition: "opacity .5s ease, transform .5s ease", marginTop: "auto" }}>
             <button
               onClick={() => navigate("plan")}
-              style={{ ...s.tealBtn(false), padding: "13px 10px", fontSize: 14, fontWeight: 700, borderRadius: 14, boxShadow: `0 0 28px rgba(0,212,177,0.4)`, letterSpacing: "0.2px" }}
+              style={{ ...s.tealBtn(false), padding: "13px 10px", fontSize: 14, fontWeight: 700, borderRadius: 14, boxShadow: `0 0 28px rgba(76,141,255,0.4)`, letterSpacing: "0.2px" }}
             >
               Start Day 1 <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px" }} />
             </button>
