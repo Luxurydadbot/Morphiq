@@ -378,6 +378,36 @@ const sb = {
     } catch { return []; }
   },
 
+  // Fetch WORKING sets only (excludes warm-ups, same set_number=gt.0
+  // convention as getLastSetForExercise() above) over a date-based lookback
+  // window, across every exercise. Feeds progressPlan()'s plateau/deload
+  // trend check as well as its existing 2-for-2 progression rule.
+  //
+  // Session 11: added because the only thing progressPlan() was previously
+  // fed at its real call site (checkAndGenerateNextWeek() in Morphiq.jsx)
+  // was sb.getWorkoutLogs(uid, 30) -- no set_number filter at all, and a
+  // flat 30-row cap across every exercise combined. That silently mixed
+  // warm-up sets (lighter weight, different rep count) into every
+  // progression decision, and 30 rows total wasn't enough history to judge
+  // a real per-exercise trend once a member has more than a handful of
+  // exercises in rotation. Kept as its own function rather than changing
+  // getWorkoutLogs() itself, since the Progress screen still wants that
+  // one's simple, unfiltered, most-recent-N-sets behavior as-is.
+  async getWorkoutLogsForProgression(supabaseUserId, daysBack = 70) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - daysBack);
+      const cutoffStr = localDateStr(cutoff);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&set_number=gt.0&workout_date=gte.${cutoffStr}&order=logged_at.desc&limit=500`,
+        { headers: SB_GET() }
+      );
+      return await res.json();
+    } catch { return []; }
+  },
+
   // Fetch just the distinct workout dates (no exercise detail) over a lookback
   // window, for the week-streak calculation in loadHistoricalData(). Deliberately
   // separate from getWorkoutLogs() above: that one is capped at a small row limit
@@ -1631,6 +1661,139 @@ function buildSetDetails(sets, reps, weight, loadStyle, goal) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// detectPlateau — looks at ONE exercise's own working-set history (already
+// filtered to set_number > 0 by the caller -- see getWorkoutLogsForProgression()
+// above -- warm-ups excluded, same convention as getLastSetForExercise()) and
+// flags whether it's been flat or dropping for several sessions in a row.
+//
+// Session 11: this is the real signal behind the new plateau-based deload
+// trigger below, replacing the old flat "every 5 weeks" calendar clock.
+// Same trend-math approach as isBigWeightJump() (WorkoutScreen.jsx) and the
+// 2-for-2 rule already in progressPlan() below -- plain comparisons over
+// numbers already being logged, no AI call needed.
+//
+// logs: array of {reps, weight, date} for ONE exercise, any order (this
+// re-sorts by date). Same shape progressPlan()'s logMap already builds --
+// reuse that, don't build a second copy (see the "duplicate logic" note in
+// HANDOFF.md -- that's the recurring root cause of real bugs here).
+// sessionsToCheck: how many most-recent distinct session DATES to look at
+// (a session may have several sets; only that day's top set counts).
+//
+// Returns { isPlateaued, sessionsChecked, topWeightTrend }. isPlateaued is
+// only ever true when there's enough history to actually judge (never
+// flags a brand-new exercise) AND the most recent session's top weight is
+// no higher than the oldest checked session's AND reps didn't pick up the
+// slack either -- a member adding reps at the same weight is still
+// progressing, that's the 2-for-2 rule about to fire, not a plateau.
+// ═══════════════════════════════════════════════════════════════════
+function detectPlateau(logs, sessionsToCheck = 4) {
+  const byDate = {};
+  (logs || []).forEach(l => {
+    if (!l.date) return;
+    if (!byDate[l.date]) byDate[l.date] = [];
+    byDate[l.date].push(l);
+  });
+  const sessionDates = Object.keys(byDate).sort((a, b) => new Date(b) - new Date(a));
+  if (sessionDates.length < sessionsToCheck) {
+    return { isPlateaued: false, sessionsChecked: sessionDates.length, topWeightTrend: [] };
+  }
+  const recentDates = sessionDates.slice(0, sessionsToCheck);
+  // Per session: top weight actually lifted that day, and the best reps
+  // logged at that top weight.
+  const sessions = recentDates.map(date => {
+    const sets = byDate[date];
+    const topWeight = Math.max(...sets.map(s => s.weight || 0));
+    const repsAtTop = Math.max(...sets.filter(s => s.weight === topWeight).map(s => s.reps || 0));
+    return { date, topWeight, repsAtTop };
+  }).reverse(); // oldest -> newest, easier to read as a trend
+
+  const oldest = sessions[0];
+  const newest = sessions[sessions.length - 1];
+  const weightFlatOrDown = newest.topWeight <= oldest.topWeight;
+  const repsFlatOrDown = newest.repsAtTop <= oldest.repsAtTop;
+  const isPlateaued = weightFlatOrDown && repsFlatOrDown;
+
+  return {
+    isPlateaued,
+    sessionsChecked: sessions.length,
+    topWeightTrend: sessions.map(s => ({ date: s.date, weight: s.topWeight, reps: s.repsAtTop })),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// shouldTriggerDeloadFromPlateau — the plan-wide decision progressPlan()
+// calls to decide isDeload. Runs detectPlateau() (above) across every
+// exercise in the plan and applies a majority rule: deload once at least
+// half of the exercises we have ENOUGH data to judge are flat or dropping
+// -- one stalled accessory lift shouldn't force a deload while everything
+// else is still climbing.
+//
+// Two safety floors so this can't misbehave at the edges:
+// 1. minWeeksSinceLastDeload -- never deload again immediately after one
+//    (a member's numbers are SUPPOSED to look flat/down the week right
+//    after a deload; that's not a new plateau, don't double-trigger).
+// 2. calendarFallbackDue -- if it's been 8+ weeks since the last deload
+//    and we still don't have enough clean per-exercise history to judge a
+//    real plateau (new member, brand-new plan, sparse logging), fall back
+//    to the old calendar behavior rather than letting a data gap mean
+//    "never deload." Once real data exists, the plateau signal takes over.
+// ═══════════════════════════════════════════════════════════════════
+function shouldTriggerDeloadFromPlateau(currentPlan, workoutLogs, nextWeekNum, opts = {}) {
+  const sessionsToCheck = opts.sessionsToCheck ?? 4;
+  const minWeeksSinceLastDeload = opts.minWeeksSinceLastDeload ?? 3;
+  const calendarFallbackWeeks = opts.calendarFallbackWeeks ?? 8;
+
+  const lastDeloadWeek = currentPlan.lastDeloadWeek || 0;
+  const weeksSinceLastDeload = nextWeekNum - lastDeloadWeek;
+  const calendarFallbackDue = weeksSinceLastDeload >= calendarFallbackWeeks;
+
+  if (weeksSinceLastDeload < minWeeksSinceLastDeload) {
+    return { shouldDeload: false, reason: "too_soon_since_last_deload", plateauedExercises: [], exercisesChecked: 0 };
+  }
+
+  const allExercises = [
+    ...(currentPlan.exercises || []),
+    ...((currentPlan.customDays || []).flatMap(day => day.exercises || [])),
+  ];
+  const uniqueNames = [...new Set(allExercises.map(ex => ex.name))];
+
+  const logMap = {};
+  (workoutLogs || []).forEach(log => {
+    const key = log.exercise_name;
+    if (!logMap[key]) logMap[key] = [];
+    logMap[key].push({ reps: log.reps, weight: log.weight, date: log.workout_date });
+  });
+
+  const results = uniqueNames.map(name => ({ name, ...detectPlateau(logMap[name] || [], sessionsToCheck) }));
+  const withEnoughData = results.filter(r => r.sessionsChecked >= sessionsToCheck);
+
+  if (withEnoughData.length === 0) {
+    return {
+      shouldDeload: calendarFallbackDue,
+      reason: calendarFallbackDue ? "calendar_fallback_no_data" : "insufficient_data",
+      plateauedExercises: [],
+      exercisesChecked: 0,
+    };
+  }
+
+  const plateaued = withEnoughData.filter(r => r.isPlateaued);
+  const plateauRate = plateaued.length / withEnoughData.length;
+  const realPlateau = plateauRate >= 0.5;
+
+  // Once there's enough real data to judge, trust it -- the calendar
+  // fallback above only exists to cover the NO-data case. Without this,
+  // a member with clean data clearly showing progress every week would
+  // still get force-deloaded the moment 8 weeks passed, which defeats
+  // the entire point of making this data-driven instead of calendar-driven.
+  return {
+    shouldDeload: realPlateau,
+    reason: realPlateau ? "plateau_detected" : "still_progressing",
+    plateauedExercises: plateaued.map(r => r.name),
+    exercisesChecked: withEnoughData.length,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // progressPlan — takes current plan + workout logs, returns next week's plan
 // Applies the 2-for-2 NSCA rule: exceed rep target by 2+ for 2 sessions → add weight
 // No API call. Deterministic.
@@ -1656,10 +1819,21 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
   const goal = userProfile.goal || "general_fitness";
 
   // ── Deload logic ──────────────────────────────────────────────────
-  // Experienced members: deload every 5 weeks
-  // Beginners/some: no scheduled deload — app detects fatigue via missed reps instead
-  const isDeload = isExperienced && !isOver40 && nextWeekNum % 5 === 0;
-  const isPostDeload = isExperienced && !isOver40 && nextWeekNum % 5 === 1 && nextWeekNum > 1;
+  // Session 11: replaced the old flat "every 5 weeks" calendar clock with
+  // shouldTriggerDeloadFromPlateau() (above) -- deload timing now follows
+  // each member's actual working-weight/reps trend from workout_logs
+  // instead of a fixed countdown that fired whether or not they were
+  // really stalling. Beginners/some still get no scheduled deload here —
+  // the existing missed-reps fatigue handling further down already covers
+  // them, same as before.
+  const deloadCheck = (isExperienced && !isOver40)
+    ? shouldTriggerDeloadFromPlateau(currentPlan, workoutLogs, nextWeekNum)
+    : { shouldDeload: false, reason: "not_eligible", plateauedExercises: [], exercisesChecked: 0 };
+  const isDeload = deloadCheck.shouldDeload;
+  // Post-deload = the week right after a deload week. currentPlan.isDeloadWeek
+  // is set on the deload week's own plan (see the return object below) --
+  // this reads whether the plan the member is CURRENTLY finishing was one.
+  const isPostDeload = isExperienced && !isOver40 && currentPlan.isDeloadWeek === true;
 
   // ── Build log lookup: exerciseName → array of recent sessions ─────
   // workoutLogs is an array of { exercise_name, reps, weight, workout_date }
@@ -1721,9 +1895,14 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
 
     // Post-deload: reset to week 1 weight + 10%, swap to variation exercise
     if (isPostDeload) {
-      // Mesocycle number: 1 = weeks 1-5, 2 = weeks 6-10, 3 = weeks 11-15...
+      // Mesocycle number = how many deloads have happened so far (see
+      // deloadCount on the returned plan below). Used to be calendar math
+      // (floor((week-1)/5)) back when deloads were fixed every 5 weeks --
+      // now that deloads are data-triggered and irregular, the deload
+      // COUNT is the only reliable mesocycle boundary. Even/odd meaning
+      // below is unchanged from the original.
       // Even mesocycles use variation, odd mesocycles use primary
-      const mesocycle = Math.floor((nextWeekNum - 1) / 5);
+      const mesocycle = currentPlan.deloadCount || 0;
       const useVariation = mesocycle % 2 === 1;
       // Find this exercise's variation from the library (custom-plan exercise
       // names typically won't match anything here, so variationName just
@@ -1823,22 +2002,36 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
     ? currentPlan.customDays.map(day => ({ ...day, exercises: (day.exercises || []).map(progressOne) }))
     : currentPlan.customDays;
 
+  // "Last hard week before recovery" used to be predictable (calendar-based
+  // deloads meant week 4-of-5 could always warn "recovery's next week").
+  // That's no longer knowable in advance now that deloads are data-triggered
+  // -- removed rather than left in place showing a stale/misleading heads-up.
   return {
     ...currentPlan,
     weekNumber: nextWeekNum,
     weekStartDate: new Date().toISOString().split("T")[0],
+    // Deload bookkeeping for next time shouldTriggerDeloadFromPlateau() and
+    // the mesocycle/isPostDeload logic above run: lastDeloadWeek anchors the
+    // minWeeksSinceLastDeload gate, deloadCount drives the primary/variation
+    // exercise alternation, isDeloadWeek is what next week's progressPlan()
+    // call reads to know it's now in a post-deload reset.
+    lastDeloadWeek: isDeload ? nextWeekNum : (currentPlan.lastDeloadWeek || 0),
+    deloadCount: isDeload ? (currentPlan.deloadCount || 0) + 1 : (currentPlan.deloadCount || 0),
+    isDeloadWeek: isDeload,
     weeklyFocus: isDeload
-      ? "Recovery week. Lighter weights, same movements. You'll come back stronger."
-      : (nextWeekNum % 5 === 4
-          ? "Last hard week before recovery. Leave everything on the floor."
-          : "Progressive overload in action — a little better than last week is all you need."),
+      ? (deloadCheck.reason === "plateau_detected"
+          ? "Your weight and reps have leveled off the last few sessions — recovery week. Lighter weights, same movements. You'll come back stronger."
+          : "Recovery week. Lighter weights, same movements. You'll come back stronger.")
+      : "Progressive overload in action — a little better than last week is all you need.",
     tip: isDeload
       ? "This week is supposed to feel easy. That's the point — let your body consolidate the gains."
       : (isExperienced
           ? "Track your final-set reps carefully — that's what triggers your weight increase."
           : "Consistency is the variable that matters most right now. Just show up."),
     progressionRule: isDeload
-      ? "Deload: all weights at 60% of last week. RPE 6 max."
+      ? (deloadCheck.reason === "plateau_detected"
+          ? "Deload triggered: your weight and reps flattened across recent sessions. All weights at 60% this week, RPE 6 max."
+          : "Deload: all weights at 60% of last week. RPE 6 max.")
       : "Auto-calculated from your logged weight and reps.",
     exercises: nextExercises,
     customDays: nextCustomDays,
@@ -2329,6 +2522,7 @@ export {
   theme, css,
   // Plan engine
   buildPlan, progressPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
+  detectPlateau, shouldTriggerDeloadFromPlateau,
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components

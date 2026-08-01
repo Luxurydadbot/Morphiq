@@ -411,9 +411,17 @@ function AppProvider({ children }) {
       if (!currentPlan?.weekStartDate) return;
       const daysSince = Math.floor((Date.now() - new Date(currentPlan.weekStartDate)) / 86400000);
       if (daysSince < 7) return;
-      // Fetch workout logs then run local progression engine
+      // Fetch workout logs then run local progression engine.
+      // Session 11: switched from sb.getWorkoutLogs(uid, 30) to
+      // sb.getWorkoutLogsForProgression(uid) -- the old call had no
+      // set_number filter (warm-ups were mixed into progression decisions)
+      // and only a flat 30-row cap across every exercise combined, which
+      // isn't enough history for the new plateau/deload trend check (or
+      // even the existing 2-for-2 rule) once a member has more than a
+      // few exercises in rotation. See getWorkoutLogsForProgression() in
+      // shared.jsx for the full explanation.
       if (!uid || uid.startsWith("sim-")) return;
-      sb.getWorkoutLogs(uid, 30).then(logs => {
+      sb.getWorkoutLogsForProgression(uid).then(logs => {
         const nextPlan = progressPlan(currentPlan, logs || [], currentUser);
         setPlan(nextPlan);
         sb.upsertProfile(uid, currentUser, nextPlan).catch(() => {});
