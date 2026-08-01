@@ -736,11 +736,11 @@ function PlanOverviewScreen() {
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Daily targets</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
-          {[[plan?.calories?.toLocaleString() || "—", "Calories", "100%", a], [`${plan?.protein || "—"}g`, "Protein", "72%", "#5DCAA5"], [`${plan?.carbs || "—"}g`, "Carbs", "55%", "#1D9E75"]].map(([v, l, w, c]) => (
+          {[[plan?.calories?.toLocaleString() || "—", "Calories", "100%", a], [`${plan?.protein || "—"}g`, "Protein", "72%", "#7C93B8"], [`${plan?.carbs || "—"}g`, "Carbs", "55%", "#5FA8E0"]].map(([v, l, w, c]) => (
             <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
               <div style={{ fontSize: 20, fontWeight: 500, color: "#EDEEF0" }}>{v}</div>
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
-              <div style={{ height: 3, background: "#222", borderRadius: 2, marginTop: 6 }}><div style={{ height: 3, borderRadius: 2, background: c, width: w }} /></div>
+              <div style={{ height: 3, background: theme.borderSubtle, borderRadius: 2, marginTop: 6 }}><div style={{ height: 3, borderRadius: 2, background: c, width: w }} /></div>
             </div>
           ))}
         </div>
@@ -757,7 +757,7 @@ function PlanOverviewScreen() {
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: ".8rem 1.25rem", borderBottom: i < arr.length - 1 ? `0.5px solid #1A1A1A` : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 24, height: 24, borderRadius: 6, background: "#242730", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: theme.textDim, fontWeight: 500, flexShrink: 0 }}>{i + 1}</div>
-                  <div><div style={{ fontSize: 14, color: "#D0D0D0" }}>{ex.name}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{ex.weight} lbs · {ex.reps} reps</div></div>
+                  <div><div style={{ fontSize: 14, color: theme.text }}>{ex.name}</div><div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{ex.weight} lbs · {ex.reps} reps</div></div>
                 </div>
                 <div style={{ fontSize: 12, color: theme.textMuted, background: "#1A1A1A", borderRadius: 6, padding: "3px 8px" }}>{ex.sets} sets</div>
               </div>
@@ -992,9 +992,9 @@ function HomeDashboardScreen() {
   return (
     <Layout activeNav="home">
     {syncIssue && (
-      <div style={{ margin: "1rem 1.25rem 0", background: "#2A1F1F", border: "1px solid #7A3B3B", borderRadius: 12, padding: "0.75rem 1rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <div style={{ fontSize: 13, color: "#F0B0B0" }}>Could not sync your latest progress. Showing your last saved plan.</div>
-        <button onClick={() => window.location.reload()} style={{ background: "none", border: "1px solid #F0B0B0", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: "#F0B0B0", cursor: "pointer", flexShrink: 0 }}>Try again</button>
+      <div style={{ margin: "1rem 1.25rem 0", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: "0.75rem 1rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div style={{ fontSize: 13, color: theme.red }}>Could not sync your latest progress. Showing your last saved plan.</div>
+        <button onClick={() => window.location.reload()} style={{ background: "none", border: `1px solid ${theme.red}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, color: theme.red, cursor: "pointer", flexShrink: 0 }}>Try again</button>
       </div>
     )}
       <div style={{ margin: "1.5rem 1.25rem 0", background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 16, padding: "1rem 1.25rem", display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -1006,7 +1006,7 @@ function HomeDashboardScreen() {
               style={{ background: "none", border: "none", cursor: coachLoading ? "default" : "pointer", fontSize: 13, color: coachLoading ? "transparent" : "#6E7480", padding: 0, lineHeight: 1 }}
               title="Get a new message"><Icon name="refresh" size={16} /></button>
           </div>
-          <div style={{ fontSize: 14, color: "#C0C0C0", lineHeight: 1.55 }}>{coachLoading ? "..." : coachMsg}</div>
+          <div style={{ fontSize: 14, color: theme.textMuted, lineHeight: 1.55 }}>{coachLoading ? "..." : coachMsg}</div>
         </div>
       </div>
       {/* Gym messages notification card — only shown when there are unread messages */}
@@ -1020,13 +1020,13 @@ function HomeDashboardScreen() {
               <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(76,141,255,0.12)", border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="chat" size={15} /></div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, color: a, fontWeight: 500 }}>Message from your gym</div>
-                <div style={{ fontSize: 13, color: "#C0C0C0", marginTop: 2 }}>{unreadMessages.length} new message{unreadMessages.length > 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginTop: 2 }}>{unreadMessages.length} new message{unreadMessages.length > 1 ? "s" : ""}</div>
               </div>
               <div style={{ fontSize: 18, color: "#6E7480", transform: msgExpanded ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
             </div>
             {msgExpanded && unreadMessages.map(msg => (
               <div key={msg.id} style={{ borderTop: "0.5px solid rgba(255,255,255,0.06)", padding: "0.85rem 1.25rem" }}>
-                <div style={{ fontSize: 13, color: "#D0D0D0", lineHeight: 1.55, marginBottom: 10 }}>{msg.message}</div>
+                <div style={{ fontSize: 13, color: theme.text, lineHeight: 1.55, marginBottom: 10 }}>{msg.message}</div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ fontSize: 11, color: "#6E7480" }}>{new Date(msg.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                   <button
@@ -1143,7 +1143,7 @@ function HomeDashboardScreen() {
             <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
                 <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 2 }}>Next suggested meal</div>
-                <div style={{ fontSize: 14, color: "#D0D0D0", fontWeight: 500 }}>{nextMeal.name}</div>
+                <div style={{ fontSize: 14, color: theme.text, fontWeight: 500 }}>{nextMeal.name}</div>
                 <div style={{ fontSize: 12, color: theme.textDim }}>{nextMeal.cal} cal · {nextMeal.protein}g protein</div>
               </div>
               <button onClick={() => navigate("meals")} style={{ background: "transparent", border: `0.5px solid ${a}`, borderRadius: 8, padding: "5px 12px", fontSize: 12, color: a, cursor: "pointer", fontFamily: "inherit" }}>

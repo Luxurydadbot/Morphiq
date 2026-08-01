@@ -1139,13 +1139,13 @@ function WorkoutScreen() {
           {currentWarmup?.description && (
             <div style={{ background: "#0A1628", border: "1px solid rgba(76,141,255,0.2)", borderRadius: 14, padding: "1.1rem 1.25rem", marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 8, fontWeight: 600 }}>How to do it</div>
-              <div style={{ fontSize: 16, color: "#D8E4E0", lineHeight: 1.7 }}>{currentWarmup.description}</div>
+              <div style={{ fontSize: 16, color: theme.text, lineHeight: 1.7 }}>{currentWarmup.description}</div>
             </div>
           )}
 
           {/* Why it matters — always visible */}
           <div style={{ background: "#1B1D21", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "1rem 1.25rem", marginBottom: 14 }}>
-            <div style={{ fontSize: 15, color: "#8A9EAD", lineHeight: 1.65 }}>
+            <div style={{ fontSize: 15, color: theme.textDim, lineHeight: 1.65 }}>
               Take your time. A proper warm-up <span style={{ color: a, fontWeight: 600 }}>reduces your injury risk</span> and <span style={{ color: a, fontWeight: 600 }}>makes every working set feel better</span>.
             </div>
           </div>
@@ -1321,7 +1321,7 @@ function WorkoutScreen() {
             <div className="mq-fade" style={{ background: "linear-gradient(135deg, #2D1A00 0%, #1A1200 100%)", border: "2px solid #F59E0B", borderRadius: 14, padding: "10px 16px", width: "100%", textAlign: "center", boxShadow: "0 0 30px rgba(245,158,11,0.2)", marginBottom: 12 }}>
               <span style={{ marginRight: 6, color: "#F59E0B", verticalAlign: "-3px", display: "inline-block" }}><Icon name="trophy" size={18} /></span>
               <span style={{ fontSize: 14, fontWeight: 700, color: "#F59E0B" }}>New personal record!</span>
-              <span style={{ fontSize: 13, color: "#E8C97A", marginLeft: 6 }}>{displayWeight} lbs on {ex.name}</span>
+              <span style={{ fontSize: 13, color: theme.amber, marginLeft: 6 }}>{displayWeight} lbs on {ex.name}</span>
             </div>
           )}
 

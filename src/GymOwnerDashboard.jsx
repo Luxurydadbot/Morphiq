@@ -3,7 +3,7 @@ import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon, SU
 
 function buildMemberRow(profile, sessions, lastDate, weightDelta) {
   const initials = (profile.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  const avatarColors = ["#0B1E3D/#4C8DFF","#2D1A00/#F59E0B","#1A1040/#A78BFA","#1F1010/#F87171","#0A1628/#60A5FA"];
+  const avatarColors = ["#0B1E3D/#4C8DFF","#16233D/#7C93B8","#0F2A3D/#5FA8E0","#152A4D/#2D5FA8","#0F1E38/#8BA9D4"];
   const [bg, color] = (avatarColors[initials.charCodeAt(0) % avatarColors.length]).split("/");
 
   const today = new Date();
@@ -129,8 +129,8 @@ function OwnerOverviewTab() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
         <OwnerStatCard value={total || "0"} label="Total members" />
         <OwnerStatCard value={`${activePct}%`} label="Active this month" color="#4C8DFF" />
-        <OwnerStatCard value={totalSessions.toLocaleString()} label="Sessions this month" color="#F59E0B" />
-        <OwnerStatCard value={avgLoss ? `${avgLoss}lb` : "—"} label="Avg weight change" color="#818cf8" />
+        <OwnerStatCard value={totalSessions.toLocaleString()} label="Sessions this month" color="#7C93B8" />
+        <OwnerStatCard value={avgLoss ? `${avgLoss}lb` : "—"} label="Avg weight change" color="#5FA8E0" />
       </div>
 
       <div style={{ fontSize: 11, color: "#6E7480", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Activity breakdown</div>
@@ -597,9 +597,9 @@ function PricingScreen() {
       name: "Growth",
       price: "$199",
       perMember: "$1.75",
-      color: "#A78BFA",
-      bg: "#1E1040",
-      border: "rgba(167,139,250,0.4)",
+      color: "#7C93B8",
+      bg: "#16233D",
+      border: "rgba(124,147,184,0.4)",
       badge: "Most popular",
       features: [
         "Up to 500 active members",
@@ -615,9 +615,9 @@ function PricingScreen() {
       name: "Scale",
       price: "$399",
       perMember: "$1.50",
-      color: "#F59E0B",
-      bg: "#2D1A00",
-      border: "rgba(245,158,11,0.3)",
+      color: "#5FA8E0",
+      bg: "#0F2A3D",
+      border: "rgba(95,168,224,0.3)",
       badge: "Best value",
       features: [
         "Unlimited active members",
@@ -651,7 +651,7 @@ function PricingScreen() {
         {plans.map(plan => (
           <div key={plan.name} style={{ background: plan.bg, border: `1px solid ${plan.border}`, borderRadius: 16, padding: "16px 14px", marginBottom: 12, position: "relative" }}>
             {plan.badge && (
-              <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", background: plan.color, color: plan.name === "Growth" ? "#1E1040" : "#2D1A00", borderRadius: 20, padding: "2px 12px", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+              <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", background: plan.color, color: "#0B1E3D", borderRadius: 20, padding: "2px 12px", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
                 {plan.badge}
               </div>
             )}
@@ -669,7 +669,7 @@ function PricingScreen() {
               {plan.features.map(f => (
                 <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
                   <div style={{ width: 14, height: 14, borderRadius: "50%", background: plan.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#121316", flexShrink: 0 }}><Icon name="check" size={9} /></div>
-                  <span style={{ fontSize: 12, color: "#C0C0C0" }}>{f}</span>
+                  <span style={{ fontSize: 12, color: theme.textMuted }}>{f}</span>
                 </div>
               ))}
             </div>

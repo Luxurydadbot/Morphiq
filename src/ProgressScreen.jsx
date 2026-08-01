@@ -294,7 +294,7 @@ function ProgressScreen() {
                 <div>
                   <div style={sL}>
                     Weight trend
-                    {!useRealWeightData && <span style={{ color:"#2D3A4A", marginLeft:6, fontStyle:"italic" }}>(sample)</span>}
+                    {!useRealWeightData && <span style={{ color: theme.textFaint, marginLeft:6, fontStyle:"italic" }}>(sample)</span>}
                   </div>
                   <div style={{ fontSize:26, fontWeight:700, color:theme.text, lineHeight:1 }}>
                     {curr} <span style={{ fontSize:13, color:"#6E7480", fontWeight:400 }}>lbs</span>
@@ -348,7 +348,7 @@ function ProgressScreen() {
               )}
 
               {!useRealWeightData && !weightLoading && (
-                <div style={{ fontSize:10, color:"#2D3A4A", textAlign:"center", marginTop:4 }}>
+                <div style={{ fontSize:10, color: theme.textFaint, textAlign:"center", marginTop:4 }}>
                   Log your weight to replace this sample chart with your real data
                 </div>
               )}
@@ -465,7 +465,7 @@ function ProgressScreen() {
         {tab === "bests" && (() => {
           // Build real volume-per-exercise from workout logs for the current month
           const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-          const volColors = [a, "#818cf8", "#F59E0B", "#f472b6", "#60A5FA", "#34D399"];
+          const volColors = [a, "#7C93B8", "#5FA8E0", "#2D5FA8"];
           const realVolBars = useRealWorkoutData ? (() => {
             const vol = {};
             strengthLogs.forEach(row => {

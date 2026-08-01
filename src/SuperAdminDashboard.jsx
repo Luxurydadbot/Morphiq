@@ -21,8 +21,8 @@ function StatusPill({ gym }) {
   }
   const status = gym.subscription_status || "trialing";
   const map = {
-    active:   { bg: "#0A1A14", color: "#4C8DFF", label: "Active" },
-    trialing: { bg: "#0A1628", color: "#60A5FA", label: "Trialing" },
+    active:   { bg: "#0A1A14", color: "#1D9E75", label: "Active" },
+    trialing: { bg: "#0A1628", color: "#4C8DFF", label: "Trialing" },
     past_due: { bg: "#2D1A00", color: "#F59E0B", label: "Past due" },
     canceled: { bg: "#1F1010", color: "#F87171", label: "Canceled" },
   };
