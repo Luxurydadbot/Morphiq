@@ -1,4 +1,4 @@
-# Hypergentiq — Session 11 master handoff (continued: color redesign)
+# Hypergentiq — Session 11 master handoff (continued: design audit + fixes)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
 
@@ -20,6 +20,20 @@ This file is the handoff. At the start of every session, fetch this file from th
 **`WarmupTest` is currently LEFT in this real deload state on purpose** — Bryant can open the app, log into `WarmupTest`, and see an actual data-triggered deload week live (60% weights, RPE 6 cap, "leveled off" copy) without needing me to drive a login. The seeded `workout_logs` rows are still in the table too, so Progress-screen history for that profile will show the flat trend that caused it. Say the word and it'll get reset back to a clean week 1.
 
 **Still NOT independently verified by me:** the actual browser → PostgREST → RLS network round-trip (this session's testing went through Supabase directly rather than a real signed-in browser session, since that requires an OTP email code only Bryant can receive) and the literal on-screen rendering. The query shape and RLS pattern are identical to `getLastSetForExercise()`, which already works live in production, so this is low-risk — but a real look at the actual screen is still the cleanest way to fully close this out, whenever Bryant wants to take a look.
+
+## Also this session: design audit against top-tier apps, then a fix round
+
+Bryant asked for an honest comparison against Whoop/Fitbod-tier apps on aesthetics and content density. Got real access to the live app (a test login session was still active in the browser) and walked Home, an active workout set, Meals, Progress, and Chat. Verdict: the color redesign landed well -- dark base + blue accent genuinely reads close to top-tier already, and the workout active-set screen is the strongest screen in the app, on par with Fitbod's logging flow. The gaps found were layout/polish, not color:
+
+1. **Font swapped DM Sans -> Inter.** Bryant asked what top apps use typographically; Inter is the closest thing to a current standard for data-dense UI (Linear, Vercel, most fintech/health dashboards), with better small-size numeral legibility -- relevant here given how many raw numbers this app shows.
+2. **Chat screen bottom-anchor fix.** Messages were stacking from the top of their flex container, leaving a large empty void above the input on a short conversation. Added `justifyContent: "flex-end"` -- one-line fix, matches how every chat UI worth copying behaves.
+3. **Stale 145lb weight during a resumed workout -- NOT a real bug.** Traced to `autoregulatedWeight()` in WorkoutScreen.jsx correctly reacting to a same-day already-logged set from earlier testing, which got stale when this session's SQL-seeded deload test data overwrote the plan mid-session (something that can't happen in normal use -- plans only change week-to-week, never mid-workout). Cleared the stale `workout_progress` (cloud + localStorage) rather than touching any logic.
+4. **Home screen stat tiles: skeleton loading state.** The "4 then -" flicker was `historicalData` being null during its async fetch, correctly falling back to "-" -- not broken, just not polished. Added a pulsing skeleton placeholder (new `.mq-skeleton` class in shared.jsx) instead of a static dash, so a loading number doesn't misread as a missing one.
+5. **"Aug 1" rendering as "Aua 1" on the Progress weight chart -- took two attempts.** First guess (font too small at 8px) was wrong and didn't fix it -- confirmed by re-checking the live site after deploy. Zoomed into the actual rendered pixels and found the real cause: the SVG `<text>` baseline sat exactly at `y={H}`, the bottom edge of the viewBox, so the descender on "g" was being clipped outside the visible area by the SVG itself. Moved the baseline up 3px (`y={H-3}`). Confirmed fixed by fetching the live JS bundle directly to bypass CDN/browser caching before re-screenshotting.
+6. **Water tracker demoted from hero card to compact secondary row on Meals**, and unified its separate "#60A5FA" blue identity onto the single app accent instead of leaving a third unrelated color next to the redesign.
+7. **Found and fixed 5 more stray leftover colors** missed in the first redesign pass (`#0A1F1D`, `#F0F0F0` in Morphiq.jsx/shared.jsx, one more `#60A5FA` on an unrelated droplet icon, `public/index.html`'s theme-color meta tag) -- same pattern as before, different specific hex values doing the same job as ones already caught.
+
+All of the above verified live against the deployed app, not just by reading code -- including re-checking after the glyph-bug false-start by fetching the actual deployed JS bundle to rule out stale caching before concluding it was fixed.
 
 ## Also this session: color redesign shipped
 
@@ -45,7 +59,7 @@ Nothing near the 3,800-line hard limit on any file.
 
 ## Latest commit
 
-`ae87662` on `main`.
+`149e9a9` on `main`.
 
 ## Punch list, in priority order
 
