@@ -53,6 +53,20 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep, message
   );
 }
 
+// Out-of-range guardrail: catches an accidental or extreme manual weight
+// jump before it gets logged. Deliberately NOT an AI call -- this is a plain
+// number comparison against today's planned weight for this exact set, so
+// it's instant, free, and gives the same answer every time. Never blocks
+// logging; it just asks the member to confirm before saving. Threshold is a
+// 50%+ swing either direction, and only kicks in once the planned weight is
+// big enough that a swing that size is actually meaningful -- a 50% jump on
+// a 10 lb accessory exercise isn't worth interrupting anyone over.
+const BIG_JUMP_MIN_PLANNED = 20;
+function isBigWeightJump(newWeight, plannedWeight) {
+  if (!plannedWeight || plannedWeight < BIG_JUMP_MIN_PLANNED) return false;
+  return newWeight >= plannedWeight * 1.5 || newWeight <= plannedWeight * 0.5;
+}
+
 // ─── SWAP ALTERNATIVES ────────────────────────────────────────────────────────
 // Keyed by muscle group string — must match the muscle field in WORKOUT_EXERCISES.
 // Each entry is 3 alternatives. Weight is a sensible starting default.
@@ -418,6 +432,10 @@ function WorkoutScreen() {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [repCount, setRepCount] = useState(null); // null = not set yet, number = user typed/adjusted
   const [weightOverride, setWeightOverride] = useState(null); // null = use plan/nudge weight, number = member manually adjusted this set's weight
+  // Whether the big-jump confirm banner is showing -- set right before
+  // logging, not on every keystroke, so tapping +/- repeatedly doesn't
+  // flash a warning mid-adjustment.
+  const [showBigJumpConfirm, setShowBigJumpConfirm] = useState(false);
 
   const REST_SECS = plan?.restSeconds || 120;
   const [restSecs, setRestSecs] = useState(REST_SECS);
@@ -792,6 +810,7 @@ function WorkoutScreen() {
   function advanceSet() {
     setRepCount(null);
     setWeightOverride(null);
+    setShowBigJumpConfirm(false);
     if (safeSetIdx < totalSetsInPlan - 1) {
       // Same exercise, next set in the plan (warm-up or working) — keep nudge
       setSetIdx(safeSetIdx + 1);
@@ -839,6 +858,7 @@ function WorkoutScreen() {
     setNudgeSource(null);
     setRepCount(null);
     setWeightOverride(null);
+    setShowBigJumpConfirm(false);
     setState("active");
     setShowSwapSheet(false);
     // Show a brief "Swapped in X ✓" confirmation banner for 2.5 seconds
@@ -936,6 +956,7 @@ function WorkoutScreen() {
     setNudgeSource(null);
     setRepCount(null);
     setWeightOverride(null);
+    setShowBigJumpConfirm(false);
     setPendingAISwap(null);
     // Show confirmation banner so member knows the AI swap happened
     const swapLabel = _type === "injury" ? `${area} exercises swapped out`
@@ -1422,6 +1443,17 @@ function WorkoutScreen() {
   const isLastSet = safeSetIdx === totalSetsInPlan - 1;
   const displayReps = repCount !== null ? repCount : currentTargetReps;
 
+  // Gate the actual log action behind the big-jump confirm when needed --
+  // only checked on the tap that would log the set, not on every +/- press,
+  // so adjusting the weight itself never feels interrupted.
+  function handleLogTap() {
+    if (weightOverride !== null && isBigWeightJump(displayWeight, currentSpec.weight) && !showBigJumpConfirm) {
+      setShowBigJumpConfirm(true);
+      return;
+    }
+    logSet(displayReps);
+  }
+
   return (
     <Layout activeNav="workout" chatTarget="chat_workout">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
@@ -1596,13 +1628,34 @@ function WorkoutScreen() {
           </div>
         </div>
 
+        {/* Big-jump confirm -- only appears right before logging a set whose
+            manually-adjusted weight is way outside today's planned number.
+            Never blocks the set, just double-checks once. */}
+        {showBigJumpConfirm && (
+          <div className="mq-fade" style={{ background: "#1A1206", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 10, padding: "10px 12px", marginBottom: 8, display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ flexShrink: 0, color: "#F59E0B" }}><Icon name="flame" size={16} /></div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#F59E0B", marginBottom: 2 }}>That's a big jump from today's plan</div>
+              <div style={{ fontSize: 11, color: "#9BB3C8", lineHeight: 1.45, marginBottom: 8 }}>
+                Planned {currentSpec.weight} lbs for this set — you've got {displayWeight} lbs. Just checking that's right.
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowBigJumpConfirm(false)}
+                  style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "7px 4px", fontSize: 12, color: "#9BB3C8", cursor: "pointer", fontFamily: "inherit" }}>Let me adjust</button>
+                <button onClick={() => logSet(displayReps)}
+                  style={{ flex: 1, background: "#F59E0B", border: "none", borderRadius: 8, padding: "7px 4px", fontSize: 12, color: "#1A1206", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Yes, that's right</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bottom actions */}
         <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
           <button onClick={() => { logSet(0); }}
             style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
           <button onClick={() => setShowSwapSheet(true)}
             style={{ flex: 1, background: "rgba(0,212,177,0.06)", border: `1px solid rgba(0,212,177,0.3)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: a, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Icon name="swap" size={11} /> Swap</button>
-          <button onClick={() => logSet(displayReps)}
+          <button onClick={handleLogTap}
             style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px 6px", fontSize: 12, color: "#003D35", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Log {displayReps} reps <Icon name="check" size={13} /></button>
         </div>
 
