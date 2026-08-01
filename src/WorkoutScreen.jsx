@@ -1476,15 +1476,20 @@ function WorkoutScreen() {
             {isWarmupSet ? `${currentSpec.label} · not a working set` : `Working set ${workingIdx} of ${workingCount}`}
           </div>
           <div style={{ fontSize: 42, fontWeight: 700, color: theme.text, lineHeight: 1.1, marginBottom: 6 }}>{ex.name}</div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ fontSize: 13, color: theme.textDim }}>{ex.muscle}</div>
-            {isWarmupSet ? (
-              <Pill variant="gray">Warm-up · {currentTargetReps} reps</Pill>
-            ) : (
-              <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${currentTargetReps} reps`}</Pill>
-            )}
-            {!isWarmupSet && ex.rpe && <div style={{ background: "#212429", border: "1px solid rgba(110,116,128,0.3)", borderRadius: 20, padding: "2px 8px", fontSize: 10, color: "#6E7480" }}>RPE {ex.rpe}</div>}
+          <div style={{ fontSize: 13, color: theme.textDim, marginBottom: 8 }}>{ex.muscle}</div>
+          {/* Big, glanceable target-reps indicator. This used to be a small 10px
+              pill plus a separate "Target reps" number tile below (same number
+              shown twice) -- collapsed into one badge, sized to actually be
+              readable at a quick glance mid-set, not just on close inspection. */}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: isWarmupSet ? "#212429" : "#0B1E3D", border: `1.5px solid ${isWarmupSet ? "rgba(110,116,128,0.35)" : "rgba(76,141,255,0.35)"}`, borderRadius: 20, padding: "7px 18px", fontSize: 19, fontWeight: 700, color: isWarmupSet ? theme.text : a }}>
+            {isWarmupSet ? <>Warm-up · {currentTargetReps} reps</> : <>Target: {currentTargetReps} reps</>}
           </div>
+          {!isWarmupSet && (isLastSet || ex.rpe) && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 }}>
+              {isLastSet && <Pill variant="amber">Final set</Pill>}
+              {ex.rpe && <div style={{ background: "#212429", border: "1px solid rgba(110,116,128,0.3)", borderRadius: 20, padding: "2px 8px", fontSize: 10, color: "#6E7480" }}>RPE {ex.rpe}</div>}
+            </div>
+          )}
         </div>
 
         <SetDots total={totalSetsInPlan} current={safeSetIdx} />
@@ -1503,9 +1508,11 @@ function WorkoutScreen() {
           />
         )}
 
-        {/* Weight + target reps display */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-          <div style={{ flex: 1, background: "#212429", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
+        {/* Weight display -- target reps now lives in the badge under the
+            exercise name above, instead of a second tile here showing the
+            same number a second time. */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ background: "#212429", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
             <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               {/* Minus — lets a member drop the weight for this set without touching the plan */}
@@ -1531,10 +1538,6 @@ function WorkoutScreen() {
             ) : (
               <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{displayWeight === currentSpec.weight ? "Today's target" : `${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan`}</div>
             )}
-          </div>
-          <div style={{ flex: 1, background: "#212429", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
-            <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Target reps</div>
-            <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? theme.text : a, lineHeight: 1 }}>{currentTargetReps} <span style={{ fontSize: 15, color: theme.textDim }}>reps</span></div>
           </div>
         </div>
         {/* ── LAST TIME display — shown when we have history for this exercise ── */}
