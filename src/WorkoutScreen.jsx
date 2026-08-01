@@ -1511,7 +1511,7 @@ function WorkoutScreen() {
               {/* Minus — lets a member drop the weight for this set without touching the plan */}
               <button onClick={() => setWeightOverride(Math.max(0, displayWeight - (ex.weightIncrement || 5)))}
                 style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>−</button>
-              <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? theme.textDim : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
+              <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? theme.text : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
               {/* Plus — bump the weight for this set only; logged as-is, plan target is untouched */}
               <button onClick={() => setWeightOverride(displayWeight + (ex.weightIncrement || 5))}
                 style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>+</button>
@@ -1534,7 +1534,7 @@ function WorkoutScreen() {
           </div>
           <div style={{ flex: 1, background: "#212429", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
             <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Target reps</div>
-            <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? theme.textDim : a, lineHeight: 1 }}>{currentTargetReps} <span style={{ fontSize: 15, color: theme.textDim }}>reps</span></div>
+            <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? theme.text : a, lineHeight: 1 }}>{currentTargetReps} <span style={{ fontSize: 15, color: theme.textDim }}>reps</span></div>
           </div>
         </div>
         {/* ── LAST TIME display — shown when we have history for this exercise ── */}
@@ -1598,7 +1598,7 @@ function WorkoutScreen() {
               style={{ width: 52, height: 52, borderRadius: "50%", background: "#212429", border: `1px solid rgba(255,255,255,0.1)`, fontSize: 26, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}>−</button>
 
             {/* Big rep number */}
-            <div style={{ fontSize: 80, fontWeight: 700, color: repCount !== null ? a : theme.textDim, lineHeight: 1, minWidth: 100, textAlign: "center", transition: "color 0.2s" }}>
+            <div style={{ fontSize: 80, fontWeight: 700, color: repCount !== null ? a : theme.text, lineHeight: 1, minWidth: 100, textAlign: "center", transition: "color 0.2s" }}>
               {displayReps}
             </div>
 
