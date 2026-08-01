@@ -2372,7 +2372,7 @@ function WeightChart({ data, accent }) {
           fill={i === points.length - 1 ? accent : "#212429"} stroke={accent} strokeWidth="1.5" />
       ))}
       {chartData.map((d, i) => (
-        <text key={i} x={points[i][0]} y={H} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
+        <text key={i} x={points[i][0]} y={H - 3} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
       ))}
       <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
     </svg>
