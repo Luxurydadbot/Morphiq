@@ -268,7 +268,7 @@ function ProgressScreen() {
           {[
             { val: lost > 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, lbl:"Weight change", color: lost >= 0 ? a : "#F87171" },
             { val: (() => { var ws = historicalData?.weekStreak ?? 0; return ws > 0 ? <><Icon name="flame" size={14} style={{verticalAlign:"-2px", marginRight:2}} />{ws}</> : "—"; })(), lbl:"Week streak", color:"#F59E0B" },
-            { val: String(realPBs.length || 0), lbl:"PBs logged", color:"#A78BFA" },
+            { val: String(realPBs.length || 0), lbl:"PBs logged", color:"#5FA8E0" },
           ].map(({ val, lbl, color }) => (
             <div key={lbl} style={{ background:"#212429", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
               <div style={{ fontSize:18, fontWeight:700, color }}>{val}</div>
@@ -428,7 +428,7 @@ function ProgressScreen() {
                       <div style={{ fontSize:11, color:"#6E7480", marginTop:2 }}>{w.date} · {w.sets} sets · {w.vol}</div>
                     </div>
                     {w.pbs > 0 && (
-                      <span style={{ background:"#2D1A00", color:"#F59E0B", borderRadius:20, padding:"2px 8px", fontSize:10, fontWeight:500, flexShrink:0 }}>
+                      <span style={{ background:"#0A1A14", color:theme.success, borderRadius:20, padding:"2px 8px", fontSize:10, fontWeight:500, flexShrink:0 }}>
                         <Icon name="flame" size={11} style={{verticalAlign:"-1px", marginRight:2}} />{w.pbs} PB{w.pbs > 1 ? "s" : ""}
                       </span>
                     )}

@@ -757,12 +757,12 @@ function OwnerUsageTab() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
             <div style={card}><div style={big}>{totalCalls}</div><div style={dim}>Total AI calls</div></div>
             <div style={{ ...card, background: "#0A1A14", border: "1px solid rgba(76,141,255,0.2)" }}><div style={big}>${estCost}</div><div style={dim}>Est. cost this month</div></div>
-            <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#A78BFA" }}>{totalTokens.toLocaleString()}</div><div style={dim}>Tokens used</div></div>
+            <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#7C93B8" }}>{totalTokens.toLocaleString()}</div><div style={dim}>Tokens used</div></div>
             <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#F59E0B" }}>{chatCalls}</div><div style={dim}>Chat messages</div></div>
           </div>
           <div style={card}>
             <div style={{ fontSize: 11, color: "#6E7480", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Usage by feature</div>
-            {[["AI Chat", chatCalls, a], ["Meal parsing", mealCalls, "#F59E0B"], ["Plan generation", totalCalls - chatCalls - mealCalls, "#A78BFA"]].map(([label, count, color]) => (
+            {[["AI Chat", chatCalls, a], ["Meal parsing", mealCalls, "#F59E0B"], ["Plan generation", totalCalls - chatCalls - mealCalls, "#5FA8E0"]].map(([label, count, color]) => (
               <div key={label} style={{ marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9BA0AA", marginBottom: 4 }}>
                   <span>{label}</span><span style={{ color }}>{count} calls</span>
@@ -821,7 +821,7 @@ function GymOwnerDashboard() {
 
       {/* Footer back link */}
       <div style={{ padding: "14px 16px", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-        <button onClick={() => navigate("pricing")} style={{ background: "none", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#A78BFA", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4 }}>Plans & pricing <Icon name="arrow-right" size={12} /></button>
+        <button onClick={() => navigate("pricing")} style={{ background: "none", border: "1px solid rgba(76,141,255,0.3)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4C8DFF", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4 }}>Plans & pricing <Icon name="arrow-right" size={12} /></button>
       </div>
       <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "0 0 12px" }}>POWERED BY HYPERGENTIQ</div>
     </div>

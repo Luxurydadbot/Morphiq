@@ -5,8 +5,8 @@ import { useApp, sb, Spinner, MonthlyTrendLineChart } from "./shared.jsx";
 // If the real Stripe prices ever change, update both places at once.
 const PLAN_PRICING = {
   starter: { label: "Starter", flat: 99, perMember: 2,    color: "#4C8DFF" },
-  growth:  { label: "Growth",  flat: 199, perMember: 1.75, color: "#F59E0B" },
-  scale:   { label: "Scale",   flat: 399, perMember: 1.5,  color: "#A78BFA" },
+  growth:  { label: "Growth",  flat: 199, perMember: 1.75, color: "#7C93B8" },
+  scale:   { label: "Scale",   flat: 399, perMember: 1.5,  color: "#5FA8E0" },
 };
 
 function expectedRevenue(planTier, memberCount) {
@@ -227,7 +227,7 @@ function SuperAdminDashboard() {
               <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>Total gyms</div>
             </div>
             <div style={{ background: "#212429", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: "#60A5FA" }}>{activeGymCount}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "#7C93B8" }}>{activeGymCount}</div>
               <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>Not locked</div>
             </div>
             <div style={{ background: "#212429", borderRadius: 12, padding: "12px 14px" }}>
@@ -242,7 +242,7 @@ function SuperAdminDashboard() {
               Membership growth — last 12 months
             </div>
             <MonthlyTrendLineChart series={[
-              { label: "Total members", color: "#60A5FA", data: monthlyTotal },
+              { label: "Total members", color: "#7C93B8", data: monthlyTotal },
               { label: "Active members", color: "#4C8DFF", data: monthlyActive },
             ]} />
           </div>
@@ -259,7 +259,7 @@ function SuperAdminDashboard() {
               <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>Logged a workout, last 7 days</div>
             </div>
             <div style={{ background: "#212429", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#60A5FA" }}>{activity.active30}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#7C93B8" }}>{activity.active30}</div>
               <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>Logged a workout, last 30 days</div>
             </div>
           </div>

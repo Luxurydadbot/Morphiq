@@ -1044,7 +1044,7 @@ function HomeDashboardScreen() {
         <div style={{ background: theme.surface, border: `0.5px solid ${allDone ? theme.border : theme.border}`, borderRadius: 16, overflow: "hidden" }}>
           {allDone ? (
             <div style={{ padding: "1.5rem 1.25rem", textAlign: "center" }}>
-              <div style={{ marginBottom: 8, display: "flex", justifyContent: "center", color: "#F59E0B" }}><Icon name="trophy" size={32} /></div>
+              <div style={{ marginBottom: 8, display: "flex", justifyContent: "center", color: theme.success }}><Icon name="trophy" size={32} /></div>
               <div style={{ fontSize: 18, fontWeight: 500, color: a, marginBottom: 6 }}>Week complete!</div>
               <div style={{ fontSize: 14, color: theme.textDim, marginBottom: 4 }}>You finished all {weeklyTarget} workouts this week.</div>
               <div style={{ fontSize: 13, color: theme.textMuted }}>New workouts unlock on Monday.</div>
@@ -1356,7 +1356,7 @@ function ProfileScreen() {
         {/* Daily targets */}
         <div style={sL}>Daily Targets</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-          {[[(plan?.calories?.toLocaleString() || "1,800"), "Calories", a], [(plan?.protein ? plan.protein + "g" : "140g"), "Protein", "#F59E0B"], [(plan?.carbs ? plan.carbs + "g" : "160g"), "Carbs", "#818cf8"], [(plan?.fat ? plan.fat + "g" : "55g"), "Fat", "#f472b6"]].map(([v, l, c]) => (
+          {[[(plan?.calories?.toLocaleString() || "1,800"), "Calories", a], [(plan?.protein ? plan.protein + "g" : "140g"), "Protein", "#7C93B8"], [(plan?.carbs ? plan.carbs + "g" : "160g"), "Carbs", "#5FA8E0"], [(plan?.fat ? plan.fat + "g" : "55g"), "Fat", "#2D5FA8"]].map(([v, l, c]) => (
             <div key={l} style={{ background: "#212429", borderRadius: 12, padding: "10px 12px" }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: c }}>{v}</div>
               <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{l}</div>

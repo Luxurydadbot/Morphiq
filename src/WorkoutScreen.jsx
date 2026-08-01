@@ -1228,7 +1228,7 @@ function WorkoutScreen() {
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "2rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <div style={{ marginBottom: 12, color: "#F59E0B" }}><Icon name="trophy" size={36} /></div>
+          <div style={{ marginBottom: 12, color: theme.success }}><Icon name="trophy" size={36} /></div>
           <div style={{ fontSize: 22, fontWeight: 700, color: theme.text, marginBottom: 4 }}>Workout complete!</div>
           <div style={{ fontSize: 14, color: theme.textDim, marginBottom: "1.5rem" }}>Great work, {user.name || "champ"}. Recovery starts now.</div>
           {/* Big stats grid */}
@@ -1265,10 +1265,10 @@ function WorkoutScreen() {
             })}
           </div>
           {overloadApplied && (
-            <div style={{ width: "100%", background: "#1A1200", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 12, padding: "10px 14px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ color: "#F59E0B" }}><Icon name="bolt" size={20} /></div>
+            <div style={{ width: "100%", background: "#0A1A14", border: "1px solid rgba(29,158,117,0.3)", borderRadius: 12, padding: "10px 14px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ color: theme.success }}><Icon name="bolt" size={20} /></div>
               <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#F59E0B" }}>Progressive overload applied</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: theme.success }}>Progressive overload applied</div>
                 <div style={{ fontSize: 11, color: theme.textDim, marginTop: 1 }}>Hypergentiq nudged your weight up this session — you're getting stronger.</div>
               </div>
             </div>
@@ -1290,7 +1290,7 @@ function WorkoutScreen() {
           <div style={{ textAlign: "center", fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Rest</div>
 
           {/* Logged confirmation strip */}
-          <div style={{ background: wasSkipped ? "#1A1A0A" : "#0B1E3D", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: wasSkipped ? theme.amber : a, textAlign: "center", marginBottom: 4 }}>
+          <div style={{ background: wasSkipped ? "#212429" : "#0B1E3D", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: wasSkipped ? theme.textDim : a, textAlign: "center", marginBottom: 4 }}>
             {wasSkipped
               ? <><Icon name="arrow-right" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Set skipped</>
               : <><Icon name="check" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Logged — {loggedSets[loggedSets.length - 1]?.reps} reps at {loggedSets[loggedSets.length - 1]?.weight} lbs</>}
@@ -1318,10 +1318,10 @@ function WorkoutScreen() {
 
           {/* PR celebration banner — compact, sits above the rest ring */}
           {isPR && !wasSkipped && (
-            <div className="mq-fade" style={{ background: "linear-gradient(135deg, #2D1A00 0%, #1A1200 100%)", border: "2px solid #F59E0B", borderRadius: 14, padding: "10px 16px", width: "100%", textAlign: "center", boxShadow: "0 0 30px rgba(245,158,11,0.2)", marginBottom: 12 }}>
-              <span style={{ marginRight: 6, color: "#F59E0B", verticalAlign: "-3px", display: "inline-block" }}><Icon name="trophy" size={18} /></span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#F59E0B" }}>New personal record!</span>
-              <span style={{ fontSize: 13, color: theme.amber, marginLeft: 6 }}>{displayWeight} lbs on {ex.name}</span>
+            <div className="mq-fade" style={{ background: "linear-gradient(135deg, #0F2A20 0%, #0A1A14 100%)", border: "2px solid #1D9E75", borderRadius: 14, padding: "10px 16px", width: "100%", textAlign: "center", boxShadow: "0 0 30px rgba(29,158,117,0.2)", marginBottom: 12 }}>
+              <span style={{ marginRight: 6, color: theme.success, verticalAlign: "-3px", display: "inline-block" }}><Icon name="trophy" size={18} /></span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: theme.success }}>New personal record!</span>
+              <span style={{ fontSize: 13, color: theme.success, marginLeft: 6 }}>{displayWeight} lbs on {ex.name}</span>
             </div>
           )}
 
@@ -1472,18 +1472,18 @@ function WorkoutScreen() {
 
         {/* Header — exercise name front and center */}
         <div style={{ textAlign: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 10, color: isWarmupSet ? "#F59E0B" : theme.textDim, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>
+          <div style={{ fontSize: 10, color: theme.textDim, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>
             {isWarmupSet ? `${currentSpec.label} · not a working set` : `Working set ${workingIdx} of ${workingCount}`}
           </div>
           <div style={{ fontSize: 42, fontWeight: 700, color: theme.text, lineHeight: 1.1, marginBottom: 6 }}>{ex.name}</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ fontSize: 13, color: theme.textDim }}>{ex.muscle}</div>
             {isWarmupSet ? (
-              <Pill variant="amber">Warm-up · {currentTargetReps} reps</Pill>
+              <Pill variant="gray">Warm-up · {currentTargetReps} reps</Pill>
             ) : (
               <Pill variant={isLastSet ? "amber" : "teal"}>{isLastSet ? "Final set" : `Target: ${currentTargetReps} reps`}</Pill>
             )}
-            {!isWarmupSet && ex.rpe && <div style={{ background: "#212429", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 20, padding: "2px 8px", fontSize: 10, color: "#A78BFA" }}>RPE {ex.rpe}</div>}
+            {!isWarmupSet && ex.rpe && <div style={{ background: "#212429", border: "1px solid rgba(110,116,128,0.3)", borderRadius: 20, padding: "2px 8px", fontSize: 10, color: "#6E7480" }}>RPE {ex.rpe}</div>}
           </div>
         </div>
 
@@ -1511,7 +1511,7 @@ function WorkoutScreen() {
               {/* Minus — lets a member drop the weight for this set without touching the plan */}
               <button onClick={() => setWeightOverride(Math.max(0, displayWeight - (ex.weightIncrement || 5)))}
                 style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>−</button>
-              <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
+              <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? theme.textDim : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
               {/* Plus — bump the weight for this set only; logged as-is, plan target is untouched */}
               <button onClick={() => setWeightOverride(displayWeight + (ex.weightIncrement || 5))}
                 style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>+</button>
@@ -1521,11 +1521,11 @@ function WorkoutScreen() {
               // feel light -- that's the point. Reacting to that the same way
               // a real working-set miss gets reacted to would be treating
               // normal, working-as-intended behavior as a problem.
-              <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-ups aren't meant to feel heavy — that's normal. Still ramping to {ex.weight} lbs.</div>
+              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>Warm-ups aren't meant to feel heavy — that's normal. Still ramping to {ex.weight} lbs.</div>
             ) : isWarmupSet ? (
-              <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
+              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
             ) : nudgeAcceptedRef.current ? (
-              <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
+              <div style={{ fontSize: 10, color: theme.success, marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
             ) : weightOverride !== null ? (
               <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>Adjusted{displayWeight !== currentSpec.weight ? ` · ${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan` : ""}</div>
             ) : (
@@ -1534,7 +1534,7 @@ function WorkoutScreen() {
           </div>
           <div style={{ flex: 1, background: "#212429", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
             <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Target reps</div>
-            <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? "#F59E0B" : a, lineHeight: 1 }}>{currentTargetReps} <span style={{ fontSize: 15, color: theme.textDim }}>reps</span></div>
+            <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? theme.textDim : a, lineHeight: 1 }}>{currentTargetReps} <span style={{ fontSize: 15, color: theme.textDim }}>reps</span></div>
           </div>
         </div>
         {/* ── LAST TIME display — shown when we have history for this exercise ── */}
@@ -1556,10 +1556,10 @@ function WorkoutScreen() {
         {/* Warm-up callout — shown on every warm-up set so it's unmistakable
             this is NOT a working set and shouldn't be taken hard. */}
         {isWarmupSet && (
-          <div style={{ background: "#1A1206", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 10, padding: "10px 12px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <div style={{ flexShrink: 0, color: "#F59E0B" }}><Icon name="flame" size={16} /></div>
+          <div style={{ background: "#1A1A1A", border: "1px solid rgba(110,116,128,0.3)", borderRadius: 10, padding: "10px 12px", marginBottom: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ flexShrink: 0, color: theme.textDim }}><Icon name="flame" size={16} /></div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#F59E0B", marginBottom: 2 }}>This is a warm-up set — take it easy</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: theme.textDim, marginBottom: 2 }}>This is a warm-up set — take it easy</div>
               <div style={{ fontSize: 11, color: "#9BA0AA", lineHeight: 1.45 }}>
                 Move smooth and controlled to prime your muscles. Don't push hard or chase reps — save your energy for the working sets at {ex.weight} lbs.
               </div>

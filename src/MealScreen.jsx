@@ -152,7 +152,7 @@ function HungryButton({ calsLeft, proteinLeft, goal }) {
           <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>Remaining today</div>
           <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
             <div><span style={{ fontSize: 24, fontWeight: 700, color: "#EDEEF0" }}>{calsLeft}</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>cal</span></div>
-            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#4C8DFF" }}>{proteinLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>protein</span></div>
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#7C93B8" }}>{proteinLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>protein</span></div>
           </div>
         </div>
         {state === "idle" && (
@@ -636,9 +636,9 @@ function MealPlanScreen() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <MacroBar label="Protein" current={totals.protein} goal={PROTEIN_GOAL} color="#4C8DFF" />
-            <MacroBar label="Carbs"   current={totals.carbs}   goal={CARBS_GOAL}   color="#7C93B8" />
-            <MacroBar label="Fat"     current={totals.fat}     goal={FAT_GOAL}     color="#5FA8E0" />
+            <MacroBar label="Protein" current={totals.protein} goal={PROTEIN_GOAL} color="#7C93B8" />
+            <MacroBar label="Carbs"   current={totals.carbs}   goal={CARBS_GOAL}   color="#5FA8E0" />
+            <MacroBar label="Fat"     current={totals.fat}     goal={FAT_GOAL}     color="#2D5FA8" />
           </div>
         </div>
 
