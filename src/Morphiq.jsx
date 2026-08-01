@@ -81,7 +81,7 @@ function AppProvider({ children }) {
   // Fix (June 2026): plan was never saved to Supabase on fresh PC login because
   // supabaseUser?.id was null when the save ran. Use this ref instead.
   const supabaseUserIdRef = useRef(null);
-  const [gymBranding, setGymBranding] = useState({ name: "Your Gym", accent: "#4C8DFF", welcome: "Welcome. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
+  const [gymBranding, setGymBranding] = useState({ name: "Hypergentiq Gym", accent: "#4C8DFF", welcome: "Welcome to Hypergentiq Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
   const [historicalData, setHistoricalData] = useState(null);
   // Tracks the current exercise + set while WorkoutScreen is active
   // so ChatScreen can pass exact context to Claude (e.g. "Set 2 of 3 · Goblet Squat")
