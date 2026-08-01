@@ -603,25 +603,39 @@ const sb = {
   },
 
   // ── GYM BRANDING ─────────────────────────────────────────────────────────
-  async getGymBranding(gymId = "demo-gym") {
-    try {
-      // Logged-out visitors (no real session yet) only have permission to see
-      // the public branding columns -- asking for anything else here fails
-      // outright, since Postgres requires access to every column touched
-      // when no explicit column list is given. Once someone's actually signed
-      // in, fetch the full row so the paywall/suspension check still works.
-      let hasRealToken = false;
-      try { hasRealToken = !!localStorage.getItem("mq_access_token"); } catch {}
-      const cols = hasRealToken
-        ? "gym_id,name,accent,welcome,logo_url,plan_tier,owner_email,subscription_status,is_suspended,is_beta_exempt,trial_ends_at,admin_notes,stripe_customer_id,stripe_subscription_id,created_at,updated_at"
-        : "gym_id,name,accent,welcome,logo_url";
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1&select=${cols}`,
-        { headers: SB_GET() }
-      );
-      const rows = await res.json();
-      return rows?.[0] || null;
-    } catch { return null; }
+  // Fix (this session): this used to be a single attempt with a bare catch --
+  // any transient failure (most commonly right when the app resumes from the
+  // background on mobile and the network is still reconnecting) silently gave
+  // up and left the caller's gymBranding state on its hardcoded placeholder
+  // default. That placeholder used to be a real gym's name, so a flaky reload
+  // could permanently show one specific real gym's identity to every member
+  // until the next reload happened to succeed -- this is the "flips back to
+  // the wrong gym after minimizing the app" bug. Retrying a few times with a
+  // short backoff (same pattern as getProfileWithRetry) makes this correction
+  // reliable instead of a coin flip on every app resume.
+  async getGymBranding(gymId = "demo-gym", attempts = 3) {
+    // Logged-out visitors (no real session yet) only have permission to see
+    // the public branding columns -- asking for anything else here fails
+    // outright, since Postgres requires access to every column touched
+    // when no explicit column list is given. Once someone's actually signed
+    // in, fetch the full row so the paywall/suspension check still works.
+    let hasRealToken = false;
+    try { hasRealToken = !!localStorage.getItem("mq_access_token"); } catch {}
+    const cols = hasRealToken
+      ? "gym_id,name,accent,welcome,logo_url,plan_tier,owner_email,subscription_status,is_suspended,is_beta_exempt,trial_ends_at,admin_notes,stripe_customer_id,stripe_subscription_id,created_at,updated_at"
+      : "gym_id,name,accent,welcome,logo_url";
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}&limit=1&select=${cols}`,
+          { headers: SB_GET() }
+        );
+        const rows = await res.json();
+        if (rows?.[0]) return rows[0];
+      } catch {}
+      if (i < attempts - 1) await new Promise(r => setTimeout(r, 600));
+    }
+    return null;
   },
 
   async saveGymBranding(gymId = "demo-gym", { name, accent, welcome }) {

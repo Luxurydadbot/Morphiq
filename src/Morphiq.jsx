@@ -81,7 +81,7 @@ function AppProvider({ children }) {
   // Fix (June 2026): plan was never saved to Supabase on fresh PC login because
   // supabaseUser?.id was null when the save ran. Use this ref instead.
   const supabaseUserIdRef = useRef(null);
-  const [gymBranding, setGymBranding] = useState({ name: "IronForge Gym", accent: "#4C8DFF", welcome: "Welcome to IronForge Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
+  const [gymBranding, setGymBranding] = useState({ name: "Your Gym", accent: "#4C8DFF", welcome: "Welcome. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
   const [historicalData, setHistoricalData] = useState(null);
   // Tracks the current exercise + set while WorkoutScreen is active
   // so ChatScreen can pass exact context to Claude (e.g. "Set 2 of 3 · Goblet Squat")
@@ -97,10 +97,23 @@ function AppProvider({ children }) {
   const [selectedDayOverride, setSelectedDayOverride] = useState(null);
 
   // ── On mount: load gym branding from Supabase ────────────────────────────
+  // Fix (this session): this effect used to run unconditionally on every
+  // mount and fetch a "demo-gym" default with no regard for whether a real
+  // member/owner session already existed. That raced against the session-
+  // restore effect below (and against signIn()), which independently fetch
+  // the SAME user's REAL gym branding. Because this fetch has no dependency
+  // chain ahead of it, it usually resolved first and got correctly overwritten
+  // -- but not always, and if a "demo-gym" row ever exists in the gyms table
+  // in the future, a lost race here would silently show its branding to a
+  // logged-in member of a completely different gym. Only run this default
+  // fetch for a genuinely logged-out visitor, or when an invite link
+  // explicitly names a gym -- a logged-in user's branding always comes from
+  // their own profile's gym_id, set by the session-restore effect or signIn().
   useEffect(() => {
     // Check if a gym ID was passed in the URL (from invite link)
     const urlParams = new URLSearchParams(window.location.search);
     const gymIdFromUrl = urlParams.get("gym");
+    if (!gymIdFromUrl && savedSession?.uid) return;
     const gymToLoad = gymIdFromUrl || "demo-gym";
 
     sb.getGymBranding(gymToLoad).then(row => {
@@ -142,7 +155,7 @@ function AppProvider({ children }) {
       // Fix (session 9): gym branding was only ever refreshed during a fresh
       // sign-in (see signIn() below). Reopening the app with an existing saved
       // session restored the plan/profile here but never re-fetched branding,
-      // so it silently fell back to the hardcoded "IronForge Gym" default on
+      // so it silently fell back to the hardcoded placeholder default on
       // every reopen. Fire-and-forget -- branding is cosmetic, never block the
       // home screen on it.
       if (profile?.gym_id) {
