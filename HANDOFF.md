@@ -1,3 +1,37 @@
+# Hypergentiq — Session 15b master handoff (real Push/Pull day exercises, shipped)
+
+This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
+
+## Session 15b — filled out thin Push/Pull days with real, properly-chosen accessory work
+
+Right after Session 15 shipped real per-day variation for the AI plan splits, Bryant asked directly: should Push and Pull days (2 exercises each) get more work, given Legs day has 4-5? Answer was yes, and he was explicit he wanted this grounded in real fitness programming, not just filled in to look complete.
+
+**What was added:** a `push_secondary` (lateral raise) and `pull_secondary` (bicep curl) exercise for all 4 equipment types in `EXERCISE_LIBRARY`, each with its own independently-calibrated starting-weight table, wired into the Push/Pull/Legs split only (5+ days/week — the 4-day Upper/Lower split's Upper day already had 5 exercises and wasn't the thin one).
+
+**Why those two specific movements, not the existing "accessory" slot:** Push day already gets two pressing angles (primary + variation); lateral raise hits the one shoulder head pressing barely touches, it's low injury risk done light, and it's easy to coach correctly with no supervision. Pull day already gets two rowing angles; "back and biceps" is the standard real-world PPL pairing, and biceps get zero direct work anywhere else in the plan. The existing `accessory` slot was deliberately NOT reused for this — its actual muscle target is inconsistent across equipment (kettlebell's `accessory` is genuinely a leg exercise despite the generic label), so auto-routing it to a day risked landing the wrong movement on the wrong day for some equipment types. That's exactly why it stayed out of the split entirely in Session 15.
+
+**Real programming detail, not just extra entries:** these aren't built through the same `makeEx()` compound path — a new `makeIsolationEx()` gives them 12-15 reps (vs. whatever the member's goal/experience compound rep range is), RPE capped at 7, and shorter rest, matching how isolation accessory work is actually programmed in real training (lighter load, less systemic fatigue, higher reps to protect against using momentum). Starting weights are independently set per exercise rather than copy-pasted — kettlebell in particular does NOT reuse the existing 15/25/35/44/53 ladder every other kettlebell exercise in the table shares, since a 15lb kettlebell lateral raise is too heavy for a beginner.
+
+**Injury handling:** shoulder injury skips the lateral raise entirely rather than substituting — as a bonus isolation exercise (not a primary slot that needs a real replacement), "do less" is the safer call, and lateral raises are one of the more impingement-prone accessory movements. Wrist injury swaps barbell curl for a neutral-grip dumbbell hammer curl — the one curl variant of the four that's actually wrist-stressed; dumbbell/kettlebell/cable curls already allow a wrist-friendly grip without needing a swap.
+
+**Real bug caught and fixed while building this (not part of the original ask):** kettlebell's existing "experienced members get push_exp" logic mutated `pushEx.name` in place while leaving `pushEx.variation` untouched. `push_exp`'s own `.variation` field happens to be the exact same string that was getting written into `.name` — so once Session 15's `makeVariationEx()` started actually building a second push exercise from `.variation`, experienced kettlebell members would have seen "Kettlebell push press" listed twice back-to-back on Push day. Completely invisible before Session 15 since only one push exercise was ever built per plan. Fixed by swapping the whole exercise object (`pushEx = lib.push_exp`) instead of overwriting one field, which correctly leaves `.variation` pointing at the original floor press.
+
+**Verification done this session:** `esbuild` parse check passes. Ran the real `buildPlan()` in Node across all 4 equipment types at 5 days/week — confirmed Push and Pull both now show 3 exercises with sensible weight/rep/rest numbers, confirmed the shoulder-injury skip and wrist-injury swap both fire correctly, confirmed the kettlebell duplicate-exercise bug is gone (now shows "Kettlebell push press" + "Kettlebell floor press", two real distinct exercises). Confirmed the 4-day Upper/Lower and ≤3-day full-body paths are byte-for-byte unchanged — this session touched nothing outside the 5+ day branch except the kettlebell bug fix (which affects all plan shapes, but only changes the corrupted `.variation` field, not which exercise a kettlebell member's push slot shows). Ran the real `progressPlan()` against 2 weeks of synthetic logs on the new lateral-raise exercise specifically — progressed +5lb on schedule, confirming the isolation exercises plug into the exact same progression math as everything else.
+
+**Still NOT done:** same as Session 15 — no live/browser look at the actual rendered Push/Pull/Legs screens yet, everything verified by running the real functions in Node. Also worth knowing: Push and Pull days are 3 exercises now, still one fewer than Legs' 4-5. That's judged as reasonable (real PPL programs vary day-to-day length too), but if it ever feels thin in practice, the next lever is adding a second isolation movement per day (e.g. a triceps exercise on Push, a rear-delt/back-width move on Pull) rather than reaching for the ambiguous `accessory` slot.
+
+## Files touched this session
+
+- `src/shared.jsx`: 2,649 → 2,743 (+94) — `push_secondary`/`pull_secondary` library entries (4 equipment types) + starting weights, `makeIsolationEx()`, kettlebell `push_exp` object-swap bug fix
+
+Well under the 3,800-line hard limit.
+
+## Latest commit
+
+`42b9e77` on `main` — Session 15b's Push/Pull secondary exercises. `bdffc02` (Session 15's handoff doc) is the commit before it.
+
+---
+
 # Hypergentiq — Session 15 master handoff (real per-day AI plan variation, shipped)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
