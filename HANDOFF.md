@@ -1,6 +1,34 @@
-# Hypergentiq — Session 11 master handoff (continued: design audit + fixes)
+# Hypergentiq — Session 12 master handoff (color-uniformity sweep, IN PROGRESS)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
+
+## Session 12 — color-uniformity sweep (IN PROGRESS, not finished)
+
+Bryant asked, after the redesign: "make it uniform... anything not in the color palette, less rainbow." Approved the full plan with "Yes to all." This is a big sweep across every screen file and it is **not done yet** — partial progress was committed this session so nothing gets lost, but there is real work still open. Do NOT report this as complete.
+
+**Shipped and pushed this session (commit `90b495f`):**
+- Meals input box background unified off its stray blue onto the standard card color
+- MealScreen macro-bar colors (Protein/Carbs/Fat) and water tracker demoted/recolored
+- Home screen's first "Daily targets" 3-item widget (Calories/Protein/Carbs) recolored
+- ProgressScreen volume-chart colors + "(sample)" label grays
+- WorkoutScreen stray warm-up-text grays and gold PR text recolored
+- Morphiq.jsx stray grays + sync-error banner restyled
+- GymOwnerDashboard pricing-tier colors, avatar colors, stat-card colors
+- SuperAdminDashboard status-pill colors
+
+**Still open — exact locations, found via a fresh audit re-run, none of these are fixed yet:**
+
+1. **Second "Daily Targets" macro widget** in `Morphiq.jsx` (~line 1359) — a 4-item version (Calories/Protein/Carbs/Fat) still using the old scheme `[a, "#F59E0B", "#818cf8", "#f472b6"]`. Needs the harmonized family. **Important collision to watch:** Calories already uses the app's accent blue `a` — Protein/Carbs/Fat must NOT also use accent blue anywhere a Calories tile appears alongside them, or two tiles in the same row will look identical. Recommended final mapping app-wide: Calories = accent `#4C8DFF` (headline only), Protein = `#7C93B8`, Carbs = `#5FA8E0`, Fat = `#2D5FA8`. **This also means MealScreen's MacroBar (fixed earlier this session) needs a second look** — it currently has Protein on accent blue `#4C8DFF`, which will collide with any Calories tile using the same accent. Shift MealScreen to the same Protein/Carbs/Fat = slate/ice/deep mapping for true consistency.
+2. **Remaining `#A78BFA` (light purple) — 6 occurrences, none fixed:** `GymOwnerDashboard.jsx` lines ~760/765 (AI-usage-breakdown "Tokens used" stat + "Plan generation" category), `GymOwnerDashboard.jsx` line ~824 (Plans & pricing button), `ProgressScreen.jsx` line ~271 ("PBs logged" stat), `SuperAdminDashboard.jsx` line ~9 (a SEPARATE `scale` tier color definition, parallel/duplicate to the `plans` array already fixed in GymOwnerDashboard.jsx — same duplicate-logic pattern flagged in Session 11's notes, needs updating to match), `WorkoutScreen.jsx` line ~1486 (RPE badge, `background: "#212429", border: "1px solid rgba(167,139,250,0.3)", color: "#A78BFA"`).
+3. **Remaining `#60A5FA` — 4 occurrences, none fixed:** `SuperAdminDashboard.jsx` lines ~230, 245, 262 (admin stat displays — need context check for what each represents before recoloring).
+4. **Amber re-scoping in `WorkoutScreen.jsx` — discussed and agreed with Bryant, ZERO code changes made yet.** Full plan from that conversation: warm-up messaging (calm, not urgent) → switch to `theme.textDim`/gray; PR/celebration moments → switch to `theme.success` green; genuine caution (rest-timer urgency, big-weight-jump confirm) → keep amber. Exact locations mapped out this session, ready to execute:
+   - **→ GRAY (warm-up, calm demotion):** line ~1472 "not a working set" label, line ~1482 `Pill variant="amber"` for the warm-up pill (note: `Pill` component in `shared.jsx` ~line 2111 already has a `gray` variant defined — use it), line ~1507 warm-up weight number, line ~1514/1537 warm-up weight/reps numbers, lines ~1524/1526/1528 "Warm-ups aren't meant to feel heavy" reassurance text, lines ~1560/1562 "This is a warm-up set — take it easy" flame callout (background `#1A1206` + border also need a neutral-gray equivalent, not just the text).
+   - **→ GREEN (celebration):** line ~1231 trophy icon on "Workout complete" screen, lines ~1264/1269-1271 "Progressive overload applied" badge (bolt icon + text + border, `#1A1200` bg), lines ~1321-1323 PR banner on the rest screen (gradient `#2D1A00→#1A1200`, border, trophy icon, "New personal record!" text — `theme.amber` used for the weight sub-text too), line ~1516 the inline "Progressive overload applied" note under the weight display.
+   - **→ KEEP AMBER (genuine caution, do not touch):** line ~1332 rest-timer countdown when ≤15s left, lines ~1636-1646 the "That's a big jump from today's plan" guardrail confirm card and its Yes/adjust buttons.
+   - Also line ~1291-1312 "Set skipped" indicator (`wasSkipped` amber vs `a`) — this is informational, not caution or celebration; recommend gray to match the calm-demotion pattern rather than leaving it implying urgency.
+5. **Not yet investigated for context:** `#2D1A00`-family occurrences in `GymSignupScreen.jsx` line ~246 (error-state icon) and `ProgressScreen.jsx` line ~431 (a badge) — likely genuine-caution/error uses worth keeping, but need an individual look before deciding; `#333333` in `GymOwnerDashboard.jsx` line ~714; smaller dark-tint clusters not yet opened: `#1a2e2b`, `#1a1206` (partially covered above), `#1a1200` (partially covered above), `#0f1a28`, `#1a1010`, `#1a1a0a`, `#0a0a0a`, `#111111`.
+
+**Next session should:** finish items 1-5 above, re-run the audit script to confirm the palette is clean (excluding legitimate semantic colors: `theme.success` green, `theme.amber` for real caution only, `theme.red` for errors), run esbuild + line-count-delta checks on every touched file, commit, push, update this file's "Latest commit" line, and live-verify via the deployed bundle (not a screenshot alone — this app has bitten us on stale CDN caching once already, see Session 11 notes below).
 
 ## Session 11 shipped
 
@@ -59,7 +87,7 @@ Nothing near the 3,800-line hard limit on any file.
 
 ## Latest commit
 
-`149e9a9` on `main`.
+`90b495f` on `main` — Session 12's partial color-sweep commit. This is a checkpoint, not a finished feature; see the Session 12 section above for exactly what's left.
 
 ## Punch list, in priority order
 
