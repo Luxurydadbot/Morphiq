@@ -1198,6 +1198,11 @@ const EXERCISE_LIBRARY = {
     pull_back:      { name: "Chest-supported DB row",    muscle: "Back / Biceps",     pattern: "pull"  },
     accessory_shoulder: { name: "Landmine press",        muscle: "Shoulders",         pattern: "accessory" },
     finisher_back:  { name: "Kettlebell swings",         muscle: "Full body",         pattern: "accessory" },
+    // Push/Pull day secondary movements (session 15b) -- see comment above
+    // pushSecondaryEx/pullSecondaryEx in buildPlan() for why these exist.
+    push_secondary: { name: "Dumbbell lateral raise", muscle: "Shoulders (lateral delt)", pattern: "accessory" },
+    pull_secondary: { name: "Barbell curl",           muscle: "Biceps",                  pattern: "accessory" },
+    pull_secondary_wrist: { name: "Dumbbell hammer curl", muscle: "Biceps / Forearms",   pattern: "accessory" },
   },
   dumbbell: {
     squat:     { name: "Goblet squat",              variation: "Dumbbell split squat",         muscle: "Quads / Glutes",       pattern: "squat" },
@@ -1215,6 +1220,8 @@ const EXERCISE_LIBRARY = {
     pull_back:      { name: "Chest-supported DB row",    muscle: "Back / Biceps",     pattern: "pull"  },
     accessory_shoulder: { name: "Hammer curl",           muscle: "Biceps",            pattern: "accessory" },
     finisher_shoulder:  { name: "Dumbbell swing",        muscle: "Full body",         pattern: "accessory" },
+    push_secondary: { name: "Dumbbell lateral raise", muscle: "Shoulders (lateral delt)", pattern: "accessory" },
+    pull_secondary: { name: "Dumbbell bicep curl",    muscle: "Biceps",                  pattern: "accessory" },
   },
   machine: {
     squat:     { name: "Leg press",                 variation: "Hack squat machine",           muscle: "Quads / Glutes",       pattern: "squat" },
@@ -1230,6 +1237,8 @@ const EXERCISE_LIBRARY = {
     squat_knee: { name: "Seated leg extension (light)", muscle: "Quads",            pattern: "squat" },
     push_shoulder: { name: "Cable chest fly",       muscle: "Chest",                pattern: "push"  },
     pull_back:  { name: "Lat pulldown",             muscle: "Back",                 pattern: "pull"  },
+    push_secondary: { name: "Cable lateral raise", muscle: "Shoulders (lateral delt)", pattern: "accessory" },
+    pull_secondary: { name: "Cable bicep curl",    muscle: "Biceps",                  pattern: "accessory" },
   },
   kettlebell: {
     squat:     { name: "Kettlebell goblet squat",   variation: "Kettlebell sumo squat",        muscle: "Quads / Glutes",       pattern: "squat" },
@@ -1249,6 +1258,8 @@ const EXERCISE_LIBRARY = {
     pull_back:      { name: "Kettlebell drag curl",      muscle: "Biceps",            pattern: "pull"  },
     accessory_wrist:{ name: "Kettlebell halo",           muscle: "Shoulders / Core",  pattern: "accessory" },
     finisher_back:  { name: "Jump rope 3 min",           muscle: "Full body",         pattern: "accessory" },
+    push_secondary: { name: "Kettlebell lateral raise", muscle: "Shoulders (lateral delt)", pattern: "accessory" },
+    pull_secondary: { name: "Kettlebell bicep curl",    muscle: "Biceps",                  pattern: "accessory" },
   },
 };
 
@@ -1286,6 +1297,26 @@ const STARTING_WEIGHTS = {
   "Hip thrust":                   { beginner: 0,   some: 25,  returning: 45,  experienced: 65  },
   "Landmine press":               { beginner: 25,  some: 35,  returning: 45,  experienced: 65  },
   "Barbell complex":              { beginner: 35,  some: 45,  returning: 55,  experienced: 65  },
+  // Push/Pull day secondary isolation movements (session 15b). Deliberately
+  // lighter progressions than the compound lifts above -- lateral raises in
+  // particular are notorious for looking "easy" on paper but wrecking form
+  // and inviting shoulder impingement the moment the weight gets ambitious;
+  // real coaching consensus is to stay conservative here and let reps/burn
+  // do the work rather than the load.
+  "Dumbbell lateral raise":       { beginner: 5,   some: 8,   returning: 10,  experienced: 12  },
+  "Cable lateral raise":          { beginner: 5,   some: 10,  returning: 15,  experienced: 20  },
+  // Kettlebells only come in big fixed jumps (see weightIncrement note in
+  // buildPlan()) -- deliberately NOT reusing the same 15/25/35/44/53 ladder
+  // every other kettlebell exercise in this table uses. That ladder is
+  // calibrated for squats/presses/rows; a beginner starting lateral raises
+  // at a 15lb kettlebell is a real recipe for using momentum instead of the
+  // delt. Lighter, raise-appropriate numbers instead.
+  "Kettlebell lateral raise":     { beginner: 8,   some: 12,  returning: 15,  experienced: 18  },
+  "Barbell curl":                 { beginner: 20,  some: 30,  returning: 40,  experienced: 50  },
+  "Dumbbell bicep curl":          { beginner: 10,  some: 15,  returning: 20,  experienced: 25  },
+  "Dumbbell hammer curl":         { beginner: 10,  some: 15,  returning: 20,  experienced: 25  },
+  "Cable bicep curl":             { beginner: 15,  some: 20,  returning: 30,  experienced: 40  },
+  "Kettlebell bicep curl":        { beginner: 10,  some: 15,  returning: 20,  experienced: 25  },
 };
 const DEFAULT_WEIGHT = 20; // fallback if exercise not in table
 
@@ -1486,7 +1517,7 @@ function buildPlan(userProfile, existingMacros) {
   const hingeEx   = hasKnee     ? pick("hinge", "knee")
                   : hasBack     ? pick("hinge", "back")
                   : pick("hinge");
-  const pushEx    = hasShoulder ? pick("push", "shoulder")  : pick("push");
+  let pushEx      = hasShoulder ? pick("push", "shoulder")  : pick("push");
   const pullEx    = hasBack     ? pick("pull", "back")       : pick("pull");
 
   // Slot 5: accessory vs finisher based on goal
@@ -1507,11 +1538,43 @@ function buildPlan(userProfile, existingMacros) {
     }
   }
 
-  // Experienced members on push slot: kettlebell gets push_exp
-  if (equipment === "kettlebell" && isExperienced && !hasShoulder) {
-    const kbPushExp = lib.push_exp;
-    if (kbPushExp) pushEx.name = kbPushExp.name; // in-place upgrade
+  // Experienced members on push slot: kettlebell gets push_exp.
+  // Bug fix (session 15b): this used to mutate just pushEx.name in place,
+  // leaving pushEx.variation pointing at push_exp's own name too (push_exp's
+  // variation IS "Kettlebell push press" -- the same string this line was
+  // writing into .name) -- invisible before this session since only one push
+  // exercise was ever built per plan, but the new Push/Pull/Legs split now
+  // builds a second exercise off .variation, which would have shown
+  // "Kettlebell push press" twice back to back. Swapping the whole object
+  // instead of one field keeps .variation correctly pointing at the
+  // original push exercise (floor press), which now correctly becomes the
+  // second Push-day movement instead of a duplicate.
+  if (equipment === "kettlebell" && isExperienced && !hasShoulder && lib.push_exp) {
+    pushEx = lib.push_exp;
   }
+
+  // Push/Pull day secondary isolation movements (session 15b) -- only used
+  // by the Push/Pull/Legs split (5+ days/week, see "Day structure" below).
+  // Push day already gets two pressing angles (primary + variation), so the
+  // highest-value single addition is lateral raise -- the medial delt is the
+  // one shoulder head pressing barely touches, it's low-injury-risk done
+  // light, and it's an easy movement to coach correctly with no supervision.
+  // Skipped entirely on a shoulder injury rather than substituted -- lateral
+  // raises are one of the more impingement-prone accessory movements, and
+  // "do less" is the safer call for an isolation bonus exercise (unlike a
+  // primary compound slot, which always needs a real replacement).
+  const pushSecondaryEx = hasShoulder ? null : (lib.push_secondary || null);
+
+  // Pull day already gets two rowing angles, so its highest-value addition
+  // is a biceps curl -- "back and biceps" is the standard real-world PPL
+  // pairing, and biceps get zero direct work anywhere else in the plan.
+  // Wrist injury swaps to a neutral-grip hammer curl where the library has
+  // one (currently just barbell, where a straight bar curl is the most
+  // wrist-stressed of the four equipment variants) -- dumbbell/kettlebell/
+  // cable curls already allow a wrist-friendly grip without needing a swap.
+  const pullSecondaryEx = hasWrist && lib.pull_secondary_wrist
+    ? lib.pull_secondary_wrist
+    : (lib.pull_secondary || null);
 
   // ── Starting weight lookup ────────────────────────────────────────
   const getWeight = (exName) => {
@@ -1581,6 +1644,37 @@ function buildPlan(userProfile, existingMacros) {
     };
   };
 
+  // Isolation accessory builder (lateral raise / bicep curl) -- deliberately
+  // NOT built from makeEx()'s compound rep range. Real programming trains
+  // single-joint isolation work at higher reps (12-15) than compound lifts
+  // regardless of the member's overall goal or experience tier -- lighter
+  // load, less systemic fatigue, and a higher rep target actively protects
+  // against using momentum to cheat a lateral raise. RPE is capped at 7 for
+  // the same reason accessories don't need to be pushed to true failure to
+  // do their job, and rest is short (effectiveRestAccessory) since a single-
+  // joint movement doesn't need full ATP-PC recovery between sets the way a
+  // heavy compound does.
+  const makeIsolationEx = (exObj) => {
+    if (!exObj) return null;
+    const w = getWeight(exObj.name);
+    return {
+      name: exObj.name,
+      sets: 3,
+      reps: 12,
+      repMin: 12,
+      repMax: 15,
+      weight: w,
+      warmupSets: [], // light isolation work doesn't need a loaded warm-up ramp
+      muscle: exObj.muscle,
+      pattern: exObj.pattern,
+      rpe: Math.min(rpe, 7),
+      restSeconds: effectiveRestAccessory,
+      alternative: "",
+      usePyramid: false,
+      weightIncrement: 5,
+    };
+  };
+
   // ── Day structure ─────────────────────────────────────────────────
   // Below 4 days/week: one full-body session, reused every workout --
   // unchanged from before this feature. 4 days/week: a real Upper/Lower
@@ -1602,8 +1696,8 @@ function buildPlan(userProfile, existingMacros) {
   let exercises, customDays;
 
   if (daysPerWeek >= 5) {
-    const pushDay = [makeEx(pushEx, false), makeVariationEx(pushEx, false)].filter(Boolean);
-    const pullDay = [makeEx(pullEx, false), makeVariationEx(pullEx, false)].filter(Boolean);
+    const pushDay = [makeEx(pushEx, false), makeVariationEx(pushEx, false), makeIsolationEx(pushSecondaryEx)].filter(Boolean);
+    const pullDay = [makeEx(pullEx, false), makeVariationEx(pullEx, false), makeIsolationEx(pullSecondaryEx)].filter(Boolean);
     const legsDay = [
       makeEx(squatEx, true), makeVariationEx(squatEx, true),
       makeEx(hingeEx, true), makeVariationEx(hingeEx, true),
