@@ -813,10 +813,16 @@ function HomeDashboardScreen() {
   })();
 
   // Weekly workout count -- derived from real logged sets (Supabase), not a
-  // local counter. Any day with at least one logged set counts as a workout
-  // for that week. Fixes two real problems: stopping partway through a
-  // session used to not count at all, and the old counter lived only in this
-  // device's local storage so it didn't follow you across devices.
+  // local counter, so it follows you across devices. BUT counting "any day
+  // with at least one logged set" as a full workout was wrong -- a single
+  // warm-up set logged while testing, or a couple of sets on just one
+  // exercise before getting interrupted, counted exactly the same as a real
+  // multi-exercise session. That let a handful of partial/test days this
+  // week add up to "4 of 4 -- Week complete!" despite only one of those days
+  // being a real workout. Fix: a day only counts if it has a logged set
+  // (reps > 0, so a stray 0-rep test tap doesn't count either) on more than
+  // one distinct exercise that day -- cardio sessions still count on their
+  // own, same as before, since they're not exercise-set based.
   const weeklyTarget = plan?.daysPerWeek ?? 3;
   const monday = (() => {
     const now = new Date();
@@ -825,11 +831,17 @@ function HomeDashboardScreen() {
     return new Date(now.getFullYear(), now.getMonth(), diff);
   })();
   const mondayStr = localDateStr(monday);
-  const weeklyDone = new Set(
-    (historicalData?.workoutLogs || [])
-      .map((l) => l.workout_date)
-      .filter((d) => d >= mondayStr)
-  ).size;
+  const qualifyingDatesThisWeek = (() => {
+    const logsThisWeek = (historicalData?.workoutLogs || []).filter((l) => l.workout_date >= mondayStr);
+    const byDate = {};
+    for (const l of logsThisWeek) {
+      if (!byDate[l.workout_date]) byDate[l.workout_date] = { exercises: new Set(), hasCardio: false };
+      if (l.is_cardio) byDate[l.workout_date].hasCardio = true;
+      else if ((l.reps || 0) > 0 && l.exercise_name) byDate[l.workout_date].exercises.add(l.exercise_name);
+    }
+    return Object.keys(byDate).filter((d) => byDate[d].hasCardio || byDate[d].exercises.size > 1);
+  })();
+  const weeklyDone = qualifyingDatesThisWeek.length;
   const allDone = weeklyDone >= weeklyTarget;
   const weekNum = plan?.weekNumber ?? 1;
   // For custom multi-day plans, show the upcoming day's name and exercises.
