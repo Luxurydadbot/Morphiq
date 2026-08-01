@@ -9,6 +9,7 @@ import { ProgressScreen } from "./ProgressScreen.jsx";
 import { ChatScreen } from "./ChatScreen.jsx";
 import {
   sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY, isGymBlocked,
+  isMultiDayPlan,
   setSessionCookie, getSessionCookie, clearSessionCookie,
   localDateStr, buildPlan, progressPlan,
   SUPABASE_URL, SB_GET, getAuthToken,
@@ -847,18 +848,18 @@ function HomeDashboardScreen() {
   // For custom multi-day plans, show the upcoming day's name and exercises.
   // If the member manually picked a day (selectedDayOverride), use that instead
   // of the normal auto-pick. The override only ever affects this one card/session.
-  const isMultiDayPlan = plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1;
+  const isMultiDay = isMultiDayPlan(plan);
   // Continue from wherever the member actually last did (their last day + 1,
   // wrapping) rather than inferring from how many days they've worked out
   // this week -- that count-based guess drifts once a manual day-pick breaks
   // the plain 1-2-3-4 sequence (see profiles.last_workout_day_index).
-  const activeDayIdx = isMultiDayPlan
+  const activeDayIdx = isMultiDay
     ? ((selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
         ? selectedDayOverride
         : (typeof user?.lastWorkoutDayIndex === "number" ? (user.lastWorkoutDayIndex + 1) % plan.customDays.length : 0))
     : null;
   const getUpcomingDayData = () => {
-    if (isMultiDayPlan) {
+    if (isMultiDay) {
       try { return plan.customDays[activeDayIdx]; } catch { return null; }
     }
     return null;
@@ -1083,7 +1084,7 @@ function HomeDashboardScreen() {
                 </div>
                 <div style={{ background: "rgba(76,141,255,0.1)", border: "0.5px solid rgba(76,141,255,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>{workoutType}</div>
               </div>
-              {isMultiDayPlan && (
+              {isMultiDay && (
                 <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 6 }}>
                   {plan.customDays.map((d, idx) => (
                     <button key={idx} onClick={() => setSelectedDayOverride(idx)}

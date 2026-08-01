@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight } from "./shared.jsx";
+         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
+         isMultiDayPlan } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -308,8 +309,8 @@ function WorkoutScreen() {
   // they've done this week (that count-based guess drifts once a manual pick
   // breaks the plain 1-2-3-4 sequence, e.g. picking Day 2 first would make the
   // old math suggest Day 2 again next time instead of Day 3).
-  const isMultiDayPlan = plan?.isCustomPlan && Array.isArray(plan?.customDays) && plan.customDays.length > 1;
-  const activeDayIdx = isMultiDayPlan
+  const isMultiDay = isMultiDayPlan(plan);
+  const activeDayIdx = isMultiDay
     ? (typeof savedProgress?.dayIndex === "number" && savedProgress.dayIndex < plan.customDays.length
         ? savedProgress.dayIndex
         : (selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
@@ -345,7 +346,7 @@ function WorkoutScreen() {
   // Stored in state (not const) so swapping an exercise updates it live.
   const [exercises, setExercises] = useState(() => {
     let sourceExercises = plan?.exercises || WORKOUT_EXERCISES;
-    if (isMultiDayPlan) {
+    if (isMultiDay) {
       try {
         const dayData = plan.customDays[activeDayIdx];
         if (dayData?.exercises?.length > 0) sourceExercises = dayData.exercises;
@@ -362,7 +363,7 @@ function WorkoutScreen() {
   // savedProgress.dayIndex above, so this just re-writes the same value.
   useEffect(() => {
     if (selectedDayOverride !== null) setSelectedDayOverride(null);
-    if (isMultiDayPlan && activeDayIdx !== null && supabaseUser?.id) {
+    if (isMultiDay && activeDayIdx !== null && supabaseUser?.id) {
       sb.updateLastWorkoutDayIndex(supabaseUser.id, activeDayIdx).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -413,7 +414,7 @@ function WorkoutScreen() {
       // than the one this device guessed at mount, rebuild the exercise list
       // from the correct day -- otherwise exIdx/setIdx above would point into
       // the wrong day's exercises (same bug as the local-storage resume path).
-      if (isMultiDayPlan && typeof cloud.dayIndex === "number" && cloud.dayIndex !== activeDayIdx && cloud.dayIndex < plan.customDays.length) {
+      if (isMultiDay && typeof cloud.dayIndex === "number" && cloud.dayIndex !== activeDayIdx && cloud.dayIndex < plan.customDays.length) {
         const dayData = plan.customDays[cloud.dayIndex];
         if (dayData?.exercises?.length > 0) {
           setExercises(dayData.exercises.map(normalizeExercise));

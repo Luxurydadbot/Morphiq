@@ -1549,17 +1549,21 @@ function buildPlan(userProfile, existingMacros) {
     };
   };
 
-  const exercises = [
-    makeEx(squatEx, true),
-    makeEx(hingeEx, true),
-    makeEx(pushEx, false),
-    makeEx(pullEx, false),
-    makeEx(slot5Ex, false),
-  ].filter(Boolean);
+  // A slot's `variation` field (already used week-to-week by progressPlan's
+  // post-deload primary/variation alternation) doubles as a second, distinct
+  // exercise for the same movement pattern -- used below to give split plans
+  // more than one exercise per pattern without inventing new library entries.
+  const makeVariationEx = (exObj, isLower) => {
+    if (!exObj?.variation) return null;
+    return makeEx({ ...exObj, name: exObj.variation }, isLower);
+  };
 
-  // ── Add core slot for experienced members, 3+ days ────────────────
-  if (isExperienced && daysPerWeek >= 3 && lib.core) {
-    exercises.push({
+  // Core/carry slot -- same construction reused across every plan shape
+  // (full body, Upper/Lower, Push/Pull/Legs). Only added for experienced
+  // members on 3+ days/week, same gate as before this feature existed.
+  const buildCoreEx = () => {
+    if (!(isExperienced && daysPerWeek >= 3 && lib.core)) return null;
+    return {
       name: lib.core.name,
       sets: 3,
       reps: 40, // seconds for carries
@@ -1574,7 +1578,70 @@ function buildPlan(userProfile, existingMacros) {
       alternative: "Pallof press",
       usePyramid: false,
       weightIncrement: 5,
-    });
+    };
+  };
+
+  // ── Day structure ─────────────────────────────────────────────────
+  // Below 4 days/week: one full-body session, reused every workout --
+  // unchanged from before this feature. 4 days/week: a real Upper/Lower
+  // split -- a Lower day (squat + hinge, each paired with its variation for
+  // extra volume) and an Upper day (push + pull, same treatment, plus slot
+  // 5). 5+ days/week: real Push/Pull/Legs -- Push and Pull days use each
+  // pattern's variation as their second exercise (the library only has one
+  // named exercise per pattern per equipment type), Legs carries squat +
+  // hinge + their variations + core.
+  //
+  // Bug fix (session 15): workoutType used to be just a label -- every day
+  // actually got the identical 5-exercise list underneath no matter what the
+  // label said ("Upper / Lower" and "Push / Pull / Legs" were both lies).
+  // Below, each split actually builds distinct per-day exercise lists,
+  // stored the exact same way CustomPlanScreen already stores hand-built
+  // multi-day plans (plan.customDays) -- so the existing day-rotation UI,
+  // progressPlan(), and the plateau/deload detector, all of which already
+  // read customDays generically, pick these up with no separate changes.
+  let exercises, customDays;
+
+  if (daysPerWeek >= 5) {
+    const pushDay = [makeEx(pushEx, false), makeVariationEx(pushEx, false)].filter(Boolean);
+    const pullDay = [makeEx(pullEx, false), makeVariationEx(pullEx, false)].filter(Boolean);
+    const legsDay = [
+      makeEx(squatEx, true), makeVariationEx(squatEx, true),
+      makeEx(hingeEx, true), makeVariationEx(hingeEx, true),
+      buildCoreEx(),
+    ].filter(Boolean);
+    customDays = [
+      { dayLabel: "Push", exercises: pushDay },
+      { dayLabel: "Pull", exercises: pullDay },
+      { dayLabel: "Legs", exercises: legsDay },
+    ];
+    exercises = pushDay;
+  } else if (daysPerWeek === 4) {
+    const lowerDay = [
+      makeEx(squatEx, true), makeVariationEx(squatEx, true),
+      makeEx(hingeEx, true), makeVariationEx(hingeEx, true),
+      buildCoreEx(),
+    ].filter(Boolean);
+    const upperDay = [
+      makeEx(pushEx, false), makeVariationEx(pushEx, false),
+      makeEx(pullEx, false), makeVariationEx(pullEx, false),
+      makeEx(slot5Ex, false),
+    ].filter(Boolean);
+    customDays = [
+      { dayLabel: "Lower", exercises: lowerDay },
+      { dayLabel: "Upper", exercises: upperDay },
+    ];
+    exercises = lowerDay;
+  } else {
+    exercises = [
+      makeEx(squatEx, true),
+      makeEx(hingeEx, true),
+      makeEx(pushEx, false),
+      makeEx(pullEx, false),
+      makeEx(slot5Ex, false),
+    ].filter(Boolean);
+    const coreEx = buildCoreEx();
+    if (coreEx) exercises.push(coreEx);
+    customDays = null;
   }
 
   // ── Workout structure ─────────────────────────────────────────────
@@ -1622,6 +1689,7 @@ function buildPlan(userProfile, existingMacros) {
       { name: "Child's pose",       duration: "60 seconds",   description: "Kneel, reach arms forward, breathe deeply." },
     ],
     exercises,
+    customDays,
   };
 }
 
@@ -2517,6 +2585,22 @@ function getWeekStreakFromDates(workoutDates, daysPerWeek) {
 
 
 
+// -- Multi-day plan helper ----------------------------------------------
+// A plan is "multi-day" (has more than one distinct workout to rotate
+// through) purely based on whether plan.customDays holds more than one day
+// -- NOT on plan.isCustomPlan. That flag only ever meant "a member hand-built
+// this in CustomPlanScreen" and has nothing to do with day-count; AI-generated
+// Upper/Lower and Push/Pull/Legs plans (see buildPlan(), session 15) also
+// populate customDays and need the exact same day-rotation UI. Session 15
+// bug fix: this used to be duplicated inline in both Morphiq.jsx and
+// WorkoutScreen.jsx as `plan?.isCustomPlan && ...`, which silently excluded
+// AI split plans from ever rotating days -- collapsed to one shared function
+// here instead of patching each copy separately (the exact lesson from the
+// session-10 warm-up bug).
+function isMultiDayPlan(plan) {
+  return Array.isArray(plan?.customDays) && plan.customDays.length > 1;
+}
+
 // -- Billing / paywall gate --------------------------------------------
 // Central place that decides if a gym's members and owner should be locked
 // out of the app. Internal/beta-exempt gyms (is_beta_exempt) are NEVER
@@ -2560,4 +2644,6 @@ export {
   MonthlyTrendLineChart,
   // Billing / paywall
   isGymBlocked,
+  // Multi-day plan helper
+  isMultiDayPlan,
 };
