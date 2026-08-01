@@ -1311,6 +1311,22 @@ function reRampWarmups(workingWeight, exerciseName, overriddenIndex, overriddenW
   }));
 }
 
+// Suggested new working weight when the member manually raises their LAST
+// warm-up set (the one closest to their actual working weight, e.g. the 85%
+// step on a compound lift). Deliberately NOT used for earlier warm-up sets --
+// those are supposed to feel light by design (that's the whole point of a
+// warm-up), so treating "felt light" as a signal on every step would react
+// to something that's working correctly. The last step is the one real
+// readiness check, the same way lifters use a heavy "opener" set to decide
+// whether to push their working weight up, hold, or back off.
+function impliedWorkingWeight(exerciseName, overriddenWeight) {
+  const isCompound = COMPOUND_LIFT_PATTERN.test(exerciseName || "");
+  const pcts = isCompound ? [0.5, 0.7, 0.85] : [0.6];
+  const lastPct = pcts[pcts.length - 1];
+  const roundTo = 5;
+  return Math.max(roundTo, Math.round((overriddenWeight / lastPct) / roundTo) * roundTo);
+}
+
 function buildPlan(userProfile, existingMacros) {
   const {
     goal = "get_fit",
@@ -2312,7 +2328,7 @@ export {
   // Theme
   theme, css,
   // Plan engine
-  buildPlan, progressPlan, buildSetDetails, buildWarmupRamp, reRampWarmups,
+  buildPlan, progressPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components

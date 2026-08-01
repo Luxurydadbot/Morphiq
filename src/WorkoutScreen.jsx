@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
-         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups } from "./shared.jsx";
+         WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -30,7 +30,7 @@ function RestRing({ secondsLeft, totalSeconds, accent, size = 100 }) {
   );
 }
 
-function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
+function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep, message }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
   return (
@@ -40,8 +40,10 @@ function AINudgeCard({ exercise, oldWeight, newWeight, onAccept, onKeep }) {
         <div style={{ fontSize: 15, color: a, fontWeight: 700 }}>Your trainer noticed something</div>
       </div>
       <div style={{ fontSize: 14, color: "#9BB3C8", lineHeight: 1.6, marginBottom: 12 }}>
-        You exceeded target reps both sets. Nudging weight to{" "}
-        <span style={{ color: "#E8EDF2", fontWeight: 700 }}>{newWeight} lbs</span> for this set.
+        {message || (
+          <>You exceeded target reps both sets. Nudging weight to{" "}
+          <span style={{ color: "#E8EDF2", fontWeight: 700 }}>{newWeight} lbs</span> for this set.</>
+        )}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={onKeep} style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.12)`, borderRadius: 10, padding: "10px 4px", fontSize: 13, color: "#6B7A8D", cursor: "pointer", fontFamily: "inherit" }}>Keep {oldWeight} lbs</button>
@@ -423,6 +425,11 @@ function WorkoutScreen() {
   const timerRef = useRef(null);
 
   const [nudgedWeight, setNudgedWeight] = useState(null);
+  // What triggered the current nudge card -- "overload" (beat target reps
+  // twice) or "warmupCarry" (member raised their last warm-up set). Lets the
+  // same AINudgeCard show the right before/after numbers and wording for
+  // either case instead of needing two separate components.
+  const [nudgeSource, setNudgeSource] = useState(null);
   const [showSwapSheet, setShowSwapSheet] = useState(false);  // controls the swap picker sheet
   const [swapConfirmName, setSwapConfirmName] = useState(null); // shows "Swapped in X ✓" briefly
   const [voiceSwapActive, setVoiceSwapActive] = useState(false); // mic open inside swap sheet
@@ -490,6 +497,7 @@ function WorkoutScreen() {
     setWarmupStep(0);
     setCooldownStep(0);
     setNudgedWeight(null);
+    setNudgeSource(null);
     nudgeAcceptedRef.current = false;
     setPhase(warmupExercises.length > 0 ? "warmup" : "active");
     setState("active");
@@ -614,6 +622,10 @@ function WorkoutScreen() {
   const safeSetIdx = Math.min(setIdx, totalSetsInPlan - 1);
   const currentSpec = setPlan[safeSetIdx] || setPlan[setPlan.length - 1];
   const isWarmupSet = currentSpec?.kind === "warmup";
+  // The LAST warm-up set (closest to working weight) is the one meaningful
+  // readiness check -- see impliedWorkingWeight() in shared.jsx for why
+  // earlier warm-up sets are deliberately ignored for this.
+  const isLastWarmupSet = isWarmupSet && safeSetIdx === effectiveWarmups.length - 1;
   // Working-set numbering for display (e.g. "Working set 2 of 4")
   const workingIdx = setPlan.slice(0, safeSetIdx + 1).filter(s => s.kind === "working").length;
 
@@ -691,9 +703,19 @@ function WorkoutScreen() {
     // "Last set" = last entry in the whole plan (warm-ups + working)
     const isLastSet = safeSetIdx >= totalSetsInPlan - 1;
     const increment = ex.weightIncrement || 5;
-    // Never nudge on a warm-up. Trigger only when 2+ working sets beat target.
-    if (!isWarmupSet && exceededCount >= 2 && !isLastSet && !nudgeAcceptedRef.current) {
+    // Manually raising the LAST warm-up set (the real readiness check) gets
+    // its own nudge, offering to carry that into the working weight -- see
+    // impliedWorkingWeight() in shared.jsx. Checked before the overload
+    // nudge below since they can never both apply to the same set.
+    const warmupWasRaised = isLastWarmupSet && weightOverride !== null && weightOverride > currentSpec.weight;
+    if (warmupWasRaised && !nudgeAcceptedRef.current) {
+      setNudgedWeight(impliedWorkingWeight(ex.name, weightOverride));
+      setNudgeSource("warmupCarry");
+      setState("nudge");
+    // Never nudge on a warm-up otherwise. Trigger only when 2+ working sets beat target.
+    } else if (!isWarmupSet && exceededCount >= 2 && !isLastSet && !nudgeAcceptedRef.current) {
       setNudgedWeight((nudgedWeight ?? ex.weight) + increment);
+      setNudgeSource("overload");
       setState("nudge");
     } else {
       // Seed the rest ring's numbers here, in the same tick as the state
@@ -777,6 +799,7 @@ function WorkoutScreen() {
     } else if (exIdx < exercises.length - 1) {
       // New exercise — clear nudge state, restart the plan at set 0
       setNudgedWeight(null);
+      setNudgeSource(null);
       nudgeAcceptedRef.current = false;
       setExIdx(i => i + 1);
       setSetIdx(0);
@@ -813,6 +836,7 @@ function WorkoutScreen() {
     });
     setSetIdx(0);
     setNudgedWeight(null);
+    setNudgeSource(null);
     setRepCount(null);
     setWeightOverride(null);
     setState("active");
@@ -909,6 +933,7 @@ function WorkoutScreen() {
     // Reset set counter — the exercise at exIdx may have changed
     setSetIdx(0);
     setNudgedWeight(null);
+    setNudgeSource(null);
     setRepCount(null);
     setWeightOverride(null);
     setPendingAISwap(null);
@@ -1435,10 +1460,14 @@ function WorkoutScreen() {
         {state === "nudge" && nudgedWeight && (
           <AINudgeCard
             exercise={ex}
-            oldWeight={currentSpec.weight}
+            oldWeight={nudgeSource === "warmupCarry" ? ex.weight : currentSpec.weight}
             newWeight={nudgedWeight}
+            message={nudgeSource === "warmupCarry" ? (
+              <>That last warm-up looked strong — carry it into your working weight at{" "}
+              <span style={{ color: "#E8EDF2", fontWeight: 700 }}>{nudgedWeight} lbs</span>?</>
+            ) : undefined}
             onAccept={() => { nudgeAcceptedRef.current = true; setState("rest"); }}
-            onKeep={() => { setNudgedWeight(currentSpec.weight); nudgeAcceptedRef.current = true; setState("rest"); }}
+            onKeep={() => { setNudgedWeight(nudgeSource === "warmupCarry" ? ex.weight : currentSpec.weight); nudgeAcceptedRef.current = true; setState("rest"); }}
           />
         )}
 
@@ -1455,7 +1484,13 @@ function WorkoutScreen() {
               <button onClick={() => setWeightOverride(displayWeight + (ex.weightIncrement || 5))}
                 style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>+</button>
             </div>
-            {isWarmupSet ? (
+            {isWarmupSet && weightOverride !== null && !isLastWarmupSet ? (
+              // Reassurance, not a warning: early warm-up sets are SUPPOSED to
+              // feel light -- that's the point. Reacting to that the same way
+              // a real working-set miss gets reacted to would be treating
+              // normal, working-as-intended behavior as a problem.
+              <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-ups aren't meant to feel heavy — that's normal. Still ramping to {ex.weight} lbs.</div>
+            ) : isWarmupSet ? (
               <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
             ) : nudgeAcceptedRef.current ? (
               <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
