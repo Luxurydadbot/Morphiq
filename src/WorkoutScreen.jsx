@@ -1510,33 +1510,37 @@ function WorkoutScreen() {
 
         {/* Weight display -- target reps now lives in the badge under the
             exercise name above, instead of a second tile here showing the
-            same number a second time. */}
+            same number a second time. Sized up across the board (Aug 2026)
+            now that this tile has the full row to itself instead of sharing
+            it with the old Target reps tile -- the smaller sizing looked
+            undersized for the extra room, and weight is the number members
+            check most carefully before a set. */}
         <div style={{ marginBottom: 10 }}>
-          <div style={{ background: "#212429", borderRadius: 12, padding: "10px 12px", textAlign: "center" }}>
-            <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 2 }}>Weight this set</div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <div style={{ background: "#212429", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+            <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 4 }}>Weight this set</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
               {/* Minus — lets a member drop the weight for this set without touching the plan */}
               <button onClick={() => setWeightOverride(Math.max(0, displayWeight - (ex.weightIncrement || 5)))}
-                style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>−</button>
-              <div style={{ fontSize: 40, fontWeight: 700, color: isWarmupSet ? theme.text : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 15, color: theme.textDim }}>lbs</span></div>
+                style={{ width: 30, height: 30, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 18, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>−</button>
+              <div style={{ fontSize: 60, fontWeight: 700, color: isWarmupSet ? theme.text : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 20, color: theme.textDim }}>lbs</span></div>
               {/* Plus — bump the weight for this set only; logged as-is, plan target is untouched */}
               <button onClick={() => setWeightOverride(displayWeight + (ex.weightIncrement || 5))}
-                style={{ width: 24, height: 24, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 15, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>+</button>
+                style={{ width: 30, height: 30, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 18, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>+</button>
             </div>
             {isWarmupSet && weightOverride !== null && !isLastWarmupSet ? (
               // Reassurance, not a warning: early warm-up sets are SUPPOSED to
               // feel light -- that's the point. Reacting to that the same way
               // a real working-set miss gets reacted to would be treating
               // normal, working-as-intended behavior as a problem.
-              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>Warm-ups aren't meant to feel heavy — that's normal. Still ramping to {ex.weight} lbs.</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Warm-ups aren't meant to feel heavy — that's normal. Still ramping to {ex.weight} lbs.</div>
             ) : isWarmupSet ? (
-              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
             ) : nudgeAcceptedRef.current ? (
-              <div style={{ fontSize: 10, color: theme.success, marginTop: 4 }}><Icon name="bolt" size={10} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
+              <div style={{ fontSize: 12, color: theme.success, marginTop: 6 }}><Icon name="bolt" size={12} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
             ) : weightOverride !== null ? (
-              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>Adjusted{displayWeight !== currentSpec.weight ? ` · ${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan` : ""}</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Adjusted{displayWeight !== currentSpec.weight ? ` · ${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan` : ""}</div>
             ) : (
-              <div style={{ fontSize: 10, color: theme.textDim, marginTop: 4 }}>{displayWeight === currentSpec.weight ? "Today's target" : `${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan`}</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>{displayWeight === currentSpec.weight ? "Today's target" : `${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan`}</div>
             )}
           </div>
         </div>
