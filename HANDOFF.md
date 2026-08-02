@@ -12,20 +12,23 @@ Steps, in order:
 
 1. **[ ] Fix current PWA gaps first** — `public/manifest.json` doesn't reference the existing `logo192.png`/`logo512.png` icon files, and there's no service worker registered. Clean this up as groundwork before wrapping with Capacitor.
 2. **[ ] Add Capacitor to the project, generate iOS + Android native projects.** No external blocker — can start anytime.
-3. **[ ] Android path (no Mac needed):**
+3. **[ ] Set up a live-update pipeline (e.g. Capgo) so most future changes don't need a full store re-review.** Once the app is live, the backend (Vercel API functions + Supabase) always updates instantly regardless of app store status — that never changes. But the JS/UI bundle that ships inside the native app is otherwise frozen until a new store submission. A live-update tool lets us push JS, styling, and copy changes (the kind of edits done most sessions — headers, colors, wording, most bug fixes) straight to installed users without going back through Apple/Google review, which keeps our regular workflow close to what it is today. This is explicitly allowed under Apple's guideline 3.3.1(B) since Capacitor apps run their web layer inside Apple's own WebKit. It does NOT cover anything touching native functionality — new permissions, new native plugins, icon/name changes — those still require a real store submission and review every time.
+4. **[ ] Android path (no Mac needed):**
    - [ ] Bryant creates a Google Play Console developer account — $25 one-time fee, requires ID verification and 2-Step Verification on the Google account. This step has to be done by Bryant directly (identity/payment).
    - [ ] Build and sign the Android app, submit for review.
-4. **[ ] iOS path (needs a Mac running macOS Sequoia 15.6 or newer, for Xcode 26 — Apple requires every submission to be built with Xcode 26 / the iOS 26 SDK as of April 28, 2026):**
+5. **[ ] iOS path (needs a Mac running macOS Sequoia 15.6 or newer, for Xcode 26 — Apple requires every submission to be built with Xcode 26 / the iOS 26 SDK as of April 28, 2026):**
    - [ ] Bryant to check the Mac available at work — confirm it can run macOS Sequoia 15.6+. (Ruled out: the 2013 MacBook Pro at home — its hardware ceiling is macOS Catalina or Big Sur depending on exact model, well short of what Xcode 26 requires.)
    - [ ] If the work Mac can't run it either, fall back to a cloud Mac build service (e.g. Codemagic, Ionic Appflow, or a macOS GitHub Actions runner) — no purchase needed, just setup.
    - [ ] Bryant creates an Apple Developer Program account — $99/year, requires ID verification. Has to be done by Bryant directly.
    - [ ] Build and sign the iOS app, submit for review.
-5. **[ ] Privacy policy — hard gate for BOTH stores, not optional.** Still blocked on a lawyer (see punch list). Both app stores require a real, linked privacy policy before they'll accept a submission — this needs to move from "blocked" to "in progress" for the store timeline to be realistic.
-6. **[ ] Store listing assets** — app icon in required sizes (already have source logos to build from), a handful of screenshots of the app in use, short description text, and each store's age-rating / data-safety questionnaire.
-7. **[ ] Confirm no Apple in-app purchase conflict** — members don't pay inside the app (gyms pay via Stripe outside the consumer-facing app), which should keep this out of Apple's in-app purchase requirement, but worth a final check against Apple's current guidelines right before submission.
-8. **[ ] Submit.** Apple review is typically fast once submitted (most decisions in 24-48 hours). Google's first-time review for a brand-new developer account can take longer.
+6. **[ ] Privacy policy — hard gate for BOTH stores, not optional.** Still blocked on a lawyer (see punch list). Both app stores require a real, linked privacy policy before they'll accept a submission — this needs to move from "blocked" to "in progress" for the store timeline to be realistic.
+7. **[ ] Store listing assets** — app icon in required sizes (already have source logos to build from), a handful of screenshots of the app in use, short description text, and each store's age-rating / data-safety questionnaire.
+8. **[ ] Confirm no Apple in-app purchase conflict** — members don't pay inside the app (gyms pay via Stripe outside the consumer-facing app), which should keep this out of Apple's in-app purchase requirement, but worth a final check against Apple's current guidelines right before submission.
+9. **[ ] Submit.** Apple review is typically fast once submitted (most decisions in 24-48 hours). Google's first-time review for a brand-new developer account can take longer.
 
-**Realistic sequencing:** steps 1-3 (PWA fixes, Capacitor setup, Android) have no external blocker and can start immediately. Step 4 (iOS) is waiting on Bryant confirming Mac access. Step 5 (privacy policy) blocks final submission on both stores regardless of platform, so it should be unblocked in parallel, not left until last.
+**Realistic sequencing:** steps 1-4 (PWA fixes, Capacitor setup, live-update pipeline, Android) have no external blocker and can start immediately. Step 5 (iOS) is waiting on Bryant confirming Mac access. Step 6 (privacy policy) blocks final submission on both stores regardless of platform, so it should be unblocked in parallel, not left until last.
+
+**How updates work once live (for reference):** backend changes (Vercel/Supabase) — instant, always, same as today. Frontend changes to the web version at the Vercel URL — instant, always, same as today. Frontend changes to the installed app — instant via the live-update pipeline (step 3) for JS/styling/copy changes; a real store submission + review only for changes touching native functionality.
 
 ## Session 17 — three real bugs found and fixed, plus the full session-8 live spot-check finally closed out
 
