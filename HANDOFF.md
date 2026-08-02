@@ -1,3 +1,36 @@
+# Hypergentiq — Session 16 master handoff (two punch-list bugs, shipped)
+
+This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
+
+## Session 16 — macro-wipe bug + flat custom-plan weight increment, both fixed
+
+Bryant asked to knock out the two remaining real bugs from the punch list.
+
+**Bug 1 — edit-plan macro wipe (open since session 7):** `ProfileScreen`'s `saveChanges()` in `Morphiq.jsx` called `buildPlan(updatedUser)` with no second argument. `buildPlan()`'s `existingMacros` param only gets used via `...(existingMacros || {})` at the top of its return object — nothing else in the function sets calories/protein/carbs/fat — so passing nothing meant those four fields silently came back `undefined` on every edit. Changing your goal, days/week, or equipment on the Profile screen wiped your nutrition targets instead of updating them.
+
+Fixed by actually recalculating rather than just preserving the old numbers — a goal change should move your calorie target (surplus for muscle, deficit for fat loss), so preserving stale macros wouldn't have been fully correct either. This surfaced that the Mifflin-St Jeor macro formula existed as two separate copies — one in `OnboardingScreen.jsx`, one in `CustomPlanScreen` (`WorkoutScreen.jsx`) — each with a comment saying it was "kept in sync manually." Collapsed to one shared `calcMacros()` in `shared.jsx`, used by all three call sites now. `ProfileScreen` parses the member's stored `"5′ 10″"` / `"180 lbs"` formatted strings back into numbers to feed it, falling back to preserving the plan's existing macros (never `undefined`) if that parsing fails — e.g. a member who built a custom plan and skipped the optional stats step.
+
+**Bug 2 — flat 2.5lb custom-plan weight increment:** `CustomPlanScreen` hardcoded `weightIncrement: 2.5` for every hand-built exercise regardless of equipment — real gyms essentially never offer a true 2.5lb TOTAL jump (a barbell needs a plate on each side, dumbbells/machines jump in 5s). New shared `getWeightIncrement(equipment)` in `shared.jsx` returns 5 for barbell/dumbbell/machine and 9 for kettlebell — the 9 isn't a guess, it matches the 9-10lb spacing already baked into this file's own kettlebell `STARTING_WEIGHTS` ladder (15→25→35→44→53). Wired into both `CustomPlanScreen` and `buildPlan()` (AI plans previously used a flat 5 for every equipment type, including kettlebell, with a comment admitting that wasn't a real fix — now genuinely equipment-aware everywhere instead of two different half-fixed conventions).
+
+**Verification done this session:** all four changed files pass an `esbuild` parse check. Reimplemented the two OLD inline macro formulas exactly as they were and ran them against 4 scenarios (male/female, all 4 goals, capitalized and lowercase sex input) side by side with the new shared `calcMacros()` — byte-identical output every time, confirming the extraction is a pure refactor with zero behavior change for the two screens that already worked. Confirmed a goal-only change on otherwise-identical body stats now correctly shifts calories (build_muscle 3,029 vs lose_fat 2,429 on the same profile) instead of returning `undefined`. Confirmed the height/weight regex parser recovers the right numbers from the stored format string and produces macros matching a direct call. Confirmed `getWeightIncrement()` returns 9 for kettlebell, 5 for everything else including unknown equipment, and that `buildPlan()`'s exercises now actually carry it. Router/component-name safety checklist intact.
+
+**Still open, unchanged from before:** the session-8 live spot-checks (needs Bryant to run through it, not code), confirming the warm-up compound/isolation split is sufficient, exercise diagrams and kettlebell-specific weight-increment refinement beyond the flat 9 (both still deferred), the one unidentified blank-named test profile row, and privacy policy/terms (blocked on a lawyer).
+
+## Files touched this session
+
+- `src/shared.jsx`: 2,743 → 2,801 (+58) — shared `calcMacros()`, `getWeightIncrement()`
+- `src/Morphiq.jsx`: 1,507 → 1,540 (+33) — `ProfileScreen.saveChanges()` now recalculates macros instead of wiping them
+- `src/OnboardingScreen.jsx`: 603 → 578 (−25) — calls shared `calcMacros()` instead of its own copy
+- `src/WorkoutScreen.jsx`: 2,433 → 2,421 (−12) — calls shared `calcMacros()`; `weightIncrement` now equipment-aware instead of flat 2.5
+
+All well under the 3,800-line hard limit.
+
+## Latest commit
+
+`e0ee7a0` on `main` — Session 16's two bug fixes. `fbabd60` (Session 15b's handoff doc) is the commit before it.
+
+---
+
 # Hypergentiq — Session 15b master handoff (real Push/Pull day exercises, shipped)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
