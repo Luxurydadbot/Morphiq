@@ -49,6 +49,16 @@ All well under the 3,800-line hard limit.
 
 **New, smaller items surfaced this session, not yet actioned:** the kettlebell weight-stepper increment specifically inside a custom plan was never live-tapped (low risk — same shared function already confirmed correct elsewhere); the RPE-6 deload cap has no visible UI element to confirm against, worth deciding whether that's intentional (rule stays invisible, just affects the numbers) or whether it should be surfaced.
 
+## New items flagged by Bryant this session — for discussion next session (nothing built yet)
+
+**Grocery list — add a per-category "manual/custom item" that stays put.** Bryant likes the preselected, tap-to-check-off grocery items, but wants each category to also support adding a member's own recurring item (something they buy every week that isn't in the preset list) that then sticks around permanently so they can just check it off each time, instead of retyping it. Needs a design decision on where these custom items live (per-member, persisted — not just a one-time session add) before any code.
+
+**Progress screen, Body tab — "Workout streak" card is unclear and possibly not worth keeping.** It currently shows days-of-the-week as column headers but no row/data underneath, so it doesn't actually communicate anything and reads as misleading/broken rather than informative. Bryant wants to reconsider whether this card — or the whole space it occupies — serves a real purpose before fixing it, rather than just patching the display.
+
+**Workout screen — "Log Cardio" card doesn't match the app's color system.** It's currently a dark blue that stands out from every other card's palette (should follow the same `theme` conventions as everything else — see the ongoing color-consistency work from Session 17). Separately, and before just re-coloring it, Bryant wants to discuss whether the Log Cardio feature itself is pulling its weight / has a real purpose as currently built.
+
+**Progress screen, Bests card — fine for now, but part of a bigger open question.** Bryant wants a broader pass on what Progress (and Nutrition) should actually be measuring — i.e., looking at what top-tier fitness apps track for progress and checking whether Hypergentiq is measuring the same things, and measuring them accurately. Not a bug, a product/design discussion for next session.
+
 ## Technical notes carried forward
 
 **MANDATORY fetch method — do not use any other method.** There are two ways to pull files from this repo, and only one of them is reliable:
