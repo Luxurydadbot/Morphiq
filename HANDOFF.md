@@ -1,3 +1,66 @@
+# Hypergentiq — Session 17 master handoff (Greg's rest-screen bug, a color mixup, and a stale-plan-resume bug — all shipped)
+
+This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
+
+## Session 17 — three real bugs found and fixed, plus the full session-8 live spot-check finally closed out
+
+Bryant relayed a bug report from a gym member (Greg) with a screenshot, then asked to continue the standing punch list (the session-8 live spot-check that had been open since session 8). Both threads turned up real bugs.
+
+**Bug 1 — rest-screen "Up next" card didn't advance to the next exercise after the last set (Greg's report).** On the rest screen, `WorkoutScreen.jsx` always titled the "Up next" card with the CURRENT exercise's name and only checked `setPlan[safeSetIdx + 1]` for the subtitle. Once the just-logged set was the last set of that exercise, `next` came back undefined and the code fell back to a "Last set done — nice work" subtitle, but the title above it still showed the just-finished exercise instead of advancing to the real next one — "After that" sat one slot behind the whole time. Fixed with a `upNextIsNewExercise` flag that shifts both the "Up next" and "After that" cards forward together when there are no more sets left in the current exercise, instead of only the subtitle text changing. Commit `70f6f7a`.
+
+**Bug 2 — stray green-tinted card background used in blue-context cards (Bryant's follow-up question).** Bryant asked whether the green in Greg's screenshot was a real bug, since he thought green had been removed from the palette entirely. Scanned every hardcoded hex color across all 17 src/api files against the official palette (`theme` object in `shared.jsx`) and found the real story: `#0A1A14` (a dark green tint) is correctly used in exactly 4 places for genuine celebration/status-positive moments (PR banner, progressive-overload badge, PB flame badge, "Active" status pill — all paired with green borders/text). But in 12 OTHER places — including the exact "Up next" card from Bug 1 — that same green background had been used by mistake in cards paired with blue borders/text, when the established pattern everywhere else in the app for that exact visual (dark card + blue border + blue accent text) is `#0A1628`. Fixed all 12 (5 in `WorkoutScreen.jsx`, 2 in `GymOwnerDashboard.jsx`, 5 in `SuperAdminDashboard.jsx`). Also found and fixed `src/index.js` (the "Something went wrong" crash fallback screen) still running the fully retired teal-and-black palette (`#00D4B1`, `#0F0F0F`, `#9CA3AF`, `#FFFFFF`) — it was never touched by the session 12/13 color sweeps since it isn't one of the 9 tracked screen files. Commit `e4a2b54`.
+
+**Bug 3 — brand new plan resumed the OLD plan's in-progress workout (found live-testing the session-8 spot-check).** Live-verified the full session-8 punch-list item: weight stepper/increment math, the big-weight-jump guardrail, warm-up reassurance/carry-over prompts, progressive overload, PR detection, the rep-correction flow, rest-timer duration controls, and — the part that had never been tested before — actually building and walking a full custom multi-day plan start to finish. Used the "Restart onboarding quiz" button on WarmupTest (a real, existing feature) to build a fresh 2-day custom plan. Starting the workout resumed the OLD plan's stale progress instead of starting fresh — wrong exercise/set index, wrong logged-sets count, and a stale 240 lbs weight from earlier testing bleeding into the new plan's kettlebell deadlift. Root cause: `morphiq_workout_progress_<uid>` in localStorage is keyed only by user id, never by which plan is active, and neither `OnboardingScreen.jsx`'s AI-plan save nor `CustomPlanScreen`'s `savePlan()` (`WorkoutScreen.jsx`) ever cleared it on a successful save — the "only resume if saved today" guard doesn't catch a same-day plan rebuild, since that's exactly the case it was never designed for. Fixed with one new shared `clearWorkoutProgress(uid)` in `shared.jsx`, called from both save paths plus refactored into `WorkoutScreen.jsx`'s own `clearProgress()` (which used to inline the same two lines) — collapses three copies into one, same lesson as every other duplicate-logic bug already documented in this file. Commit `66d96ea`.
+
+**Verification done this session:** all three fixes were confirmed live in Chrome, not just syntax-checked. Bug 1: walked squat through all 7 sets on WarmupTest, confirmed the rest screen correctly showed "Barbell Romanian deadlift" as up next (not squat again) with "Barbell bench press" as after-that. Bug 2: zoomed on the fixed card, confirmed solid navy-blue with no green tint anywhere; separately confirmed the 4 legitimate green spots (PR banner, overload badge, PB flame badge, Active pill) were untouched and still render green. Bug 3: rebuilt WarmupTest's plan twice (once via custom-plan builder, once via AI onboarding) after the fix deployed — the AI-plan rebuild started a genuinely clean "Warm-up 1 of 5" with no resume banner and no stale data, confirming the fix holds for both save paths. Also incidentally live-verified along the way: 5 lb weight-stepper increment for barbell/dumbbell equipment, the early-warm-up reassurance message, the last-warm-up "carry into working weight?" accept flow (115→155 lbs, correctly flagged "PR pace"), the big-jump guardrail firing on a manual 240 lbs override but staying silent on an AI-suggested jump, the guardrail resetting after one confirmation, the rep-correction ("Wrong number? Fix it") flow saving correctly, rest-timer duration switching recalculating the countdown and turning amber under 15 seconds, and the Progress → Bests tab reflecting new PRs from the live session. Custom-plan builder itself (goal/stats/days/rest-pref/exercise search against the live Supabase library/per-day exercise entry/macro calc on review/day-rotation tabs on Home) all worked correctly on the first pass.
+
+**Not separately verified:** the kettlebell-specific 9 lb weight-stepper increment inside a custom plan specifically (the underlying `getWeightIncrement()` function is shared and already confirmed correct for barbell/dumbbell live, and was statically verified equipment-aware for kettlebell in code, but the live stepper tap wasn't done on a kettlebell exercise before the resume-bug investigation took priority). Also unconfirmed: the RPE-6 cap during a deload week — it's applied in the underlying math but no UI element was found that surfaces the RPE number to check against.
+
+**Important state change to know about:** `WarmupTest` is no longer in the session-11 seeded deload state (60% weights, "leveled off" copy) that earlier handoffs describe leaving in place on purpose. This session's testing rebuilt its plan twice via "Restart onboarding quiz" — it currently holds a fresh AI-generated "Get fit & healthy" full-body plan (5 exercises, 3x/week, Barbells & racks equipment), with a few extra logged sets/PRs from this session's live testing sitting in its workout history. Bryant said not to worry about resetting it — it's disposable test data and remains open and usable — but any future session referencing "the seeded deload state on WarmupTest" should know that state no longer exists.
+
+## Files touched this session (final line counts)
+
+- `src/WorkoutScreen.jsx`: 2,421 → 2,441 (+20) — Up Next/After That advance fix, 5 stray color fixes, `clearWorkoutProgress()` wiring (import + `clearProgress()` refactor + `savePlan()` call)
+- `src/GymOwnerDashboard.jsx`: 845 → 845 (net 0) — 2 stray color fixes, values-only swap
+- `src/SuperAdminDashboard.jsx`: 343 → 343 (net 0) — 5 stray color fixes, values-only swap
+- `src/index.js`: 57 → 58 (+1) — retired teal-era colors replaced with the current palette in the crash fallback screen
+- `src/shared.jsx`: 2,801 → 2,822 (+21) — new shared `clearWorkoutProgress()` function + export
+- `src/OnboardingScreen.jsx`: 578 → 583 (+5) — `clearWorkoutProgress()` wiring (import + call after successful save)
+
+All well under the 3,800-line hard limit.
+
+## Latest commits
+
+`66d96ea` (stale-plan-resume fix) → `e4a2b54` (color mixup fix) → `70f6f7a` (Up Next/After That fix) → `c03387b` (session 16 handoff doc), all on `main`.
+
+## Punch list, in priority order
+
+**TOP PRIORITY — none of the carried-over items are blocking; pick whichever Bryant wants next.** The session-8 live spot-check that had been open since session 8 is now fully closed (see verification notes above).
+
+**Confirming the warm-up compound/isolation split is sufficient** — still needs a direct look/decision from Bryant, not code.
+
+**Kettlebell-specific weight-increment refinement beyond the flat 9 lb placeholder** — deferred, needs its own model (not plate-based).
+
+**Exercise diagrams/animations** — deferred, needs a licensed clip library.
+
+**The one unidentified blank-named test profile row** in Supabase — still unidentified.
+
+**Privacy policy/terms** — blocked on a lawyer.
+
+**New, smaller items surfaced this session, not yet actioned:** the kettlebell weight-stepper increment specifically inside a custom plan was never live-tapped (low risk — same shared function already confirmed correct elsewhere); the RPE-6 deload cap has no visible UI element to confirm against, worth deciding whether that's intentional (rule stays invisible, just affects the numbers) or whether it should be surfaced.
+
+## Technical notes carried forward
+
+**raw.githubusercontent.com can serve stale/cached content even when a plain URL-fetch tool can reach it.** This session, fetching `HANDOFF.md` via a URL-fetch tool returned session-10-era content while `git clone` (over authenticated HTTPS, from a location outside any mounted/synced folder) showed the real, current session-16 content. The earlier note in this file saying raw.githubusercontent.com "IS reachable via a plain URL-fetch tool" is still true, but it should not be treated as authoritative for freshness — `git clone`/`git log` is the only reliable source of truth for current repo state. Also worth knowing: `git clone`/`git push` fail with permission errors ("Operation not permitted" on `.git` internals) when run inside a mounted/synced output folder — they work fine in a plain scratch directory outside any mounted folder.
+
+**Stale client-side state can outlive the plan/data it was created for.** Session 17's Bug 3 is the same root shape as the gym-branding bug from session 14 and the warm-up-pollution bug from session 11: a piece of local/cached state (`morphiq_workout_progress_<uid>` in localStorage) that was never invalidated when the thing it depended on (which plan is active) changed underneath it. When adding any new "resume where you left off" or cached-state feature, check whether it's keyed narrowly enough (by plan, not just by user) or whether a plan/data change elsewhere needs to explicitly clear it.
+
+**Duplicate logic is still the recurring root cause of real bugs in this codebase.** Session 17 added a fourth example to the running list (session 10's warm-up bug, session 13's pricing-tier color drift, session 14's gym-branding bug): two plan-save code paths (`OnboardingScreen.jsx`, `CustomPlanScreen` in `WorkoutScreen.jsx`) both needed the same cleanup step and neither had it. Collapsed to one shared `clearWorkoutProgress()` in `shared.jsx`, following the same pattern as `calcMacros()`, `getWeightIncrement()`, and `isMultiDayPlan()` before it.
+
+**A useful low-risk way to test features that need an "existing member" state (custom plans, restarted onboarding, etc.) without a fresh signup:** Profile screen's "Restart onboarding quiz" (danger-zone button) lets an already-logged-in test profile re-enter onboarding and choose either path (AI plan or "I have my own routine" → custom builder) without needing a new email/OTP signup. Used this on `WarmupTest` twice this session — see the "important state change" note above for what that left behind.
+
+---
+
 # Hypergentiq — Session 16 master handoff (two punch-list bugs, shipped)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
