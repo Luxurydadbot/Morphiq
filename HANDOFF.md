@@ -2,6 +2,31 @@
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
 
+## STANDING GOAL — App Store + Google Play submission roadmap (carry forward every session, do not delete until fully checked off)
+
+Bryant wants Hypergentiq submitted to both the Apple App Store and Google Play. This is a real target, not a someday-idea — every session should check this list and make progress on whatever isn't blocked.
+
+**The plan:** wrap the existing React web app with Capacitor (not a React Native rewrite) — it reuses this codebase almost as-is and produces real native iOS + Android projects, with access to native camera/mic/push notifications the browser version can't fully offer.
+
+Steps, in order:
+
+1. **[ ] Fix current PWA gaps first** — `public/manifest.json` doesn't reference the existing `logo192.png`/`logo512.png` icon files, and there's no service worker registered. Clean this up as groundwork before wrapping with Capacitor.
+2. **[ ] Add Capacitor to the project, generate iOS + Android native projects.** No external blocker — can start anytime.
+3. **[ ] Android path (no Mac needed):**
+   - [ ] Bryant creates a Google Play Console developer account — $25 one-time fee, requires ID verification and 2-Step Verification on the Google account. This step has to be done by Bryant directly (identity/payment).
+   - [ ] Build and sign the Android app, submit for review.
+4. **[ ] iOS path (needs a Mac running macOS Sequoia 15.6 or newer, for Xcode 26 — Apple requires every submission to be built with Xcode 26 / the iOS 26 SDK as of April 28, 2026):**
+   - [ ] Bryant to check the Mac available at work — confirm it can run macOS Sequoia 15.6+. (Ruled out: the 2013 MacBook Pro at home — its hardware ceiling is macOS Catalina or Big Sur depending on exact model, well short of what Xcode 26 requires.)
+   - [ ] If the work Mac can't run it either, fall back to a cloud Mac build service (e.g. Codemagic, Ionic Appflow, or a macOS GitHub Actions runner) — no purchase needed, just setup.
+   - [ ] Bryant creates an Apple Developer Program account — $99/year, requires ID verification. Has to be done by Bryant directly.
+   - [ ] Build and sign the iOS app, submit for review.
+5. **[ ] Privacy policy — hard gate for BOTH stores, not optional.** Still blocked on a lawyer (see punch list). Both app stores require a real, linked privacy policy before they'll accept a submission — this needs to move from "blocked" to "in progress" for the store timeline to be realistic.
+6. **[ ] Store listing assets** — app icon in required sizes (already have source logos to build from), a handful of screenshots of the app in use, short description text, and each store's age-rating / data-safety questionnaire.
+7. **[ ] Confirm no Apple in-app purchase conflict** — members don't pay inside the app (gyms pay via Stripe outside the consumer-facing app), which should keep this out of Apple's in-app purchase requirement, but worth a final check against Apple's current guidelines right before submission.
+8. **[ ] Submit.** Apple review is typically fast once submitted (most decisions in 24-48 hours). Google's first-time review for a brand-new developer account can take longer.
+
+**Realistic sequencing:** steps 1-3 (PWA fixes, Capacitor setup, Android) have no external blocker and can start immediately. Step 4 (iOS) is waiting on Bryant confirming Mac access. Step 5 (privacy policy) blocks final submission on both stores regardless of platform, so it should be unblocked in parallel, not left until last.
+
 ## Session 17 — three real bugs found and fixed, plus the full session-8 live spot-check finally closed out
 
 Bryant relayed a bug report from a gym member (Greg) with a screenshot, then asked to continue the standing punch list (the session-8 live spot-check that had been open since session 8). Both threads turned up real bugs.
