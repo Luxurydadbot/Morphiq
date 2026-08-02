@@ -21,21 +21,22 @@ function ErrorFallback() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#0F0F0F',
-      color: '#FFFFFF',
+      background: '#121316', // theme.bg — was the retired old-teal-era near-black
+      color: '#EDEEF0', // theme.text
       fontFamily: 'DM Sans, sans-serif',
       padding: 24,
       textAlign: 'center',
     }}>
       <h1 style={{ fontSize: 20, marginBottom: 8 }}>Something went wrong</h1>
-      <p style={{ color: '#9CA3AF', marginBottom: 20 }}>
+      {/* theme.textMuted */}
+      <p style={{ color: '#9BA0AA', marginBottom: 20 }}>
         We've been notified and are looking into it.
       </p>
       <button
         onClick={() => window.location.reload()}
         style={{
-          background: '#00D4B1',
-          color: '#0F0F0F',
+          background: '#4C8DFF', // theme.accent — retired teal accent replaced
+          color: '#0B1E3D', // dark navy, matches text-on-accent pattern used elsewhere
           border: 'none',
           borderRadius: 10,
           padding: '10px 20px',

@@ -64,11 +64,11 @@ function GymCard({ gym, memberCount, activeCount, onToggleSuspend, onSaveNotes }
           <div style={{ fontSize: 10, color: "#6E7480" }}>Members</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0" }}>{memberCount}</div>
         </div>
-        <div style={{ background: "#0A1A14", border: "1px solid rgba(76,141,255,0.15)", borderRadius: 8, padding: "8px 10px" }}>
+        <div style={{ background: "#0A1628", border: "1px solid rgba(76,141,255,0.15)", borderRadius: 8, padding: "8px 10px" }}>
           <div style={{ fontSize: 10, color: "#6E7480" }}>Active members</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#4C8DFF" }}>{activeCount?.active30 || 0}</div>
         </div>
-        <div style={{ background: "#0A1A14", borderRadius: 8, padding: "8px 10px" }}>
+        <div style={{ background: "#0A1628", borderRadius: 8, padding: "8px 10px" }}>
           <div style={{ fontSize: 10, color: "#6E7480" }}>Expected/mo</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#4C8DFF" }}>${revenue.toFixed(2)}</div>
         </div>
@@ -218,7 +218,7 @@ function SuperAdminDashboard() {
         <>
           {/* Top summary row */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, margin: "18px 0" }}>
-            <div style={{ background: "#0A1A14", border: "1px solid rgba(76,141,255,0.2)", borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ background: "#0A1628", border: "1px solid rgba(76,141,255,0.2)", borderRadius: 12, padding: "12px 14px" }}>
               <div style={{ fontSize: 22, fontWeight: 700, color: "#4C8DFF" }}>${totalRevenue.toFixed(2)}</div>
               <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>Expected monthly revenue</div>
             </div>
@@ -254,7 +254,7 @@ function SuperAdminDashboard() {
               <div style={{ fontSize: 20, fontWeight: 700 }}>{totalMembers}</div>
               <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>Total members, all gyms</div>
             </div>
-            <div style={{ background: "#0A1A14", border: "1px solid rgba(76,141,255,0.2)", borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ background: "#0A1628", border: "1px solid rgba(76,141,255,0.2)", borderRadius: 12, padding: "12px 14px" }}>
               <div style={{ fontSize: 20, fontWeight: 700, color: "#4C8DFF" }}>{activity.active7}</div>
               <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>Logged a workout, last 7 days</div>
             </div>
@@ -280,7 +280,7 @@ function SuperAdminDashboard() {
                     <div style={{ fontSize: 11, color: "#6E7480", marginTop: 2 }}>{m.gymName} · joined {m.joined ? new Date(m.joined).toLocaleDateString() : "—"}</div>
                   </div>
                   <span style={{
-                    background: m.activeThisWeek ? "#0A1A14" : "#212429",
+                    background: m.activeThisWeek ? "#0A1628" : "#212429",
                     color: m.activeThisWeek ? "#4C8DFF" : "#6E7480",
                     border: m.activeThisWeek ? "1px solid rgba(76,141,255,0.2)" : "1px solid #2B2E34",
                     borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600,

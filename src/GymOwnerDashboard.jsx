@@ -165,7 +165,7 @@ function OwnerOverviewTab() {
 
           {/* Nudge button — sends a pre-written re-engagement message to all at-risk members only */}
           {nudgeResult ? (
-            <div style={{ background: "#0A1A14", border: "1px solid rgba(76,141,255,0.3)", borderRadius: 10, padding: "10px 14px", textAlign: "center", fontSize: 12, color: "#4C8DFF", marginTop: 4 }}>
+            <div style={{ background: "#0A1628", border: "1px solid rgba(76,141,255,0.3)", borderRadius: 10, padding: "10px 14px", textAlign: "center", fontSize: 12, color: "#4C8DFF", marginTop: 4 }}>
               <Icon name="check" size={12} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Nudge sent to {nudgeResult.sent} member{nudgeResult.sent !== 1 ? "s" : ""}
               {nudgeResult.failed > 0 && <span style={{ color: "#F87171", marginLeft: 6 }}>({nudgeResult.failed} failed)</span>}
             </div>
@@ -756,7 +756,7 @@ function OwnerUsageTab() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
             <div style={card}><div style={big}>{totalCalls}</div><div style={dim}>Total AI calls</div></div>
-            <div style={{ ...card, background: "#0A1A14", border: "1px solid rgba(76,141,255,0.2)" }}><div style={big}>${estCost}</div><div style={dim}>Est. cost this month</div></div>
+            <div style={{ ...card, background: "#0A1628", border: "1px solid rgba(76,141,255,0.2)" }}><div style={big}>${estCost}</div><div style={dim}>Est. cost this month</div></div>
             <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#7C93B8" }}>{totalTokens.toLocaleString()}</div><div style={dim}>Tokens used</div></div>
             <div style={card}><div style={{ fontSize: 18, fontWeight: 700, color: "#F59E0B" }}>{chatCalls}</div><div style={dim}>Chat messages</div></div>
           </div>

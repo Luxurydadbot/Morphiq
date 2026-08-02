@@ -1407,7 +1407,7 @@ function WorkoutScreen() {
             const afterThatExercise = upNextIsNewExercise ? exercises[exIdx + 2] : nextEx;
             return (
               <>
-                <div style={{ background: "#0A1A14", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                <div style={{ background: "#0A1628", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
                   <div style={{ width: 42, height: 42, borderRadius: 10, background: "#0B1E3D", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="arrow-right" size={20} /></div>
                   <div>
                     <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Up next</div>
@@ -1479,7 +1479,7 @@ function WorkoutScreen() {
         {/* Resume banner — appears briefly when we restored an in-progress
             workout, then fades. Makes auto-resume visible and intentional. */}
         {showResumeBanner && (
-          <div className="mq-fade" style={{ background: "#0A1A14", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div className="mq-fade" style={{ background: "#0A1628", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#0B1E3D", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="refresh" size={13} /></div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: a }}>Picked up where you left off</div>
@@ -1743,7 +1743,7 @@ function WorkoutScreen() {
             {/* Alternatives list — plan's AI-suggested alternative shown first */}
             {ex.alternative && (
               <button key={ex.alternative} onClick={() => doSwap({ name: ex.alternative, muscle: ex.muscle, pattern: ex.pattern, sets: ex.sets, targetReps: ex.targetReps, weight: Math.round(ex.weight * 0.9), rpe: ex.rpe, alternative: null })}
-                style={{ width: "100%", background: "#0A1A14", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
+                style={{ width: "100%", background: "#0A1628", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit" }}>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#EDEEF0" }}>{ex.alternative}</div>
                   <div style={{ fontSize: 11, color: a, marginTop: 2 }}><Icon name="sparkle" size={10} style={{ verticalAlign: "-1px", marginRight: 3 }} /> AI recommended — same movement pattern</div>
@@ -1799,7 +1799,7 @@ function WorkoutScreen() {
             )}
             {/* Heard — confirm or retry */}
             {!voiceSwapActive && voiceSwapHeard && (
-              <div style={{ background: "#0A1A14", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 12, padding: "14px", marginBottom: 8 }}>
+              <div style={{ background: "#0A1628", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 12, padding: "14px", marginBottom: 8 }}>
                 <div style={{ fontSize: 10, color: "#6E7480", marginBottom: 5 }}>Heard:</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#EDEEF0", marginBottom: 12 }}>"{voiceSwapHeard}"</div>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -2226,7 +2226,7 @@ function CustomPlanScreen() {
 
           {/* Pending exercise — configure before adding */}
           {pending ? (
-            <div style={{ background: "#0A1A14", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 12, padding: "12px", marginBottom: 8 }}>
+            <div style={{ background: "#0A1628", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 12, padding: "12px", marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: a, marginBottom: 10 }}>{pending.name}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
                 {[["Sets", "sets"], ["Reps", "reps"], [pending.loadStyle === "ramp_down" ? "Top set weight (lbs)" : "Weight (lbs)", "weight"]].map(([lbl, key]) => (
