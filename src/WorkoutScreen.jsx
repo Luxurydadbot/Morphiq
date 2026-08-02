@@ -1392,32 +1392,49 @@ function WorkoutScreen() {
             )
           )}
 
-          {/* Up next — large and prominent */}
-          <div style={{ background: "#0A1A14", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 10, background: "#0B1E3D", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="arrow-right" size={20} /></div>
-            <div>
-              <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Up next</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, lineHeight: 1.1 }}>{ex.name}</div>
-              {(() => {
-                const next = setPlan[safeSetIdx + 1];
-                if (!next) return <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>Last set done — nice work</div>;
-                const w = next.kind === "warmup" ? next.weight : (nudgedWeight ?? ex.weight);
-                return <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{next.label} · {w} lbs · {next.targetReps} reps</div>;
-              })()}
-            </div>
-          </div>
+          {/* Up next / After that — large-card + small-card preview pair.
+              Bug fix (Greg, member report via Bryant): once the just-logged
+              set was the LAST set of the current exercise, "Up next" used to
+              keep showing the just-finished exercise's own name (with a
+              "Last set done" subtitle) instead of advancing to the real next
+              exercise — "After that" sat one slot behind the whole time.
+              upNextIsNewExercise flags that case so both cards shift forward
+              together instead of only the subtitle text changing. */}
+          {(() => {
+            const next = setPlan[safeSetIdx + 1];
+            const upNextIsNewExercise = !next && !!nextEx;
+            const upNextExercise = upNextIsNewExercise ? nextEx : ex;
+            const afterThatExercise = upNextIsNewExercise ? exercises[exIdx + 2] : nextEx;
+            return (
+              <>
+                <div style={{ background: "#0A1A14", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 10, background: "#0B1E3D", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="arrow-right" size={20} /></div>
+                  <div>
+                    <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Up next</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, lineHeight: 1.1 }}>{upNextExercise ? upNextExercise.name : ex.name}</div>
+                    {next ? (
+                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{next.label} · {next.kind === "warmup" ? next.weight : (nudgedWeight ?? ex.weight)} lbs · {next.targetReps} reps</div>
+                    ) : upNextIsNewExercise ? (
+                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{nextEx.sets} sets · {nextEx.targetReps} reps</div>
+                    ) : (
+                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>Last set done — nice work</div>
+                    )}
+                  </div>
+                </div>
 
-          {/* After that — smaller, secondary */}
-          {nextEx && (
-            <div style={{ background: "#0F1922", border: `1px solid rgba(255,255,255,0.05)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#212429", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, color: theme.textDim }}>⏱</div>
-              <div>
-                <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 1 }}>After that</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: theme.textDim }}>{nextEx.name}</div>
-                <div style={{ fontSize: 11, color: theme.textFaint }}>{nextEx.sets} sets · {nextEx.targetReps} reps</div>
-              </div>
-            </div>
-          )}
+                {afterThatExercise && (
+                  <div style={{ background: "#0F1922", border: `1px solid rgba(255,255,255,0.05)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: "#212429", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, color: theme.textDim }}>⏱</div>
+                    <div>
+                      <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 1 }}>After that</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: theme.textDim }}>{afterThatExercise.name}</div>
+                      <div style={{ fontSize: 11, color: theme.textFaint }}>{afterThatExercise.sets} sets · {afterThatExercise.targetReps} reps</div>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Quick-tap rest duration buttons */}
           <div style={{ marginTop: "auto", marginBottom: 8 }}>
