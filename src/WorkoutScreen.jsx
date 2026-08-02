@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
          WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
-         isMultiDayPlan } from "./shared.jsx";
+         isMultiDayPlan, calcMacros as calcMacrosShared, getWeightIncrement } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -1888,32 +1888,13 @@ function CustomPlanScreen() {
 
   const defaults = GOAL_REP_RANGES[goal] || GOAL_REP_RANGES.general_fitness;
 
-  // Same Mifflin-St Jeor formula as the AI-plan path (OnboardingScreen.jsx
-  // generatePlan()) — kept in sync manually since the two screens don't yet
-  // share a macro-calc helper. Returns null unless sex + height + weight + age
-  // are all present and valid, so the review step can preview it and savePlan()
-  // can use it without duplicating the math in two places.
+  // Bug fix (session 16): this used to be its own copy of the Mifflin-St Jeor
+  // formula, "kept in sync manually" with an identical copy in
+  // OnboardingScreen.jsx per a comment that used to live here -- now both
+  // call the one shared calcMacros() in shared.jsx instead. Thin wrapper
+  // keeps every existing call site below (calcMacros()) unchanged.
   function calcMacros() {
-    const validBody = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && bodyWeight && parseFloat(bodyWeight) > 0;
-    const validAge = age && parseInt(age) >= 13 && parseInt(age) <= 100;
-    if (!sex || !validBody || !validAge) return null;
-    const weightKg = parseFloat(bodyWeight) / 2.205;
-    const heightCm = ((parseInt(heightFt) * 12) + parseInt(heightIn || 0)) * 2.54;
-    const ageNum = parseInt(age);
-    const bmr = sex === "male"
-      ? Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) + 5)
-      : Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) - 161);
-    const activityMult = daysPerWeek >= 4 ? 1.55 : 1.375;
-    const tdee = Math.round(bmr * activityMult);
-    const goalAdj = goal === "build_muscle" ? 250 : goal === "lose_fat" ? -350 : 0;
-    const minCals = sex === "male" ? 1600 : 1400;
-    const cals = Math.max(minCals, tdee + goalAdj);
-    const proteinPer = goal === "general_fitness" ? 0.8 : 1.0;
-    const fatPer = goal === "build_muscle" ? 0.4 : goal === "lose_fat" ? 0.3 : 0.35;
-    const prot = Math.round(parseFloat(bodyWeight) * proteinPer);
-    const ft = Math.round(parseFloat(bodyWeight) * fatPer);
-    const cb = Math.round((cals - (prot * 4) - (ft * 9)) / 4);
-    return { calories: cals, protein: prot, carbs: cb, fat: ft };
+    return calcMacrosShared({ sex, heightFt, heightIn, bodyWeight, age, daysPerWeek, goal });
   }
   const calcPreview = calcMacros();
 
@@ -2010,7 +1991,14 @@ function CustomPlanScreen() {
     const exercises = (allDays[0]?.exercises || []).map(e => ({
       name: e.name, sets: e.sets, reps: e.reps, repMin: e.reps, repMax: e.reps + 2,
       weight: e.weight, warmupSets: [], muscle: "", pattern: "custom",
-      rpe: 7, restSeconds: restPref || repDefaults.rest, weightIncrement: 2.5,
+      // Bug fix (session 16): this was a flat 2.5 for every hand-built
+      // exercise regardless of equipment -- real gyms essentially never
+      // offer a true 2.5lb TOTAL jump (see getWeightIncrement() in
+      // shared.jsx). user.equipment reflects whatever the member selected
+      // during AI onboarding, if they ever went through it; a member who
+      // came straight to a custom plan without onboarding first falls back
+      // to the same 5lb default every other equipment type gets.
+      rpe: 7, restSeconds: restPref || repDefaults.rest, weightIncrement: getWeightIncrement(user?.equipment),
       usePyramid: e.loadStyle === "ramp_up" || e.loadStyle === "ramp_down",
       setDetails: e.setDetails || null, loadStyle: e.loadStyle || "same",
     }));

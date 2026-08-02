@@ -9,7 +9,7 @@ import { ProgressScreen } from "./ProgressScreen.jsx";
 import { ChatScreen } from "./ChatScreen.jsx";
 import {
   sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY, isGymBlocked,
-  isMultiDayPlan,
+  isMultiDayPlan, calcMacros,
   setSessionCookie, getSessionCookie, clearSessionCookie,
   localDateStr, buildPlan, progressPlan,
   SUPABASE_URL, SB_GET, getAuthToken,
@@ -1213,7 +1213,40 @@ function ProfileScreen() {
   async function saveChanges(newGoal, newDays, newEquip) {
     setSaving(true);
     const updatedUser = { ...user, goal: newGoal, daysPerWeek: newDays, equipment: newEquip };
-    const newPlan = buildPlan(updatedUser);
+    // Bug fix (session 16): buildPlan() was called here with no second
+    // argument, so its existingMacros param was undefined -- calories,
+    // protein, carbs, and fat all silently came back undefined too (they
+    // only ever get set by spreading existingMacros into buildPlan()'s
+    // return value, nothing else in there sets them). Editing your goal,
+    // days, or equipment wiped your nutrition targets instead of updating
+    // them, open since session 7.
+    //
+    // Real fix, not just a patch: a goal change is exactly the edit that
+    // SHOULD move your calorie target (surplus for muscle, deficit for fat
+    // loss) -- so recalculate properly with the shared calcMacros(), the
+    // same Mifflin-St Jeor formula onboarding used to set these numbers in
+    // the first place, rather than just carrying the old ones forward
+    // unchanged. user.height/user.weight are stored as formatted strings
+    // ("5′ 10″" / "180 lbs") from onboarding/CustomPlanScreen, so parse the
+    // numbers back out first.
+    const heightMatch = /^(\d+)′\s*(\d+)″/.exec(user.height || "");
+    const weightMatch = /^([\d.]+)/.exec(user.weight || "");
+    const recalculatedMacros = calcMacros({
+      sex: user.sex,
+      heightFt: heightMatch ? heightMatch[1] : null,
+      heightIn: heightMatch ? heightMatch[2] : null,
+      bodyWeight: weightMatch ? weightMatch[1] : null,
+      age: user.age,
+      daysPerWeek: newDays,
+      goal: newGoal,
+    });
+    // Fall back to whatever the plan already had (never undefined) if body
+    // stats can't be recovered -- e.g. a member who built a custom plan and
+    // skipped the optional stats step never has a parseable height/weight.
+    const existingMacros = recalculatedMacros || {
+      calories: plan?.calories, protein: plan?.protein, carbs: plan?.carbs, fat: plan?.fat,
+    };
+    const newPlan = buildPlan(updatedUser, existingMacros);
     // Preserve week tracking so streak isn't lost
     newPlan.weekNumber    = plan?.weekNumber    || 1;
     newPlan.weekStartDate = plan?.weekStartDate || new Date().toISOString().split("T")[0];

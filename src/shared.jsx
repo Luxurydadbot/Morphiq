@@ -1320,6 +1320,62 @@ const STARTING_WEIGHTS = {
 };
 const DEFAULT_WEIGHT = 20; // fallback if exercise not in table
 
+// ── Weight increment lookup ───────────────────────────────────────────────
+// What's actually loadable per equipment type, not a flat guess. A barbell
+// needs a 2.5lb plate on EACH side to add weight at all -- that's really a
+// 5lb jump, no smaller real option -- and commercial dumbbells/machine pins
+// jump in 5s too. Kettlebells only come in big fixed sizes; the app's own
+// STARTING_WEIGHTS ladder for kettlebell exercises above already jumps by
+// 9-10lb between tiers (15->25->35->44->53), so 9 here isn't a guess, it's
+// grounded in that same real spacing rather than pretending kettlebells
+// behave like a barbell. Session 16 fix: CustomPlanScreen (WorkoutScreen.jsx)
+// used to hardcode 2.5 for every hand-built exercise regardless of
+// equipment -- real gyms essentially never offer a true 2.5lb TOTAL jump, so
+// members were being told to add weight in increments that don't exist on
+// the equipment they actually have. Shared here so buildPlan() (AI plans)
+// and CustomPlanScreen (hand-built plans) can't drift apart on this again.
+function getWeightIncrement(equipment) {
+  return equipment === "kettlebell" ? 9 : 5;
+}
+
+// ── Macro calculator (Mifflin-St Jeor) ────────────────────────────────────
+// Same formula OnboardingScreen.jsx and CustomPlanScreen (WorkoutScreen.jsx)
+// each used to keep as their own separate copy, "kept in sync manually" per
+// the comments that used to live in both places -- collapsed to one shared
+// function here instead, for the same reason isMultiDayPlan() was: two
+// copies of the same math drifting apart is the recurring root cause of
+// real bugs in this codebase. Returns null unless sex + a valid height +
+// weight + age are all present, so callers can preview it before it's
+// complete and fall back to manual entry when body stats are unknown.
+function calcMacros({ sex, heightFt, heightIn, bodyWeight, age, daysPerWeek, goal }) {
+  const validBody = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && bodyWeight && parseFloat(bodyWeight) > 0;
+  const validAge = age && parseInt(age) >= 13 && parseInt(age) <= 100;
+  if (!sex || !validBody || !validAge) return null;
+  // Case-insensitive on purpose -- sex is stored capitalized ("Male") coming
+  // from some screens and lowercase ("male") from others; a bare === "male"
+  // check silently gave every "Male" member the female BMR formula and
+  // calorie floor until this was caught and fixed in OnboardingScreen in
+  // July 2026. Keep this normalized even if the callers' casing changes.
+  const isMale = (sex || "").toLowerCase() === "male";
+  const weightKg = parseFloat(bodyWeight) / 2.205;
+  const heightCm = ((parseInt(heightFt) * 12) + parseInt(heightIn || 0)) * 2.54;
+  const ageNum = parseInt(age);
+  const bmr = isMale
+    ? Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) + 5)
+    : Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) - 161);
+  const activityMult = daysPerWeek >= 4 ? 1.55 : 1.375;
+  const tdee = Math.round(bmr * activityMult);
+  const goalAdj = goal === "build_muscle" ? 250 : goal === "lose_fat" ? -350 : 0; // Research: ~350 cal deficit = ~0.7lb/week loss, maximizes fat loss while preserving muscle
+  const minCals = isMale ? 1600 : 1400;
+  const cals = Math.max(minCals, tdee + goalAdj);
+  const proteinPer = goal === "general_fitness" ? 0.8 : 1.0; // Research: 0.7g/lb is minimum; 0.8-1.0g/lb optimal for body recomposition at any goal
+  const fatPer = goal === "build_muscle" ? 0.4 : goal === "lose_fat" ? 0.3 : 0.35; // Fat loss: slightly lower fat to create deficit room for protein
+  const prot = Math.round(parseFloat(bodyWeight) * proteinPer);
+  const ft = Math.round(parseFloat(bodyWeight) * fatPer);
+  const cb = Math.round((cals - (prot * 4) - (ft * 9)) / 4);
+  return { calories: cals, protein: prot, carbs: cb, fat: ft, bmr, tdee, goalAdjustment: goalAdj };
+}
+
 // ── Warm-up ramp generator ──────────────────────────────────────────────────
 // Shared by buildPlan() (bakes a ramp into AI-generated plans at creation
 // time) and WorkoutScreen's live fallback (computes one on the fly for
@@ -1608,7 +1664,7 @@ function buildPlan(userProfile, existingMacros) {
       // which is exactly why barbell incline press couldn't land on 135.
       // Kettlebells are a separate, coarser problem (fixed sizes, ~9-13 lb
       // gaps between them) -- left at 5 here as a placeholder, not a real fix.
-      weightIncrement: 5,
+      weightIncrement: getWeightIncrement(equipment),
     };
   };
 
@@ -1640,7 +1696,7 @@ function buildPlan(userProfile, existingMacros) {
       restSeconds: effectiveRestAccessory,
       alternative: "Pallof press",
       usePyramid: false,
-      weightIncrement: 5,
+      weightIncrement: getWeightIncrement(equipment),
     };
   };
 
@@ -1671,7 +1727,7 @@ function buildPlan(userProfile, existingMacros) {
       restSeconds: effectiveRestAccessory,
       alternative: "",
       usePyramid: false,
-      weightIncrement: 5,
+      weightIncrement: getWeightIncrement(equipment),
     };
   };
 
@@ -2740,4 +2796,6 @@ export {
   isGymBlocked,
   // Multi-day plan helper
   isMultiDayPlan,
+  // Macro calc + weight increment lookup
+  calcMacros, getWeightIncrement,
 };

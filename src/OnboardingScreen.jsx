@@ -3,7 +3,7 @@ import {
   useApp, theme, sb,
   GOAL_OPTIONS, GOAL_ICONS,
   Pill, Spinner, Icon,
-  buildPlan,
+  buildPlan, calcMacros,
 } from "./shared.jsx";
 
 function OnboardingScreen() {
@@ -55,43 +55,18 @@ function OnboardingScreen() {
       const activityMap = { returning: "returning after a long break (treat as rebuilding, use 60-70% of experienced weights)", consistent: "moderately active, some consistency recently", active: "currently training regularly" };
       const fitnessProfile = `${historyMap[trainingHistory] || "beginner"}, ${activityMap[recentActivity] || "just starting out"}`;
 
-      // Mifflin-St Jeor BMR — convert imperial to metric first
-      const weightKg = parseFloat(weight) / 2.205;
-      const heightCm = ((parseInt(heightFt) * 12) + parseInt(heightIn || 0)) * 2.54;
-      const ageNum = parseInt(age);
-      // Bug fix (July 2026): the sex-selection buttons below setSex(label) with
-      // capitalized "Male"/"Female", but this comparison checked lowercase
-      // "male" — always false, so every member (regardless of selection) was
-      // silently getting the female BMR formula and calorie floor. Normalizing
-      // case here fixes it for new AND existing saved profiles, no data
-      // migration needed. Don't remove the .toLowerCase() even if the button
-      // code changes later — keep this comparison case-insensitive.
-      const isMale = (sex || "").toLowerCase() === "male";
-      const bmrCalc = isMale
-        ? Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) + 5)
-        : Math.round((10 * weightKg) + (6.25 * heightCm) - (5 * ageNum) - 161);
-      const activityMult = daysPerWeek >= 4 ? 1.55 : 1.375;
-      const tdeeCalc = Math.round(bmrCalc * activityMult);
-      const goalAdj = goal === "build_muscle" ? 250 : goal === "lose_fat" ? -350 : 0; // Research: 350 cal deficit = ~0.7lb/week loss, maximizes fat loss while preserving muscle
-      const minCals = isMale ? 1600 : 1400;
-      const targetCals = Math.max(minCals, tdeeCalc + goalAdj);
-
-      const proteinPer = goal === "general_fitness" ? 0.8 : 1.0; // Research: 0.7g/lb is minimum; 0.8-1.0g/lb optimal for body recomposition at any goal
-      const fatPer = goal === "build_muscle" ? 0.4 : goal === "lose_fat" ? 0.3 : 0.35; // Fat loss: slightly lower fat to create deficit room for protein
-      const targetProtein = Math.round(parseFloat(weight) * proteinPer);
-      const targetFat = Math.round(parseFloat(weight) * fatPer);
-      const targetCarbs = Math.round((targetCals - (targetProtein * 4) - (targetFat * 9)) / 4);
+      // Bug fix (session 16): this used to be its own copy of the Mifflin-St
+      // Jeor formula, "kept in sync manually" with an identical copy in
+      // CustomPlanScreen (WorkoutScreen.jsx) per a comment that used to live
+      // here -- now both call the one shared calcMacros() in shared.jsx
+      // instead of maintaining two copies that can silently drift apart.
+      const macrosForPlan = calcMacros({ sex, heightFt, heightIn, bodyWeight: weight, age, daysPerWeek, goal }) || {};
 
       // Build plan locally — deterministic, code-driven, no prompt engineering needed
       const profileForPlan = {
         goal, sex, age, trainingHistory, recentActivity,
         daysPerWeek, equipment, injuries,
         restPref, // Fix (June 2026): restPref was captured in onboarding but never passed to buildPlan — rest times were always calculated from age/goal, ignoring the user's choice
-      };
-      const macrosForPlan = {
-        calories: targetCals, protein: targetProtein,
-        carbs: targetCarbs, fat: targetFat,
-        bmr: bmrCalc, tdee: tdeeCalc, goalAdjustment: goalAdj,
       };
 
       try {
