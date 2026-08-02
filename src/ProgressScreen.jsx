@@ -74,7 +74,7 @@ function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
   }
 
   return (
-    <div style={{ background: "#0A1628", border: "1px solid rgba(76,141,255,0.15)", borderRadius: 14, padding: "14px", marginBottom: 12 }}>
+    <div style={{ background: "#212429", border: "1px solid " + theme.borderSubtle, borderRadius: 14, padding: "14px", marginBottom: 12 }}>
       {phase === "idle" && (
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
