@@ -299,6 +299,10 @@ function LogInput({ onLog, accent }) {
   return (
     <div style={{ background: "#212429", border: "1px solid " + theme.borderSubtle, borderRadius: 14, padding: "14px", marginBottom: 12 }}>
 
+      {/* Header — makes clear this box is where you log a meal */}
+      <div style={{ fontSize: 17, fontWeight: 700, color: theme.text, marginBottom: 2 }}>Log a meal</div>
+      <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 12 }}>Say it, snap it, or type it in</div>
+
       {/* Hidden file input for camera */}
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
         onChange={handlePhoto} style={{ display: "none" }} />
