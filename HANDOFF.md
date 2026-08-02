@@ -39,7 +39,7 @@ All well under the 3,800-line hard limit.
 
 **Confirming the warm-up compound/isolation split is sufficient** — still needs a direct look/decision from Bryant, not code.
 
-**Kettlebell-specific weight-increment refinement beyond the flat 9 lb placeholder** — deferred, needs its own model (not plate-based).
+**Kettlebell weight increments — note this is NOT the same as the flat-2.5lb bug (that was fixed in Session 16; kettlebell exercises correctly step by 9 lbs today, confirmed in code).** What's still open is a refinement: that 9 lbs is one flat number applied to every kettlebell exercise. Making it vary per exercise instead of one-size-fits-all is deferred — needs its own model, not plate-based.
 
 **Exercise diagrams/animations** — deferred, needs a licensed clip library.
 
