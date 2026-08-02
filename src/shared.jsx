@@ -2751,6 +2751,25 @@ function isMultiDayPlan(plan) {
   return Array.isArray(plan?.customDays) && plan.customDays.length > 1;
 }
 
+// -- Clear stale in-progress workout state -------------------------------
+// Bug found live-testing a freshly-built custom plan: after restarting
+// onboarding and saving a brand new plan, WorkoutScreen would resume the
+// OLD plan's in-progress workout snapshot (exIdx/setIdx/loggedSets/weight)
+// from morphiq_workout_progress_<uid> in localStorage -- that key is keyed
+// only by user id, with no check for whether the plan itself changed. The
+// "only resume if saved today" guard in WorkoutScreen.jsx's savedProgress
+// doesn't catch this, since a same-day plan rebuild is exactly the case
+// that guard was never designed for. Neither OnboardingScreen.jsx's AI-plan
+// save nor CustomPlanScreen's savePlan() (WorkoutScreen.jsx) ever cleared
+// this on a successful save -- same shape of bug as every other "two save
+// paths, one shared cleanup step missing" issue in this file. One shared
+// function now, called from both of those plus WorkoutScreen's own
+// clearProgress(), instead of three separate copies that can drift apart.
+function clearWorkoutProgress(uid) {
+  try { localStorage.removeItem(`morphiq_workout_progress_${uid || "anon"}`); } catch {}
+  if (uid) sb.syncWorkoutProgress(uid, null).catch(() => {});
+}
+
 // -- Billing / paywall gate --------------------------------------------
 // Central place that decides if a gym's members and owner should be locked
 // out of the app. Internal/beta-exempt gyms (is_beta_exempt) are NEVER
@@ -2798,4 +2817,6 @@ export {
   isMultiDayPlan,
   // Macro calc + weight increment lookup
   calcMacros, getWeightIncrement,
+  // Stale in-progress workout cleanup
+  clearWorkoutProgress,
 };

@@ -3,7 +3,7 @@ import {
   useApp, theme, sb,
   GOAL_OPTIONS, GOAL_ICONS,
   Pill, Spinner, Icon,
-  buildPlan, calcMacros,
+  buildPlan, calcMacros, clearWorkoutProgress,
 } from "./shared.jsx";
 
 function OnboardingScreen() {
@@ -91,6 +91,11 @@ function OnboardingScreen() {
               setPlanError("Your plan was built, but we couldn't save it — your connection or our database may have had a hiccup. Tap to try again.");
               return;
             }
+            // Bug fix: a brand new plan must never resume an old plan's
+            // in-progress workout snapshot (see clearWorkoutProgress() in
+            // shared.jsx for the full story -- same fix applied to
+            // CustomPlanScreen's savePlan() in WorkoutScreen.jsx).
+            clearWorkoutProgress(_saveUid);
             // Profile row now exists — safe to write the starting weight
             const startingWeight = parseFloat(weight);
             if (startingWeight > 0) {

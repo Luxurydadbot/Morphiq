@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
          WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
-         isMultiDayPlan, calcMacros as calcMacrosShared, getWeightIncrement } from "./shared.jsx";
+         isMultiDayPlan, calcMacros as calcMacrosShared, getWeightIncrement, clearWorkoutProgress } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -502,8 +502,7 @@ function WorkoutScreen() {
   // Clears saved progress — used when the workout finishes or the member
   // chooses to restart. Without this, a completed workout would try to resume.
   const clearProgress = () => {
-    try { localStorage.removeItem(progressKey); } catch {}
-    if (supabaseUser?.id) { sb.syncWorkoutProgress(supabaseUser.id, null).catch(() => {}); }
+    clearWorkoutProgress(supabaseUser?.id);
   };
 
   // Restart: wipe saved progress and reset back to the very beginning.
@@ -2039,6 +2038,10 @@ function CustomPlanScreen() {
       try { localStorage.setItem("mq_cached_plan_" + uid, JSON.stringify({ plan, user: userData })); } catch {}
       const ok = await sb.upsertProfile(uid, userData, plan);
       if (!ok) { setSaveError("Couldn't save — check your connection and try again."); setSaving(false); return; }
+      // Bug fix: a brand new plan must never resume an old plan's
+      // in-progress workout snapshot (see clearWorkoutProgress() in
+      // shared.jsx for the full story).
+      clearWorkoutProgress(uid);
     }
     setUser(userData);
     setPlan(plan);
