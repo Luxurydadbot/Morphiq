@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon, SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./shared.jsx";
+import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon, PoweredByHypergentiq, SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./shared.jsx";
 
 function buildMemberRow(profile, sessions, lastDate, weightDelta) {
   const initials = (profile.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -466,7 +466,7 @@ function OwnerBrandingTab() {
           <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#0B1E3D", border: `2px solid ${FIXED_ACCENT}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: FIXED_ACCENT }}>M</div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0" }}>{gymName}</div>
-            <div style={{ fontSize: 10, color: "#6E7480" }}>Powered by Hypergentiq</div>
+            <div style={{ fontSize: 10, color: "#6E7480" }}><PoweredByHypergentiq /></div>
           </div>
         </div>
         <div style={{ padding: "14px" }}>
@@ -711,7 +711,7 @@ function PricingScreen() {
         </div>
       </div>
 
-      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "8px 0 12px" }}>POWERED BY HYPERGENTIQ</div>
+      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "8px 0 12px" }}><PoweredByHypergentiq caps /></div>
     </div>
   );
 }
@@ -823,7 +823,7 @@ function GymOwnerDashboard() {
       <div style={{ padding: "14px 16px", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
         <button onClick={() => navigate("pricing")} style={{ background: "none", border: "1px solid rgba(76,141,255,0.3)", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4C8DFF", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4 }}>Plans & pricing <Icon name="arrow-right" size={12} /></button>
       </div>
-      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "0 0 12px" }}>POWERED BY HYPERGENTIQ</div>
+      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", padding: "0 0 12px" }}><PoweredByHypergentiq caps /></div>
     </div>
   );
 }
@@ -837,7 +837,7 @@ function LoadingScreen() {
       <div style={{ width: 48, height: 48, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: a }}>M</div>
       <Spinner size={36} color={a} trackColor={ob.card} />
       <div style={{ fontSize: 13, color: ob.body }}>Loading your account…</div>
-      <div style={{ fontSize: 9, color: "#333", letterSpacing: ".5px", marginTop: 20 }}>POWERED BY HYPERGENTIQ</div>
+      <div style={{ fontSize: 9, color: "#333", letterSpacing: ".5px", marginTop: 20 }}><PoweredByHypergentiq caps /></div>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   useApp, theme, sb,
   GOAL_OPTIONS, GOAL_ICONS,
-  Pill, Spinner, Icon,
+  Pill, Spinner, Icon, PoweredByHypergentiq,
   buildPlan, calcMacros, clearWorkoutProgress,
 } from "./shared.jsx";
 
@@ -163,7 +163,7 @@ function OnboardingScreen() {
           <div style={{ width: 20, height: 20, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: a }}>M</div>
           <span style={{ fontSize: 13, fontWeight: 600, color: a }}>{gymBranding.name}</span>
         </div>
-        <span style={{ fontSize: 9, color: ob.muted }}>Powered by Hypergentiq</span>
+        <span style={{ fontSize: 9, color: ob.muted }}><PoweredByHypergentiq /></span>
       </div>
       {step < 10 && (
         <div style={{ padding: "8px 14px 0", flexShrink: 0 }}>
@@ -179,7 +179,7 @@ function OnboardingScreen() {
               {gymBranding.name?.[0]?.toUpperCase() || "M"}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
-            <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>Powered by Hypergentiq</div>
+            <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}><PoweredByHypergentiq /></div>
           </div>
           <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "12px 14px", fontSize: 13, lineHeight: 1.6, color: ob.body, marginBottom: 20 }}>
             I'll build a training plan personal to you in about 2 minutes. Let's start with your name.
@@ -574,7 +574,7 @@ function OnboardingScreen() {
 
         </div>}
       </div>
-      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: "0.5px", padding: "4px 0 6px", flexShrink: 0 }}>POWERED BY HYPERGENTIQ</div>
+      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: "0.5px", padding: "4px 0 6px", flexShrink: 0 }}><PoweredByHypergentiq caps /></div>
     </div>
   );
 }

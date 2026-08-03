@@ -13,7 +13,7 @@ import {
   setSessionCookie, getSessionCookie, clearSessionCookie,
   localDateStr, buildPlan, progressPlan,
   SUPABASE_URL, SB_GET, getAuthToken,
-  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon,
+  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq,
   GOAL_OPTIONS, GOAL_ICONS, EQUIPMENT_OPTIONS,
   WORKOUT_EXERCISES, MEAL_DATA, GROCERY_DATA,
   FALLBACK_REPLIES, CHAT_SUGGESTIONS,
@@ -616,7 +616,7 @@ function AuthScreen() {
       <div style={{ padding: "36px 20px 24px", textAlign: "center" }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: ob.tealDk, border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: 24, fontWeight: 700, color: a }}>M</div>
         <div style={{ fontSize: 20, fontWeight: 700, color: ob.white }}>{gymBranding.name}</div>
-        <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Powered by Hypergentiq</div>
+        <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}><PoweredByHypergentiq /></div>
 
       </div>
 
@@ -727,7 +727,7 @@ function AuthScreen() {
       </div>
 
 
-      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: ".5px", padding: "4px 0 10px" }}>POWERED BY HYPERGENTIQ</div>
+      <div style={{ textAlign: "center", fontSize: 9, color: "#333", letterSpacing: ".5px", padding: "4px 0 10px" }}><PoweredByHypergentiq caps /></div>
     </div>
   );
 }

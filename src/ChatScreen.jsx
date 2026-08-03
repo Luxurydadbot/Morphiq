@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   useApp, theme, sb,
-  MicIcon, Spinner, Icon,
+  MicIcon, Spinner, Icon, PoweredByHypergentiq,
   CHAT_SUGGESTIONS,
   getFallbackReply, fetchAIReply,
 } from "./shared.jsx";
@@ -291,7 +291,7 @@ function ChatScreen({ fromScreen = "home" }) {
       </div>
 
       {/* Bottom text */}
-      <div style={{ textAlign: "center", fontSize: 10, color: theme.textFaint, paddingBottom: 10, background: "#0D1117", flexShrink: 0 }}>Powered by Hypergentiq</div>
+      <div style={{ textAlign: "center", fontSize: 10, color: theme.textFaint, paddingBottom: 10, background: "#0D1117", flexShrink: 0 }}><PoweredByHypergentiq /></div>
     </div>
   );
 }

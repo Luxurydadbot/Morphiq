@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useApp, sb, Spinner, MonthlyTrendLineChart } from "./shared.jsx";
+import { useApp, sb, Spinner, MonthlyTrendLineChart, PoweredByHypergentiq } from "./shared.jsx";
 
 // ── PRICING — must match api/create-checkout.js exactly ──────────────────
 // If the real Stripe prices ever change, update both places at once.
@@ -335,7 +335,7 @@ function SuperAdminDashboard() {
         </>
       )}
 
-      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", paddingTop: 20 }}>POWERED BY HYPERGENTIQ</div>
+      <div style={{ textAlign: "center", fontSize: 10, color: "#333", letterSpacing: ".5px", paddingTop: 20 }}><PoweredByHypergentiq caps /></div>
     </div>
   );
 }

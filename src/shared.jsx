@@ -2375,7 +2375,7 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
         <button onClick={() => navigate("profile")} style={{ width: 34, height: 34, borderRadius: "50%", background: theme.accentDim, border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 500, color: a, cursor: "pointer" }}>{user.name ? user.name[0].toUpperCase() : "?"}</button>
       </div>
       {children}
-      <div style={{ textAlign: "center", fontSize: 11, color: theme.textFaint, padding: ".6rem", marginBottom: "3.5rem" }}>Powered by Hypergentiq</div>
+      <div style={{ textAlign: "center", fontSize: 11, color: theme.textFaint, padding: ".6rem", marginBottom: "3.5rem" }}><PoweredByHypergentiq /></div>
 
       <div className="mq-pulse-ring" style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: "rgba(76,141,255,0.18)" }} />
       <button onClick={() => navigate(chatTarget)} style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: a, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -2402,6 +2402,27 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 // are drawn by the phone's own emoji font in full color no matter what --
 // they can never pick up the app's teal theme. These use stroke="currentColor"
 // so they automatically match whatever text color surrounds them.
+function PoweredByHypergentiq({ caps = false, logoHeight = "1em" }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, verticalAlign: "middle" }}>
+      <span>{caps ? "POWERED BY" : "Powered by"}</span>
+      <svg viewBox="0 -99.2 584.8 130.2" style={{ height: logoHeight, width: "auto", flexShrink: 0 }} role="img" aria-label="Hypergentiq">
+      <path d="M70 0V720H154V419Q179 464 224.5 490.0Q270 516 324 516Q382 516 425.0 492.5Q468 469 491.0 421.0Q514 373 514 300V0H431V291Q431 367 399.0 405.5Q367 444 306 444Q263 444 228.5 423.0Q194 402 174.0 363.0Q154 324 154 267V0Z" fill="#9BA0AA" transform="translate(0.00,0) scale(0.100000,-0.100000)"/>
+      <path d="M125 -220 248 56H219L21 504H112L276 119L448 504H535L213 -220Z" fill="#9BA0AA" transform="translate(57.50,0) scale(0.100000,-0.100000)"/>
+      <path d="M70 -220V504H146L153 422Q169 446 194.0 467.5Q219 489 254.0 502.5Q289 516 334 516Q408 516 462.5 481.0Q517 446 547.5 386.5Q578 327 578.0 251.0Q578 175 547.5 115.5Q517 56 462.0 22.0Q407 -12 333 -12Q272 -12 225.5 13.0Q179 38 154 83V-220ZM324 61Q373 61 411.0 85.0Q449 109 470.5 151.5Q492 194 492 252Q492 309 470.5 352.0Q449 395 411.0 419.0Q373 443 324 443Q274 443 236.0 419.0Q198 395 177.0 352.0Q156 309 156 252Q156 194 177.0 151.5Q198 109 236.0 85.0Q274 61 324 61Z" fill="#9BA0AA" transform="translate(113.10,0) scale(0.100000,-0.100000)"/>
+      <path d="M291 -12Q220 -12 165.5 21.0Q111 54 80.0 113.5Q49 173 49 252Q49 332 79.5 391.0Q110 450 165.5 483.0Q221 516 293 516Q367 516 418.5 483.0Q470 450 497.5 396.5Q525 343 525 279V258Q525 247 524 233H131Q134 180 154 143Q176 101 212.5 80.0Q249 59 291 59Q344 59 378.5 82.5Q413 106 428 146H511Q499 101 469.0 65.0Q439 29 394.5 8.5Q350 -12 291 -12ZM132 298H443Q440 367 397.5 406.0Q355 445 291 445Q248 445 211.5 425.5Q175 406 153 369Q136 339 132 298Z" fill="#9BA0AA" transform="translate(175.70,0) scale(0.100000,-0.100000)"/>
+      <path d="M70 0V504H146L152 408Q169 442 195.5 466.0Q222 490 259.5 503.0Q297 516 345 516V428H314Q282 428 253.0 419.5Q224 411 201.5 392.0Q179 373 166.5 340.5Q154 308 154 260V0Z" fill="#9BA0AA" transform="translate(232.50,0) scale(0.100000,-0.100000)"/>
+      <path d="M269 -232Q201 -232 148.5 -214.5Q96 -197 67.0 -161.0Q38 -125 38 -72Q38 -49 47.5 -23.0Q57 3 81 28Q92 41 109 52Q89 60 75 70Q57 82 43 95V118L129 203Q107 222 93 247Q70 287 70.0 337.0Q70 387 93.5 427.0Q117 467 161.0 491.5Q205 516 268 516Q312 516 347 504H531V441L436 437Q439 432 442 427Q465 387 465.0 337.0Q465 287 442.0 246.5Q419 206 375.0 182.0Q331 158 268 158Q226 158 192 169L140 123Q144 120 147 118Q157 111 174.0 106.0Q191 101 221.5 97.0Q252 93 302 89Q371 84 412.5 65.0Q454 46 472.5 14.0Q491 -18 491 -62Q491 -105 467.5 -143.5Q444 -182 395.0 -207.0Q346 -232 269 -232ZM188 31Q149 12 136 -11Q120 -40 120 -64Q120 -97 139.0 -119.0Q158 -141 192.0 -152.0Q226 -163 269.0 -163.0Q312 -163 343.0 -151.0Q374 -139 391.0 -117.0Q408 -95 408 -65Q408 -30 382.0 -6.5Q356 17 283 21Q227 25 188 31ZM268 227Q322 227 353.0 255.0Q384 283 384 337Q384 390 353.0 418.0Q322 446 268 446Q215 446 182.5 418.0Q150 390 150 337Q150 283 182.0 255.0Q214 227 268 227Z" fill="#9BA0AA" transform="translate(269.50,0) scale(0.100000,-0.100000)"/>
+      <path d="M291 -12Q220 -12 165.5 21.0Q111 54 80.0 113.5Q49 173 49 252Q49 332 79.5 391.0Q110 450 165.5 483.0Q221 516 293 516Q367 516 418.5 483.0Q470 450 497.5 396.5Q525 343 525 279V258Q525 247 524 233H131Q134 180 154 143Q176 101 212.5 80.0Q249 59 291 59Q344 59 378.5 82.5Q413 106 428 146H511Q499 101 469.0 65.0Q439 29 394.5 8.5Q350 -12 291 -12ZM132 298H443Q440 367 397.5 406.0Q355 445 291 445Q248 445 211.5 425.5Q175 406 153 369Q136 339 132 298Z" fill="#9BA0AA" transform="translate(325.30,0) scale(0.100000,-0.100000)"/>
+      <path d="M70 0V504H146L150 416Q174 463 218.5 489.5Q263 516 320 516Q379 516 422.0 492.5Q465 469 489.0 421.5Q513 374 513 301V0H429V292Q429 368 395.5 406.0Q362 444 301 444Q259 444 226.0 423.5Q193 403 173.5 364.5Q154 326 154 269V0Z" fill="#9BA0AA" transform="translate(382.10,0) scale(0.100000,-0.100000)"/>
+      <path d="M268 0Q223 0 190.0 14.0Q157 28 139.5 61.5Q122 95 122 152V433H34V504H122L133 626H206V504H352V433H206V152Q206 105 225.0 88.5Q244 72 292 72H346V0Z" fill="#9BA0AA" transform="translate(439.50,0) scale(0.100000,-0.100000)"/>
+      <path d="M68 0V700H208V0Z" fill="#4C8DFF" transform="translate(478.70,0) scale(0.100000,-0.100000)"/>
+      <path d="M555 -111 485 -1Q442 -12 392 -12Q290 -12 212.0 34.0Q134 80 89.5 161.5Q45 243 45.0 350.0Q45 457 89.5 538.5Q134 620 212.0 666.0Q290 712 392 712Q495 712 573.5 666.0Q652 620 695.5 538.5Q739 457 739.0 350.0Q739 243 696 162Q663 101 611 60L723 -111ZM392 114Q402 114 412 115L299 292H460L538 173Q558 195 572 225Q597 277 597.0 350.0Q597 423 572.0 475.5Q547 528 501.0 557.0Q455 586 392 586Q330 586 284.5 557.0Q239 528 213.5 475.5Q188 423 188.0 350.0Q188 277 213.5 224.5Q239 172 284.5 143.0Q330 114 392 114Z" fill="#4C8DFF" transform="translate(506.30,0) scale(0.100000,-0.100000)"/>
+      </svg>
+    </span>
+  );
+}
+
 function Icon({ name, size = 16, color = "currentColor", style, filled = false }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style };
   switch (name) {
@@ -2799,7 +2820,7 @@ export {
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components
-  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon,
+  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq,
   // Screen data constants
   GOAL_ICONS, GOAL_OPTIONS, EQUIPMENT_OPTIONS,
   WORKOUT_EXERCISES, MEAL_DATA, GROCERY_DATA,
