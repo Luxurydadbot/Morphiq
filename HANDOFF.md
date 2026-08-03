@@ -1,4 +1,4 @@
-# Hypergentiq — Session 17 master handoff (Greg's rest-screen bug, a color mixup, and a stale-plan-resume bug — all shipped)
+# Hypergentiq — Session 18 master handoff (brand identity designed and shipped: wordmark, app icon, and the App Store roadmap)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
 
@@ -45,6 +45,74 @@ Shipped to the real app -- `public/logo192.png`, `public/logo512.png`, and `publ
 **Realistic sequencing:** steps 1-4 (PWA fixes, Capacitor setup, live-update pipeline, Android) have no external blocker and can start immediately. Step 5 (iOS) is waiting on Bryant confirming Mac access. Step 6 (privacy policy) blocks final submission on both stores regardless of platform, so it should be unblocked in parallel, not left until last.
 
 **How updates work once live (for reference):** backend changes (Vercel/Supabase) — instant, always, same as today. Frontend changes to the web version at the Vercel URL — instant, always, same as today. Frontend changes to the installed app — instant via the live-update pipeline (step 3) for JS/styling/copy changes; a real store submission + review only for changes touching native functionality.
+
+## Session 18 — brand identity from scratch: wordmark, app icon, App Store roadmap, and several smaller fixes
+
+Long session, mostly product/design work rather than bug fixes. Rough chronology:
+
+**Kettlebell wording correction.** Bryant pushed back on the punch list implying "all kettlebell issues" were open, when the flat-2.5lb bug was actually fixed in Session 16. Corrected the wording so it's clear the base fix is done and confirmed in code (`getWeightIncrement()` in `shared.jsx` returns 9 for kettlebell) -- only a further per-exercise refinement and one live-tap verification remain open. Doc-only.
+
+**Meal entry box clarity.** Bryant felt the voice/photo/type block on the Meals screen didn't explain itself. Added a "Log a meal" header + "Say it, snap it, or type it in" subtext to `LogInput` in `MealScreen.jsx`.
+
+**Four new product/design items logged** (not built, for future discussion): grocery list per-category custom/recurring items; the Progress screen's "Workout streak" card being unclear/possibly unnecessary; the Log Cardio card's color and whether the feature itself is worth keeping; a broader review of what Progress/Nutrition should measure vs. top fitness apps.
+
+**App Store / Google Play submission roadmap.** Bryant wants Hypergentiq in both stores -- this is now a standing, carried-forward section at the top of this file (see STANDING GOAL above), not just a chat answer. Covers: fixing the PWA manifest first, adding Capacitor, a live-update pipeline (Capgo) so most JS/copy/style changes can ship to installed users without full store re-review, the Android path (no Mac needed, $25 one-time Google account), the iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26 -- ruled out Bryant's 2013 MacBook Pro, pending a check on his work Mac, cloud-Mac fallback noted), the privacy policy as a hard gate on both stores (still blocked on a lawyer -- this is now the single highest-leverage blocker since it blocks two separate tracks), store listing assets, and an Apple in-app-purchase sanity check (should be a non-issue since members never pay in-app).
+
+**Log Cardio color fix + real bug found while fixing the PWA manifest.** Fixed `CardioQuickLog` in `src/ProgressScreen.jsx` (corrected mislabel: it's the Progress screen's Workouts tab, not the Workout screen) to use the same neutral `#212429` card background as everything else instead of a standalone blue. While wiring `manifest.json`'s icons to the existing `logo192.png`/`logo512.png`, discovered those files were still the default Create React App placeholder (the blue React atom logo) -- Hypergentiq had never actually had a logo designed. Bryant independently realized the same thing moments later.
+
+**Full brand identity built from scratch.** Explored 6 abstract icon-mark concepts (orbit, neural hub, faceted H monogram, ascending pulse, spark diamond, lattice) and 6 wordmark typography treatments, all using the app's real accent blue (`#4C8DFF`) and real fonts (DM Sans/DM Mono), not invented colors. Bryant picked the wordmark treatment "hypergent" (DM Sans Regular, muted gray `#9BA0AA`) + "IQ" (DM Sans ExtraBold, accent blue) -- deliberately spotlighting the "IQ" already sitting inside the brand name. Built a full brand kit and delivered it to Bryant directly (not committed to this repo): true vector wordmark (SVG + PDF, real outlined glyph paths built from the actual DM Sans font files via `fontTools`, not live text), PNG previews, the DM Sans font files + SIL Open Font License text, and a brand guide PDF with typography specs and color values including nearest-Pantone references (accent blue ≈ PMS 2718 C, approximate only -- this blue exceeds typical spot-ink gamut; muted gray ≈ PMS 535 C, a close match) computed via Lab-space nearest-neighbor against the real Pantone solid-coated library, not guessed.
+
+**Brand positioning decision (Bryant's call, logged as a real decision):** Hypergentiq's own identity stays quiet/attribution-only inside the member-facing app -- gyms' own branding is deliberately the dominant visual identity there via the existing `gymBranding` system, which the app already does correctly. Hypergentiq's mark is for company-facing surfaces: the store listings, the admin/gym-owner dashboard, and the footer credit. The icon direction stays abstract/tech rather than fitness-themed on purpose, so it doesn't visually compete with individual gyms' own fitness branding, and so it doesn't blend into an app store full of literal dumbbell/heart icons.
+
+**Wordmark shipped into the real app.** All 12 places that said the plain text "Powered by Hypergentiq" (or "POWERED BY HYPERGENTIQ") across `ChatScreen.jsx`, `GymOwnerDashboard.jsx` (x4), `Morphiq.jsx` (x2), `OnboardingScreen.jsx` (x3), `SuperAdminDashboard.jsx`, and `shared.jsx`'s own `Layout` component now render the real wordmark instead. Built as a single shared `PoweredByHypergentiq` component in `shared.jsx` (real vector glyph outlines embedded once, same technique as the brand kit file) so it isn't duplicated 12 times -- each call site keeps its own existing color/case/tracking via normal CSS inheritance from its wrapping element, only the logo itself is new. Visually confirmed it holds up clearly at the actual sizes these footers use (9-16px) before shipping.
+
+**Icon mark: picked, then genuinely iterated on, then shipped.** Bryant's personal pick, based on meaning rather than just looks, was "ascending pulse" -- a heartbeat-style line trending upward into a solid dot, tying the felt physical effort of a workout to visible AI-tracked progress, which is the actual emotional promise of the product. Went through several real rounds of feedback before landing on a final version: full-width/edge-to-edge composition (not small and timid -- this was Bryant's and his wife's specific reaction to an early draft), thin line weight (not the bolder weight tried in between), solid accent blue with no gradient (tried and rejected a gray-to-blue gradient version), and a soft blur duplicated directly under the line itself so it reads as gently glowing rather than lit from one corner.
+
+**Shipped to production.** `public/logo192.png`, `public/logo512.png`, and `public/favicon.ico` (all three still the default CRA placeholder before today) now contain real exports of the final mark, generated natively at each target size (16/32/48/192/512/1024) rather than one image resized down. `manifest.json`'s `theme_color`/`background_color` aligned to the app's real dark background (`#121316`) instead of the old mismatched `#080E1A`. The `"maskable"` purpose flag was deliberately removed from the manifest's icon entry -- the full-bleed composition Bryant and his wife preferred runs close to the edges, which some Android launchers can crop under a declared-maskable icon; removing that flag tells Android to use the icon as provided instead. iOS isn't affected either way (no adaptive masking there).
+
+**Told Bryant existing home-screen shortcuts won't auto-update.** Both iOS Safari and Android Chrome (in this app's current state, with no service worker registered) take a one-time icon snapshot when a user first does "Add to Home Screen" -- they don't re-fetch it from the manifest later. Existing testers/gym members with the app already on their home screen need to remove and re-add the shortcut to see the new icon; this isn't something code can fix retroactively. Worth remembering if members report "the icon didn't change."
+
+## Files touched this session (final line counts)
+
+- `src/MealScreen.jsx`: 720 → 724 (+4) -- "Log a meal" header on `LogInput`
+- `src/ProgressScreen.jsx`: 580 → 580 (net 0) -- `CardioQuickLog` card background color fix
+- `src/shared.jsx`: 2822 → 2843 (+21) -- new shared `PoweredByHypergentiq` component, export list, `Layout`'s own footer usage
+- `src/ChatScreen.jsx`: 300 → 300 (net 0) -- import + footer swapped to `PoweredByHypergentiq`
+- `src/GymOwnerDashboard.jsx`: 845 → 845 (net 0) -- import + 4 footer instances swapped
+- `src/Morphiq.jsx`: 1540 → 1540 (net 0) -- import + 2 footer instances swapped
+- `src/OnboardingScreen.jsx`: 583 → 583 (net 0) -- import + 3 footer instances swapped
+- `src/SuperAdminDashboard.jsx`: 343 → 343 (net 0) -- import + 1 footer instance swapped
+- `public/manifest.json`: icons array, `theme_color`, `background_color` updated (not part of the line-count convention -- small JSON config file)
+- `public/logo192.png`, `public/logo512.png`, `public/favicon.ico`: binary, fully replaced (were the default CRA placeholder, now the real Hypergentiq mark)
+- `src/WorkoutScreen.jsx`, `src/GymSignupScreen.jsx`: untouched this session (2441 and 269 lines respectively, unchanged)
+
+All well under the 3,800-line hard limit.
+
+## Latest commits
+
+`ed763d9` (icon shipped, handoff doc) → `5ef5105` (app icon shipped to prod) → `688892d` (wordmark-live handoff doc) → `0a3ac2f` (wordmark shipped to all 12 footers) → `0afc7e4` → `8d45b4e` → `89c7737` → `40b673a` (Log Cardio fix + manifest icon wiring) → `8f61b65` → `d6a8041` (App Store roadmap) → `2e6eb22` → `5ac26ed` (Log a meal header) → `94b5cf8` (kettlebell wording fix) → `754e760` (this file's mandatory-fetch-method note) → `d306631` (session 17 handoff), all on `main`.
+
+## Confirmed working vs. still needs testing
+
+**Confirmed (visually verified before shipping, not just described):** the `PoweredByHypergentiq` wordmark renders correctly at actual in-app footer sizes (9-16px); the final app icon renders cleanly at 192px (the real shipped size) and at favicon sizes down to 16px; the Log Cardio card now matches the rest of the Progress screen visually.
+
+**Not yet verified:** the icon/favicon/manifest changes have not been checked live in a deployed browser tab or via an actual "Add to Home Screen" flow on a real phone -- only rendered/previewed via the sandbox's own image tools. Worth a real phone check next session (remove + re-add the home screen shortcut, per the note above, to actually see it).
+
+## Next priority task
+
+Two reasonable directions, neither blocking the other: (1) unblock the privacy policy -- it's the single highest-leverage item on the board since it now blocks both the punch list and the entire App Store roadmap; Bryant hasn't asked for a draft yet but it was offered. (2) Start the no-blocker App Store groundwork -- Capacitor setup and the Capgo live-update pipeline (roadmap steps 1-3) -- now that the icon/wordmark assets it depends on visually actually exist. The four product/design discussion items from earlier this session (grocery custom items, workout streak card, Log Cardio's actual purpose, Progress/Nutrition measurement review) are still open and untouched if Bryant wants product work instead of infrastructure.
+
+## Paste this at the start of your next session
+
+```
+Continue Hypergentiq build. Fetch HANDOFF.md and all src/api files by cloning the GitHub repo directly
+(git clone) into a plain scratch folder OUTSIDE any mounted/synced folder -- do NOT fetch HANDOFF.md as a
+webpage/URL, it has repeatedly returned stale cached content. Report line counts from the actual cloned
+files before doing anything else, then remind me of the next priority task from Session 18's handoff
+(privacy policy unblock vs. Capacitor/App Store groundwork vs. the open product-design items).
+```
+
+---
 
 ## Session 17 — three real bugs found and fixed, plus the full session-8 live spot-check finally closed out
 
