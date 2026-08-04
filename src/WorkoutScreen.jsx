@@ -327,6 +327,26 @@ function WorkoutScreen() {
         : getAutoWorkoutDayIndex(plan, user, historicalData))
     : null;
 
+  // When an explicit day pick conflicts with a stale in-progress workout
+  // (local, above -- or a cross-device cloud one, detected further down),
+  // don't just silently discard the old one. Bryant's ask, after watching
+  // this exact conflict happen live: surface it as a real choice --
+  // continue the unfinished day, or confirm starting the newly-picked one
+  // and discard it. The screen already renders the fresh override day by
+  // default (see savedProgress/activeDayIdx above); this banner is the
+  // "actually, continue the old one" escape hatch on top of that default.
+  const [dayConflict, setDayConflict] = useState(() => {
+    if (overrideValid && savedProgressValid && rawSavedProgress.dayIndex !== selectedDayOverride) {
+      return {
+        savedDayIndex: rawSavedProgress.dayIndex,
+        savedDayLabel: plan.customDays[rawSavedProgress.dayIndex]?.dayLabel || `Day ${rawSavedProgress.dayIndex + 1}`,
+        overrideDayLabel: plan.customDays[selectedDayOverride]?.dayLabel || `Day ${selectedDayOverride + 1}`,
+        raw: rawSavedProgress,
+      };
+    }
+    return null;
+  });
+
   // Shared by the initial load below and the cross-device cloud-resume
   // rebuild further down -- used to be two separate copies of the same
   // mapping (the exact duplication pattern that caused the warm-up bug
@@ -410,6 +430,27 @@ function WorkoutScreen() {
     let cancelled = false;
     sb.getWorkoutProgress(supabaseUser.id).then(cloud => {
       if (cancelled || !cloud || cloud.date !== localDateStr()) return;
+      // Bug found live-testing the explicit-override fix (session 19): this
+      // cross-device cloud snapshot used to apply unconditionally whenever
+      // there was no LOCAL saved progress -- which is exactly the situation
+      // right after an explicit day pick discards a conflicting local
+      // snapshot (see savedProgress above). That left a second, un-guarded
+      // path for the exact same stale day to silently resurface from
+      // Supabase instead. If there's an explicit pick this session and the
+      // cloud snapshot is for a DIFFERENT day, surface the same
+      // continue-or-start-fresh choice as the local-storage conflict
+      // instead of silently applying it.
+      if (overrideValid && isMultiDay && typeof cloud.dayIndex === "number" && cloud.dayIndex !== selectedDayOverride && cloud.dayIndex < plan.customDays.length) {
+        if (!dayConflict) {
+          setDayConflict({
+            savedDayIndex: cloud.dayIndex,
+            savedDayLabel: plan.customDays[cloud.dayIndex]?.dayLabel || `Day ${cloud.dayIndex + 1}`,
+            overrideDayLabel: plan.customDays[selectedDayOverride]?.dayLabel || `Day ${selectedDayOverride + 1}`,
+            raw: cloud,
+          });
+        }
+        return;
+      }
       setPhase(cloud.phase ?? (warmupExercises.length > 0 ? "warmup" : "active"));
       setWarmupStep(cloud.warmupStep ?? 0);
       setCooldownStep(cloud.cooldownStep ?? 0);
@@ -858,6 +899,39 @@ function WorkoutScreen() {
     }
     // Workout is finished — clear the in-progress save so it won't resume.
     clearProgress();
+  }
+
+  // The two answers to the "you have an unfinished X workout" conflict
+  // banner (see dayConflict above). Bryant's ask, live: don't silently pick
+  // one side -- ask.
+  function continueOldWorkout() {
+    if (!dayConflict) return;
+    const { savedDayIndex, raw } = dayConflict;
+    try {
+      const dayData = plan.customDays[savedDayIndex];
+      if (dayData?.exercises?.length > 0) setExercises(dayData.exercises.map(normalizeExercise));
+    } catch {}
+    setPhase(raw.phase ?? (warmupExercises.length > 0 ? "warmup" : "active"));
+    setWarmupStep(raw.warmupStep ?? 0);
+    setCooldownStep(raw.cooldownStep ?? 0);
+    setExIdx(raw.exIdx ?? 0);
+    setSetIdx((raw.setIdx ?? 0) + (raw.state === "rest" ? 1 : 0));
+    setLoggedSets(raw.loggedSets ?? []);
+    // Re-point selectedDayOverride at the day actually being resumed, so
+    // activeDayIdx (and every place that reads it -- the progress-persist
+    // effect, recordWorkoutComplete's day-index write) lines up with what's
+    // now on screen instead of the originally-tapped day.
+    setSelectedDayOverride(savedDayIndex);
+    setDayConflict(null);
+    setShowResumeBanner(true);
+  }
+
+  function startNewWorkout() {
+    // Already showing the freshly-picked day by default -- just confirm the
+    // choice and make sure the old unfinished workout can't quietly resurface
+    // later (wipes both the local snapshot and the cross-device cloud copy).
+    clearProgress();
+    setDayConflict(null);
   }
 
   // Called when member picks an alternative from the swap sheet.
@@ -1489,6 +1563,29 @@ function WorkoutScreen() {
   return (
     <Layout activeNav="workout" chatTarget="chat_workout">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
+
+        {/* Day-conflict banner — shown instead of silently picking a side
+            when an explicit day pick collides with an unfinished workout on
+            a different day (local or cross-device). Bryant's ask, after
+            watching the old silent-override behavior live. */}
+        {dayConflict && (
+          <div className="mq-fade" style={{ background: "#1A1A0A", border: `1px solid rgba(217,164,6,0.35)`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0", marginBottom: 4 }}>
+              You have an unfinished {dayConflict.savedDayLabel} workout
+            </div>
+            <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>
+              Exercise {(dayConflict.raw.exIdx ?? 0) + 1}, set {(dayConflict.raw.setIdx ?? 0) + 1} · saved sets are still there
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={continueOldWorkout} style={{ flex: 1, background: "transparent", border: `1px solid ${a}`, color: a, borderRadius: 10, padding: "9px 4px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                Continue {dayConflict.savedDayLabel}
+              </button>
+              <button onClick={startNewWorkout} style={{ flex: 1, background: a, border: "none", color: "#0B1E3D", borderRadius: 10, padding: "9px 4px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Start {dayConflict.overrideDayLabel}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Resume banner — appears briefly when we restored an in-progress
             workout, then fades. Makes auto-resume visible and intentional. */}
