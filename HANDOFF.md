@@ -1,3 +1,96 @@
+# Hypergentiq — Session 19 master handoff (multi-day workout day-picker bugs, fixed)
+
+This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
+
+## STANDING GOAL — App Store + Google Play submission roadmap (carry forward every session, do not delete until fully checked off)
+
+Bryant wants Hypergentiq submitted to both the Apple App Store and Google Play. This is a real target, not a someday-idea — every session should check this list and make progress on whatever isn't blocked. Untouched this session (Session 19 was a bug-fix session, not roadmap work) — carried forward unchanged from Session 18.
+
+**The plan:** wrap the existing React web app with Capacitor (not a React Native rewrite) — it reuses this codebase almost as-is and produces real native iOS + Android projects, with access to native camera/mic/push notifications the browser version can't fully offer.
+
+Steps, in order:
+
+1. **[ ] Fix current PWA gaps first** — `public/manifest.json` doesn't reference the existing `logo192.png`/`logo512.png` icon files, and there's no service worker registered. Clean this up as groundwork before wrapping with Capacitor.
+2. **[ ] Add Capacitor to the project, generate iOS + Android native projects.** No external blocker — can start anytime.
+3. **[ ] Set up a live-update pipeline (e.g. Capgo) so most future changes don't need a full store re-review.** Once the app is live, the backend (Vercel API functions + Supabase) always updates instantly regardless of app store status — that never changes. But the JS/UI bundle that ships inside the native app is otherwise frozen until a new store submission. A live-update tool lets us push JS, styling, and copy changes (the kind of edits done most sessions — headers, colors, wording, most bug fixes) straight to installed users without going back through Apple/Google review, which keeps our regular workflow close to what it is today. This is explicitly allowed under Apple's guideline 3.3.1(B) since Capacitor apps run their web layer inside Apple's own WebKit. It does NOT cover anything touching native functionality — new permissions, new native plugins, icon/name changes — those still require a real store submission and review every time.
+4. **[ ] Android path (no Mac needed):**
+   - [ ] Bryant creates a Google Play Console developer account — $25 one-time fee, requires ID verification and 2-Step Verification on the Google account. This step has to be done by Bryant directly (identity/payment).
+   - [ ] Build and sign the Android app, submit for review.
+5. **[ ] iOS path (needs a Mac running macOS Sequoia 15.6 or newer, for Xcode 26 — Apple requires every submission to be built with Xcode 26 / the iOS 26 SDK as of April 28, 2026):**
+   - [ ] Bryant to check the Mac available at work — confirm it can run macOS Sequoia 15.6+. (Ruled out: the 2013 MacBook Pro at home — its hardware ceiling is macOS Catalina or Big Sur depending on exact model, well short of what Xcode 26 requires.)
+   - [ ] If the work Mac can't run it either, fall back to a cloud Mac build service (e.g. Codemagic, Ionic Appflow, or a macOS GitHub Actions runner) — no purchase needed, just setup.
+   - [ ] Bryant creates an Apple Developer Program account — $99/year, requires ID verification. Has to be done by Bryant directly.
+   - [ ] Build and sign the iOS app, submit for review.
+6. **[ ] Privacy policy — hard gate for BOTH stores, not optional.** Still blocked on a lawyer (see punch list). Both app stores require a real, linked privacy policy before they'll accept a submission — this needs to move from "blocked" to "in progress" for the store timeline to be realistic.
+7. **[ ] Store listing assets** — real branded app icon in required sizes (now shipped, see Session 18), a handful of screenshots of the app in use, short description text, and each store's age-rating / data-safety questionnaire.
+8. **[ ] Confirm no Apple in-app purchase conflict** — members don't pay inside the app (gyms pay via Stripe outside the consumer-facing app), which should keep this out of Apple's in-app purchase requirement, but worth a final check against Apple's current guidelines right before submission.
+9. **[ ] Submit.** Apple review is typically fast once submitted (most decisions in 24-48 hours). Google's first-time review for a brand-new developer account can take longer.
+
+## Session 19 — two real workout-scheduling bugs, both fixed
+
+Bryant reported two related problems with the multi-day workout picker: (1) picking Day 1 from the Home screen and tapping "Start workout" sometimes loaded a DIFFERENT day's exercises instead (his example: picked Day 1 / leg press, actually landed on barbell bench press); (2) the app had no concept of "start of the week" — the day-rotation pointer just rolled forward forever with no reset, so it couldn't reliably default back to Day 1 at the start of a new week or correctly pick up "the day after whatever was last completed."
+
+**Bug 1 — explicit day pick silently lost to stale saved progress (`WorkoutScreen.jsx`).** `activeDayIdx` checked `savedProgress?.dayIndex` (an in-progress-workout snapshot cached in localStorage under `morphiq_workout_progress_<uid>`, valid for same-day resume) BEFORE it checked `selectedDayOverride` (the member's explicit tap on the Home screen's day picker). If any same-day saved progress existed — even from an abandoned/incomplete workout on a different day earlier that day — it silently won over a brand new, deliberate day selection. Fixed: an explicit `selectedDayOverride` now always wins. If it conflicts with the saved progress's day, that saved progress is discarded entirely (not partially reapplied) so stale `exIdx`/`setIdx`/`loggedSets` from the wrong day can never bleed into the newly-picked day. If there's no override, same-day resume behavior is unchanged from Session 9's original fix.
+
+**Bug 2 — no weekly reset, so the day pointer just rolled forward forever.** `profiles.last_workout_day_index` is a single number with no associated date — the old auto-pick math, `(lastWorkoutDayIndex + 1) % numDays`, had no way to know whether that number was from today's training week or three weeks ago, so it never reset to Day 1 and couldn't distinguish "nothing done yet this week" from "already partway through this week." New shared `getAutoWorkoutDayIndex(plan, user, historicalData)` in `shared.jsx`: checks whether a qualifying workout (same definition the home-screen weekly-progress ring already uses — a logged cardio session, or 2+ distinct exercises with real reps logged on one date) has happened since this week's Monday. If not, always returns Day 1 (index 0), regardless of what `lastWorkoutDayIndex` says. If a qualifying workout HAS happened this week, continues from `lastWorkoutDayIndex + 1` (wrapping) exactly as before. Replaces two separate inline copies of the old rolling-pointer math — one in `Morphiq.jsx`'s `HomeDashboardScreen` (the day-preview card), one in `WorkoutScreen.jsx` (what actually loads) — collapsed into this one shared function so the two screens can't drift apart, same lesson as `isMultiDayPlan()`, `calcMacros()`, and `getWeightIncrement()` before it.
+
+**Related fix, needed to make "day after the last one COMPLETED" literally true:** `last_workout_day_index` was being written on WorkoutScreen MOUNT (i.e. the moment a day is opened/started), not on completion. That meant just starting a day and abandoning it without finishing still advanced the pointer, so the next auto-pick could skip a day that was never actually completed. Moved the `sb.updateLastWorkoutDayIndex()` call from the mount `useEffect` into `recordWorkoutComplete()`, which only fires when a workout is genuinely finished (cool-down done, "Back to dashboard" tapped).
+
+**Verification done this session:** all three changed files pass an `esbuild` parse check. Router/component-name safety checklist confirmed intact (`export default function Morphiq()`, `function GymOwnerDashboard()`, `function WorkoutScreen()`, `AuthScreen` in `Morphiq.jsx`). `getAutoWorkoutDayIndex()` was pulled out and run standalone in Node against 6 scenarios: fresh week with no logs (returns Day 1 regardless of a stale `lastWorkoutDayIndex`), a qualifying workout completed today (correctly continues to the next day), wrap-around past the last day back to Day 1, a single stray non-qualifying logged set (still treated as no real workout — stays on Day 1), a cardio-only session (correctly counts as qualifying), and logs that exist but are from LAST week only (still resets to Day 1). All 6 passed. The day-priority conflict logic (explicit override vs. stale same-day progress) was also pulled out and run standalone against Bryant's exact bug report (explicit Day 1 pick + stale progress pointing at Day 2) plus 3 other scenarios (no-conflict resume, override matching saved progress, plain auto-pick) — all behaved as intended.
+
+**Still NOT done — this is the real open risk.** None of this has been clicked through in the actual running app yet — every check above was done by extracting the real logic and running it in Node, or reading the code, not by opening Hypergentiq in a browser and tapping through the day picker. Worth a real live pass next session: pick Day 1 explicitly and confirm it now sticks even with a stale in-progress workout sitting in localStorage from a different day; and, ideally with a test profile whose `last_workout_day_index`/workout history can be controlled, confirm a fresh week actually shows Day 1 and that finishing a workout (not just starting one) is what advances the pointer.
+
+## Files touched this session
+
+- `src/shared.jsx`: 2,843 → 2,880 (+37) — new shared `getAutoWorkoutDayIndex()` + export
+- `src/Morphiq.jsx`: 1,540 → 1,540 (net 0) — `HomeDashboardScreen`'s day-preview now calls the shared function instead of its own inline copy
+- `src/WorkoutScreen.jsx`: 2,441 → 2,456 (+15) — explicit-override-wins priority fix, shared auto-pick function, `last_workout_day_index` write moved from mount to `recordWorkoutComplete()`
+
+All well under the 3,800-line hard limit.
+
+## Latest commit
+
+`6793117` on `main` — Session 19's day-picker fixes. `0d25354` (Session 18's handoff doc) is the commit before it.
+
+## Punch list, in priority order
+
+**TOP PRIORITY — live-verify Session 19's fix.** Nothing above has been clicked through in the real app yet (see "Still NOT done" above). Do this before considering either bug closed.
+
+**SECOND — unblock the privacy policy.** Still the single highest-leverage item on the board since it blocks both the general punch list and the entire App Store roadmap (STANDING GOAL above, step 6). Blocked on Bryant contacting a lawyer; a draft has been offered but not requested.
+
+**THIRD — no-blocker App Store groundwork.** Capacitor setup and the Capgo live-update pipeline (roadmap steps 1-3) can start anytime; the icon/wordmark assets they depend on are already shipped (Session 18).
+
+**FOURTH — four product/design items from Session 18, still just discussion, nothing built:** a per-category custom/recurring grocery item that persists; the Progress screen's "Workout streak" card, which currently shows no real data and may not be worth keeping as-is; whether the "Log Cardio" feature is worth keeping at all (its color was fixed in Session 18, but Bryant separately questioned the feature itself); and a broader review of what Progress/Nutrition should measure against top fitness apps.
+
+**FIFTH — confirming the warm-up compound/isolation split is sufficient.** Needs a direct decision from Bryant, not code.
+
+**SIXTH — kettlebell weight-increment refinement.** Not the flat-2.5lb bug (fixed Session 16) — kettlebell already steps by 9 lbs correctly. What's open is varying that 9 lbs per exercise instead of one flat number; deferred, needs its own model.
+
+**SEVENTH — exercise diagrams/animations.** Deferred, needs a licensed clip library.
+
+**LOWER PRIORITY / OPS.** The one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only).
+
+## Technical notes carried forward
+
+**MANDATORY fetch method — do not use any other method.** `git clone` over authenticated HTTPS, run from a plain scratch/temp directory NOT inside any mounted/synced/"outputs" folder, is the only reliable way to pull this repo's true current state — confirmed working again this session. Run `wc -l` directly on the cloned files for line counts. Do NOT fetch `HANDOFF.md` or any src/api file via a URL-fetch tool / raw.githubusercontent.com / the GitHub REST API — these have repeatedly returned stale, cached content in past sessions. Note: `git push` (not just `git clone`) also works fine over the same authenticated-HTTPS method from a plain scratch directory — used successfully this session to ship the fix directly, no manual copy/paste needed. `api.github.com` (the REST API) and plain `curl`/HTTP fetches to `github.com`/`raw.githubusercontent.com` are blocked by this environment's outbound proxy allowlist; only `git` operations (clone/push) over `https://` reliably get through.
+
+**Duplicate logic is still the recurring root cause of real bugs in this codebase — Session 19 adds a fifth example** (session 10's warm-up bug, session 13's pricing-tier color drift, session 14's gym-branding bug, session 17's stale-plan-resume bug): the day-auto-pick math lived as two separate inline copies (`Morphiq.jsx`'s Home preview card, `WorkoutScreen.jsx`'s actual loader), and only one of them needed to go stale for the two screens to visibly disagree with each other. Collapsed into one shared `getAutoWorkoutDayIndex()`, following the exact same pattern as `isMultiDayPlan()`, `calcMacros()`, `getWeightIncrement()`, and `clearWorkoutProgress()` before it.
+
+**A field with no associated timestamp can't tell you whether it's stale.** The root cause of Bug 2 wasn't bad math, it was a missing dimension: `last_workout_day_index` alone can't distinguish "picked up today" from "picked up three weeks ago." Rather than adding a new database column (a real schema change, flagged per the standing DATABASE RULES rather than assumed), the fix instead re-derives "has this week started" from data the app already loads for another purpose (`historicalData.workoutLogs`, already used by the home screen's weekly-progress ring) — same category of fix as Session 14's gym-branding retry logic: make the existing signal reliable rather than bolting on a new piece of state that could itself go stale.
+
+## Paste this at the start of your next session
+
+```
+Continue Hypergentiq build. Fetch HANDOFF.md and all src/api files by cloning the GitHub repo directly
+(git clone) into a plain scratch folder OUTSIDE any mounted/synced folder -- do NOT fetch HANDOFF.md as a
+webpage/URL, it has repeatedly returned stale cached content. Report line counts from the actual cloned
+files before doing anything else, then remind me of the next priority task from Session 19's handoff:
+live-verifying the two day-picker fixes (explicit day pick losing to stale progress; no weekly reset to
+Day 1) before considering either bug closed.
+```
+
+---
+
 # Hypergentiq — Session 18 master handoff (brand identity designed and shipped: wordmark, app icon, and the App Store roadmap)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand.
