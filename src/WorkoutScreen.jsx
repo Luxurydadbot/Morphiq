@@ -1197,6 +1197,31 @@ function WorkoutScreen() {
   const card = { background: "#212429", borderRadius: 12, padding: "10px 12px", marginBottom: 8 };
   const totalCompleted = loggedSets.filter(l => l.exIdx === exIdx && l.kind !== "warmup").length;
 
+  // Day-conflict banner -- pulled out to a shared element so it can render
+  // during the warm-up/cool-down phases too (those have their own early
+  // returns below, before the main return further down), not just once the
+  // member reaches the active-set screen. A conflict is detected right at
+  // mount, so it should be visible from the very first screen, not appear
+  // partway through.
+  const dayConflictBanner = dayConflict && (
+    <div className="mq-fade" style={{ background: "#1A1A0A", border: `1px solid rgba(217,164,6,0.35)`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0", marginBottom: 4 }}>
+        You have an unfinished {dayConflict.savedDayLabel} workout
+      </div>
+      <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>
+        Exercise {(dayConflict.raw.exIdx ?? 0) + 1}, set {(dayConflict.raw.setIdx ?? 0) + 1} · saved sets are still there
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={continueOldWorkout} style={{ flex: 1, background: "transparent", border: `1px solid ${a}`, color: a, borderRadius: 10, padding: "9px 4px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+          Continue {dayConflict.savedDayLabel}
+        </button>
+        <button onClick={startNewWorkout} style={{ flex: 1, background: a, border: "none", color: "#0B1E3D", borderRadius: 10, padding: "9px 4px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          Start {dayConflict.overrideDayLabel}
+        </button>
+      </div>
+    </div>
+  );
+
   // ── WARM-UP PHASE ──────────────────────────────────────────────────────────
   if (phase === "warmup") {
     const currentWarmup = warmupExercises[warmupStep];
@@ -1205,6 +1230,8 @@ function WorkoutScreen() {
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
+
+          {dayConflictBanner}
 
           {/* Header */}
           <div style={{ textAlign: "center", marginBottom: 14 }}>
@@ -1266,6 +1293,7 @@ function WorkoutScreen() {
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
+          {dayConflictBanner}
           <div style={{ textAlign: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 10, color: a, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Cool-down · {cooldownStep + 1} of {cooldownExercises.length}</div>
             <div style={{ fontSize: 13, color: theme.textDim }}>5 minutes to recover properly</div>
@@ -1564,28 +1592,7 @@ function WorkoutScreen() {
     <Layout activeNav="workout" chatTarget="chat_workout">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
 
-        {/* Day-conflict banner — shown instead of silently picking a side
-            when an explicit day pick collides with an unfinished workout on
-            a different day (local or cross-device). Bryant's ask, after
-            watching the old silent-override behavior live. */}
-        {dayConflict && (
-          <div className="mq-fade" style={{ background: "#1A1A0A", border: `1px solid rgba(217,164,6,0.35)`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0", marginBottom: 4 }}>
-              You have an unfinished {dayConflict.savedDayLabel} workout
-            </div>
-            <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>
-              Exercise {(dayConflict.raw.exIdx ?? 0) + 1}, set {(dayConflict.raw.setIdx ?? 0) + 1} · saved sets are still there
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={continueOldWorkout} style={{ flex: 1, background: "transparent", border: `1px solid ${a}`, color: a, borderRadius: 10, padding: "9px 4px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                Continue {dayConflict.savedDayLabel}
-              </button>
-              <button onClick={startNewWorkout} style={{ flex: 1, background: a, border: "none", color: "#0B1E3D", borderRadius: 10, padding: "9px 4px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                Start {dayConflict.overrideDayLabel}
-              </button>
-            </div>
-          </div>
-        )}
+        {dayConflictBanner}
 
         {/* Resume banner — appears briefly when we restored an in-progress
             workout, then fades. Makes auto-resume visible and intentional. */}
