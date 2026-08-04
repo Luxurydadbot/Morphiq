@@ -2772,6 +2772,43 @@ function isMultiDayPlan(plan) {
   return Array.isArray(plan?.customDays) && plan.customDays.length > 1;
 }
 
+// -- Weekly-aware auto day-pick -------------------------------------------
+// Which day of a multi-day plan to land on next, when the member hasn't
+// explicitly picked one. Two things Bryant asked for directly, neither of
+// which the old plain "(lastWorkoutDayIndex + 1) % numDays" math understood,
+// since lastWorkoutDayIndex just rolls forward forever with no idea what
+// week it's in:
+//   1. A new week always starts on Day 1 -- profiles.last_workout_day_index
+//      from a PREVIOUS week is stale and must never carry into this one.
+//   2. Once a real workout has actually been completed THIS week, the next
+//      auto-pick continues from the day AFTER that one (lastWorkoutDayIndex
+//      + 1, wrapping) -- picking up from whatever was last completed, not a
+//      blind 1-2-3-4 guess that drifts the moment a manual day-pick (or a
+//      skipped day) breaks the plain sequence.
+// "Completed this week" reuses the exact qualifying-workout definition the
+// home-screen weekly-progress ring already uses (a logged cardio session,
+// or 2+ distinct exercises with real reps logged on one date) so the two
+// pieces of UI can never disagree about whether the week has started.
+function getAutoWorkoutDayIndex(plan, user, historicalData) {
+  if (!isMultiDayPlan(plan)) return null;
+  const numDays = plan.customDays.length;
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun,1=Mon,...
+  const mondayDiff = now.getDate() - dow + (dow === 0 ? -6 : 1);
+  const monday = new Date(now.getFullYear(), now.getMonth(), mondayDiff);
+  const mondayStr = localDateStr(monday);
+  const logsThisWeek = (historicalData?.workoutLogs || []).filter(l => l.workout_date >= mondayStr);
+  const byDate = {};
+  for (const l of logsThisWeek) {
+    if (!byDate[l.workout_date]) byDate[l.workout_date] = { exercises: new Set(), hasCardio: false };
+    if (l.is_cardio) byDate[l.workout_date].hasCardio = true;
+    else if ((l.reps || 0) > 0 && l.exercise_name) byDate[l.workout_date].exercises.add(l.exercise_name);
+  }
+  const hasQualifyingWorkoutThisWeek = Object.values(byDate).some(d => d.hasCardio || d.exercises.size > 1);
+  if (!hasQualifyingWorkoutThisWeek) return 0; // fresh week -- always Day 1
+  return typeof user?.lastWorkoutDayIndex === "number" ? (user.lastWorkoutDayIndex + 1) % numDays : 0;
+}
+
 // -- Clear stale in-progress workout state -------------------------------
 // Bug found live-testing a freshly-built custom plan: after restarting
 // onboarding and saving a brand new plan, WorkoutScreen would resume the
@@ -2835,7 +2872,7 @@ export {
   // Billing / paywall
   isGymBlocked,
   // Multi-day plan helper
-  isMultiDayPlan,
+  isMultiDayPlan, getAutoWorkoutDayIndex,
   // Macro calc + weight increment lookup
   calcMacros, getWeightIncrement,
   // Stale in-progress workout cleanup

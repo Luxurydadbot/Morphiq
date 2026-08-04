@@ -9,7 +9,7 @@ import { ProgressScreen } from "./ProgressScreen.jsx";
 import { ChatScreen } from "./ChatScreen.jsx";
 import {
   sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY, isGymBlocked,
-  isMultiDayPlan, calcMacros,
+  isMultiDayPlan, getAutoWorkoutDayIndex, calcMacros,
   setSessionCookie, getSessionCookie, clearSessionCookie,
   localDateStr, buildPlan, progressPlan,
   SUPABASE_URL, SB_GET, getAuthToken,
@@ -856,7 +856,7 @@ function HomeDashboardScreen() {
   const activeDayIdx = isMultiDay
     ? ((selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
         ? selectedDayOverride
-        : (typeof user?.lastWorkoutDayIndex === "number" ? (user.lastWorkoutDayIndex + 1) % plan.customDays.length : 0))
+        : getAutoWorkoutDayIndex(plan, user, historicalData))
     : null;
   const getUpcomingDayData = () => {
     if (isMultiDay) {

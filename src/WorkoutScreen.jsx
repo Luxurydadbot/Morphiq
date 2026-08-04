@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
          WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
-         isMultiDayPlan, calcMacros as calcMacrosShared, getWeightIncrement, clearWorkoutProgress } from "./shared.jsx";
+         isMultiDayPlan, getAutoWorkoutDayIndex, calcMacros as calcMacrosShared, getWeightIncrement, clearWorkoutProgress } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -280,7 +280,7 @@ function WorkoutScreen() {
   // BEFORE activeDayIdx below (moved up in session 9) so a same-day resume
   // can pin the day it already started on, instead of re-deriving a fresh one.
   const progressKey = `morphiq_workout_progress_${supabaseUser?.id || "anon"}`;
-  const savedProgress = (() => {
+  const rawSavedProgress = (() => {
     try {
       const raw = localStorage.getItem(progressKey);
       if (!raw) return null;
@@ -293,29 +293,38 @@ function WorkoutScreen() {
     } catch { return null; }
   })();
 
-  // For custom plans with multiple days: which day to load.
-  // Fix (session 9): a same-day in-progress workout now wins over everything
-  // else. Previously this was recomputed fresh from lastWorkoutDayIndex on
-  // every mount, with no memory of which day the CURRENT unfinished workout
-  // actually started on -- so if WorkoutScreen ever remounted mid-workout
-  // (backgrounding the app, the "continue where you left off" flow itself is
-  // a fresh mount, a token refresh causing a re-render), it could silently
-  // recompute a DIFFERENT day while the saved exIdx/setIdx from localStorage
-  // still applied, landing the member on the wrong day's exercise at the same
-  // set position. A manual pick from the Home screen wins if there's no
-  // same-day progress; otherwise continue from wherever the member actually
-  // last did (their last day + 1, wrapping) -- tracked in
-  // profiles.last_workout_day_index, NOT derived from how many workouts
-  // they've done this week (that count-based guess drifts once a manual pick
-  // breaks the plain 1-2-3-4 sequence, e.g. picking Day 2 first would make the
-  // old math suggest Day 2 again next time instead of Day 3).
+  // For custom plans with multiple days: which day to load. Priority,
+  // highest first:
+  //   1. An EXPLICIT day pick from the Home screen (selectedDayOverride).
+  //      Bug fix: this used to lose to same-day saved progress pointing at a
+  //      DIFFERENT day (e.g. an abandoned workout started earlier today) --
+  //      so tapping "Day 1" then "Start workout" could silently land on Day
+  //      2's exercises instead. A deliberate pick now always wins; if it
+  //      conflicts with the saved progress's day, that saved progress
+  //      belongs to the wrong day and is discarded entirely below (not
+  //      partially reapplied) rather than letting stale exIdx/setIdx bleed
+  //      into the newly-picked day.
+  //   2. A same-day in-progress workout with no explicit override (session
+  //      9's fix) -- so backgrounding/reopening mid-workout, or a token
+  //      refresh causing a remount, resumes the exact day it started on.
+  //   3. Neither of the above -- auto-pick via getAutoWorkoutDayIndex()
+  //      (shared.jsx), which resets to Day 1 at the start of every week and
+  //      otherwise continues from the day after whichever one was last
+  //      actually COMPLETED (profiles.last_workout_day_index, now updated
+  //      on completion in recordWorkoutComplete() below rather than here on
+  //      mount -- see that function for why).
   const isMultiDay = isMultiDayPlan(plan);
+  const overrideValid = isMultiDay && selectedDayOverride !== null && selectedDayOverride < plan.customDays.length;
+  const savedProgressValid = isMultiDay && typeof rawSavedProgress?.dayIndex === "number" && rawSavedProgress.dayIndex < plan.customDays.length;
+  const savedProgress = (savedProgressValid && overrideValid && rawSavedProgress.dayIndex !== selectedDayOverride)
+    ? null // explicit pick conflicts with stale progress from a different day -- drop the stale progress
+    : rawSavedProgress;
   const activeDayIdx = isMultiDay
-    ? (typeof savedProgress?.dayIndex === "number" && savedProgress.dayIndex < plan.customDays.length
-        ? savedProgress.dayIndex
-        : (selectedDayOverride !== null && selectedDayOverride < plan.customDays.length)
+    ? (overrideValid
         ? selectedDayOverride
-        : (typeof user?.lastWorkoutDayIndex === "number" ? (user.lastWorkoutDayIndex + 1) % plan.customDays.length : 0))
+        : savedProgressValid && savedProgress
+        ? savedProgress.dayIndex
+        : getAutoWorkoutDayIndex(plan, user, historicalData))
     : null;
 
   // Shared by the initial load below and the cross-device cloud-resume
@@ -357,15 +366,12 @@ function WorkoutScreen() {
 
   // The manual day pick from the Home screen is a one-time nudge — clear it
   // right after this screen has used it, so it never carries over to a future
-  // session or week. Also remember which day this session actually used (auto
-  // or override) so the next auto-pick correctly continues from here. Safe to
-  // re-run on a resumed session too -- activeDayIdx is now pinned by
-  // savedProgress.dayIndex above, so this just re-writes the same value.
+  // session or week. Note: this used to ALSO write last_workout_day_index
+  // here on mount -- moved to recordWorkoutComplete() instead (below), so
+  // merely opening/starting a day, without finishing it, no longer advances
+  // the pointer that getAutoWorkoutDayIndex() uses to pick the NEXT day.
   useEffect(() => {
     if (selectedDayOverride !== null) setSelectedDayOverride(null);
-    if (isMultiDay && activeDayIdx !== null && supabaseUser?.id) {
-      sb.updateLastWorkoutDayIndex(supabaseUser.id, activeDayIdx).catch(() => {});
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -841,6 +847,15 @@ function WorkoutScreen() {
   // sign-in/resume to catch up.
   function recordWorkoutComplete() {
     try { if (supabaseUser?.id) loadHistoricalData(supabaseUser.id); } catch {}
+    // Record which day of a multi-day plan was actually FINISHED, so the
+    // next auto-pick (getAutoWorkoutDayIndex in shared.jsx) continues from
+    // the day after this one. Moved here from mount -- writing it on mount
+    // meant just starting a day (without finishing it) silently advanced
+    // the pointer, so an abandoned Day 2 could make the app skip straight
+    // to Day 3 next time instead of offering Day 2 again.
+    if (isMultiDay && activeDayIdx !== null && supabaseUser?.id) {
+      sb.updateLastWorkoutDayIndex(supabaseUser.id, activeDayIdx).catch(() => {});
+    }
     // Workout is finished — clear the in-progress save so it won't resume.
     clearProgress();
   }
