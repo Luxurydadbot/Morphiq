@@ -1994,7 +1994,7 @@ const GOAL_REP_RANGES = {
 // progression instead of only this builder screen being able to.
 
 function CustomPlanScreen() {
-  const { navigate, setUser, setPlan, user, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
+  const { navigate, setUser, setPlan, user, plan, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
   const a = gymBranding.accent || "#4C8DFF";
   const ob = theme.ob;
 
@@ -2006,8 +2006,18 @@ function CustomPlanScreen() {
   const [dayExercises, setDayExercises] = useState([]); // exercises for the current day being built
   const [allDays, setAllDays]   = useState([]); // [{dayLabel, exercises:[{name,sets,reps,weight}]}]
   const [query, setQuery]       = useState("");
-  const [calories, setCalories] = useState("");
-  const [protein, setProtein]   = useState("");
+  // Bug fix (session 20): these used to always start blank, even for a member
+  // rebuilding/editing a plan they'd already set real numbers for. Every trip
+  // through this screen re-asked "optional" stats that had already been
+  // answered, and skipping (or just not re-typing them) fed blank values into
+  // savePlan() -- which overwrites the member's profile and plan outright, so
+  // real height/weight/age/sex and real calorie/protein targets silently got
+  // replaced with nulls, and the app fell back to its generic 1,800 cal /
+  // 140g defaults. Now these hydrate from the member's existing saved data,
+  // so leaving them untouched carries the real numbers forward instead of
+  // wiping them -- only an explicit "Skip" or an actual edit changes anything.
+  const [calories, setCalories] = useState(plan?.calories ? String(plan.calories) : "");
+  const [protein, setProtein]   = useState(plan?.protein ? String(plan.protein) : "");
   const [saving, setSaving]     = useState(false);
   const [saveError, setSaveError] = useState("");
   const [dbSuggestions, setDbSuggestions] = useState([]); // live results from Supabase exercises table
@@ -2016,12 +2026,19 @@ function CustomPlanScreen() {
   // (OnboardingScreen.jsx) so custom plans get the same calorie/protein/carb/fat
   // calculation and rest-timer choice. Skippable — savePlan() falls back to the
   // old manual-only behavior if these are left blank.
-  const [sex, setSex] = useState(null);            // 'male' | 'female' | null
-  const [heightFt, setHeightFt] = useState("");
-  const [heightIn, setHeightIn] = useState("");
-  const [bodyWeight, setBodyWeight] = useState(""); // member's body weight — separate from per-exercise weight below
-  const [age, setAge] = useState("");
-  const [restPref, setRestPref] = useState(null);   // seconds; null = skipped, falls back to goal-based default
+  // Hydrated from the member's existing profile (see bug-fix note on
+  // calories/protein above) -- height/weight are stored as formatted strings
+  // ("5′ 10″" / "180 lbs") same as Morphiq.jsx's Edit Plan screen, so parsed
+  // back out the same way.
+  const initialHeightMatch = /^(\d+)′\s*(\d+)″/.exec(user?.height || "");
+  const initialWeightMatch = /^([\d.]+)/.exec(user?.weight || "");
+  const initialSex = (user?.sex || "").toLowerCase();
+  const [sex, setSex] = useState(initialSex === "male" || initialSex === "female" ? initialSex : null);
+  const [heightFt, setHeightFt] = useState(initialHeightMatch ? initialHeightMatch[1] : "");
+  const [heightIn, setHeightIn] = useState(initialHeightMatch ? initialHeightMatch[2] : "");
+  const [bodyWeight, setBodyWeight] = useState(initialWeightMatch ? initialWeightMatch[1] : ""); // member's body weight — separate from per-exercise weight below
+  const [age, setAge] = useState(user?.age || "");
+  const [restPref, setRestPref] = useState(user?.restPref || null);   // seconds; null = skipped, falls back to goal-based default
 
   // Pending exercise being configured before adding to the day
   const [pending, setPending]   = useState(null); // {name, sets, reps, weight, loadStyle, setDetails}
