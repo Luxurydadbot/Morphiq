@@ -467,10 +467,17 @@ const sb = {
     } catch { return null; }
   },
 
-  // Fetch the most recent WORKING set for a specific exercise (excludes warm-ups tagged set_number=0).
-  // Used to show "Last time: X lbs × Y reps" before each set.
-  // Returns { weight, reps, date } or null if no history found.
-  async getLastSetForExercise(supabaseUserId, exerciseName) {
+  // Fetch the most recent time a SPECIFIC working set number (1st working set,
+  // 2nd, etc.) was performed for this exercise -- NOT just whatever was logged
+  // last overall. Used to show "Last time: X lbs x Y reps" before each set.
+  // Bug fix (session 20): this used to ignore setNumber entirely and grab the
+  // single most-recently-logged working set for the exercise, so every set of
+  // a multi-set exercise (set 1, set 2, set 3...) showed the identical number --
+  // usually the heaviest/last set from last time -- instead of the matching
+  // set from last time's ramp. Now it matches set-for-set (today's set 1 is
+  // compared to last time's set 1, not last time's set 4).
+  // Returns { weight, reps, date } or null if no history found for that set number.
+  async getLastSetForExercise(supabaseUserId, exerciseName, setNumber) {
     try {
       const profileId = await this.getProfileId(supabaseUserId);
       if (!profileId) return null;
@@ -480,7 +487,7 @@ const sb = {
       // last time you actually trained this exercise (a real prior session).
       const today = localDateStr();
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${name}&set_number=gt.0&workout_date=lt.${today}&order=logged_at.desc&limit=1`,
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${name}&set_number=eq.${setNumber}&workout_date=lt.${today}&order=logged_at.desc&limit=1`,
         { headers: SB_GET() }
       );
       const rows = await res.json();

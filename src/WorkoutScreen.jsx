@@ -720,16 +720,24 @@ function WorkoutScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exIdx, setIdx, displayWeight, isWarmupSet]);
 
-  // Fetch last working set for the current exercise whenever exIdx changes.
-  // This powers the "Last time: X lbs × Y reps" display below the weight card.
+  // Fetch last working set for the CURRENT set number whenever exIdx or
+  // workingIdx changes. This powers the "Last time: X lbs × Y reps" display
+  // below the weight card.
+  // Bug fix (session 20): this used to only depend on exIdx, so it fetched
+  // once per exercise and showed the same "last time" number (whatever was
+  // logged last overall, usually the heaviest set) on every set of that
+  // exercise. Now it refetches per set and asks for the SAME set number
+  // (workingIdx) so set 1 is compared to last time's set 1, set 2 to last
+  // time's set 2, etc., instead of every set being compared to last time's
+  // final set.
   // Runs silently — null while loading, false if no history, object if found.
   useEffect(() => {
-    setLastSetHistory(null); // reset to loading state on exercise change
-    if (!supabaseUser?.id || !ex?.name) return;
-    sb.getLastSetForExercise(supabaseUser.id, ex.name)
+    setLastSetHistory(null); // reset to loading state on exercise/set change
+    if (!supabaseUser?.id || !ex?.name || isWarmupSet) return;
+    sb.getLastSetForExercise(supabaseUser.id, ex.name, workingIdx)
       .then(result => setLastSetHistory(result || false))
       .catch(() => setLastSetHistory(false));
-  }, [exIdx, ex?.name, supabaseUser?.id]);
+  }, [exIdx, workingIdx, ex?.name, supabaseUser?.id, isWarmupSet]);
 
   const restStartRef = useRef(null);
   const activeRestSecsRef = useRef(activeRestSecs);
