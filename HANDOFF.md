@@ -17,7 +17,18 @@ Session-start fetch initially used the web-fetch tool against `raw.githubusercon
 - `shared.jsx`: three new functions — `isBarbellExercise(name)` (name-based, checks for the `"Barbell "` prefix `EXERCISE_LIBRARY` already uses consistently for every real barbell movement, deliberately not the plan-level equipment setting, since even a "barbell" plan mixes in real dumbbell accessory work like "Dumbbell lateral raise" that the plan-level flag can't distinguish), `getPlateBreakdown(totalWeight, barWeight = 45)` (greedy fill over standard plate sizes `[45, 35, 25, 10, 5, 2.5]`, returns `{ plates, perSide, remainder, barOnly }` or `null` below bar weight), and `formatPlateBreakdown(breakdown)` (human-readable line, e.g. `"2×45 + 1×10 per side"` or `"Just the bar (45 lbs)"`). All exported.
 - `WorkoutScreen.jsx`: wired into the existing weight tile on the active-set screen — a small caption line shown under the big weight number, for both warm-up and working sets (a member has to load the actual bar either way), gated on `isBarbellExercise(ex.name)` so it never shows for dumbbell/kettlebell/machine exercises.
 - **Known simplification, documented in code comments, not a bug:** assumes one standard 45lb Olympic bar for every barbell exercise. Doesn't account for a women's 35lb bar, EZ-curl bar, or trap bar weight. Same spirit as the existing kettlebell-increment placeholder — flagged rather than silently wrong.
-- **Verification this session:** `esbuild` used to bundle-check both changed files (no live Node toolchain available in the sandbox to run the real `react-scripts build` — `node_modules` isn't checked into the repo and wasn't installed this session) — both compiled clean, zero syntax/JSX errors. Diff reviewed line-by-line before pushing; both pre-push safety checks passed (`function WorkoutScreen()` present, `export default function Morphiq()` present, line-count deltas exactly matched what was added: `shared.jsx` +61, `WorkoutScreen.jsx` +17). **Not yet live-tested in Chrome** — next session should open a barbell-plan test workout and confirm the breakdown renders correctly and matches real plate math by hand, same as the standing practice for other numeric features in this app.
+- **Verification this session:** `esbuild` used to bundle-check both changed files (no live Node toolchain available in the sandbox to run the real `react-scripts build` — `node_modules` isn't checked into the repo and wasn't installed this session) — both compiled clean, zero syntax/JSX errors. Diff reviewed line-by-line before pushing; both pre-push safety checks passed (`function WorkoutScreen()` present, `export default function Morphiq()` present, line-count deltas exactly matched what was added: `shared.jsx` +61, `WorkoutScreen.jsx` +17). **Live-verified in Chrome this session, immediately after building it.** Temporarily edited `WarmupTest`'s Push day (via direct Supabase update, same established pattern as prior sessions' test setups) to cover the key cases, then logged in and clicked through the real workout:
+- Exactly bar weight (45 lbs, Barbell back squat) → correctly showed "Just the bar (45 lbs)".
+- Clean 1-plate case (135 lbs working set, Barbell bench press) → "1×45 per side", correct.
+- Multiple warm-up steps on the way to 135 (70/95/115 lbs) → each showed the right breakdown, confirming it recomputes correctly as weight changes.
+- A 3-distinct-plate-size case (210 lbs working set, Barbell Romanian deadlift) → "1×45 + 1×35 + 1×2.5 per side", correct.
+- A same-plate-repeated case surfaced by the app's own autoregulation (180 lbs warm-up) → "1×45 + 2×10 + 1×2.5 per side", correct — good unplanned test of the plate-count aggregation.
+- A 4-distinct-plate case surfaced the same way (200 lbs) → "1×45 + 1×25 + 1×5 + 1×2.5 per side", correct.
+- Negative control (Dumbbell lateral raise, 8 lbs) → correctly showed no breakdown line at all, confirming the barbell-only gate works.
+
+All math double-checked by hand against each displayed weight — every case correct. Also incidentally re-confirmed that autoregulated weight (mid-workout weight adjustment based on rep performance) is a real, pre-existing app behavior unrelated to this feature — the plate breakdown correctly tracks whatever weight is actually displayed, regardless of why.
+
+**Test-data cleanup performed after verification:** the click-through's "Skip set" action logs a real 0-rep `workout_logs` row per set (not a no-op, learned this during testing) — 12 rows created across the test exercises were identified by exercise name and deleted. `WarmupTest`'s Push day was restored to its original three exercises, and its `workout_progress` in-progress snapshot was cleared to avoid leaving stale state behind (same category of risk flagged in Session 21 — cleared deliberately this time rather than left to chance).
 
 ## Files touched this session (final line counts)
 
@@ -62,29 +73,27 @@ All files, current full line counts:
 
 **Verified this session:** both changed files compile clean via `esbuild` (syntax/JSX valid), diff reviewed, pre-push safety checks passed.
 
-**Not yet live-tested:** the plate-math breakdown itself hasn't been clicked through in the real running app yet — do this first next session, on a barbell-equipment test profile, checking a few different weights by hand (including an edge case like exactly-bar-weight and a weight requiring 3+ plate sizes).
+**Live-verified this session:** the plate-math breakdown (see above) — six weight values checked by hand across three barbell exercises plus one negative control, all correct.
 
 ## Punch list, in priority order
 
-**FIRST — live-verify plate-math breakdown** (see above) — quick, do it before building anything else so it doesn't join the backlog of code-reviewed-but-not-clicked-through items.
+**FIRST — the other 2 items from Session 20's competitive research, still not built:** a daily readiness check-in (one-tap rough/ok/great nudging that day's volume/intensity, no wearable needed) and a staleness audit of the AI per-day plan variation over a longer simulated timeline (verification task, not new code, unless an issue turns up).
 
-**SECOND — the other 2 items from Session 20's competitive research:** a daily readiness check-in (one-tap rough/ok/great nudging that day's volume/intensity, no wearable needed) and a staleness audit of the AI per-day plan variation over a longer simulated timeline (verification task, not new code, unless an issue turns up).
+**SECOND — unblock the privacy policy.** Still the single highest-leverage blocked item — blocks both this punch list and the entire App Store roadmap (STANDING GOAL, step 6). Still blocked on Bryant contacting a lawyer.
 
-**THIRD — unblock the privacy policy.** Still the single highest-leverage blocked item — blocks both this punch list and the entire App Store roadmap (STANDING GOAL, step 6). Still blocked on Bryant contacting a lawyer.
+**THIRD — no-blocker App Store groundwork.** Capacitor setup and the Capgo live-update pipeline can start anytime.
 
-**FOURTH — no-blocker App Store groundwork.** Capacitor setup and the Capgo live-update pipeline can start anytime.
+**FOURTH — optional completeness check on gym-logo branding** (carried from Session 21): live-test the actual member splash screen (not just the owner preview panel) for a real no-logo gym, if maximum confidence is wanted before considering that feature fully closed out.
 
-**FIFTH — optional completeness check on gym-logo branding** (carried from Session 21): live-test the actual member splash screen (not just the owner preview panel) for a real no-logo gym, if maximum confidence is wanted before considering that feature fully closed out.
+**FIFTH — four product/design items from Session 18, still just discussion, nothing built:** a per-category custom/recurring grocery item that persists; the Progress screen's "Workout streak" card (currently shows no real data); whether "Log Cardio" is worth keeping at all; a broader review of what Progress/Nutrition should measure against top fitness apps.
 
-**SIXTH — four product/design items from Session 18, still just discussion, nothing built:** a per-category custom/recurring grocery item that persists; the Progress screen's "Workout streak" card (currently shows no real data); whether "Log Cardio" is worth keeping at all; a broader review of what Progress/Nutrition should measure against top fitness apps.
+**SIXTH — walk a full week on `WarmupTest` (or a fresh test profile) start-to-finish**, carried forward from Session 19/21. `WarmupTest`'s in-progress Legs-day snapshot was very likely destroyed during Session 21 testing — this walkthrough needs to start fresh.
 
-**SEVENTH — walk a full week on `WarmupTest` (or a fresh test profile) start-to-finish**, carried forward from Session 19/21. `WarmupTest`'s in-progress Legs-day snapshot was very likely destroyed during Session 21 testing — this walkthrough needs to start fresh.
+**SEVENTH — confirming the warm-up compound/isolation split is sufficient.** Needs a direct decision from Bryant, not code.
 
-**EIGHTH — confirming the warm-up compound/isolation split is sufficient.** Needs a direct decision from Bryant, not code.
+**EIGHTH — kettlebell weight-increment refinement** and **exercise diagrams/animations** — both deferred, both need their own dedicated model/library before starting.
 
-**NINTH — kettlebell weight-increment refinement** and **exercise diagrams/animations** — both deferred, both need their own dedicated model/library before starting.
-
-**TENTH — personal trainer market segment** (from Session 21, see DECISIONS.md). Worth a real discussion before any building — pricing, positioning, and go-to-market all need answers first.
+**NINTH — personal trainer market segment** (from Session 21, see DECISIONS.md). Worth a real discussion before any building — pricing, positioning, and go-to-market all need answers first.
 
 **LOWER PRIORITY / OPS.** `shared.jsx` at 3,065 lines — propose a split next time it's touched. The one unidentified blank-named test profile row in Supabase. Naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only).
 
