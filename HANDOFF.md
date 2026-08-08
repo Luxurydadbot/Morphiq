@@ -1,10 +1,30 @@
-# Hypergentiq — Session 23 master handoff (daily readiness check-in shipped; plan-staleness gap found AND fixed — age-40 exclusion removed)
+# Hypergentiq — Session 25 master handoff (Capacitor groundwork added — native android/ and ios/ projects scaffolded)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
 ## STANDING GOAL — App Store + Google Play submission roadmap (carry forward every session, do not delete until fully checked off)
 
-Untouched this session. Bryant wants Hypergentiq submitted to both the Apple App Store and Google Play via Capacitor (not a React Native rewrite). Full step list lives in git history (`git show 0d25354:HANDOFF.md` or earlier); short version: (1) fix PWA gaps (manifest icons, service worker), (2) add Capacitor + generate native projects, (3) set up Capgo live-update pipeline, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service), (6) privacy policy — hard gate for both stores, still blocked on a lawyer, (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit. No progress this session.
+Progress this session on step (2): Capacitor installed and both native projects (`android/`, `ios/`) generated and committed. Full step list lives in git history (`git show 0d25354:HANDOFF.md` or earlier); short version: (1) fix PWA gaps (manifest icons, service worker) — still open, (2) add Capacitor + generate native projects — **started this session, see Session 25 below**, (3) set up Capgo live-update pipeline, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service — this sandbox has no Xcode, confirmed via `npx cap doctor`), (6) privacy policy — hard gate for both stores, still blocked on a lawyer, (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit.
+
+## Session 25 — Capacitor groundwork (native android/ and ios/ projects added)
+
+Bryant asked to start on the Capacitor step of the App Store roadmap, with a heads-up that his session budget was nearly out — so this was scoped to one clean, safely-committable chunk rather than the full multi-step Capacitor pipeline.
+
+**What was built:**
+- Added `@capacitor/core`, `@capacitor/android`, `@capacitor/ios` as real dependencies and `@capacitor/cli` as a dev dependency in `package.json` (all pinned to the current latest, 8.5.0).
+- Added `capacitor.config.json` at the repo root — app ID `com.hypergentiq.app`, app name "Hypergentiq", `webDir` set to `build` (the existing Create React App output folder, no build config changes needed), background color matched to the app's dark theme (`#121316`).
+- Ran `npx cap add android` and `npx cap add ios` — this generated two full native project folders, `android/` (a real Android Studio/Gradle project) and `ios/` (a real Xcode project, using Capacitor 8's newer Swift Package Manager setup — no CocoaPods dependency, which matters because CocoaPods can only run on a Mac and this sandbox is Linux).
+- Ran `npx cap sync` so both native projects have the current built web app copied in as their starting content.
+- Added Capacitor-specific entries to `.gitignore` (local Android Studio files, Xcode user state, build output folders) so future sessions don't accidentally commit machine-specific junk.
+- Added three convenience scripts to `package.json`: `npm run cap:sync`, `npm run cap:android`, `npm run cap:ios` (each rebuilds the web app, syncs it into the native project, and opens the native IDE — the last step, `cap open`, will only work on a machine that actually has Android Studio or Xcode installed).
+
+**Verified this session:** `npm run build` succeeded cleanly both before and after the dependency changes (only pre-existing lint warnings, no new errors). `npx cap doctor` confirmed both platforms are correctly wired up — "Android looking great," iOS reported "Xcode is not installed" which is expected and correct for this Linux sandbox, not a problem with the setup itself. Diff reviewed before pushing: `package.json`/`package-lock.json` changes are exactly the four new dependencies plus the three new scripts, nothing else touched.
+
+**What this does NOT mean yet:** the native projects exist as real, valid starting points, but nobody has actually opened them in Android Studio or Xcode and built a real app on a device or emulator yet. That's the next concrete step whenever Bryant is ready to continue — Android can be done on a normal Windows PC with Android Studio installed; iOS genuinely needs a Mac (or a cloud Mac build service), per the standing goal's step 5.
+
+**No app source code was touched this session** — `src/` and `api/` are unchanged, so the file line counts below are identical to Session 23/24's numbers.
+
+**Latest commit:** `a3461c7` (Capacitor groundwork) on `main`.
 
 ## Session 23 — what got built this session
 
@@ -106,7 +126,7 @@ All files, current full line counts:
 
 **FIRST — unblock the privacy policy.** Still the single highest-leverage blocked item — blocks both this punch list and the entire App Store roadmap (STANDING GOAL, step 6). Still blocked on Bryant contacting a lawyer. Confirmed via code audit: no privacy policy page/route/file exists anywhere in the repo.
 
-**SECOND — no-blocker App Store groundwork.** Capacitor setup and the Capgo live-update pipeline can start anytime. Confirmed via code audit: no `capacitor.config`, no Capacitor dependency in `package.json`, no service worker file — genuinely not started.
+**SECOND — no-blocker App Store groundwork.** **Capacitor is now started** (Session 25): `capacitor.config.json` exists, `@capacitor/core`/`android`/`ios` are real dependencies, and both native `android/`/`ios/` projects are scaffolded and committed. Still open: PWA manifest/service-worker gaps (no service worker file still exists), the Capgo live-update pipeline, and actually opening/building the native projects in Android Studio (doable on Bryant's Windows PC) or Xcode (needs a Mac).
 
 **THIRD — optional completeness check on gym-logo branding** (carried from Session 21): live-test the actual member splash screen (not just the owner preview panel) for a real no-logo gym, if maximum confidence is wanted before considering that feature fully closed out. Confirmed via code audit: the no-logo fallback code itself is already in place (`Morphiq.jsx`, Session 21 — a gym with no logo set falls back to its plain gym name as text). This item was only ever asking for a *live* verification pass, not missing code.
 
@@ -182,6 +202,6 @@ All files well under the 3,800-line hard limit. `shared.jsx` and `WorkoutScreen.
 
 Fetch HANDOFF.md and all src/ and api/ files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content, confirmed Session 22). Report every file's line count before doing anything else; stop and propose a split if any file exceeds 3,800 lines (none do currently — `shared.jsx` is the largest at 3,108).
 
-Remind Bryant of the next priority task: the privacy policy is still the highest-leverage blocked item (needs him to contact a lawyer — not actionable by Claude). The next thing actually startable without him is Capacitor/App Store groundwork (PWA manifest + service worker fixes first). He may also want to discuss punch-list item NINTH — building real exercise-variety pools beyond the current one-primary/one-variation-per-slot swap — before more rotation work happens.
+Remind Bryant of the next priority task: the privacy policy is still the highest-leverage blocked item (needs him to contact a lawyer — not actionable by Claude). Capacitor groundwork is now started (Session 25) — `android/` and `ios/` native projects exist and are committed, but nobody has opened/built them yet. Next concrete step: open `android/` in Android Studio on his Windows PC and confirm it builds; iOS needs a Mac and hasn't been attempted. PWA manifest/service-worker gaps are still open too. He may also want to discuss punch-list item NINTH — building real exercise-variety pools beyond the current one-primary/one-variation-per-slot swap — before more rotation work happens.
 
-Current state: daily readiness check-in and the plate-math breakdown are both shipped and live-verified. The AI plan-staleness gap Bryant flagged (age-40 exclusion from exercise rotation) is fixed and logic-verified — every experience tier now rotates, beginners get a 6-week runway first, age plays no role anywhere in the rotation/deload gate. A minor cosmetic gap remains: the "Up next"/"After that" rest-screen preview cards don't reflect the readiness-adjusted weight yet.
+Current state: daily readiness check-in and the plate-math breakdown are both shipped and live-verified. The AI plan-staleness gap Bryant flagged (age-40 exclusion from exercise rotation) is fixed and logic-verified — every experience tier now rotates, beginners get a 6-week runway first, age plays no role anywhere in the rotation/deload gate. A minor cosmetic gap remains: the "Up next"/"After that" rest-screen preview cards don't reflect the readiness-adjusted weight yet. Capacitor is installed, configured, and both native projects are scaffolded and committed (Session 25) — no app source code changed, this is pure App Store groundwork.
