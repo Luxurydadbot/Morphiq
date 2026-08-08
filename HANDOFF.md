@@ -1,4 +1,4 @@
-# Hypergentiq — Session 23 master handoff (daily readiness check-in shipped; plan-staleness audit found a real gap)
+# Hypergentiq — Session 23 master handoff (daily readiness check-in shipped; plan-staleness gap found AND fixed — age-40 exclusion removed)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -39,16 +39,28 @@ The last remaining item from Session 20's competitive research. JuggernautAI's #
 
 **Not fixed this session — this is a product/scope decision, not a quick bug fix**, consistent with Bryant's standing instruction to confirm any real change with him before writing it. A fix would mean either building out real per-exercise variation pools for every equipment type (the library currently has exactly one `variation` per slot, by design, per Session 15) or adding a separate non-deload-linked rotation schedule for the excluded segments — both are real feature work, not a one-line patch. Flagged as the new top punch-list item pending Bryant's direction on scope.
 
+## Session 23 — plan-staleness gap fixed (age-40 exclusion removed, research-backed beginner runway added)
+
+Bryant reviewed the staleness audit finding and pushed back on the age-40 exclusion specifically: no reason someone over 40 should be locked out of exercise variety forever, and if anything the opposite. Asked for a second pass researching how top fitness apps (Fitbod, JuggernautAI) and the periodization/motor-learning literature actually handle exercise rotation timing, then to implement whatever that research supported.
+
+**Research findings:** neither Fitbod nor JuggernautAI gate exercise rotation by age anywhere — Fitbod rotates continuously based on a "variability" setting plus logged preferences/history, JuggernautAI's exercise selection is driven by identifying individual weak points. What both tie rotation cadence to is training experience. Separately, the injury-prevention literature points the opposite direction from the old code's assumption: older adults have naturally lower movement-coordination variability day to day, which raises (not lowers) the risk of overuse injury from repeating one exact resistance-training pattern — so purposeful variation is arguably more valuable for older lifters, not something to withhold from them. On beginner pacing specifically, strength-coaching sources converge on 4-6 weeks of consistent exercises before introducing variation, to let the nervous system groove a stable motor pattern first (novice linear-progression phases run long, but the "add a couple of new exercises" guidance clusters at 4-6 weeks).
+
+**What changed in `progressPlan()` (`shared.jsx`, commit `4a2a395`):** the `isOver40` check was deleted from both the deload-eligibility gate and the post-deload exercise-swap gate — age no longer affects whether or when someone's exercises rotate anywhere in this file. Every experience tier is now eligible for the same plateau-driven deload/rotation cycle that only "experienced" members got before. A true beginner (`trainingHistory === "new"`) gets a 6-week floor before their first plateau check can fire (`minWeeksSinceLastDeload: 6`, the upper end of the research-backed 4-6 week runway, favoring technique-building since this is a coaching app for people learning the movements); every other tier keeps the existing 3-week floor unchanged. Nothing about *how* a deload/rotation is judged changed (still the same plateau-detection majority-rule logic from Session 11) — only *who's eligible* and *how soon a beginner's first one can trigger*.
+
+**Verification done this session:** `esbuild` syntax check passed clean. Diff reviewed line-by-line (net +27 lines, entirely the age-40 removal plus explanatory comments and the one new `minWeeksSinceLastDeload` line — no unrelated changes). Given a real multi-week live walkthrough isn't practical to run in one sitting, verified the actual logic change by extracting the real, pushed `shouldTriggerDeloadFromPlateau()` function (not a rewritten copy — same method Session 15 used to verify `buildPlan()`) into a standalone Node script and running it against synthetic plateaued workout logs: confirmed a beginner's deload/rotation check correctly refuses to fire at week 4 (`too_soon_since_last_deload`) and correctly fires at week 7 (`plateau_detected`) against identical data, and confirmed a non-beginner still uses the original 3-week floor unchanged (blocked at week 2, fires at week 4). All four cases matched the intended behavior exactly.
+
+**Still open:** this fixes *eligibility and pacing* — it does not expand the exercise variety pool itself. Every rotation is still a binary swap between one primary exercise and its single paired "variation" (the Session 15 library limitation noted in the audit above). A member who rotates will now actually get that swap regardless of age or tier, but the swap itself is still just two states alternating, not a larger rotating pool. That's still a real feature-scope item if Bryant wants deeper variety later, not something this fix addresses.
+
 ## Files touched this session (final line counts)
 
-- `src/shared.jsx`: 3,065 → 3,089 (+24)
+- `src/shared.jsx`: 3,065 → 3,108 (+43: +24 readiness feature, +19 age-40 exclusion removal/beginner runway)
 - `src/WorkoutScreen.jsx`: 2,628 → 2,711 (+83 net: +77 readiness feature, +6 exIdx bug fix)
 
 All files, current full line counts:
 
 | File | Lines |
 | --- | --- |
-| src/shared.jsx | 3,089 |
+| src/shared.jsx | 3,108 |
 | src/WorkoutScreen.jsx | 2,711 |
 | src/Morphiq.jsx | 1,586 |
 | src/GymOwnerDashboard.jsx | 927 |
@@ -72,11 +84,11 @@ All files, current full line counts:
 | api/_sentry.js | 32 |
 | api/ping.js | 12 |
 
-`shared.jsx` (3,089) and `WorkoutScreen.jsx` (2,711) are both well past the 2,000-line soft target and `WorkoutScreen.jsx` in particular is creeping toward the 3,800-line hard limit faster than `shared.jsx` is. Bryant raised this concern directly this session and asked to defer any split for now (not a housekeeping session) — explicitly hold off starting a split until he asks, but flag it again if `WorkoutScreen.jsx` crosses roughly 3,000 lines.
+`shared.jsx` (3,108) and `WorkoutScreen.jsx` (2,711) are both well past the 2,000-line soft target and `WorkoutScreen.jsx` in particular is creeping toward the 3,800-line hard limit faster than `shared.jsx` is. Bryant raised this concern directly this session and asked to defer any split for now (not a housekeeping session) — explicitly hold off starting a split until he asks, but flag it again if `WorkoutScreen.jsx` crosses roughly 3,000 lines.
 
 ## Latest commit
 
-`1a07899` (exIdx bounds-check fix) on `main`. Readiness feature itself is `ba7a3bd`.
+`4a2a395` (age-40 exclusion removed from exercise rotation) on `main`. Also this session: `1a07899` (exIdx bounds-check fix), `ba7a3bd` (readiness check-in feature).
 
 ## Confirmed working vs still open
 
@@ -84,27 +96,29 @@ All files, current full line counts:
 
 **Live-verified this session:** the daily readiness check-in (Rough/OK/Great, all three paths, plus reload-persistence) — see above, all correct.
 
+**Verified this session (logic, not live browser):** the age-40 exclusion removal and 6-week beginner runway — confirmed via a Node harness running the real, pushed `shouldTriggerDeloadFromPlateau()` against synthetic plateaued logs (see above). Real live confirmation would require walking a test account through 6+ simulated weeks, impractical in one sitting — worth doing opportunistically if `WarmupTest`'s plan/logs ever get built out that far for other testing.
+
 **Known open item, not urgent:** "Up next"/"After that" preview cards don't reflect the readiness-adjusted weight (see above).
 
 ## Punch list, in priority order
 
-**FIRST — decide how to close the plan-staleness gap found this session.** Beginners, "some"/"returning" training history, and anyone 40+ get zero exercise rotation for the life of their plan (see audit above) — only "experienced and under 40" members ever see their exercises change. Needs a scope decision from Bryant before any code: build real variation pools per equipment/pattern, or add a separate rotation schedule not tied to the deload system. Not started.
+**FIRST — unblock the privacy policy.** Still the single highest-leverage blocked item — blocks both this punch list and the entire App Store roadmap (STANDING GOAL, step 6). Still blocked on Bryant contacting a lawyer.
 
-**SECOND — unblock the privacy policy.** Still the single highest-leverage blocked item — blocks both this punch list and the entire App Store roadmap (STANDING GOAL, step 6). Still blocked on Bryant contacting a lawyer.
+**SECOND — no-blocker App Store groundwork.** Capacitor setup and the Capgo live-update pipeline can start anytime.
 
-**THIRD — no-blocker App Store groundwork.** Capacitor setup and the Capgo live-update pipeline can start anytime.
+**THIRD — optional completeness check on gym-logo branding** (carried from Session 21): live-test the actual member splash screen (not just the owner preview panel) for a real no-logo gym, if maximum confidence is wanted before considering that feature fully closed out.
 
-**FOURTH — optional completeness check on gym-logo branding** (carried from Session 21): live-test the actual member splash screen (not just the owner preview panel) for a real no-logo gym, if maximum confidence is wanted before considering that feature fully closed out.
+**FOURTH — four product/design items from Session 18, still just discussion, nothing built:** a per-category custom/recurring grocery item that persists; the Progress screen's "Workout streak" card (currently shows no real data); whether "Log Cardio" is worth keeping at all; a broader review of what Progress/Nutrition should measure against top fitness apps.
 
-**FIFTH — four product/design items from Session 18, still just discussion, nothing built:** a per-category custom/recurring grocery item that persists; the Progress screen's "Workout streak" card (currently shows no real data); whether "Log Cardio" is worth keeping at all; a broader review of what Progress/Nutrition should measure against top fitness apps.
+**FIFTH — walk a full week on `WarmupTest` (or a fresh test profile) start-to-finish**, carried forward from Session 19/21/22.
 
-**SIXTH — walk a full week on `WarmupTest` (or a fresh test profile) start-to-finish**, carried forward from Session 19/21/22.
+**SIXTH — confirming the warm-up compound/isolation split is sufficient.** Needs a direct decision from Bryant, not code.
 
-**SEVENTH — confirming the warm-up compound/isolation split is sufficient.** Needs a direct decision from Bryant, not code.
+**SEVENTH — kettlebell weight-increment refinement** and **exercise diagrams/animations** — both deferred, both need their own dedicated model/library before starting.
 
-**EIGHTH — kettlebell weight-increment refinement** and **exercise diagrams/animations** — both deferred, both need their own dedicated model/library before starting.
+**EIGHTH — personal trainer market segment** (from Session 21, see DECISIONS.md). Worth a real discussion before any building — pricing, positioning, and go-to-market all need answers first.
 
-**NINTH — personal trainer market segment** (from Session 21, see DECISIONS.md). Worth a real discussion before any building — pricing, positioning, and go-to-market all need answers first.
+**NINTH — expand exercise variety beyond the binary primary/variation swap** (new, see the rotation fix above). Every rotation-eligible member (now everyone, paced by experience tier) still only ever alternates between exactly one primary exercise and one paired variation per slot — real deeper variety would mean building out proper variation pools per equipment/pattern. Not urgent, but the natural next step if Bryant wants richer rotation later.
 
 **LOWER PRIORITY / OPS.** `WorkoutScreen.jsx` at 2,711 lines and `shared.jsx` at 3,089 lines — Bryant is aware and wants to defer a split; do not start one without asking again. The "Up next"/"After that" preview cards not reflecting readiness adjustment (see above). The one unidentified blank-named test profile row in Supabase. Naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only).
 
