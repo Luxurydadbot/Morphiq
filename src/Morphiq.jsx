@@ -596,10 +596,27 @@ function AuthScreen() {
         signIn(result.email, "super_admin", result.uid);
         return;
       }
-      // Check if this email is a gym owner
-      const gymRow = await sb.getGymByOwnerEmail(email);
-      const role = gymRow ? "owner" : "member";
-      signIn(result.email, role, result.uid);
+      // Fix (Bryant, live report): this used to ignore the Member/Owner toggle
+      // entirely and always route to Owner if the email happened to own a gym --
+      // so a dual-role account (owns a gym AND has their own member profile,
+      // e.g. an owner who also works out in their own app) could never reach
+      // the member view through a fresh login, no matter which tab they picked.
+      // Now the toggle is honored: "Gym Owner" always does the owner lookup
+      // (and shows a clear error if this email doesn't actually own a gym,
+      // instead of silently falling through to member onboarding); "I'm a
+      // Member" always signs in as a member, even if this email also owns a gym.
+      if (mode === "owner") {
+        const gymRow = await sb.getGymByOwnerEmail(email);
+        if (!gymRow) {
+          setStep("code");
+          setCode(["","","","","",""]);
+          setErrorMsg("No gym found for this email. Switch to \"I'm a Member\" if you're signing in as a member.");
+          return;
+        }
+        signIn(result.email, "owner", result.uid);
+        return;
+      }
+      signIn(result.email, "member", result.uid);
     } else {
       setStep("code");
       setCode(["","","","","",""]);
