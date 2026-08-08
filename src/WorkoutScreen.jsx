@@ -525,8 +525,14 @@ function WorkoutScreen() {
   // shown on screen instead of failing silently. Remove once the save bug is fixed.
   const [saveFailReason, setSaveFailReason] = useState(null);
 
-  const ex = exercises[exIdx];
-  const nextEx = exercises[exIdx + 1];
+  // Defensive clamp (mirrors safeSetIdx further down): stale saved/synced
+  // progress can point exIdx past the end of a since-changed exercises array
+  // (e.g. plan regenerated with fewer exercises), which used to crash the
+  // whole screen when ex.warmupSets etc. were read off `undefined`. Never
+  // let exIdx run past the last valid exercise.
+  const safeExIdx = Math.min(exIdx, exercises.length - 1);
+  const ex = exercises[safeExIdx];
+  const nextEx = exercises[safeExIdx + 1];
 
   // Persist progress whenever position changes, so reopening resumes here.
   // Fire-and-forget — a storage failure must never crash the workout.
@@ -1617,7 +1623,7 @@ function WorkoutScreen() {
             // several sets in a row while silently skipping the sets that
             // were actually coming up sooner.
             const afterThatSet = !upNextIsNewExercise && afterNext ? afterNext : null;
-            const afterThatExercise = afterThatSet ? null : (upNextIsNewExercise ? exercises[exIdx + 2] : nextEx);
+            const afterThatExercise = afterThatSet ? null : (upNextIsNewExercise ? exercises[safeExIdx + 2] : nextEx);
             return (
               <>
                 <div style={{ background: "#0A1628", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
