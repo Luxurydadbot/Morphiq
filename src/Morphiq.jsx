@@ -1468,19 +1468,27 @@ function LoadingScreen() {
   // pure CSS and runs for however long the real load takes, it never adds
   // delay on top of it.
   //
-  // Gym-logo branding (this session): this used to always show the big
-  // hardcoded Hypergentiq wordmark, which undercuts the white-label pitch --
-  // every gym's members saw HYPERGENTIQ's own brand on first load, not
-  // their gym's. Now it's 100% data-driven off gymBranding.logo (set from
-  // gyms.logo_url, wired in signIn()/session-restore above): a gym with a
+  // Gym-logo branding: data-driven off gymBranding.logo (set from
+  // gyms.logo_url, wired in signIn()/session-restore above) -- a gym with a
   // real uploaded logo shows that logo plus a small "Powered by Hypergentiq"
   // credit beneath it, exactly like the footer credit used elsewhere in the
-  // app. A gym with NO logo set falls back to its plain gym name as text --
-  // matching the top bar's own treatment -- never the Hypergentiq mark
-  // itself. The Hypergentiq mark only ever appears here because demo-gym's
-  // own logo_url happens to point at it (real data), not as hardcoded
-  // fallback behavior in this component.
+  // app. A real third-party gym with NO logo set still falls back to its
+  // plain gym name as text -- matching the top bar's own treatment -- never
+  // Hypergentiq's own mark, to protect the white-label pitch.
+  //
+  // Fix (this session): that text fallback was also firing for Hypergentiq's
+  // OWN account (demo-gym / "Hypergentiq Gym", gymId "demo-gym") and for the
+  // brief default state before any gym branding has loaded at all (gymId not
+  // set yet) -- Bryant kept seeing plain text instead of the real two-tone
+  // wordmark on his own splash. Those two cases are recognizably
+  // Hypergentiq's own account, not a white-labeled customer, so they now
+  // render the actual compiled-in wordmark (the same two-tone mark used in
+  // the "Powered by" footer everywhere else) via PoweredByHypergentiq's
+  // hideLabel mode -- inline SVG, no network fetch, so it can never race
+  // against the branding load the way an uploaded image logo can and can't
+  // ever show as a broken image if a gym-logo file upload is bad.
   const { gymBranding } = useApp();
+  const isHypergentiqOwnAccount = !gymBranding?.gymId || gymBranding.gymId === "demo-gym";
   return (
     <div style={{ background: theme.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(76,141,255,0.16) 0%, rgba(76,141,255,0) 70%)", pointerEvents: "none" }} />
@@ -1490,6 +1498,8 @@ function LoadingScreen() {
             <GymLogo src={gymBranding.logo} size={64} />
             <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 14 }}><PoweredByHypergentiq /></div>
           </>
+        ) : isHypergentiqOwnAccount ? (
+          <PoweredByHypergentiq hideLabel logoHeight="42px" />
         ) : (
           <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: ".1em", color: theme.accent, textTransform: "uppercase" }}>{gymBranding?.name || "Hypergentiq"}</span>
         )}
