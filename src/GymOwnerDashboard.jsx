@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon, PoweredByHypergentiq, SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./shared.jsx";
+import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon, PoweredByHypergentiq, GymLogo, SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme } from "./shared.jsx";
 
 function buildMemberRow(profile, sessions, lastDate, weightDelta) {
   const initials = (profile.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -415,6 +415,16 @@ function OwnerBrandingTab() {
   const { gymBranding, setGymBranding } = useApp();
   const [gymName, setGymName] = useState(gymBranding.name);
   const [welcome, setWelcome] = useState(gymBranding.welcome || `Welcome to ${gymBranding.name}. Your personal AI trainer is ready. Let's get to work.`);
+  // Gym-logo branding (this session): logoUrl mirrors gymName/welcome's own
+  // pattern -- edited locally, only actually persisted to gyms.logo_url when
+  // "Save changes" is pressed, via saveGymBranding()'s existing (until now
+  // unused) optional `logo` param. The file itself uploads to Storage
+  // immediately on selection (uploadGymLogo already handles overwrite-in-place
+  // via upsert), but the DB row and app state don't change until Save.
+  const [logoUrl, setLogoUrl] = useState(gymBranding.logo || null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState(null);
+  const fileInputRef = useRef(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -426,15 +436,50 @@ function OwnerBrandingTab() {
   // stays consistent, but it's a constant, not something read from state.
   const FIXED_ACCENT = "#4C8DFF";
 
+  // Client-side validation before ever touching the network -- matches the
+  // Storage bucket's own 2MB cap and image-mime-type restriction, but fails
+  // fast with a plain-English message instead of waiting on a rejected upload.
+  const ALLOWED_LOGO_TYPES = { "image/png": true, "image/jpeg": true, "image/webp": true, "image/svg+xml": true };
+  const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+
+  async function handleLogoFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset so re-selecting the same file still fires onChange
+    if (!file) return;
+    setLogoError(null);
+    if (!ALLOWED_LOGO_TYPES[file.type]) {
+      setLogoError("Please choose a PNG, JPG, WebP, or SVG image.");
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setLogoError("That image is too large — 2MB max.");
+      return;
+    }
+    setLogoUploading(true);
+    const gymId = gymBranding?.gymId || "demo-gym";
+    const result = await sb.uploadGymLogo(gymId, file);
+    setLogoUploading(false);
+    if (result.ok) {
+      setLogoUrl(result.url);
+    } else {
+      setLogoError(result.error || "Upload failed — check your connection and try again.");
+    }
+  }
+
+  function removeLogo() {
+    setLogoUrl(null);
+    setLogoError(null);
+  }
+
   async function save() {
     setSaving(true);
     setError(null);
     // Use the real gym ID stored in context when the owner signed in
     const gymId = gymBranding?.gymId || "demo-gym";
-    const ok = await sb.saveGymBranding(gymId, { name: gymName, accent: FIXED_ACCENT, welcome });
+    const ok = await sb.saveGymBranding(gymId, { name: gymName, accent: FIXED_ACCENT, welcome, logo: logoUrl });
     setSaving(false);
     if (ok) {
-      setGymBranding({ name: gymName, accent: FIXED_ACCENT, welcome, units: gymBranding.units });
+      setGymBranding({ name: gymName, accent: FIXED_ACCENT, welcome, units: gymBranding.units, gymId, logo: logoUrl });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } else {
@@ -452,10 +497,31 @@ function OwnerBrandingTab() {
             style={{ width: "100%", background: "#171920", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#EDEEF0", outline: "none", fontFamily: "inherit" }} />
         </div>
         {/* Welcome message */}
-        <div>
+        <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 6 }}>Welcome message</div>
           <textarea value={welcome} onChange={e => setWelcome(e.target.value)}
             style={{ width: "100%", background: "#171920", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#9BA0AA", outline: "none", fontFamily: "inherit", resize: "none", minHeight: 60, lineHeight: 1.5 }} />
+        </div>
+        {/* Gym logo */}
+        <div>
+          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 6 }}>Gym logo</div>
+          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 8, lineHeight: 1.5 }}>Shown on your members' loading screen. PNG, JPG, WebP, or SVG — 2MB max.</div>
+          <div style={{ background: "#0F1013", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "16px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 64, marginBottom: 8 }}>
+            {logoUrl
+              ? <GymLogo src={logoUrl} size={40} />
+              : <span style={{ fontSize: 12, color: "#6E7480", textAlign: "center" }}>No logo — members will see your gym name instead</span>}
+          </div>
+          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleLogoFile} style={{ display: "none" }} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={() => fileInputRef.current?.click()} disabled={logoUploading}
+              style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "7px 12px", fontSize: 12, color: "#EDEEF0", cursor: logoUploading ? "default" : "pointer", fontFamily: "inherit" }}>
+              {logoUploading ? "Uploading…" : logoUrl ? "Change logo" : "Upload logo"}
+            </button>
+            {logoUrl && !logoUploading && (
+              <button onClick={removeLogo} style={{ background: "transparent", border: "none", fontSize: 12, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
+            )}
+          </div>
+          {logoError && <div style={{ fontSize: 12, color: "#F87171", marginTop: 8 }}>{logoError}</div>}
         </div>
       </div>
 
@@ -475,12 +541,28 @@ function OwnerBrandingTab() {
         </div>
       </div>
 
+      {/* Loading screen preview -- shows exactly what LoadingScreen in
+          Morphiq.jsx will render: the uploaded logo + small Hypergentiq
+          credit if one's set, or the plain gym name (never the Hypergentiq
+          mark) if not. */}
+      <div style={{ fontSize: 11, color: "#6E7480", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Loading screen preview</div>
+      <div style={{ background: "#000", borderRadius: 14, padding: "28px 14px", marginBottom: 16, border: "1px solid #2B2E34", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        {logoUrl ? (
+          <>
+            <GymLogo src={logoUrl} size={44} />
+            <div style={{ fontSize: 10, color: "#3A3D44", marginTop: 10 }}><PoweredByHypergentiq /></div>
+          </>
+        ) : (
+          <span style={{ fontSize: 13, fontWeight: 500, letterSpacing: ".1em", color: FIXED_ACCENT, textTransform: "uppercase" }}>{gymName}</span>
+        )}
+      </div>
+
       {error && <div style={{ fontSize: 12, color: "#F87171", marginBottom: 8, padding: "8px 12px", background: "#1F1010", borderRadius: 8 }}>{error}</div>}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={save} disabled={saving} style={{ flex: 2, background: saved ? "#0B1E3D" : "#4C8DFF", color: saved ? "#4C8DFF" : "#0B1E3D", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
           {saving ? "Saving…" : saved ? <>Saved <Icon name="check" size={12} style={{ verticalAlign: "-1px" }} /></> : "Save changes"}
         </button>
-        <button onClick={() => { setGymName(gymBranding.name); setWelcome(gymBranding.welcome || ""); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
+        <button onClick={() => { setGymName(gymBranding.name); setWelcome(gymBranding.welcome || ""); setLogoUrl(gymBranding.logo || null); setLogoError(null); }} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px", fontSize: 12, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Reset</button>
       </div>
     </div>
   );

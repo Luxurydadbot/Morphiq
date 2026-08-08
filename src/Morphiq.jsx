@@ -13,7 +13,7 @@ import {
   setSessionCookie, getSessionCookie, clearSessionCookie,
   localDateStr, buildPlan, progressPlan,
   SUPABASE_URL, SB_GET, getAuthToken,
-  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq,
+  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq, GymLogo,
   GOAL_OPTIONS, GOAL_ICONS, EQUIPMENT_OPTIONS,
   WORKOUT_EXERCISES, MEAL_DATA, GROCERY_DATA,
   FALLBACK_REPLIES, CHAT_SUGGESTIONS,
@@ -82,7 +82,7 @@ function AppProvider({ children }) {
   // Fix (June 2026): plan was never saved to Supabase on fresh PC login because
   // supabaseUser?.id was null when the save ran. Use this ref instead.
   const supabaseUserIdRef = useRef(null);
-  const [gymBranding, setGymBranding] = useState({ name: "Hypergentiq Gym", accent: "#4C8DFF", welcome: "Welcome to Hypergentiq Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial" });
+  const [gymBranding, setGymBranding] = useState({ name: "Hypergentiq Gym", accent: "#4C8DFF", welcome: "Welcome to Hypergentiq Gym. Your personal AI trainer is ready. Let's get to work.", units: "imperial", logo: null });
   const [historicalData, setHistoricalData] = useState(null);
   // Tracks the current exercise + set while WorkoutScreen is active
   // so ChatScreen can pass exact context to Claude (e.g. "Set 2 of 3 · Goblet Squat")
@@ -122,7 +122,7 @@ function AppProvider({ children }) {
         // Session 11: accent is now fixed app-wide -- gyms no longer customize
         // this, branding is logo + name + welcome message only (confirmed
         // low-risk, no real gym had ever set a custom accent).
-        setGymBranding({ name: row.name, accent: "#4C8DFF", welcome: row.welcome || "", units: "imperial", gymId: gymToLoad });
+        setGymBranding({ name: row.name, accent: "#4C8DFF", welcome: row.welcome || "", units: "imperial", gymId: gymToLoad, logo: row.logo_url || null });
       }
     });
   }, []);
@@ -162,7 +162,7 @@ function AppProvider({ children }) {
       if (profile?.gym_id) {
         sb.getGymBranding(profile.gym_id).then(gymRow => {
           if (gymRow) {
-            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome }));
+            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome, logo: gymRow.logo_url || null }));
           }
         }).catch(() => {});
       }
@@ -308,7 +308,7 @@ function AppProvider({ children }) {
       // so GymOwnerDashboard can query real member data
       const gymRow = await sb.getGymByOwnerEmail(email);
       if (gymRow?.gym_id) {
-        setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome }));
+        setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome, logo: gymRow.logo_url || null }));
       }
       // Paywall gate: owners get locked out the same way members do if their
       // gym's subscription has lapsed -- unless it's an internal/beta-exempt gym.
@@ -351,7 +351,7 @@ function AppProvider({ children }) {
         try {
           const gymRow = await sb.getGymBranding(profile.gym_id);
           if (gymRow) {
-            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome }));
+            setGymBranding(prev => ({ ...prev, gymId: gymRow.gym_id, name: gymRow.name || prev.name, accent: "#4C8DFF", welcome: gymRow.welcome || prev.welcome, logo: gymRow.logo_url || null }));
             if (isGymBlocked(gymRow)) {
               setScreen("billing_blocked");
               return;
@@ -1463,15 +1463,36 @@ function LoadingScreen() {
   // Full-screen splash instead of the normal app chrome (top bar, bottom
   // nav, chat bubble) -- none of that is meaningful yet this early (user
   // and gym data may not have loaded), and it was crowding out the logo.
-  // Large mark + a slow, gentle breathing pulse (mq-splash-pulse, see
-  // shared.jsx) so the screen reads as "working," not "stuck" or "broken" --
-  // the animation is pure CSS and runs for however long the real load
-  // takes, it never adds delay on top of it.
+  // Slow, gentle breathing pulse (mq-splash-pulse, see shared.jsx) so the
+  // screen reads as "working," not "stuck" or "broken" -- the animation is
+  // pure CSS and runs for however long the real load takes, it never adds
+  // delay on top of it.
+  //
+  // Gym-logo branding (this session): this used to always show the big
+  // hardcoded Hypergentiq wordmark, which undercuts the white-label pitch --
+  // every gym's members saw HYPERGENTIQ's own brand on first load, not
+  // their gym's. Now it's 100% data-driven off gymBranding.logo (set from
+  // gyms.logo_url, wired in signIn()/session-restore above): a gym with a
+  // real uploaded logo shows that logo plus a small "Powered by Hypergentiq"
+  // credit beneath it, exactly like the footer credit used elsewhere in the
+  // app. A gym with NO logo set falls back to its plain gym name as text --
+  // matching the top bar's own treatment -- never the Hypergentiq mark
+  // itself. The Hypergentiq mark only ever appears here because demo-gym's
+  // own logo_url happens to point at it (real data), not as hardcoded
+  // fallback behavior in this component.
+  const { gymBranding } = useApp();
   return (
     <div style={{ background: theme.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(76,141,255,0.16) 0%, rgba(76,141,255,0) 70%)", pointerEvents: "none" }} />
-      <div className="mq-splash-pulse" style={{ position: "relative" }}>
-        <PoweredByHypergentiq hideLabel logoHeight="clamp(56px, 10vw, 96px)" />
+      <div className="mq-splash-pulse" style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {gymBranding?.logo ? (
+          <>
+            <GymLogo src={gymBranding.logo} size={64} />
+            <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 14 }}><PoweredByHypergentiq /></div>
+          </>
+        ) : (
+          <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: ".1em", color: theme.accent, textTransform: "uppercase" }}>{gymBranding?.name || "Hypergentiq"}</span>
+        )}
       </div>
       <div style={{ fontSize: 13, color: theme.textDim, marginTop: 28, letterSpacing: ".04em" }}>Loading...</div>
     </div>
