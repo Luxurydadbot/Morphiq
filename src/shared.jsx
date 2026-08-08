@@ -2917,7 +2917,17 @@ function StreakCalendar({ accent, workoutDates }) {
       cell.setDate(monday.getDate() + week * 7 + d);
       if (cell > today) { row.push(null); }
       else {
-        const iso = cell.toISOString().slice(0,10);
+        // Fix (Bryant, live report): this used cell.toISOString().slice(0,10),
+        // which reads the UTC date, not the member's local date -- the same
+        // bug localDateStr()'s own comment already documents being found and
+        // fixed for the meal-day rollover, just never applied here. Any time
+        // local evening hours have already rolled past UTC midnight (e.g.
+        // ~5pm PDT onward), every cell's computed date was one day ahead of
+        // the real local date, so it could never match workout_date (which
+        // IS stored via localDateStr() -- see shared.jsx's log-set save) --
+        // real logged workouts just never lit up on the grid. localDateStr()
+        // matches what's actually in the database.
+        const iso = localDateStr(cell);
         row.push(dateSet.has(iso) ? 1 : 0);
       }
     }
