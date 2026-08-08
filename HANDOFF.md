@@ -1,4 +1,4 @@
-# Hypergentiq — Session 22 master handoff (plate-math breakdown shipped)
+# Hypergentiq — Session 23 master handoff (daily readiness check-in shipped)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -6,41 +6,36 @@ This file is the handoff. At the start of every session, fetch this file from th
 
 Untouched this session. Bryant wants Hypergentiq submitted to both the Apple App Store and Google Play via Capacitor (not a React Native rewrite). Full step list lives in git history (`git show 0d25354:HANDOFF.md` or earlier); short version: (1) fix PWA gaps (manifest icons, service worker), (2) add Capacitor + generate native projects, (3) set up Capgo live-update pipeline, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service), (6) privacy policy — hard gate for both stores, still blocked on a lawyer, (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit. No progress this session.
 
-## Important correction made at the start of this session
+## Session 23 — what got built this session
 
-Session-start fetch initially used the web-fetch tool against `raw.githubusercontent.com` for `HANDOFF.md`, which silently returned a **stale, cached Session 10 version** instead of the real current Session 21 file — even though the same tool against the same URL worked correctly for every `src/`/`api/` source file fetched in the same batch. This produced a wrong initial read (thinking plateau detection was still the top priority, when it shipped back in Session 11) before `git clone` was used and caught the discrepancy. Corrected before any duplicate work happened. See Technical notes below — the "git clone only" rule already existed for the API/raw-HTTP block, but this is the first confirmed case of `raw.githubusercontent.com` itself serving stale content through the web-fetch tool specifically (not a hard block, worse: a silent wrong answer). Treat any non-git-clone fetch of this repo as unverified until cross-checked.
+**Daily readiness check-in.** Commit `ba7a3bd` (feature), commit `1a07899` (bug fix found during live testing). The second of the two remaining items from Session 20's competitive research (plate-math breakdown shipped Session 22; the staleness audit is still open, now first on the punch list).
 
-## Session 22 — what got built this session
+- `shared.jsx`: one new export, `applyReadinessToWeight(weight, readiness, increment)` — a simple multiplier (`rough: 0.9`, `ok: 1`, `great: 1.05`) rounded to the nearest weight increment with a floor at one increment. Deliberately applies only to the *display* weight of working sets, never warm-ups and never the underlying plan/progression logic, so a rough day nudges what's shown on screen without corrupting the app's actual progression history.
+- `WorkoutScreen.jsx`: a new "readiness" phase inserted into the existing phase state machine, between the warm-up phase and the first working set — a one-tap Rough / OK / Great check-in screen. The choice is persisted the same way as everything else in the phase machine (both `localStorage` and Supabase `workout_progress`), so it survives a page reload without re-prompting. The working-set weight tile's caption line was extended to say "Lightened today — you checked in rough" or "Bumped up today — you checked in great" when the readiness adjustment changed the number, plain "Today's target" when it didn't (OK, or plate-math-only with no readiness effect).
 
-**Plate-math breakdown on barbell working sets.** Commit `92a07d0`. New punch-list item from Session 21's competitive research, picked over the other two (daily readiness check-in, AI plan staleness audit) specifically because it's fully self-contained arithmetic with no interaction with the progression/deload logic that's needed several correction passes historically.
+**Live-verified in Chrome this session**, same test-account/SQL-staging method as prior sessions (`WarmupTest` profile, direct Supabase edits to set up a working weight, click through the real deployed app):
+- Rough → 200 lb working set displayed as 180 lb, caption read "Lightened today — you checked in rough," plate math recalculated correctly for 180.
+- Great → same 200 lb base displayed as 210 lb, caption "Bumped up today — you checked in great," plate math correct for 210.
+- OK → unchanged at 200 lb, plain "Today's target" caption, no readiness language.
+- Reload-persistence confirmed: after choosing a readiness level, reloading the page resumed at the correct phase with the same choice already applied — did not re-prompt.
 
-- `shared.jsx`: three new functions — `isBarbellExercise(name)` (name-based, checks for the `"Barbell "` prefix `EXERCISE_LIBRARY` already uses consistently for every real barbell movement, deliberately not the plan-level equipment setting, since even a "barbell" plan mixes in real dumbbell accessory work like "Dumbbell lateral raise" that the plan-level flag can't distinguish), `getPlateBreakdown(totalWeight, barWeight = 45)` (greedy fill over standard plate sizes `[45, 35, 25, 10, 5, 2.5]`, returns `{ plates, perSide, remainder, barOnly }` or `null` below bar weight), and `formatPlateBreakdown(breakdown)` (human-readable line, e.g. `"2×45 + 1×10 per side"` or `"Just the bar (45 lbs)"`). All exported.
-- `WorkoutScreen.jsx`: wired into the existing weight tile on the active-set screen — a small caption line shown under the big weight number, for both warm-up and working sets (a member has to load the actual bar either way), gated on `isBarbellExercise(ex.name)` so it never shows for dumbbell/kettlebell/machine exercises.
-- **Known simplification, documented in code comments, not a bug:** assumes one standard 45lb Olympic bar for every barbell exercise. Doesn't account for a women's 35lb bar, EZ-curl bar, or trap bar weight. Same spirit as the existing kettlebell-increment placeholder — flagged rather than silently wrong.
-- **Verification this session:** `esbuild` used to bundle-check both changed files (no live Node toolchain available in the sandbox to run the real `react-scripts build` — `node_modules` isn't checked into the repo and wasn't installed this session) — both compiled clean, zero syntax/JSX errors. Diff reviewed line-by-line before pushing; both pre-push safety checks passed (`function WorkoutScreen()` present, `export default function Morphiq()` present, line-count deltas exactly matched what was added: `shared.jsx` +61, `WorkoutScreen.jsx` +17). **Live-verified in Chrome this session, immediately after building it.** Temporarily edited `WarmupTest`'s Push day (via direct Supabase update, same established pattern as prior sessions' test setups) to cover the key cases, then logged in and clicked through the real workout:
-- Exactly bar weight (45 lbs, Barbell back squat) → correctly showed "Just the bar (45 lbs)".
-- Clean 1-plate case (135 lbs working set, Barbell bench press) → "1×45 per side", correct.
-- Multiple warm-up steps on the way to 135 (70/95/115 lbs) → each showed the right breakdown, confirming it recomputes correctly as weight changes.
-- A 3-distinct-plate-size case (210 lbs working set, Barbell Romanian deadlift) → "1×45 + 1×35 + 1×2.5 per side", correct.
-- A same-plate-repeated case surfaced by the app's own autoregulation (180 lbs warm-up) → "1×45 + 2×10 + 1×2.5 per side", correct — good unplanned test of the plate-count aggregation.
-- A 4-distinct-plate case surfaced the same way (200 lbs) → "1×45 + 1×25 + 1×5 + 1×2.5 per side", correct.
-- Negative control (Dumbbell lateral raise, 8 lbs) → correctly showed no breakdown line at all, confirming the barbell-only gate works.
+**Real bug found and fixed during this testing pass.** `exercises[exIdx]` had no bounds-checking, unlike `setIdx` which was already clamped via `safeSetIdx = Math.min(setIdx, totalSetsInPlan - 1)`. Stale saved progress pointing past the end of a since-changed exercises array (this surfaced from leftover `localStorage` state from an earlier test session — see Technical notes) crashed the whole workout screen with `TypeError: Cannot read properties of undefined (reading 'warmupSets')`. Fixed with the same clamp pattern already established for `setIdx`: added `const safeExIdx = Math.min(exIdx, exercises.length - 1)` and used it everywhere `ex`/`nextEx`/the "after that" preview exercise are read. This is a genuine defensive-coding gap that could in principle affect a real member (any time a plan is regenerated with fewer exercises than a stale in-progress session expected), not just a testing artifact — worth having fixed regardless of how it was found. Commit `1a07899`. Verified via `esbuild` syntax check and a reviewed diff (net +6 lines) before pushing.
 
-All math double-checked by hand against each displayed weight — every case correct. Also incidentally re-confirmed that autoregulated weight (mid-workout weight adjustment based on rep performance) is a real, pre-existing app behavior unrelated to this feature — the plate breakdown correctly tracks whatever weight is actually displayed, regardless of why.
+**Minor known gap found, not fixed — low priority.** The "Up next" / "After that" rest-screen preview cards show the plan's raw, unadjusted weight (e.g. 200) rather than the readiness-adjusted weight (e.g. 210) a member will actually see once they get there. Only the main active-set screen's weight tile was wired to the readiness adjustment this session; the preview cards read a different, earlier computation that wasn't touched. Cosmetic/informational only — the actual working weight used and logged is correct, it's only the forward-looking preview number that's stale. Worth a quick follow-up pass next time this file is touched, not urgent enough to justify a separate session on its own.
 
-**Test-data cleanup performed after verification:** the click-through's "Skip set" action logs a real 0-rep `workout_logs` row per set (not a no-op, learned this during testing) — 12 rows created across the test exercises were identified by exercise name and deleted. `WarmupTest`'s Push day was restored to its original three exercises, and its `workout_progress` in-progress snapshot was cleared to avoid leaving stale state behind (same category of risk flagged in Session 21 — cleared deliberately this time rather than left to chance).
+**Test-data cleanup performed after verification:** stray `workout_logs` rows created during testing were identified by exercise name and current-date and deleted, `WarmupTest`'s exercise/plan data was restored, `workout_progress` was nulled in Supabase, and `localStorage` was cleared in the browser before closing the tab.
 
 ## Files touched this session (final line counts)
 
-- `src/shared.jsx`: 3,004 → 3,065 (+61)
-- `src/WorkoutScreen.jsx`: 2,611 → 2,628 (+17)
+- `src/shared.jsx`: 3,065 → 3,089 (+24)
+- `src/WorkoutScreen.jsx`: 2,628 → 2,711 (+83 net: +77 readiness feature, +6 exIdx bug fix)
 
 All files, current full line counts:
 
 | File | Lines |
 | --- | --- |
-| src/shared.jsx | 3,065 |
-| src/WorkoutScreen.jsx | 2,628 |
+| src/shared.jsx | 3,089 |
+| src/WorkoutScreen.jsx | 2,711 |
 | src/Morphiq.jsx | 1,586 |
 | src/GymOwnerDashboard.jsx | 927 |
 | src/MealScreen.jsx | 724 |
@@ -63,21 +58,23 @@ All files, current full line counts:
 | api/_sentry.js | 32 |
 | api/ping.js | 12 |
 
-`shared.jsx` is now at 3,065 lines, further past the 2,000-line soft target — still no split proposed, but every session that adds to it makes that more overdue. Worth actually proposing a split next time shared.jsx is touched, rather than continuing to note it and move on.
+`shared.jsx` (3,089) and `WorkoutScreen.jsx` (2,711) are both well past the 2,000-line soft target and `WorkoutScreen.jsx` in particular is creeping toward the 3,800-line hard limit faster than `shared.jsx` is. Bryant raised this concern directly this session and asked to defer any split for now (not a housekeeping session) — explicitly hold off starting a split until he asks, but flag it again if `WorkoutScreen.jsx` crosses roughly 3,000 lines.
 
 ## Latest commit
 
-`92a07d0` (plate-math breakdown) on `main`.
+`1a07899` (exIdx bounds-check fix) on `main`. Readiness feature itself is `ba7a3bd`.
 
 ## Confirmed working vs still open
 
-**Verified this session:** both changed files compile clean via `esbuild` (syntax/JSX valid), diff reviewed, pre-push safety checks passed.
+**Verified this session:** both changed files compile clean via `esbuild` (syntax/JSX valid), diffs reviewed, pre-push safety checks passed on both commits.
 
-**Live-verified this session:** the plate-math breakdown (see above) — six weight values checked by hand across three barbell exercises plus one negative control, all correct.
+**Live-verified this session:** the daily readiness check-in (Rough/OK/Great, all three paths, plus reload-persistence) — see above, all correct.
+
+**Known open item, not urgent:** "Up next"/"After that" preview cards don't reflect the readiness-adjusted weight (see above).
 
 ## Punch list, in priority order
 
-**FIRST — the other 2 items from Session 20's competitive research, still not built:** a daily readiness check-in (one-tap rough/ok/great nudging that day's volume/intensity, no wearable needed) and a staleness audit of the AI per-day plan variation over a longer simulated timeline (verification task, not new code, unless an issue turns up).
+**FIRST — AI plan staleness audit**, the one remaining item from Session 20's competitive research (verification task over a longer simulated timeline, not new code, unless an issue turns up).
 
 **SECOND — unblock the privacy policy.** Still the single highest-leverage blocked item — blocks both this punch list and the entire App Store roadmap (STANDING GOAL, step 6). Still blocked on Bryant contacting a lawyer.
 
@@ -87,7 +84,7 @@ All files, current full line counts:
 
 **FIFTH — four product/design items from Session 18, still just discussion, nothing built:** a per-category custom/recurring grocery item that persists; the Progress screen's "Workout streak" card (currently shows no real data); whether "Log Cardio" is worth keeping at all; a broader review of what Progress/Nutrition should measure against top fitness apps.
 
-**SIXTH — walk a full week on `WarmupTest` (or a fresh test profile) start-to-finish**, carried forward from Session 19/21. `WarmupTest`'s in-progress Legs-day snapshot was very likely destroyed during Session 21 testing — this walkthrough needs to start fresh.
+**SIXTH — walk a full week on `WarmupTest` (or a fresh test profile) start-to-finish**, carried forward from Session 19/21/22.
 
 **SEVENTH — confirming the warm-up compound/isolation split is sufficient.** Needs a direct decision from Bryant, not code.
 
@@ -95,12 +92,16 @@ All files, current full line counts:
 
 **NINTH — personal trainer market segment** (from Session 21, see DECISIONS.md). Worth a real discussion before any building — pricing, positioning, and go-to-market all need answers first.
 
-**LOWER PRIORITY / OPS.** `shared.jsx` at 3,065 lines — propose a split next time it's touched. The one unidentified blank-named test profile row in Supabase. Naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only).
+**LOWER PRIORITY / OPS.** `WorkoutScreen.jsx` at 2,711 lines and `shared.jsx` at 3,089 lines — Bryant is aware and wants to defer a split; do not start one without asking again. The "Up next"/"After that" preview cards not reflecting readiness adjustment (see above). The one unidentified blank-named test profile row in Supabase. Naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only).
 
 ## Technical notes carried forward
 
-**MANDATORY fetch method — git clone only.** Reconfirmed and *sharpened* this session: it's not just that `api.github.com` and direct `curl`/Python HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked outright by this environment's outbound proxy allowlist (`blocked-by-allowlist`) — the web-fetch tool's access to `raw.githubusercontent.com` (which does succeed, unlike direct curl) can also silently return **stale cached content** instead of erroring, which is worse than a hard block because it looks like a successful, current read. This session it served an 11-session-old `HANDOFF.md`. `git clone`/`git push` over authenticated HTTPS from a plain scratch directory remains the only fetch method to trust by default — confirmed reliable again this session (session-start fetch after catching the stale-cache issue, and the push at the end). If a non-git fetch is ever used for a quick look, treat its content as unverified until cross-checked against a fresh `git clone`.
+**MANDATORY fetch method — git clone only.** `api.github.com` and direct `curl`/Python HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked outright by this environment's outbound proxy allowlist. The web-fetch tool's access to `raw.githubusercontent.com` can also silently return **stale cached content** instead of erroring — confirmed in Session 22 (served an 11-session-old `HANDOFF.md`). `git clone`/`git push` over authenticated HTTPS from a plain scratch directory remains the only fetch method to trust by default.
+
+**Client-side progress persistence has TWO layers, both must be cleared for a clean test reset.** Learned the hard way this session: a stale `localStorage` key (`morphiq_workout_progress_<supabase_user_id>`) left over from an *earlier* test session survived a cleanup pass that only nulled the Supabase `workout_progress` column, and caused a crash on the next test run (the same crash the `exIdx` bug fix above addresses defensively, but the stale state was the trigger). Always clear both the Supabase column and the browser's `localStorage` together, not just one.
+
+**Native `window.confirm()`/`alert()`/`prompt()` dialogs block Claude-in-Chrome browser automation entirely.** Any click that triggers one hangs all subsequent tool calls (click, screenshot, get_page_text) with 30-45s timeouts, because the dialog blocks the page's JS thread and the automation's synchronous script injection can't reach past it. No workaround found — key presses sent via the automation tools don't reach native dialogs either. If a live-test click is expected to trigger a `window.confirm()` (e.g. the "Start over from set 1" button in `WorkoutScreen.jsx`), either avoid that click during automated testing or be ready to close the stuck tab and open a fresh one to recover. This is a testing-tool limitation, not an app bug.
 
 `profiles.supabase_user_id` is the auth link, `profiles.id` is the FK used everywhere else. Fire-and-forget `.catch(() => {})` pattern for all new Supabase writes. `AuthScreen` lives in `Morphiq.jsx`, not `shared.jsx`. The `exercises` table (91 rows: id, name, muscle_group, pattern, equipment, difficulty, variation_of, is_active) is still just a reference/classification table, not wired into live plan generation.
 
-**No live Node/npm toolchain in this sandbox by default** — `node_modules` isn't checked into the repo, and a full `npm install` for `react-scripts` wasn't attempted this session (network access to the npm registry does work, confirmed by installing `esbuild` standalone for a syntax check). If a future session needs a real `npm run build`, budget time for the full install, or continue using a lightweight bundler like `esbuild` for a fast syntax/JSX sanity check as a lower bar than a full CRA build.
+**No live Node/npm toolchain in this sandbox by default** — `node_modules` isn't checked into the repo. `esbuild` (installed standalone via `npm install --no-save esbuild --prefix /tmp/esbuild-check`) remains the fast syntax/JSX sanity check used in place of a full `react-scripts build`.
