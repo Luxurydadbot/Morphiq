@@ -645,13 +645,17 @@ const sb = {
     return null;
   },
 
-  async saveGymBranding(gymId = "demo-gym", { name, accent, welcome }) {
+  async saveGymBranding(gymId = "demo-gym", { name, accent, welcome, logo }) {
     try {
-      // PATCH targets the specific existing row by gym_id — correct way to update
+      // PATCH targets the specific existing row by gym_id — correct way to update.
+      // logo is optional -- pass undefined (not called at all with the key) to
+      // leave whatever's already saved untouched; pass null to explicitly clear it.
+      const body = { name, accent, welcome, updated_at: new Date().toISOString() };
+      if (logo !== undefined) body.logo_url = logo;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/gyms?gym_id=eq.${encodeURIComponent(gymId)}`, {
         method: "PATCH",
         headers: { ...SB_HEADERS(), "Prefer": "return=representation" },
-        body: JSON.stringify({ name, accent, welcome, updated_at: new Date().toISOString() }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const errText = await res.text().catch(() => "no body");
@@ -659,6 +663,35 @@ const sb = {
       }
       return res.ok;
     } catch (e) { console.error("saveGymBranding exception:", e); return false; }
+  },
+
+  // Uploads (or replaces) a gym's logo image to Supabase Storage. Always
+  // stored as "<gymId>/logo.<ext>" so a re-upload overwrites the old file
+  // instead of piling up orphaned images -- x-upsert handles the overwrite.
+  // Returns { ok: true, url } with a cache-busted public URL on success (so
+  // a fresh upload shows immediately instead of serving a browser-cached
+  // copy of the old logo at the same path), or { ok: false, error }.
+  async uploadGymLogo(gymId, file) {
+    try {
+      const extFromName = (file.name || "").split(".").pop();
+      const extFromType = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg" }[file.type];
+      const ext = (extFromType || extFromName || "png").toLowerCase();
+      const path = `${gymId}/logo.${ext}`;
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/gym-logos/${path}`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${getAuthToken()}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+        body: file,
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "no body");
+        console.error("uploadGymLogo failed:", res.status, errText, "gymId:", gymId);
+        return { ok: false, error: res.status === 413 ? "That image is too large (2MB max)." : "Upload failed — check your connection and try again." };
+      }
+      return { ok: true, url: `${SUPABASE_URL}/storage/v1/object/public/gym-logos/${path}?v=${Date.now()}` };
+    } catch (e) {
+      console.error("uploadGymLogo exception:", e);
+      return { ok: false, error: "Network error — check your connection and try again." };
+    }
   },
 
   // ── SUPER ADMIN — PLATFORM-WIDE GYM MANAGEMENT ──────────────────────────
@@ -2459,6 +2492,61 @@ function PoweredByHypergentiq({ caps = false, logoHeight = "1em", hideLabel = fa
   );
 }
 
+// Renders a gym-uploaded logo safely on the app's dark backgrounds. Small
+// gym-provided logo files are often lower quality than what a real design
+// team would produce -- flat JPEGs (which can't have transparency at all)
+// or PNGs exported with a baked-in white/solid background -- and would show
+// up as an ugly rectangle floating on the black background otherwise.
+// Detects that case (every corner pixel fully opaque = no real
+// transparency) and automatically drops the logo onto a small light plate
+// instead, the same trick real design systems use for third-party logo
+// lockups. Fails safe: if the pixel check can't run for any reason (CORS,
+// a browser that blocks canvas reads, etc.) the logo just renders plainly,
+// no plate, no error shown to anyone.
+function GymLogo({ src, size = 64, style }) {
+  const [needsPlate, setNeedsPlate] = useState(false);
+  const [errored, setErrored] = useState(false);
+
+  useEffect(() => {
+    setNeedsPlate(false);
+    setErrored(false);
+    if (!src) return;
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const corners = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]];
+        const allOpaque = corners.every(([x, y]) => ctx.getImageData(x, y, 1, 1).data[3] === 255);
+        if (!cancelled) setNeedsPlate(allOpaque);
+      } catch { /* CORS-tainted canvas or similar — render plainly, no plate */ }
+    };
+    img.onerror = () => { if (!cancelled) setErrored(true); };
+    img.src = src;
+    return () => { cancelled = true; };
+  }, [src]);
+
+  if (!src || errored) return null;
+
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      padding: needsPlate ? Math.round(size * 0.14) : 0,
+      background: needsPlate ? "#F4F5F7" : "transparent",
+      borderRadius: needsPlate ? 14 : 0,
+      ...style,
+    }}>
+      <img src={src} alt="" style={{ height: size, width: "auto", maxWidth: size * 3.5, objectFit: "contain", display: "block", borderRadius: needsPlate ? 6 : 0 }} />
+    </div>
+  );
+}
+
 function Icon({ name, size = 16, color = "currentColor", style, filled = false }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style };
   switch (name) {
@@ -2893,7 +2981,7 @@ export {
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components
-  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq,
+  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq, GymLogo,
   // Screen data constants
   GOAL_ICONS, GOAL_OPTIONS, EQUIPMENT_OPTIONS,
   WORKOUT_EXERCISES, MEAL_DATA, GROCERY_DATA,
