@@ -2190,7 +2190,7 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
     : userProfile.recentActivity === "returning" ? "returning"
     : "experienced";
   const isExperienced = expTier === "experienced";
-  const isOver40 = parseInt(userProfile.age || 30) >= 40;
+  const isBeginner = expTier === "beginner";
   const goal = userProfile.goal || "general_fitness";
 
   // ── Deload logic ──────────────────────────────────────────────────
@@ -2198,17 +2198,36 @@ function progressPlan(currentPlan, workoutLogs, userProfile) {
   // shouldTriggerDeloadFromPlateau() (above) -- deload timing now follows
   // each member's actual working-weight/reps trend from workout_logs
   // instead of a fixed countdown that fired whether or not they were
-  // really stalling. Beginners/some still get no scheduled deload here —
-  // the existing missed-reps fatigue handling further down already covers
-  // them, same as before.
-  const deloadCheck = (isExperienced && !isOver40)
-    ? shouldTriggerDeloadFromPlateau(currentPlan, workoutLogs, nextWeekNum)
-    : { shouldDeload: false, reason: "not_eligible", plateauedExercises: [], exercisesChecked: 0 };
+  // really stalling.
+  //
+  // Session 23: this used to also require isExperienced && !isOver40 --
+  // meaning beginners, "some"/"returning" members, AND anyone 40+ never
+  // reached this at all, so their exercise selection (which only ever
+  // changes via the post-deload primary/variation swap below) was frozen
+  // for the life of the plan. The staleness audit this session found that
+  // gap; the age-40 cutoff in particular had no real training rationale
+  // behind it -- competitive-app research (Fitbod, JuggernautAI) and the
+  // periodization literature both tie rotation cadence to training
+  // experience, never age, and if anything older lifters benefit MORE from
+  // variation since natural movement-coordination variability drops with
+  // age, raising overuse-injury risk from repeating one exact pattern.
+  // Age no longer gates this anywhere below.
+  //
+  // Every experience tier is now eligible, but a true beginner still gets
+  // a real runway before their first rotation -- 6 weeks, the standard
+  // "let the nervous system groove one motor pattern before introducing
+  // variation" window used across strength-coaching sources -- instead of
+  // the old 3-week floor everyone else keeps. This is pacing, not
+  // exclusion: a beginner's plateau/deload check simply can't fire until
+  // week 6+, same signal-driven logic as everyone else after that.
+  const minWeeksSinceLastDeload = isBeginner ? 6 : 3;
+  const deloadCheck = shouldTriggerDeloadFromPlateau(currentPlan, workoutLogs, nextWeekNum, { minWeeksSinceLastDeload });
   const isDeload = deloadCheck.shouldDeload;
   // Post-deload = the week right after a deload week. currentPlan.isDeloadWeek
   // is set on the deload week's own plan (see the return object below) --
   // this reads whether the plan the member is CURRENTLY finishing was one.
-  const isPostDeload = isExperienced && !isOver40 && currentPlan.isDeloadWeek === true;
+  // No longer gated by isExperienced/!isOver40 -- see note above.
+  const isPostDeload = currentPlan.isDeloadWeek === true;
 
   // ── Build log lookup: exerciseName → array of recent sessions ─────
   // workoutLogs is an array of { exercise_name, reps, weight, workout_date }
