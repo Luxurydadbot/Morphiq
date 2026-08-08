@@ -1438,6 +1438,29 @@ function formatPlateBreakdown(breakdown) {
   return breakdown.remainder > 0.01 ? `~${parts} per side` : `${parts} per side`;
 }
 
+// ── Daily readiness check-in ──────────────────────────────────────────────
+// One-tap "how do you feel today" nudge shown once at the start of a fresh
+// workout (WorkoutScreen.jsx gates this the same way it already gates the
+// one-time pre-workout mobility warm-up -- via the phase-persistence
+// mechanism, so it never reappears on a resumed session). Deliberately
+// touches ONLY the displayed working-set weight for THIS session, applied
+// the exact same way the existing progressive-overload nudge and manual
+// +/- stepper already work (a display-time layer on top of
+// currentSpec.weight, never written back to the plan) -- so it can't
+// interact with progressPlan()/buildPlan() or the deload/plateau logic at
+// all. Warm-up sets are intentionally left unadjusted (already light by
+// design, see buildWarmupRamp()'s own comments above).
+const READINESS_MULTIPLIERS = { rough: 0.9, ok: 1, great: 1.05 };
+
+function applyReadinessToWeight(weight, readiness, increment = 5) {
+  if (!weight || !readiness || readiness === "ok") return weight;
+  const mult = READINESS_MULTIPLIERS[readiness] ?? 1;
+  // Round to the nearest real increment so it's always a loadable number --
+  // same rounding convention buildWarmupRamp() uses -- with a safety floor
+  // of one increment so this can never round down to zero or negative.
+  return Math.max(increment, Math.round((weight * mult) / increment) * increment);
+}
+
 // ── Macro calculator (Mifflin-St Jeor) ────────────────────────────────────
 // Same formula OnboardingScreen.jsx and CustomPlanScreen (WorkoutScreen.jsx)
 // each used to keep as their own separate copy, "kept in sync manually" per
@@ -3039,6 +3062,7 @@ export {
   buildPlan, progressPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
   detectPlateau, shouldTriggerDeloadFromPlateau,
   isBarbellExercise, getPlateBreakdown, formatPlateBreakdown,
+  applyReadinessToWeight,
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components

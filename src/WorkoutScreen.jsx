@@ -3,7 +3,7 @@ import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
          WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
          isMultiDayPlan, getAutoWorkoutDayIndex, calcMacros as calcMacrosShared, getWeightIncrement, clearWorkoutProgress,
-         isBarbellExercise, getPlateBreakdown, formatPlateBreakdown } from "./shared.jsx";
+         isBarbellExercise, getPlateBreakdown, formatPlateBreakdown, applyReadinessToWeight } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -399,7 +399,7 @@ function WorkoutScreen() {
   // Workout phase: "warmup" | "active" | "cooldown"
   const warmupExercises = plan?.warmup || [];
   const cooldownExercises = plan?.cooldown || [];
-  const [phase, setPhase] = useState(savedProgress?.phase ?? (warmupExercises.length > 0 ? "warmup" : "active"));
+  const [phase, setPhase] = useState(savedProgress?.phase ?? (warmupExercises.length > 0 ? "warmup" : "readiness"));
   const [warmupStep, setWarmupStep] = useState(savedProgress?.warmupStep ?? 0);
   const [cooldownStep, setCooldownStep] = useState(savedProgress?.cooldownStep ?? 0);
 
@@ -407,6 +407,10 @@ function WorkoutScreen() {
   const [setIdx, setSetIdx] = useState((savedProgress?.setIdx ?? 0) + (savedProgress?.state === "rest" ? 1 : 0));
   const [loggedSets, setLoggedSets] = useState(savedProgress?.loggedSets ?? []);
   const [state, setState] = useState("active");
+  // Daily readiness check-in answer ("rough" | "ok" | "great" | null before
+  // asked). Persisted alongside the rest of workout progress (below) so a
+  // resumed session keeps the same adjustment instead of re-asking.
+  const [readiness, setReadiness] = useState(savedProgress?.readiness ?? null);
 
   // Show a brief "picked up where you left off" banner ONLY when we actually
   // restored meaningful progress (not a saved-but-untouched start). This makes
@@ -452,12 +456,13 @@ function WorkoutScreen() {
         }
         return;
       }
-      setPhase(cloud.phase ?? (warmupExercises.length > 0 ? "warmup" : "active"));
+      setPhase(cloud.phase ?? (warmupExercises.length > 0 ? "warmup" : "readiness"));
       setWarmupStep(cloud.warmupStep ?? 0);
       setCooldownStep(cloud.cooldownStep ?? 0);
       setExIdx(cloud.exIdx ?? 0);
       setSetIdx((cloud.setIdx ?? 0) + (cloud.state === "rest" ? 1 : 0));
       setLoggedSets(cloud.loggedSets ?? []);
+      setReadiness(cloud.readiness ?? null);
       // Fix (session 9): if this cloud progress belongs to a different day
       // than the one this device guessed at mount, rebuild the exercise list
       // from the correct day -- otherwise exIdx/setIdx above would point into
@@ -528,7 +533,7 @@ function WorkoutScreen() {
   useEffect(() => {
     const progressSnapshot = {
       date: localDateStr(),
-      phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state,
+      phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state, readiness,
       // Fix (session 9): pin which day of a multi-day custom plan this
       // in-progress workout belongs to, so a remount mid-workout (or the
       // "continue where you left off" flow) restores the SAME day instead of
@@ -545,7 +550,7 @@ function WorkoutScreen() {
     if (supabaseUser?.id) {
       sb.syncWorkoutProgress(supabaseUser.id, progressSnapshot).catch(() => {});
     }
-  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state, progressKey, supabaseUser?.id]);
+  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state, readiness, progressKey, supabaseUser?.id]);
 
   // Clears saved progress — used when the workout finishes or the member
   // chooses to restart. Without this, a completed workout would try to resume.
@@ -565,7 +570,8 @@ function WorkoutScreen() {
     setNudgedWeight(null);
     setNudgeSource(null);
     nudgeAcceptedRef.current = false;
-    setPhase(warmupExercises.length > 0 ? "warmup" : "active");
+    setPhase(warmupExercises.length > 0 ? "warmup" : "readiness");
+    setReadiness(null);
     setState("active");
   };
 
@@ -697,7 +703,13 @@ function WorkoutScreen() {
 
   // Weight for the current set: warm-ups use their own weight; working sets use
   // the working weight, with any progressive-overload nudge applied.
-  const currentWeight = isWarmupSet ? currentSpec.weight : (nudgedWeight ?? currentSpec.weight);
+  // Readiness check-in adjustment (shared.jsx) sits BELOW the nudge in
+  // priority -- an already-accepted progressive-overload nudge is a more
+  // specific, more recent signal than a once-per-workout mood tap, so it
+  // wins if both are present. Warm-ups are never adjusted by readiness,
+  // same reasoning as buildWarmupRamp() -- they're already light by design.
+  const readinessAdjustedWeight = applyReadinessToWeight(currentSpec.weight, readiness, ex.weightIncrement || 5);
+  const currentWeight = isWarmupSet ? currentSpec.weight : (nudgedWeight ?? readinessAdjustedWeight);
   // Target reps for the current set (warm-up reps differ from working reps).
   const currentTargetReps = currentSpec?.targetReps ?? ex.targetReps;
 
@@ -927,12 +939,13 @@ function WorkoutScreen() {
       const dayData = plan.customDays[savedDayIndex];
       if (dayData?.exercises?.length > 0) setExercises(dayData.exercises.map(normalizeExercise));
     } catch {}
-    setPhase(raw.phase ?? (warmupExercises.length > 0 ? "warmup" : "active"));
+    setPhase(raw.phase ?? (warmupExercises.length > 0 ? "warmup" : "readiness"));
     setWarmupStep(raw.warmupStep ?? 0);
     setCooldownStep(raw.cooldownStep ?? 0);
     setExIdx(raw.exIdx ?? 0);
     setSetIdx((raw.setIdx ?? 0) + (raw.state === "rest" ? 1 : 0));
     setLoggedSets(raw.loggedSets ?? []);
+    setReadiness(raw.readiness ?? null);
     // Re-point selectedDayOverride at the day actually being resumed, so
     // activeDayIdx (and every place that reads it -- the progress-persist
     // effect, recordWorkoutComplete's day-index write) lines up with what's
@@ -1285,13 +1298,70 @@ function WorkoutScreen() {
           {/* Buttons */}
           <div style={{ marginTop: "auto", paddingBottom: "1rem", display: "flex", flexDirection: "column", gap: 8 }}>
             <button onClick={() => {
-              if (isLastWarmup) { setPhase("active"); }
+              if (isLastWarmup) { setPhase("readiness"); }
               else { setWarmupStep(s => s + 1); }
             }} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               {isLastWarmup ? <>Start workout <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></> : <>Done — next <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px", marginLeft: 3 }} /></>}
             </button>
-            <button onClick={() => setPhase("active")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={() => setPhase("readiness")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
               Skip warm-up
+            </button>
+          </div>
+
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── DAILY READINESS CHECK-IN ─────────────────────────────────────────────
+  // One-tap "how do you feel today" nudge shown exactly once at the start of
+  // a fresh workout (this phase only gets reached via the same fallback that
+  // used to jump straight to "active" — see the phase-persistence mechanism
+  // above, which is why this never reappears on a resumed session). The
+  // answer only adjusts this session's displayed working-set weight
+  // (applyReadinessToWeight() in shared.jsx) -- it never touches the plan or
+  // next week's progression.
+  if (phase === "readiness") {
+    function chooseReadiness(choice) {
+      setReadiness(choice);
+      setPhase("active");
+    }
+    const readinessOptions = [
+      { id: "rough", label: "Rough", sub: "Low energy, sore, or short on sleep", icon: "arrow-down" },
+      { id: "ok", label: "OK", sub: "Normal — business as usual", icon: "check" },
+      { id: "great", label: "Great", sub: "Feeling strong and ready", icon: "arrow-up" },
+    ];
+    return (
+      <Layout activeNav="workout" chatTarget="chat_workout">
+        <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
+
+          {dayConflictBanner}
+
+          <div style={{ textAlign: "center", marginBottom: 24, marginTop: "10vh" }}>
+            <div style={{ fontSize: 34, fontWeight: 700, color: theme.text, lineHeight: 1.25 }}>How are you feeling today?</div>
+            <div style={{ fontSize: 14, color: theme.textDim, marginTop: 10, lineHeight: 1.5 }}>
+              This only adjusts today's working weight — it never changes your plan.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {readinessOptions.map(opt => (
+              <button key={opt.id} onClick={() => chooseReadiness(opt.id)}
+                style={{ width: "100%", background: "#1B1D21", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "1rem 1.1rem", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#212429", display: "flex", alignItems: "center", justifyContent: "center", color: a, flexShrink: 0 }}>
+                  <Icon name={opt.icon} size={16} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: theme.text }}>{opt.label}</div>
+                  <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{opt.sub}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ marginTop: "auto", paddingBottom: "1rem" }}>
+            <button onClick={() => chooseReadiness("ok")} style={{ width: "100%", background: "transparent", border: "none", padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+              Skip — I'll just start
             </button>
           </div>
 
@@ -1716,6 +1786,13 @@ function WorkoutScreen() {
               <div style={{ fontSize: 12, color: theme.success, marginTop: 6 }}><Icon name="bolt" size={12} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
             ) : weightOverride !== null ? (
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Adjusted{displayWeight !== currentSpec.weight ? ` · ${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan` : ""}</div>
+            ) : readiness && readiness !== "ok" && displayWeight !== currentSpec.weight ? (
+              // Readiness check-in adjustment, no manual override or accepted
+              // nudge on top of it -- explain the number rather than let it
+              // silently look like a plan change (falls through to the
+              // generic "X lbs from plan" wording otherwise, which is
+              // technically accurate but doesn't say why).
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>{readiness === "rough" ? "Lightened today — you checked in rough" : "Bumped up today — you checked in great"}</div>
             ) : (
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>{displayWeight === currentSpec.weight ? "Today's target" : `${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan`}</div>
             )}
