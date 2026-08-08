@@ -120,7 +120,7 @@ All files, current full line counts:
 
 **NINTH — expand exercise variety beyond the binary primary/variation swap** (new, see the rotation fix above). Every rotation-eligible member (now everyone, paced by experience tier) still only ever alternates between exactly one primary exercise and one paired variation per slot — real deeper variety would mean building out proper variation pools per equipment/pattern. Not urgent, but the natural next step if Bryant wants richer rotation later.
 
-**LOWER PRIORITY / OPS.** `WorkoutScreen.jsx` at 2,711 lines and `shared.jsx` at 3,089 lines — Bryant is aware and wants to defer a split; do not start one without asking again. The "Up next"/"After that" preview cards not reflecting readiness adjustment (see above). The one unidentified blank-named test profile row in Supabase. Naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only).
+**LOWER PRIORITY / OPS.** `WorkoutScreen.jsx` at 2,711 lines and `shared.jsx` at 3,108 lines — Bryant is aware and wants to defer a split; do not start one without asking again. The "Up next"/"After that" preview cards not reflecting readiness adjustment (see above). The one unidentified blank-named test profile row in Supabase. Naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only).
 
 ## Technical notes carried forward
 
@@ -133,3 +133,53 @@ All files, current full line counts:
 `profiles.supabase_user_id` is the auth link, `profiles.id` is the FK used everywhere else. Fire-and-forget `.catch(() => {})` pattern for all new Supabase writes. `AuthScreen` lives in `Morphiq.jsx`, not `shared.jsx`. The `exercises` table (91 rows: id, name, muscle_group, pattern, equipment, difficulty, variation_of, is_active) is still just a reference/classification table, not wired into live plan generation.
 
 **No live Node/npm toolchain in this sandbox by default** — `node_modules` isn't checked into the repo. `esbuild` (installed standalone via `npm install --no-save esbuild --prefix /tmp/esbuild-check`) remains the fast syntax/JSX sanity check used in place of a full `react-scripts build`.
+
+## Session 23 close-out summary
+
+**Everything built/changed this session:** plate-math breakdown was Session 22 — this session started with (1) the daily readiness check-in (Rough/OK/Great, `shared.jsx` + `WorkoutScreen.jsx`), (2) a real crash-bug fix found while testing it (`exIdx` bounds-check), (3) the AI plan-staleness audit (code-review verification, no code), and (4) a real fix in response to that audit — removed the age-40 exclusion from exercise rotation and added a research-backed 6-week beginner runway, so rotation eligibility is now paced by training experience only, never age.
+
+**Confirmed working:** readiness check-in — live-verified in Chrome (Rough/OK/Great, plate-math integration, reload-persistence). exIdx crash fix — `esbuild` + diff review. Age-40 removal / beginner runway — logic-verified via a standalone Node harness against the real, pushed `shouldTriggerDeloadFromPlateau()` function (beginner correctly blocked at week 4 / fires at week 7; non-beginner unchanged at the 3-week floor).
+
+**Still needs testing:** a real live multi-week walkthrough of the age-40/beginner-runway rotation fix (not practical to run in one sitting — would need `WarmupTest` or a fresh profile carried through 6+ simulated weeks with plateaued logs). The "Up next"/"After that" preview cards still show the pre-readiness-adjustment weight (cosmetic, low priority). The exIdx fix and readiness feature are otherwise fully verified.
+
+**Next priority task:** punch list FIRST is now the privacy policy (blocked on Bryant/a lawyer, not actionable by Claude). The next actually-startable item is SECOND — no-blocker App Store/Capacitor groundwork (PWA manifest/service-worker gaps, then Capacitor install) — or Bryant may want to talk through the NINTH item (deeper exercise-variety pools beyond the binary primary/variation swap) before that's built.
+
+**Final line counts, all files:**
+
+| File | Lines |
+| --- | --- |
+| src/shared.jsx | 3,108 |
+| src/WorkoutScreen.jsx | 2,711 |
+| src/Morphiq.jsx | 1,586 |
+| src/GymOwnerDashboard.jsx | 927 |
+| src/MealScreen.jsx | 724 |
+| src/OnboardingScreen.jsx | 583 |
+| src/ProgressScreen.jsx | 580 |
+| src/ChatScreen.jsx | 300 |
+| src/SuperAdminDashboard.jsx | 343 |
+| src/GymSignupScreen.jsx | 269 |
+| api/chat.js | 259 |
+| api/report-usage.js | 165 |
+| api/stripe-webhook.js | 161 |
+| api/coach-note.js | 108 |
+| api/admin-gym-action.js | 110 |
+| api/monthly-usage-report.js | 101 |
+| api/create-checkout.js | 89 |
+| api/photo-meal.js | 76 |
+| api/parse-meal.js | 62 |
+| api/parse-cardio.js | 62 |
+| api/plan.js | 31 |
+| api/_sentry.js | 32 |
+| api/ping.js | 12 |
+
+All files well under the 3,800-line hard limit. `shared.jsx` and `WorkoutScreen.jsx` remain past the 2,000-line soft target — split still deferred at Bryant's request, flag again if `WorkoutScreen.jsx` crosses ~3,000 lines.
+
+**Latest commit:** `897fb7b` on `main`.
+
+## Paste this at the start of your next session
+
+Fetch HANDOFF.md and all src/ and api/ files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content, confirmed Session 22). Report every file's line count before doing anything else; stop and propose a split if any file exceeds 3,800 lines (none do currently — `shared.jsx` is the largest at 3,108).
+
+Remind Bryant of the next priority task: the privacy policy is still the highest-leverage blocked item (needs him to contact a lawyer — not actionable by Claude). The next thing actually startable without him is Capacitor/App Store groundwork (PWA manifest + service worker fixes first). He may also want to discuss punch-list item NINTH — building real exercise-variety pools beyond the current one-primary/one-variation-per-slot swap — before more rotation work happens.
+
+Current state: daily readiness check-in and the plate-math breakdown are both shipped and live-verified. The AI plan-staleness gap Bryant flagged (age-40 exclusion from exercise rotation) is fixed and logic-verified — every experience tier now rotates, beginners get a 6-week runway first, age plays no role anywhere in the rotation/deload gate. A minor cosmetic gap remains: the "Up next"/"After that" rest-screen preview cards don't reflect the readiness-adjusted weight yet.
