@@ -1232,30 +1232,44 @@ function WorkoutScreen() {
   const card = { background: "#212429", borderRadius: 12, padding: "10px 12px", marginBottom: 8 };
   const totalCompleted = loggedSets.filter(l => l.exIdx === exIdx && l.kind !== "warmup").length;
 
-  // Day-conflict banner -- pulled out to a shared element so it can render
-  // during the warm-up/cool-down phases too (those have their own early
-  // returns below, before the main return further down), not just once the
-  // member reaches the active-set screen. A conflict is detected right at
-  // mount, so it should be visible from the very first screen, not appear
-  // partway through.
-  const dayConflictBanner = dayConflict && (
-    <div className="mq-fade" style={{ background: "#1A1A0A", border: `1px solid rgba(217,164,6,0.35)`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#EDEEF0", marginBottom: 4 }}>
-        You have an unfinished {dayConflict.savedDayLabel} workout
-      </div>
-      <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>
-        Exercise {(dayConflict.raw.exIdx ?? 0) + 1}, set {(dayConflict.raw.setIdx ?? 0) + 1} · saved sets are still there
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={continueOldWorkout} style={{ flex: 1, background: "transparent", border: `1px solid ${a}`, color: a, borderRadius: 10, padding: "9px 4px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-          Continue {dayConflict.savedDayLabel}
-        </button>
-        <button onClick={startNewWorkout} style={{ flex: 1, background: a, border: "none", color: "#0B1E3D", borderRadius: 10, padding: "9px 4px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-          Start {dayConflict.overrideDayLabel}
-        </button>
-      </div>
-    </div>
-  );
+  // Day-conflict resolution -- its own dedicated screen, not layered on top
+  // of whatever phase the newly-picked day would otherwise show. Bryant's
+  // call after live-testing the old stacked version (this session): showing
+  // the conflict banner directly above the readiness card in the same
+  // screen meant dismissing the banner instantly reflowed the readiness
+  // buttons into the same spot on screen -- a reflex second tap right after
+  // choosing Continue/Start could land on Rough/OK/Great before the member
+  // consciously saw the screen had changed underneath them. Gating the
+  // whole component on dayConflict here means the member resolves ONE
+  // decision (which day) on its own screen first; only once
+  // continueOldWorkout/startNewWorkout clears dayConflict does the normal
+  // phase flow (warm-up/readiness/active/cooldown) take over and ask its
+  // own questions one at a time, exactly like starting any other day.
+  if (dayConflict) {
+    return (
+      <Layout activeNav="workout" chatTarget="chat_workout">
+        <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ textAlign: "center", marginBottom: 28, marginTop: "12vh" }}>
+            <div style={{ display: "flex", justifyContent: "center", color: a }}><Icon name="refresh" size={36} /></div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: theme.text, lineHeight: 1.3, marginTop: 14 }}>
+              You have an unfinished {dayConflict.savedDayLabel} workout
+            </div>
+            <div style={{ fontSize: 14, color: theme.textDim, marginTop: 10, lineHeight: 1.5 }}>
+              Exercise {(dayConflict.raw.exIdx ?? 0) + 1}, set {(dayConflict.raw.setIdx ?? 0) + 1} · saved sets are still there
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button onClick={continueOldWorkout} style={{ width: "100%", background: "#1B1D21", border: `1px solid ${a}`, color: a, borderRadius: 14, padding: "1rem 1.1rem", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Continue {dayConflict.savedDayLabel}
+            </button>
+            <button onClick={startNewWorkout} style={{ width: "100%", background: a, border: "none", color: "#0B1E3D", borderRadius: 14, padding: "1rem 1.1rem", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Start {dayConflict.overrideDayLabel}
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   // ── WARM-UP PHASE ──────────────────────────────────────────────────────────
   if (phase === "warmup") {
@@ -1265,8 +1279,6 @@ function WorkoutScreen() {
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
-
-          {dayConflictBanner}
 
           {/* Header */}
           <div style={{ textAlign: "center", marginBottom: 14 }}>
@@ -1341,8 +1353,6 @@ function WorkoutScreen() {
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
 
-          {dayConflictBanner}
-
           <div style={{ textAlign: "center", marginBottom: 24, marginTop: "10vh" }}>
             <div style={{ fontSize: 34, fontWeight: 700, color: theme.text, lineHeight: 1.25 }}>How are you feeling today?</div>
             <div style={{ fontSize: 14, color: theme.textDim, marginTop: 10, lineHeight: 1.5 }}>
@@ -1385,7 +1395,6 @@ function WorkoutScreen() {
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
         <div className="mq-fade" style={{ padding: "1.5rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
-          {dayConflictBanner}
           <div style={{ textAlign: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 10, color: a, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 4 }}>Cool-down · {cooldownStep + 1} of {cooldownExercises.length}</div>
             <div style={{ fontSize: 13, color: theme.textDim }}>5 minutes to recover properly</div>
@@ -1709,8 +1718,6 @@ function WorkoutScreen() {
   return (
     <Layout activeNav="workout" chatTarget="chat_workout">
       <div className="mq-fade" style={{ padding: "1rem 1.25rem 0", display: "flex", flexDirection: "column", flex: 1 }}>
-
-        {dayConflictBanner}
 
         {/* Resume banner — appears briefly when we restored an in-progress
             workout, then fades. Makes auto-resume visible and intentional. */}
