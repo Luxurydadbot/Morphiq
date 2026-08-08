@@ -1526,9 +1526,20 @@ function WorkoutScreen() {
               together instead of only the subtitle text changing. */}
           {(() => {
             const next = setPlan[safeSetIdx + 1];
+            const afterNext = setPlan[safeSetIdx + 2];
             const upNextIsNewExercise = !next && !!nextEx;
             const upNextExercise = upNextIsNewExercise ? nextEx : ex;
-            const afterThatExercise = upNextIsNewExercise ? exercises[exIdx + 2] : nextEx;
+            // "After that" now resolves to the TRUE next set in sequence:
+            // another set of the CURRENT exercise if one remains after "up
+            // next" (same exercise, own weight/reps), otherwise the
+            // exercise that follows whichever exercise "up next" points to.
+            // Previously this always jumped straight to nextEx regardless
+            // of how many sets were left in the current exercise, so
+            // "after that" could show the same next-exercise preview for
+            // several sets in a row while silently skipping the sets that
+            // were actually coming up sooner.
+            const afterThatSet = !upNextIsNewExercise && afterNext ? afterNext : null;
+            const afterThatExercise = afterThatSet ? null : (upNextIsNewExercise ? exercises[exIdx + 2] : nextEx);
             return (
               <>
                 <div style={{ background: "#0A1628", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
@@ -1537,7 +1548,13 @@ function WorkoutScreen() {
                     <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>Up next</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, lineHeight: 1.1 }}>{upNextExercise ? upNextExercise.name : ex.name}</div>
                     {next ? (
-                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{next.label} · {next.kind === "warmup" ? next.weight : (nudgedWeight ?? ex.weight)} lbs · {next.targetReps} reps</div>
+                      // next.weight is already the fully-resolved weight for
+                      // THIS exact upcoming set (warm-up ramp weight, or the
+                      // working set's own planned/ramp-style/autoregulated
+                      // weight) -- pulled straight from setPlan instead of a
+                      // flat exercise-level fallback, so a warm-up set never
+                      // shows the working max as what's coming up next.
+                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{next.label} · {next.weight} lbs · {next.targetReps} reps</div>
                     ) : upNextIsNewExercise ? (
                       <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{nextEx.sets} sets · {nextEx.targetReps} reps</div>
                     ) : (
@@ -1546,13 +1563,22 @@ function WorkoutScreen() {
                   </div>
                 </div>
 
-                {afterThatExercise && (
+                {(afterThatSet || afterThatExercise) && (
                   <div style={{ background: "#0F1922", border: `1px solid rgba(255,255,255,0.05)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                     <div style={{ width: 32, height: 32, borderRadius: 8, background: "#212429", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, color: theme.textDim }}>⏱</div>
                     <div>
                       <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 1 }}>After that</div>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: theme.textDim }}>{afterThatExercise.name}</div>
-                      <div style={{ fontSize: 11, color: theme.textFaint }}>{afterThatExercise.sets} sets · {afterThatExercise.targetReps} reps</div>
+                      {afterThatSet ? (
+                        <>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: theme.textDim }}>{ex.name}</div>
+                          <div style={{ fontSize: 11, color: theme.textFaint }}>{afterThatSet.label} · {afterThatSet.weight} lbs · {afterThatSet.targetReps} reps</div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: theme.textDim }}>{afterThatExercise.name}</div>
+                          <div style={{ fontSize: 11, color: theme.textFaint }}>{afterThatExercise.sets} sets · {afterThatExercise.targetReps} reps</div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
