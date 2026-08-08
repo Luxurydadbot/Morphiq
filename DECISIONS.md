@@ -43,6 +43,19 @@ Updated automatically at the end of every session. Never delete entries — appe
 
 ---
 
+## August 8, 2026
+
+### Decision: Personal trainer market — flagged for later, not started
+- Bryant raised marketing Hypergentiq to individual/solo personal trainers, not just gyms, and asked directly whether it's a good idea.
+- **Assessment:** directionally yes, but it's a second customer segment with its own economics, not a pricing tweak on the existing product.
+  - **Pricing:** the per-active-member model works for gyms spreading a $99+/mo base across hundreds of members; it doesn't work for a trainer with a handful of clients. Would need a low flat "Solo" tier (e.g. ~$29-39/mo covering up to 10-15 clients) before per-member fees kick in.
+  - **Positioning:** some trainers will resist AI-generated programming since programming is part of what they sell. Pitch needs to be "AI drafts, you approve/edit," not "AI replaces your programming" — makes the still-unbuilt build-your-own-workout / full manual override feature (see build-your-own workout path decision above, June 26 2026 — not yet built) more important for this segment than for gym members.
+  - **Go-to-market:** gyms are a slower B2B sale; trainers need frictionless self-serve signup, likely a free trial, and influencer/referral-driven growth — a different motion than the current gym sales approach.
+  - **Competition:** Trainerize, TrueCoach, PT Distinction, Everfit already serve solo trainers, but all assume the trainer hand-builds every plan. AI-assisted programming is a real differentiator if positioned as time-saved, not replaced expertise.
+- **Decision:** worth pursuing later. Not started — competes for attention with the App Store roadmap and in-flight punch list items. Revisit once current priorities clear.
+
+---
+
 ## Standing technical decisions
 
 - **File structure:** Morphiq.jsx (3,714 lines), WorkoutScreen.jsx (1,421 lines), MealScreen.jsx (585 lines), GymOwnerDashboard.jsx (separate)
