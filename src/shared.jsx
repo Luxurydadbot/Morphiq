@@ -1442,11 +1442,31 @@ function reRampWarmups(workingWeight, exerciseName, overriddenIndex, overriddenW
   if (!pcts[overriddenIndex]) return null; // nothing after this step to re-ramp
   const roundTo = 5;
   const round = (x) => Math.max(roundTo, Math.round(x / roundTo) * roundTo);
-  const impliedWorkingWeight = overriddenWeight / pcts[overriddenIndex];
-  return pcts.map((p, i) => ({
-    weight: i === overriddenIndex ? overriddenWeight : round(impliedWorkingWeight * p),
-    reps: isCompound ? (i === 0 ? 8 : i === 1 ? 5 : 3) : 10,
-  }));
+  // Bug fix (Bryant, live report): this used to back out an "implied
+  // working weight" by dividing the override by that step's OWN percentage
+  // (overriddenWeight / pcts[overriddenIndex]), then rebuild every later
+  // step off that number. For an early, low-percentage step this massively
+  // amplifies a modest bump -- a real example: bumping a 90 lb first warm-up
+  // (50% step) to 135 implied a 270 lb working weight (135 / 0.5), nearly
+  // double the real 175 lb target, and cascaded a 190 lb "warm-up" that was
+  // already heavier than the actual working set it was supposed to build
+  // toward. Checked against Hevy, Fitbod, and JuggernautAI (the closest
+  // real comparison, since it's the one mainstream app that also reacts to
+  // warm-up feedback): none of them do a percentage-inversion recalculation
+  // like this, and none ever let a warm-up reach the real working weight,
+  // at any experience level. New rule, matching that: every later step
+  // becomes the HIGHER of (a) its own original planned number or (b) what
+  // was just lifted -- so the ramp never visibly drops after a bump, which
+  // is the original problem this function exists to prevent -- and is
+  // always capped strictly below the real working weight, however it was
+  // derived, matching buildWarmupRamp()'s own rule for the initial ramp.
+  const cap = Math.max(roundTo, workingWeight - roundTo);
+  return pcts.map((p, i) => {
+    const reps = isCompound ? (i === 0 ? 8 : i === 1 ? 5 : 3) : 10;
+    if (i <= overriddenIndex) return { weight: Math.min(overriddenWeight, cap), reps }; // not read by the caller for i < overriddenIndex; kept valid regardless
+    const originalPlanned = round(workingWeight * p);
+    return { weight: Math.min(Math.max(originalPlanned, overriddenWeight), cap), reps };
+  });
 }
 
 // Suggested new working weight when the member manually raises their LAST
