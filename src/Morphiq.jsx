@@ -1443,13 +1443,21 @@ function ProfileScreen() {
 }
 
 function LoadingScreen() {
+  // Full-screen splash instead of the normal app chrome (top bar, bottom
+  // nav, chat bubble) -- none of that is meaningful yet this early (user
+  // and gym data may not have loaded), and it was crowding out the logo.
+  // Large mark + a slow, gentle breathing pulse (mq-splash-pulse, see
+  // shared.jsx) so the screen reads as "working," not "stuck" or "broken" --
+  // the animation is pure CSS and runs for however long the real load
+  // takes, it never adds delay on top of it.
   return (
-    <Layout>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
-        <Spinner />
-        <div style={{ fontSize: 13, color: theme.textDim }}>Loading...</div>
+    <div style={{ background: theme.bg, borderRadius: 20, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(76,141,255,0.16) 0%, rgba(76,141,255,0) 70%)", pointerEvents: "none" }} />
+      <div className="mq-splash-pulse" style={{ position: "relative" }}>
+        <PoweredByHypergentiq hideLabel logoHeight="clamp(56px, 10vw, 96px)" />
       </div>
-    </Layout>
+      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 28, letterSpacing: ".04em" }}>Loading...</div>
+    </div>
   );
 }
 

@@ -2291,6 +2291,12 @@ const css = `
   @keyframes mqSpin{to{transform:rotate(360deg);}}
   .mq-pulse-ring{animation:mqPulse 2s ease-out infinite;pointer-events:none;}
   @keyframes mqPulse{0%{transform:scale(1);opacity:.5;}100%{transform:scale(1.7);opacity:0;}}
+  /* Loading-splash logo -- slow, gentle breathing so the screen feels
+     alive instead of static during however long the real load takes.
+     Purely visual (CSS only): it never adds to or waits on the actual
+     load time, it just plays for whatever that natural duration is. */
+  .mq-splash-pulse{animation:mqSplashPulse 2.4s ease-in-out infinite;}
+  @keyframes mqSplashPulse{0%,100%{opacity:.88;transform:scale(1);}50%{opacity:1;transform:scale(1.045);}}
   /* Loading placeholder for stat values that come from an async fetch (e.g.
      Home screen's Total workouts / Since you started tiles) -- a soft pulse
      instead of a static "-" so a still-loading number doesn't read as "no
@@ -2409,10 +2415,13 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
 // are drawn by the phone's own emoji font in full color no matter what --
 // they can never pick up the app's teal theme. These use stroke="currentColor"
 // so they automatically match whatever text color surrounds them.
-function PoweredByHypergentiq({ caps = false, logoHeight = "1em" }) {
+function PoweredByHypergentiq({ caps = false, logoHeight = "1em", hideLabel = false }) {
+  // hideLabel drops the "Powered by" text and just renders the mark itself
+  // -- used by the loading splash, which wants a large standalone logo, not
+  // the small inline footer credit this component was originally built for.
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, verticalAlign: "middle" }}>
-      <span>{caps ? "POWERED BY" : "Powered by"}</span>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: hideLabel ? 0 : 4, verticalAlign: "middle" }}>
+      {!hideLabel && <span>{caps ? "POWERED BY" : "Powered by"}</span>}
       <svg viewBox="0 -99.2 584.8 130.2" style={{ height: logoHeight, width: "auto", flexShrink: 0 }} role="img" aria-label="Hypergentiq">
       <path d="M70 0V720H154V419Q179 464 224.5 490.0Q270 516 324 516Q382 516 425.0 492.5Q468 469 491.0 421.0Q514 373 514 300V0H431V291Q431 367 399.0 405.5Q367 444 306 444Q263 444 228.5 423.0Q194 402 174.0 363.0Q154 324 154 267V0Z" fill="#9BA0AA" transform="translate(0.00,0) scale(0.100000,-0.100000)"/>
       <path d="M125 -220 248 56H219L21 504H112L276 119L448 504H535L213 -220Z" fill="#9BA0AA" transform="translate(57.50,0) scale(0.100000,-0.100000)"/>
