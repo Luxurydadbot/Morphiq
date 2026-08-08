@@ -1,0 +1,9 @@
+{
+  "appId": "com.hypergentiq.app",
+  "appName": "Hypergentiq",
+  "webDir": "build",
+  "backgroundColor": "#121316",
+  "server": {
+    "androidScheme": "https"
+  }
+}
