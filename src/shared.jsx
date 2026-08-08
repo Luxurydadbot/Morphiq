@@ -1378,6 +1378,66 @@ function getWeightIncrement(equipment) {
   return equipment === "kettlebell" ? 9 : 5;
 }
 
+// ── Plate-math breakdown ──────────────────────────────────────────────────
+// Shows exactly which plates to load per side for a barbell working set --
+// e.g. "2×45 + 1×10 per side" -- instead of a member doing that math
+// themselves mid-set. Pure client-side arithmetic over the standard
+// commercial plate set already on any gym floor; no AI call, same reasoning
+// as detectPlateau()/isBigWeightJump() elsewhere in this file.
+//
+// Only meaningful for a true barbell lift -- dumbbells/kettlebells are
+// already a single fixed-weight implement, and most machines are pin-loaded,
+// not plate-loaded. isBarbellExercise() is deliberately name-based (checks
+// for the "Barbell " prefix EXERCISE_LIBRARY already uses for every real
+// barbell movement) rather than reading the plan-level equipment setting,
+// because even a "barbell" plan mixes in real dumbbell accessory work (e.g.
+// "Dumbbell lateral raise") that the plan-level flag alone can't tell apart.
+//
+// Known simplification, not a bug: assumes one standard 45lb Olympic bar for
+// every barbell exercise. Doesn't account for a women's 35lb bar, EZ-curl
+// bar, or trap bar weight -- revisit if that distinction ever becomes real
+// (e.g. a per-exercise bar-weight field), same spirit as the kettlebell
+// increment placeholder above.
+const BAR_WEIGHT_LBS = 45;
+const PLATE_SIZES_LBS = [45, 35, 25, 10, 5, 2.5]; // largest first, greedy fill
+
+function isBarbellExercise(exerciseName) {
+  return /^barbell\b/i.test((exerciseName || "").trim());
+}
+
+// Returns null when there isn't enough weight to break down (below bar
+// weight -- can't happen with a real bar, but a manually-typed override
+// could go there). { plates: [{size, count}], perSide, remainder, barOnly }
+// otherwise. remainder is only ever nonzero for an odd manually-typed
+// weight that doesn't land on a clean 2.5lb-per-side step -- every plan-
+// generated and stepper-adjusted weight always does (5lb total increments).
+function getPlateBreakdown(totalWeight, barWeight = BAR_WEIGHT_LBS) {
+  if (!totalWeight || totalWeight < barWeight) return null;
+  const perSide = (totalWeight - barWeight) / 2;
+  if (perSide <= 0) return { plates: [], perSide: 0, remainder: 0, barOnly: true };
+
+  const plates = [];
+  let remaining = perSide;
+  for (const size of PLATE_SIZES_LBS) {
+    const count = Math.floor(remaining / size + 1e-9); // epsilon guards float drift
+    if (count > 0) {
+      plates.push({ size, count });
+      remaining = Math.round((remaining - count * size) * 100) / 100;
+    }
+  }
+  return { plates, perSide, remainder: remaining, barOnly: false };
+}
+
+// Human-readable line for the active-set screen, e.g. "2×45 + 1×10 per side"
+// or "Just the bar". Returns null when there's nothing useful to show.
+function formatPlateBreakdown(breakdown) {
+  if (!breakdown) return null;
+  if (breakdown.barOnly) return `Just the bar (${BAR_WEIGHT_LBS} lbs)`;
+  if (!breakdown.plates.length) return null;
+  const parts = breakdown.plates.map(p => `${p.count}×${p.size}`).join(" + ");
+  return breakdown.remainder > 0.01 ? `~${parts} per side` : `${parts} per side`;
+}
+
 // ── Macro calculator (Mifflin-St Jeor) ────────────────────────────────────
 // Same formula OnboardingScreen.jsx and CustomPlanScreen (WorkoutScreen.jsx)
 // each used to keep as their own separate copy, "kept in sync manually" per
@@ -2978,6 +3038,7 @@ export {
   // Plan engine
   buildPlan, progressPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
   detectPlateau, shouldTriggerDeloadFromPlateau,
+  isBarbellExercise, getPlateBreakdown, formatPlateBreakdown,
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components

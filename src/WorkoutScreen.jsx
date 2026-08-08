@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
          WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
-         isMultiDayPlan, getAutoWorkoutDayIndex, calcMacros as calcMacrosShared, getWeightIncrement, clearWorkoutProgress } from "./shared.jsx";
+         isMultiDayPlan, getAutoWorkoutDayIndex, calcMacros as calcMacrosShared, getWeightIncrement, clearWorkoutProgress,
+         isBarbellExercise, getPlateBreakdown, formatPlateBreakdown } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -704,6 +705,13 @@ function WorkoutScreen() {
   // unless the member manually adjusted it with the +/- stepper below.
   // Mirrors how displayReps overrides currentTargetReps for reps.
   const displayWeight = weightOverride !== null ? weightOverride : currentWeight;
+
+  // Plate-math breakdown text for the current displayed weight — recomputed
+  // whenever the weight or exercise changes (stepper adjustments, exercise
+  // swaps, warm-up vs working set). isBarbellExercise() gates rendering in
+  // the JSX below; this just does the arithmetic once per render either way,
+  // cheap enough not to bother memoizing further.
+  const plateBreakdownText = formatPlateBreakdown(getPlateBreakdown(displayWeight));
 
   // Keep shared context updated so ChatScreen always knows exactly where we are
   useEffect(() => {
@@ -1710,6 +1718,15 @@ function WorkoutScreen() {
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Adjusted{displayWeight !== currentSpec.weight ? ` · ${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan` : ""}</div>
             ) : (
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>{displayWeight === currentSpec.weight ? "Today's target" : `${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan`}</div>
+            )}
+            {/* Plate-math breakdown — barbell exercises only (dumbbells/
+                kettlebells are a single fixed implement, most machines are
+                pin-loaded). Shown for both warm-up and working sets since a
+                member has to load the actual bar either way. Computed
+                client-side, no AI call — see getPlateBreakdown() in
+                shared.jsx. */}
+            {isBarbellExercise(ex.name) && plateBreakdownText && (
+              <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 4 }}>{plateBreakdownText}</div>
             )}
           </div>
         </div>
