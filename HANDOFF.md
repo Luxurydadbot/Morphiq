@@ -1,4 +1,4 @@
-# Hypergentiq — Session 23 master handoff (daily readiness check-in shipped)
+# Hypergentiq — Session 23 master handoff (daily readiness check-in shipped; plan-staleness audit found a real gap)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -24,6 +24,20 @@ Untouched this session. Bryant wants Hypergentiq submitted to both the Apple App
 **Minor known gap found, not fixed — low priority.** The "Up next" / "After that" rest-screen preview cards show the plan's raw, unadjusted weight (e.g. 200) rather than the readiness-adjusted weight (e.g. 210) a member will actually see once they get there. Only the main active-set screen's weight tile was wired to the readiness adjustment this session; the preview cards read a different, earlier computation that wasn't touched. Cosmetic/informational only — the actual working weight used and logged is correct, it's only the forward-looking preview number that's stale. Worth a quick follow-up pass next time this file is touched, not urgent enough to justify a separate session on its own.
 
 **Test-data cleanup performed after verification:** stray `workout_logs` rows created during testing were identified by exercise name and current-date and deleted, `WarmupTest`'s exercise/plan data was restored, `workout_progress` was nulled in Supabase, and `localStorage` was cleared in the browser before closing the tab.
+
+## Session 23 — AI plan staleness audit (code-review verification, real issue found)
+
+The last remaining item from Session 20's competitive research. JuggernautAI's #1 complaint in 2026 reviews was auto-programming settling into repetitive cycles over time — the question was whether Hypergentiq's per-day AI plan variation (shipped Session 15) actually stays fresh over a longer timeline, or quietly repeats the same exercises forever once the initial plan is built.
+
+**Method:** traced `buildPlan()` and `progressPlan()` (`shared.jsx`) end to end by hand rather than running a full simulated-timeline harness — the exercise-selection logic turned out to be a small number of clean boolean gates, not numeric edge cases, so the answer was conclusive from direct code reading without needing to build a simulation script.
+
+**What was confirmed working:** `buildPlan()` correctly builds a real, distinct exercise list per training day (Push/Pull/Legs or Upper/Lower, depending on `daysPerWeek`) — this was Session 15's fix and it still holds. Within a week, Push day never shows a squat and Legs day never shows a bench press.
+
+**The real finding:** week-over-week, after the initial plan is built, exercise *selection* only ever changes for one narrow user segment — members whose `trainingHistory` resolves to the `"experienced"` tier AND whose age is under 40. For that segment, a data-driven deload (or, worst case, a calendar fallback that's guaranteed to fire by week 8) flips every exercise to its single paired "variation" movement, then back, each time a deload triggers — real rotation, but only ever a 2-way alternation between one primary and one variation per slot (a known, already-documented Session 15 library limitation, not new).
+
+**For every other segment — beginners, "some" training history, "returning," and anyone 40 or older, regardless of experience — exercise selection never changes again after the plan is first built.** `progressPlan()`'s deload/variation logic is gated entirely behind `isExperienced && !isOver40`; every other combination hits the `{ shouldDeload: false, reason: "not_eligible" }` fallback with no substitute rotation mechanism anywhere else in the file. Week 1's exercise list is byte-for-byte week 52's exercise list for these members — only the weight and rep numbers move. This is worth flagging clearly: Hypergentiq's stated target user is "busy beginners," and beginners (`trainingHistory === "new"`) are the exact segment with zero exercise rotation, ever. This is precisely the pattern JuggernautAI's reviewers complained about, not a hypothetical.
+
+**Not fixed this session — this is a product/scope decision, not a quick bug fix**, consistent with Bryant's standing instruction to confirm any real change with him before writing it. A fix would mean either building out real per-exercise variation pools for every equipment type (the library currently has exactly one `variation` per slot, by design, per Session 15) or adding a separate non-deload-linked rotation schedule for the excluded segments — both are real feature work, not a one-line patch. Flagged as the new top punch-list item pending Bryant's direction on scope.
 
 ## Files touched this session (final line counts)
 
@@ -74,7 +88,7 @@ All files, current full line counts:
 
 ## Punch list, in priority order
 
-**FIRST — AI plan staleness audit**, the one remaining item from Session 20's competitive research (verification task over a longer simulated timeline, not new code, unless an issue turns up).
+**FIRST — decide how to close the plan-staleness gap found this session.** Beginners, "some"/"returning" training history, and anyone 40+ get zero exercise rotation for the life of their plan (see audit above) — only "experienced and under 40" members ever see their exercises change. Needs a scope decision from Bryant before any code: build real variation pools per equipment/pattern, or add a separate rotation schedule not tied to the deload system. Not started.
 
 **SECOND — unblock the privacy policy.** Still the single highest-leverage blocked item — blocks both this punch list and the entire App Store roadmap (STANDING GOAL, step 6). Still blocked on Bryant contacting a lawyer.
 
