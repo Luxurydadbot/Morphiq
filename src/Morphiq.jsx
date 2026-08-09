@@ -965,11 +965,20 @@ function HomeDashboardScreen() {
   }
 
   useEffect(() => {
-    // If we already have today's cached note, nothing to do
+    // If we already have a cached note for this exact day (today's date +
+    // whichever day is selected), just show it -- no need to call the AI
+    // again. Bug fix: this used to bail out here WITHOUT updating coachMsg,
+    // so switching back to a previously-viewed day left the screen showing
+    // whatever day was viewed most recently instead of that day's own
+    // (already-fetched) note. Now it actually displays the cached note.
     try {
-      if (localStorage.getItem(coachNoteKey)) return;
+      const cached = localStorage.getItem(coachNoteKey);
+      if (cached) {
+        setCoachMsg(cached);
+        return;
+      }
     } catch {}
-    // No cache — call the AI
+    // No cache for this day yet — call the AI
     setCoachLoading(true);
     // Build a real summary of the last workout session from actual log data
     const allLogs = historicalData?.workoutLogs || [];
