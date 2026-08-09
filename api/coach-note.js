@@ -16,7 +16,7 @@ async function handler(req, res) {
   const {
     name, goal, weeklyDone, weeklyTarget, streak, totalWorkouts,
     weightChange, lastSession, weekNumber, allDone, seed,
-    lastSessionExercises, nextWorkoutExercises,
+    lastSessionExercises, nextWorkoutType,
   } = body;
 
   const firstName = (name || "there").split(" ")[0];
@@ -43,8 +43,11 @@ async function handler(req, res) {
       : "Weight holding steady."
     : "";
 
-  const nextNote = nextWorkoutExercises
-    ? `Next workout includes: ${nextWorkoutExercises}.`
+  // Day label only (e.g. "Push day"), never a specific exercise name —
+  // exercises can be swapped mid-session after this note is already cached,
+  // so anything more specific than the day label risks going stale.
+  const nextNote = nextWorkoutType
+    ? `Next workout is a ${nextWorkoutType} day.`
     : "";
 
   const prompt = `You are a real fitness coach. Write ONE practical coaching note for ${firstName}'s home screen — the kind of thing a good personal trainer would actually say, not a motivational quote.
@@ -72,7 +75,7 @@ NEVER write:
 - Greetings or ${firstName}'s name
 - Questions
 
-If you have their last session data — reference a specific exercise, weight, or rep count. That is always more useful than anything generic.
+If you have their last session data — reference a specific exercise, weight, or rep count from THAT PAST SESSION. That is always more useful than anything generic. But never name a specific exercise for the upcoming/next workout — only the last session's exercises are safe to name specifically, since the next session's exercises can still change (a member can swap one out) after this note is generated.
 
 Write only the message. No quotes, no labels, no preamble.`;
 

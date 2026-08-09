@@ -939,7 +939,10 @@ function HomeDashboardScreen() {
         weightChange, lastSession, weekNumber: weekNum, allDone,
         seed: Math.floor(Math.random() * 10000),
         lastSessionExercises: exSummaryR,
-        nextWorkoutExercises: plan?.exercises?.slice(0, 3).map(e => e.name).join(", ") || null,
+        // Day label only (e.g. "Push day") — never a specific exercise name.
+        // A cached note can outlive an in-session exercise swap, so naming
+        // a specific "next" exercise risks going stale; the day label doesn't.
+        nextWorkoutType: workoutType || null,
       }),
     })
       .then(r => r.json())
@@ -983,8 +986,8 @@ function HomeDashboardScreen() {
         : `${ex.name}: ${ex.reps} reps`);
     }
 
-    // Next planned workout — first day in plan that isn't today
-    const nextWorkout = plan?.exercises?.slice(0, 3).map(e => e.name).join(", ") || null;
+    // Next planned workout — day label only (e.g. "Push day"), not specific
+    // exercise names, since exercises can be swapped after this note is cached.
 
     fetch("/api/coach-note", {
       method: "POST",
@@ -1002,7 +1005,7 @@ function HomeDashboardScreen() {
         allDone,
         seed: Math.floor(Math.random() * 10000),
         lastSessionExercises: exerciseSummary,
-        nextWorkoutExercises: nextWorkout,
+        nextWorkoutType: workoutType || null,
       }),
     })
       .then(r => r.json())
