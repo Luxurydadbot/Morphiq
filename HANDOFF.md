@@ -1,4 +1,4 @@
-# Hypergentiq — Session 28 master handoff (workout streak calendar timezone bug fixed)
+# Hypergentiq — Session 29 master handoff (home nutrition card copy fixed)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -24,6 +24,12 @@ Continuation of Session 25's Capacitor work. The `android/` and `ios/` projects 
 **Latest commit:** `d50e9f4` (branded icons/splash) on `main`.
 
 **No app source code was touched this session** — `src/` and `api/` are unchanged, line counts identical to prior sessions.
+
+## Session 29 — home screen nutrition card overclaimed
+
+Bryant flagged the "Nutrition today" card on the home screen: once you'd logged anything at all, it said "All meals logged today — Great job hitting your nutrition targets," even mid-day and even if calories logged were nowhere near the goal. Confirmed in code (`Morphiq.jsx`, `HomeDashboardScreen`): `nextMeal` only ever checks whether the day's log has any entries at all (`saved.length === 0`), never actually compares calories against `calGoal`. The wording claimed something the code never verified.
+
+**Fix (commit `51885a3`):** copy-only change. "All meals logged today" → "Logged today"; "Great job hitting your nutrition targets." → "Add more anytime — every meal counts toward today's goal." No logic changed — still shows once anything's been logged, same as before, just doesn't overclaim completion or goal-hitting. Bryant reviewed and approved the exact wording before it shipped.
 
 ## Session 28 — workout streak calendar showed nothing despite real data
 
@@ -157,7 +163,7 @@ All files, current full line counts:
 
 ## Latest commit
 
-`bbcd795` (workout streak calendar timezone fix) on `main`. Also recent: `69a8c59` (loading-screen wordmark), `951a823` (day-conflict screen redesign), `d50e9f4`/`a3461c7` (Capacitor icon branding/groundwork, Sessions 25-26).
+`51885a3` (nutrition card copy fix) on `main`. Also recent: `bbcd795` (streak calendar timezone fix), `69a8c59` (loading-screen wordmark), `951a823` (day-conflict screen redesign).
 
 ## Confirmed working vs still open
 
