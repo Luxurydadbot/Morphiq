@@ -1195,8 +1195,16 @@ function HomeDashboardScreen() {
             </div>
           ) : (
             <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, textAlign: "center" }}>
-              <div style={{ fontSize: 13, color: a, fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}>All meals logged today <Icon name="party" size={14} /></div>
-              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 3 }}>Great job hitting your nutrition targets.</div>
+              {/* Fix (Bryant, live report): this used to say "All meals logged
+                  today -- great job hitting your nutrition targets," but
+                  nextMeal only tracks whether anything at all has been
+                  logged today (see above) -- it never actually checks
+                  calories against the goal. That wording claimed a finished,
+                  on-target day after a single early snack. Reworded to only
+                  claim what's actually true: logging has started, more can
+                  be added anytime. */}
+              <div style={{ fontSize: 13, color: a, fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}>Logged today <Icon name="party" size={14} /></div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 3 }}>Add more anytime — every meal counts toward today's goal.</div>
             </div>
           )}
         </div>
