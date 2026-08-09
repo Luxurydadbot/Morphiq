@@ -16,7 +16,7 @@ async function handler(req, res) {
   const {
     name, goal, weeklyDone, weeklyTarget, streak, totalWorkouts,
     weightChange, lastSession, weekNumber, allDone, seed,
-    lastSessionExercises, nextWorkoutType,
+    lastSessionExercises, nextWorkoutType, nextWorkoutExercises,
   } = body;
 
   const firstName = (name || "there").split(" ")[0];
@@ -43,10 +43,14 @@ async function handler(req, res) {
       : "Weight holding steady."
     : "";
 
-  // Day label only (e.g. "Push day"), never a specific exercise name —
-  // exercises can be swapped mid-session after this note is already cached,
-  // so anything more specific than the day label risks going stale.
-  const nextNote = nextWorkoutType
+  // Prefer naming the actual next exercises (now sourced correctly from
+  // the member's real, day-specific upcoming list on the frontend — see
+  // Morphiq.jsx). Fall back to just the day label if exercise names aren't
+  // available. The note regenerates whenever the member picks a different
+  // day, so this stays matched to whatever day is actually selected.
+  const nextNote = nextWorkoutExercises
+    ? `Next workout (${nextWorkoutType || "today"}): ${nextWorkoutExercises}.`
+    : nextWorkoutType
     ? `Next workout is a ${nextWorkoutType} day.`
     : "";
 
@@ -75,7 +79,7 @@ NEVER write:
 - Greetings or ${firstName}'s name
 - Questions
 
-If you have their last session data — reference a specific exercise, weight, or rep count from THAT PAST SESSION. That is always more useful than anything generic. But never name a specific exercise for the upcoming/next workout — only the last session's exercises are safe to name specifically, since the next session's exercises can still change (a member can swap one out) after this note is generated.
+If you have their last session data or the next workout's exercises — reference a specific exercise, weight, or rep count. That is always more useful than anything generic.
 
 Write only the message. No quotes, no labels, no preamble.`;
 
