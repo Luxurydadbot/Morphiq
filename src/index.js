@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import Morphiq from './Morphiq';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 // Sentry catches crashes in the live app and emails an alert instead of the
 // error just disappearing. REACT_APP_SENTRY_DSN is set in Vercel's
@@ -56,3 +57,8 @@ root.render(
     <Morphiq />
   </Sentry.ErrorBoundary>
 );
+
+// Lets the app keep working (last screen shown) if a member loses signal --
+// see src/serviceWorkerRegistration.js for the safety design. Production
+// only, no effect on local development.
+serviceWorkerRegistration.register();
