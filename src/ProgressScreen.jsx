@@ -360,11 +360,18 @@ function ProgressScreen() {
               {[
                 { label:"Starting weight", start:"", current:`${startWeight} lbs`, delta:"", dColor:a },
                 { label:"Current weight",  start:"", current:`${curr} lbs`,        delta: lost >= 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, dColor: lost >= 0 ? a : "#F87171" },
-                { label:"Body fat est.",   start:"", current:"21%",                delta:"−3%",                                                    dColor:a },
+                // Was hardcoded to a fake "21%" / "−3%" regardless of the real
+                // member -- there's no body-fat input or tracking anywhere in
+                // the app to back that number up (no onboarding field, no log,
+                // no column). Rather than invent a formula the app has no real
+                // data to feed, this now honestly shows "not tracked yet",
+                // matching how the weight chart above handles missing real
+                // data instead of quietly faking a number.
+                { label:"Body fat est.",   start:"", current:"Not tracked yet",    delta:"", dColor:a, muted:true },
               ].map((row, i, arr) => (
                 <div key={row.label} style={{ display:"flex", alignItems:"center", padding:"10px 14px", borderBottom: i < arr.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                   <div style={{ flex:1, fontSize:13, color:theme.textMuted }}>{row.label}</div>
-                  <div style={{ fontSize:13, fontWeight:600, color:theme.text, marginRight:8 }}>{row.current}</div>
+                  <div style={{ fontSize:13, fontWeight: row.muted ? 400 : 600, color: row.muted ? theme.textFaint : theme.text, marginRight:8, fontStyle: row.muted ? "italic" : "normal" }}>{row.current}</div>
                   {row.delta && <div style={{ fontSize:11, color:row.dColor, fontWeight:600, minWidth:52, textAlign:"right" }}>{row.delta}</div>}
                 </div>
               ))}
