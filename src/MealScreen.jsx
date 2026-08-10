@@ -18,11 +18,28 @@ function MacroBar({ label, current, goal, color }) {
 }
 
 // ─── GroceryList ─────────────────────────────────────────────────────────────
-function GroceryList({ groceries, onToggle }) {
+// onAdd/onDelete manage custom items only (item.custom === true) -- the
+// plan-generated items are never editable, only checkable, same as before.
+function GroceryList({ groceries, onToggle, onAdd, onDelete }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
   const total = groceries.flatMap(c => c.items).length;
   const done = groceries.flatMap(c => c.items).filter(i => i.done).length;
+  const [addingCategory, setAddingCategory] = useState(null);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQty, setNewItemQty] = useState("");
+  const [savingAdd, setSavingAdd] = useState(false);
+
+  async function submitAdd(category) {
+    if (!newItemName.trim() || savingAdd) return;
+    setSavingAdd(true);
+    await onAdd(category, newItemName.trim(), newItemQty.trim());
+    setSavingAdd(false);
+    setNewItemName("");
+    setNewItemQty("");
+    setAddingCategory(null);
+  }
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -37,15 +54,47 @@ function GroceryList({ groceries, onToggle }) {
           <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>{cat.emoji} {cat.category}</div>
           <div style={{ background: "#212429", borderRadius: 12, overflow: "hidden" }}>
             {cat.items.map((item, i) => (
-              <button key={item.name} onClick={() => onToggle(cat.category, i)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "none", border: "none", borderBottom: i < cat.items.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
-                <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${item.done ? a : "rgba(76,141,255,0.3)"}`, background: item.done ? "#0B1E3D" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 9, color: a }}>
-                  {item.done ? <Icon name="check" size={10} /> : ""}
-                </div>
-                <span style={{ flex: 1, fontSize: 13, color: item.done ? theme.textDim : theme.text, textDecoration: item.done ? "line-through" : "none" }}>{item.name}</span>
-                <span style={{ fontSize: 11, color: theme.textFaint }}>{item.qty}</span>
-              </button>
+              <div key={item.custom ? `custom-${item.customId}` : item.name}
+                style={{ display: "flex", alignItems: "center", borderBottom: i < cat.items.length - 1 || addingCategory === cat.category ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                <button onClick={() => onToggle(cat.category, i)}
+                  style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                  <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${item.done ? a : "rgba(76,141,255,0.3)"}`, background: item.done ? "#0B1E3D" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 9, color: a }}>
+                    {item.done ? <Icon name="check" size={10} /> : ""}
+                  </div>
+                  <span style={{ flex: 1, fontSize: 13, color: item.done ? theme.textDim : theme.text, textDecoration: item.done ? "line-through" : "none" }}>{item.name}</span>
+                  <span style={{ fontSize: 11, color: theme.textFaint }}>{item.qty}</span>
+                </button>
+                {item.custom && (
+                  <button onClick={() => onDelete(item.customId, cat.category)} aria-label={`Remove ${item.name}`}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: theme.textFaint, fontSize: 13, padding: "9px 12px 9px 4px", fontFamily: "inherit" }}>
+                    ✕
+                  </button>
+                )}
+              </div>
             ))}
+            {addingCategory === cat.category ? (
+              <div style={{ display: "flex", gap: 6, padding: "8px 12px", alignItems: "center" }}>
+                <input autoFocus value={newItemName} onChange={e => setNewItemName(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && submitAdd(cat.category)}
+                  placeholder="Item name" style={{ flex: 2, background: "#1B1D21", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "7px 9px", fontSize: 12, color: theme.text, outline: "none", fontFamily: "inherit" }} />
+                <input value={newItemQty} onChange={e => setNewItemQty(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && submitAdd(cat.category)}
+                  placeholder="Qty (optional)" style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "7px 9px", fontSize: 12, color: theme.text, outline: "none", fontFamily: "inherit" }} />
+                <button onClick={() => submitAdd(cat.category)} disabled={!newItemName.trim() || savingAdd}
+                  style={{ background: newItemName.trim() ? a : "#2B2E34", border: "none", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 600, color: newItemName.trim() ? "#0B1E3D" : theme.textFaint, cursor: newItemName.trim() ? "pointer" : "default", fontFamily: "inherit" }}>
+                  {savingAdd ? "..." : "Add"}
+                </button>
+                <button onClick={() => { setAddingCategory(null); setNewItemName(""); setNewItemQty(""); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: theme.textFaint, fontSize: 12, padding: "7px 4px", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setAddingCategory(cat.category)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left", fontSize: 12, color: theme.textDim }}>
+                + Add item — stays on your list every week
+              </button>
+            )}
           </div>
         </div>
       ))}
@@ -584,9 +633,67 @@ function MealPlanScreen() {
     try { localStorage.setItem(groceryWeekKey, JSON.stringify(groceries)); } catch {}
   }, [groceries, groceryWeekKey]);
 
+  // Member-added items that recur every week (Supabase-backed, see
+  // sb.getGroceryCustomItems in shared.jsx) merged into the plan-generated
+  // list, which otherwise rebuilds from scratch every week and would
+  // silently drop anything the member added by hand. Runs once real auth is
+  // ready; merges by customId so it's safe if this effect ever re-fires.
+  useEffect(() => {
+    if (!supabaseUser?.id) return;
+    let cancelled = false;
+    sb.getGroceryCustomItems(supabaseUser.id).then(rows => {
+      if (cancelled || !rows.length) return;
+      // Restore this week's checked state for custom items the same way the
+      // initial build above does for plan items, so a custom item checked
+      // off earlier this week (before this fetch resolves) stays checked.
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(groceryWeekKey) || "null"); } catch {}
+      setGroceries(prev => {
+        const existingIds = new Set(prev.flatMap(c => c.items).filter(i => i.custom).map(i => i.customId));
+        const byCategory = {};
+        for (const row of rows) {
+          if (existingIds.has(row.id)) continue; // already merged, don't duplicate
+          const sc = saved?.find(c => c.category === row.category);
+          const si = sc?.items.find(i => i.name === row.item_name);
+          (byCategory[row.category] ||= []).push({
+            name: row.item_name, qty: row.qty || "", done: si ? si.done : false,
+            custom: true, customId: row.id,
+          });
+        }
+        if (!Object.keys(byCategory).length) return prev;
+        return prev.map(cat => byCategory[cat.category]
+          ? { ...cat, items: [...cat.items, ...byCategory[cat.category]] }
+          : cat);
+      });
+    });
+    return () => { cancelled = true; };
+  }, [supabaseUser?.id, groceryWeekKey]);
+
   function toggleGrocery(category, idx) {
     setGroceries(prev => prev.map(cat => cat.category !== category ? cat : {
       ...cat, items: cat.items.map((item, i) => i !== idx ? item : { ...item, done: !item.done })
+    }));
+  }
+
+  // Adds a custom item to Supabase (so it recurs next week too) and, on
+  // success, appends it locally right away rather than waiting on a refetch.
+  async function addCustomGroceryItem(category, name, qty) {
+    if (!supabaseUser?.id) return;
+    const row = await sb.insertGroceryCustomItem(supabaseUser.id, { category, itemName: name, qty });
+    if (!row) return;
+    setGroceries(prev => prev.map(cat => cat.category !== category ? cat : {
+      ...cat, items: [...cat.items, { name: row.item_name, qty: row.qty || "", done: false, custom: true, customId: row.id }],
+    }));
+  }
+
+  // Removes a custom item from Supabase and, on success, locally -- this is
+  // a permanent removal (stops it recurring), not just unchecking it for
+  // this week, so it deliberately doesn't touch the checked/done state.
+  async function deleteCustomGroceryItem(customId, category) {
+    const ok = await sb.deleteGroceryCustomItem(customId);
+    if (!ok) return;
+    setGroceries(prev => prev.map(cat => cat.category !== category ? cat : {
+      ...cat, items: cat.items.filter(item => item.customId !== customId),
     }));
   }
 
@@ -694,7 +801,7 @@ function MealPlanScreen() {
         {/* ── Grocery tab ── */}
         {tab === "grocery" && (
           <div className="mq-fade">
-            <GroceryList groceries={groceries} onToggle={toggleGrocery} />
+            <GroceryList groceries={groceries} onToggle={toggleGrocery} onAdd={addCustomGroceryItem} onDelete={deleteCustomGroceryItem} />
           </div>
         )}
 

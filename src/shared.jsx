@@ -549,6 +549,56 @@ const sb = {
     } catch { return []; }
   },
 
+  // ── GROCERY CUSTOM ITEMS ──────────────────────────────────────────────────
+  // Member-added grocery items that recur every week, unlike the rest of the
+  // grocery list which rebuilds fresh from the plan each week. Only the item
+  // itself lives here -- checked/done state stays local (localStorage, per
+  // week), matching how every other grocery item's checked state already
+  // works. table: grocery_custom_items (id, user_id, category, item_name,
+  // qty, created_at), RLS-scoped to the member's own rows via profiles.id.
+  async getGroceryCustomItems(supabaseUserId) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/grocery_custom_items?user_id=eq.${profileId}&order=created_at.asc`,
+        { headers: SB_GET() }
+      );
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows : [];
+    } catch { return []; }
+  },
+
+  async insertGroceryCustomItem(supabaseUserId, { category, itemName, qty }) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return null;
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/grocery_custom_items`, () => ({
+        method: "POST",
+        headers: { ...SB_HEADERS(), Prefer: "return=representation" },
+        body: JSON.stringify({
+          user_id: profileId,
+          category,
+          item_name: itemName,
+          qty: qty || null,
+        }),
+      }));
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return Array.isArray(rows) && rows[0] ? rows[0] : null;
+    } catch { return null; }
+  },
+
+  async deleteGroceryCustomItem(itemId) {
+    try {
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/grocery_custom_items?id=eq.${itemId}`, () => ({
+        method: "DELETE",
+        headers: SB_HEADERS(),
+      }));
+      return res.ok;
+    } catch { return false; }
+  },
+
   // ── MEAL LOGS ─────────────────────────────────────────────────────────────
   async insertMealLog(supabaseUserId, { mealId, status, loggedName, loggedCal, loggedProtein, loggedCarbs, loggedFat }) {
     try {
