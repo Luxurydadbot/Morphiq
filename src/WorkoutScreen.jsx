@@ -1633,6 +1633,22 @@ function WorkoutScreen() {
             // were actually coming up sooner.
             const afterThatSet = !upNextIsNewExercise && afterNext ? afterNext : null;
             const afterThatExercise = afterThatSet ? null : (upNextIsNewExercise ? exercises[safeExIdx + 2] : nextEx);
+            // Preview weight for an upcoming set of the CURRENT exercise --
+            // both `next` and `afterThatSet` are pulled straight from this
+            // exercise's own setPlan (see currentSpec above), same as
+            // currentWeight is, so the same readiness adjustment applies.
+            // Bug fix: these cards used to show setPlan's raw planned/
+            // autoregulated weight even when a Rough/Great readiness
+            // check-in was already adjusting the CURRENT set's weight --
+            // so "up next" could promise a number the member wouldn't
+            // actually see once they got there. Warm-up sets are excluded,
+            // same rule as currentWeight: warm-ups are never readiness-
+            // adjusted, they're already light by design.
+            const previewWeight = (setSpec) => (
+              setSpec && setSpec.kind === "working"
+                ? applyReadinessToWeight(setSpec.weight, readiness, ex.weightIncrement || 5)
+                : setSpec?.weight
+            );
             return (
               <>
                 <div style={{ background: "#0A1628", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
@@ -1647,7 +1663,7 @@ function WorkoutScreen() {
                       // weight) -- pulled straight from setPlan instead of a
                       // flat exercise-level fallback, so a warm-up set never
                       // shows the working max as what's coming up next.
-                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{next.label} · {next.weight} lbs · {next.targetReps} reps</div>
+                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{next.label} · {previewWeight(next)} lbs · {next.targetReps} reps</div>
                     ) : upNextIsNewExercise ? (
                       <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{nextEx.sets} sets · {nextEx.targetReps} reps</div>
                     ) : (
@@ -1664,7 +1680,7 @@ function WorkoutScreen() {
                       {afterThatSet ? (
                         <>
                           <div style={{ fontSize: 15, fontWeight: 600, color: theme.textDim }}>{ex.name}</div>
-                          <div style={{ fontSize: 11, color: theme.textFaint }}>{afterThatSet.label} · {afterThatSet.weight} lbs · {afterThatSet.targetReps} reps</div>
+                          <div style={{ fontSize: 11, color: theme.textFaint }}>{afterThatSet.label} · {previewWeight(afterThatSet)} lbs · {afterThatSet.targetReps} reps</div>
                         </>
                       ) : (
                         <>
