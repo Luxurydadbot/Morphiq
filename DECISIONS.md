@@ -90,6 +90,11 @@ Updated automatically at the end of every session. Never delete entries — appe
 - **How this could fit together with the live-timer idea above:** opening a cardio day could start with a short type-picker (treadmill / bike / stepper / rower / outdoor run / other) -- matching the Strava/Apple Fitness pattern -- then the live start/stop timer, then the optional pace/speed input for the MET-based calorie estimate. `buildPlan()` only needs to decide *which days* are cardio and space them correctly; it never needs to guess *what* the member will actually do that day.
 - **Still open:** exact onboarding question wording/flow, and whether cardio day count follows the same 3-4 strength / 2-4 cardio ranges noted in the earlier competitive research, or something else. Not built -- folded into the same not-started initiative.
 
+### Follow-up: calorie estimate updates live, not just at session end
+- Showed Bryant a quick mockup of the cardio-day screen (type picker, start/stop timer, optional pace field, live calorie estimate, matching the app's real dark theme and bottom nav). He confirmed he wants the estimated-calories number to climb in real time while the timer runs, not calculate once at the end.
+- **Decision: live-updating estimate confirmed.** Also the more accurate approach, not just the more engaging one -- recalculating continuously off elapsed time means a pace change mid-session gets credited to the time it actually happened during, instead of an end-of-session calculation having to guess which pace applied to which stretch of the workout. Implementation-wise: same MET-based formula from the entry above, just re-evaluated on a running interval (e.g. every second) using elapsed time so far, rather than a single one-shot calculation on stop.
+- Mockup itself not committed anywhere (chat-only visual, not app code) -- this entry is the record of the decision it produced.
+
 ---
 
 ## Standing technical decisions
