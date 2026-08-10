@@ -91,7 +91,7 @@ function GroceryList({ groceries, onToggle, onAdd, onDelete }) {
               </div>
             ) : (
               <button onClick={() => setAddingCategory(cat.category)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left", fontSize: 12, color: theme.textDim }}>
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left", fontSize: 13, fontWeight: 700, color: a }}>
                 + Add item — stays on your list every week
               </button>
             )}
