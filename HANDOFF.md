@@ -1,10 +1,25 @@
-# Hypergentiq — Session 29 master handoff (home nutrition card copy fixed)
+# Hypergentiq — Session 30 master handoff (weight-loss/cardio redesign scoped, five punch-list items shipped)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
 ## STANDING GOAL — App Store + Google Play submission roadmap (carry forward every session, do not delete until fully checked off)
 
-Progress this session on step (2): Capacitor installed and both native projects (`android/`, `ios/`) generated and committed. Full step list lives in git history (`git show 0d25354:HANDOFF.md` or earlier); short version: (1) fix PWA gaps (manifest icons, service worker) — still open, (2) add Capacitor + generate native projects — **started this session, see Session 25 below**, (3) set up Capgo live-update pipeline, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service — this sandbox has no Xcode, confirmed via `npx cap doctor`), (6) privacy policy — hard gate for both stores, still blocked on a lawyer, (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit.
+Step (1) closed this session: PWA service worker built and shipped (see Session 30 below), manifest was already fine. Full step list lives in git history (`git show 0d25354:HANDOFF.md` or earlier); short version: (1) fix PWA gaps (manifest icons, service worker) — **done, Session 30**, (2) add Capacitor + generate native projects — done (Session 25), still not opened/built in Android Studio or Xcode, (3) set up Capgo live-update pipeline — still open, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service — this sandbox has no Xcode, confirmed via `npx cap doctor`), (6) privacy policy — hard gate for both stores, still blocked on Bryant forming a real legal business entity (a first draft exists now, see punch list FIRST), (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit.
+
+## Session 30 — coach note accuracy, five punch-list items, weight-loss/cardio redesign scoped
+
+**Live bug reports first, in order:** Bryant reported the home-screen "Your coach" AI note referencing an exercise (Bulgarian split squats) that wasn't actually part of that day's workout. Root cause: the note-generator pulled from `plan.exercises` (the plan's raw list) instead of `upcomingExercises`, the correctly-computed, day-specific list the workout card itself already used for multi-day rotations. Fixed the data source, then — per Bryant's follow-up concern that even correct data could go stale if a member swaps an exercise mid-session — restructured further so the coach note only names specific exercises from the member's already-completed last session (immutable, can't go stale) and only ever names the *upcoming* day's exercise by type (day label), regenerating automatically whenever the member switches which day they're viewing (`coachNoteKey` now includes the active day index, not just the date). A second bug surfaced during Bryant's own live testing of that fix: switching back to a previously-viewed day left the screen showing whichever day's note was displayed last, not that day's own already-cached note — the effect found the cache existed and silently did nothing with it instead of displaying it. Fixed to actually show the cached note on switch. All three fixes verified live by Bryant toggling between days in the running app.
+
+**Full punch-list code audit, requested directly by Bryant** (mirroring the Session 24 audit pattern): went through every open item and verified each against actual code rather than trusting the written description. Unlike Session 24, nothing turned out to be secretly already done this time — every open item was confirmed genuinely still open.
+
+**Five punch-list items shipped this session:**
+1. **PWA service worker** (STANDING GOAL step 1) — `public/service-worker.js` + `src/serviceWorkerRegistration.js`, network-first by design (never precache-everything, to avoid the classic bug where members get stuck on an old cached version after a deploy), explicitly skips `/api/` and cross-origin requests so no dynamic/user data is ever cached as static. Verified with a real `npm install` + `CI=false npm run build` in-session (not just `esbuild` syntax checks) — confirmed the build succeeds and `service-worker.js` lands correctly in the build output root.
+2. **Privacy policy first draft** — Bryant said an earlier draft existed but it could not be found anywhere (this repo, `HANDOFF.md`/`MASTER_HANDOFF.md` history, or the project's synced docs/files) and is presumed lost. Redrafted from a direct audit of what the app's code actually collects (onboarding fields, workout/meal/cardio logs, meal photos handled transiently not stored, voice input processed client-side, real subprocessors named: Supabase/Anthropic/Stripe/Vercel/Sentry), not generic boilerplate. Every fact only Bryant/counsel can supply (legal entity name, address, retention period, minimum age, etc.) is an explicit highlighted placeholder. Saved as `PRIVACY_POLICY_DRAFT.md` at the repo root specifically so it can't get lost the same way again, and also handed to Bryant directly as a formatted `.docx`. Real blocker corrected in the punch list: Bryant doesn't have a registered legal business entity yet, so there's no lawyer step to take until that exists.
+3. **"Body fat est." hardcoded stat** — Progress screen always showed a fake "21%" regardless of the real member, with no body-fat input, log, or column anywhere in the app to back it. Now honestly reads "Not tracked yet" in a muted style, matching how the weight chart above it already handles a member with no real data yet.
+4. **"Up next"/"After that" preview cards not reflecting readiness** — confirmed real: the cards read `setPlan`'s raw planned/autoregulated weight directly, never the readiness-adjusted number the active-set tile already showed. Fixed with a display-only `previewWeight()` helper that applies the exact same `applyReadinessToWeight()` to the preview cards — doesn't touch `setPlan`, `currentWeight`, or the logging path at all.
+5. **Grocery list custom/recurring items** — confirmed the entire grocery feature was 100% browser-local, nothing in Supabase, before writing any code (checked the real schema live via the Supabase MCP tool rather than assuming). Added a new `grocery_custom_items` table, RLS-scoped per member with the exact same policy shape as `workout_logs`/`meal_logs`/`cardio_logs`. `MealScreen.jsx`'s `GroceryList` now has an inline "Add item" row per category and a remove button on custom items only; custom items are fetched and merged into the list every time it rebuilds so they recur automatically instead of getting wiped weekly. Checked/done state still resets weekly like every other item — only the item itself persists. Follow-up style tweak per Bryant: the "+ Add item" text bumped from small/muted-gray to bold/accent-blue for more contrast.
+
+**Weight-loss (`lose_fat`) goal path — real gap identified, fully scoped, nothing built yet.** Bryant asked directly whether the app has been tested for anyone beyond strength/muscle-building goals, and specifically whether `lose_fat` includes real cardio or bodyweight training, not just the same lifting plan. Code audit confirmed the concern: `buildPlan()` treats `lose_fat` as the identical squat/hinge/push/pull structure as every other goal — only rep range, rest, and one inconsistent "finisher" slot differ, and three of the four equipment paths (barbell/dumbbell/kettlebell) never touch cardio at all in their generated plan; only the "machine" path's finisher is real cardio. No true no-equipment onboarding path exists. Real cardio logging (`CardioQuickLog`, Progress screen) is fully manual, after-the-fact only (voice/text description parsed by AI, no live timer, no wearable sync), and completely disconnected from goal selection. Nutrition math is already correctly goal-adjusted (`calcMacros()` — real ~350cal deficit for `lose_fat`, research-cited) but gets no extra UI emphasis for a weight-loss goal specifically. Researched how top hybrid-training apps (Edge, Peloton, Fitbod, Hevy+Strava, Nike, Freeletics) and pure activity trackers (Strava, Apple Fitness/Watch, Garmin) actually structure this: cardio as separate days scheduled apart from heavy lifting days (not merged into one session), and activity *type* picked at the point of starting a session, never pre-assigned days ahead — which also matches a design principle Hypergentiq already has (situational/today-only choices belong at the point of use, per the June 26, 2026 DECISIONS.md entry). Bryant proposed a concrete shape: onboarding asks lifting days and cardio days as two separate numbers; `buildPlan()` only decides which days are cardio and spaces them correctly; the member picks the actual activity type when they open that day; a live start/stop timer with an optional pace field gives a MET-based calorie estimate that updates in real time as it runs (confirmed more accurate, not just more engaging, since it credits pace changes to when they actually happened); real wearable sync (Apple Health/Fitbit) is a separate, bigger phase for later. Custom-built plans have the same gap — confirmed the custom-plan builder (`CustomPlanScreen`) has zero cardio concept either, and because AI-generated and hand-built plans already share the exact same `plan.customDays` shape, a single day-level "is this a cardio day" flag would fix both plan types at once rather than needing two separate builds. Showed Bryant a quick chat-only visual mockup of the cardio-day screen (type picker, timer, live calorie estimate) to confirm the direction — not committed anywhere, chat-only. **Everything here is documented in full in `DECISIONS.md` (August 9, 2026 entries) and referenced from punch list TENTH below. Not started — needs Bryant's decisions on cardio-day count defaults and exact onboarding wording before any implementation begins.**
 
 ## Session 26 — branded native app icons and splash screens
 
@@ -128,27 +143,36 @@ Bryant reviewed the staleness audit finding and pushed back on the age-40 exclus
 
 ## Files touched this session (final line counts)
 
-- `src/shared.jsx`: 3,065 → 3,108 (+43: +24 readiness feature, +19 age-40 exclusion removal/beginner runway)
-- `src/WorkoutScreen.jsx`: 2,628 → 2,711 (+83 net: +77 readiness feature, +6 exIdx bug fix)
+- `src/Morphiq.jsx`: 1,586 → 1,628 (+42: coach note data-source fix, per-day regeneration, cache-display fix)
+- `api/coach-note.js`: 108 → 115 (+7: matching prompt changes for the coach note fixes)
+- `src/ProgressScreen.jsx`: 580 → 587 (+7: Body fat est. honest-state fix)
+- `src/WorkoutScreen.jsx`: 2,711 → 2,734 (+23: previewWeight() readiness fix for Up next/After that)
+- `src/MealScreen.jsx`: 724 → 831 (+107: grocery custom-item add/remove UI, "+ Add item" style tweak)
+- `src/shared.jsx`: 3,108 → 3,168 (+60: sb.getGroceryCustomItems/insertGroceryCustomItem/deleteGroceryCustomItem)
+- `src/index.js`: new PWA service-worker registration call
+- `src/serviceWorkerRegistration.js`: new file, 23 lines
+- `public/service-worker.js`: new file, 90 lines (not part of the src/api line-count convention, tracked separately)
+- `PRIVACY_POLICY_DRAFT.md`: new file, 282 lines (docs, not app code)
+- **New Supabase table:** `grocery_custom_items` (id, user_id, category, item_name, qty, created_at), RLS enabled, same `members_manage_own_*`/`admin_view_all_*` policy shape as `workout_logs`/`meal_logs`/`cardio_logs`. Verified against the real schema live via the Supabase MCP tool before writing any code — confirmed no grocery table existed at all beforehand. No security advisories flagged against it after creation.
 
 All files, current full line counts:
 
 | File | Lines |
 | --- | --- |
-| src/shared.jsx | 3,108 |
-| src/WorkoutScreen.jsx | 2,711 |
-| src/Morphiq.jsx | 1,586 |
+| src/shared.jsx | 3,168 |
+| src/WorkoutScreen.jsx | 2,734 |
+| src/Morphiq.jsx | 1,628 |
 | src/GymOwnerDashboard.jsx | 927 |
-| src/MealScreen.jsx | 724 |
+| src/MealScreen.jsx | 831 |
+| src/ProgressScreen.jsx | 587 |
 | src/OnboardingScreen.jsx | 583 |
-| src/ProgressScreen.jsx | 580 |
 | src/ChatScreen.jsx | 300 |
 | src/SuperAdminDashboard.jsx | 343 |
 | src/GymSignupScreen.jsx | 269 |
 | api/chat.js | 259 |
 | api/report-usage.js | 165 |
 | api/stripe-webhook.js | 161 |
-| api/coach-note.js | 108 |
+| api/coach-note.js | 115 |
 | api/admin-gym-action.js | 110 |
 | api/monthly-usage-report.js | 101 |
 | api/create-checkout.js | 89 |
@@ -158,22 +182,24 @@ All files, current full line counts:
 | api/plan.js | 31 |
 | api/_sentry.js | 32 |
 | api/ping.js | 12 |
+| src/index.js | 64 |
+| src/serviceWorkerRegistration.js | 23 |
 
-`shared.jsx` (3,108) and `WorkoutScreen.jsx` (2,711) are both well past the 2,000-line soft target and `WorkoutScreen.jsx` in particular is creeping toward the 3,800-line hard limit faster than `shared.jsx` is. Bryant raised this concern directly this session and asked to defer any split for now (not a housekeeping session) — explicitly hold off starting a split until he asks, but flag it again if `WorkoutScreen.jsx` crosses roughly 3,000 lines.
+`shared.jsx` (3,168) and `WorkoutScreen.jsx` (2,734) remain the two largest files, both past the 2,000-line soft target but well under the 3,800-line hard limit. Bryant asked in a prior session to defer any split until he asks — still holding off, flag again if `WorkoutScreen.jsx` crosses roughly 3,000 lines (currently 266 lines of headroom).
 
 ## Latest commit
 
-`51885a3` (nutrition card copy fix) on `main`. Also recent: `bbcd795` (streak calendar timezone fix), `69a8c59` (loading-screen wordmark), `951a823` (day-conflict screen redesign).
+`1040a4a` (live-updating cardio calorie estimate decision logged) on `main`. 15 real commits this session on top of `8710a3d` (prior session's close) — full list: `e6d5458`, `d625048`, `92c8a1b` (coach note fixes), `c221766` (PWA service worker), `8f66228` (privacy policy), `0ec510d`/`e38f821` (Body fat est.), `f0cc9da`/`93bf480` (Up next readiness), `389f314`/`0777d89` (grocery custom items), `bf3ba47` (grocery button style), `87e7611`/`8107c03`/`8476dd4`/`1040a4a` (weight-loss/cardio redesign docs).
 
 ## Confirmed working vs still open
 
-**Verified this session:** both changed files compile clean via `esbuild` (syntax/JSX valid), diffs reviewed, pre-push safety checks passed on both commits.
+**Verified this session:** every code change compiled clean via `esbuild`; the PWA service worker and the grocery custom-items feature were each additionally verified with a real `npm install` + `CI=false npm run build` (not just syntax checks) — both succeeded with no new eslint warnings in touched files. The `grocery_custom_items` table was verified against the live Supabase schema and security advisors, not assumed.
 
-**Live-verified this session:** the daily readiness check-in (Rough/OK/Great, all three paths, plus reload-persistence) — see above, all correct.
+**Live-verified this session, by Bryant in the running app:** all three coach note fixes (correct exercise per day, day-switch regeneration, cache-display fix) — confirmed by toggling between days and seeing each day's own note appear correctly, instantly, without re-calling the AI on a revisit.
 
-**Verified this session (logic, not live browser):** the age-40 exclusion removal and 6-week beginner runway — confirmed via a Node harness running the real, pushed `shouldTriggerDeloadFromPlateau()` against synthetic plateaued logs (see above). Real live confirmation would require walking a test account through 6+ simulated weeks, impractical in one sitting — worth doing opportunistically if `WarmupTest`'s plan/logs ever get built out that far for other testing.
+**Verified via code/build only, not live-clicked yet:** the PWA service worker (build output confirmed correct, but nobody has opened the deployed site and checked Application > Service Workers in dev tools yet), the Body fat est. fix, the Up next/After that readiness fix, and the grocery custom-items feature (add, recur next week, remove).
 
-**Known open item, not urgent:** "Up next"/"After that" preview cards don't reflect the readiness-adjusted weight (see above).
+**Not built, fully scoped only:** the entire weight-loss/cardio redesign (onboarding questions, `buildPlan()` cardio-day spacing, cardio-day screen with type picker/timer/live calorie estimate, cardio-day support in `CustomPlanScreen` via a shared day-level flag). Full detail in `DECISIONS.md`, pointer in punch list TENTH below. This is genuinely the biggest single thing from this session — bigger in scope than everything else combined — and nothing has been written for it yet.
 
 ## Punch list, in priority order
 
@@ -203,7 +229,9 @@ All files, current full line counts:
 
 ## Technical notes carried forward
 
-**MANDATORY fetch method — git clone only.** `api.github.com` and direct `curl`/Python HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked outright by this environment's outbound proxy allowlist. The web-fetch tool's access to `raw.githubusercontent.com` can also silently return **stale cached content** instead of erroring — confirmed in Session 22 (served an 11-session-old `HANDOFF.md`). `git clone`/`git push` over authenticated HTTPS from a plain scratch directory remains the only fetch method to trust by default.
+**MANDATORY fetch method — git clone only.** `api.github.com` and direct `curl`/Python HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked outright by this environment's outbound proxy allowlist. The web-fetch tool's access to `raw.githubusercontent.com` can also silently return **stale cached content** instead of erroring — confirmed again in Session 30 (served an over-10-session-old `HANDOFF.md` on the very first fetch attempt, before falling back to `git clone` per this same note). `git clone`/`git push` over authenticated HTTPS from a plain scratch directory remains the only fetch method to trust by default.
+
+**Verify the real Supabase schema via the Supabase MCP tool before writing any DB code, don't just grep the frontend.** Session 30: confirmed live (via `list_tables`, `list_projects`, `execute_sql` against `pg_policies`) that no grocery-related table existed at all before building `grocery_custom_items`, and mirrored the exact existing RLS policy shape from `workout_logs`/`meal_logs`/`cardio_logs` rather than inventing a new pattern. Cheap, fast, and removes all doubt versus inferring schema from `shared.jsx` fetch calls alone.
 
 **Client-side progress persistence has TWO layers, both must be cleared for a clean test reset.** Learned the hard way this session: a stale `localStorage` key (`morphiq_workout_progress_<supabase_user_id>`) left over from an *earlier* test session survived a cleanup pass that only nulled the Supabase `workout_progress` column, and caused a crash on the next test run (the same crash the `exIdx` bug fix above addresses defensively, but the stale state was the trigger). Always clear both the Supabase column and the browser's `localStorage` together, not just one.
 
@@ -213,34 +241,34 @@ All files, current full line counts:
 
 **No live Node/npm toolchain in this sandbox by default** — `node_modules` isn't checked into the repo. `esbuild` (installed standalone via `npm install --no-save esbuild --prefix /tmp/esbuild-check`) remains the fast syntax/JSX sanity check used in place of a full `react-scripts build`.
 
-## Session 23 close-out summary
+## Session 30 close-out summary
 
-**Everything built/changed this session:** plate-math breakdown was Session 22 — this session started with (1) the daily readiness check-in (Rough/OK/Great, `shared.jsx` + `WorkoutScreen.jsx`), (2) a real crash-bug fix found while testing it (`exIdx` bounds-check), (3) the AI plan-staleness audit (code-review verification, no code), and (4) a real fix in response to that audit — removed the age-40 exclusion from exercise rotation and added a research-backed 6-week beginner runway, so rotation eligibility is now paced by training experience only, never age.
+**Everything built/changed this session:** three coach note bugs found and fixed live with Bryant (wrong exercise per day, stale cache on day-switch, correct-but-not-displayed cache); a full punch-list code audit (nothing stale this time, unlike Session 24); five real punch-list items shipped (PWA service worker, privacy policy first draft, Body fat est. honest state, Up next/After that readiness fix, grocery custom/recurring items with a brand-new RLS-protected Supabase table); and a large scoping/design conversation for a real `lose_fat` goal redesign (workout structure, cardio integration, onboarding flow, a live cardio timer with real-time MET-based calorie estimation, point-of-use activity-type selection) fully documented in `DECISIONS.md` but not yet built.
 
-**Confirmed working:** readiness check-in — live-verified in Chrome (Rough/OK/Great, plate-math integration, reload-persistence). exIdx crash fix — `esbuild` + diff review. Age-40 removal / beginner runway — logic-verified via a standalone Node harness against the real, pushed `shouldTriggerDeloadFromPlateau()` function (beginner correctly blocked at week 4 / fires at week 7; non-beginner unchanged at the 3-week floor).
+**Confirmed working:** all three coach note fixes, live-verified by Bryant in the running app. Everything else this session verified via `esbuild` and/or a real `npm run build`, plus the Supabase schema/RLS changes verified directly against the live database — nothing pushed on a guess.
 
-**Still needs testing:** a real live multi-week walkthrough of the age-40/beginner-runway rotation fix (not practical to run in one sitting — would need `WarmupTest` or a fresh profile carried through 6+ simulated weeks with plateaued logs). The "Up next"/"After that" preview cards still show the pre-readiness-adjustment weight (cosmetic, low priority). The exIdx fix and readiness feature are otherwise fully verified.
+**Still needs testing:** the PWA service worker hasn't been opened in a live browser yet to confirm it actually activates (Application > Service Workers). The grocery custom-items feature hasn't been live-clicked end to end (add an item, confirm it survives into a fresh week, remove it). The Body fat est. and Up next/After that fixes are small enough that build-level verification is reasonably high-confidence, but neither has been eyeballed live either.
 
-**Next priority task:** punch list FIRST is now the privacy policy (blocked on Bryant/a lawyer, not actionable by Claude). The next actually-startable item is SECOND — no-blocker App Store/Capacitor groundwork (PWA manifest/service-worker gaps, then Capacitor install) — or Bryant may want to talk through the NINTH item (deeper exercise-variety pools beyond the binary primary/variation swap) before that's built.
+**Next priority task:** the weight-loss/cardio redesign (punch list TENTH) is the single biggest thing on the table right now — fully scoped, nothing built. It needs Bryant's decisions on cardio-day count defaults (e.g. does `lose_fat` default to 3 lifting + 2 cardio?) and exact onboarding question wording before implementation can start; see `DECISIONS.md` (August 9, 2026 entries) for the full design. Aside from that, the privacy policy remains blocked on Bryant forming a real business entity (not actionable by Claude), and Capacitor's `android/` project still hasn't been opened in Android Studio to confirm it builds.
 
 **Final line counts, all files:**
 
 | File | Lines |
 | --- | --- |
-| src/shared.jsx | 3,108 |
-| src/WorkoutScreen.jsx | 2,711 |
-| src/Morphiq.jsx | 1,586 |
+| src/shared.jsx | 3,168 |
+| src/WorkoutScreen.jsx | 2,734 |
+| src/Morphiq.jsx | 1,628 |
 | src/GymOwnerDashboard.jsx | 927 |
-| src/MealScreen.jsx | 724 |
+| src/MealScreen.jsx | 831 |
+| src/ProgressScreen.jsx | 587 |
 | src/OnboardingScreen.jsx | 583 |
-| src/ProgressScreen.jsx | 580 |
 | src/ChatScreen.jsx | 300 |
 | src/SuperAdminDashboard.jsx | 343 |
 | src/GymSignupScreen.jsx | 269 |
 | api/chat.js | 259 |
 | api/report-usage.js | 165 |
 | api/stripe-webhook.js | 161 |
-| api/coach-note.js | 108 |
+| api/coach-note.js | 115 |
 | api/admin-gym-action.js | 110 |
 | api/monthly-usage-report.js | 101 |
 | api/create-checkout.js | 89 |
@@ -250,15 +278,19 @@ All files, current full line counts:
 | api/plan.js | 31 |
 | api/_sentry.js | 32 |
 | api/ping.js | 12 |
+| src/index.js | 64 |
+| src/serviceWorkerRegistration.js | 23 |
 
-All files well under the 3,800-line hard limit. `shared.jsx` and `WorkoutScreen.jsx` remain past the 2,000-line soft target — split still deferred at Bryant's request, flag again if `WorkoutScreen.jsx` crosses ~3,000 lines.
+All files well under the 3,800-line hard limit. `shared.jsx` and `WorkoutScreen.jsx` remain past the 2,000-line soft target — split still deferred at Bryant's request, flag again if `WorkoutScreen.jsx` crosses ~3,000 lines (currently 266 lines of headroom).
 
-**Latest commit:** `897fb7b` on `main`.
+**Latest commit:** `1040a4a` on `main`.
 
 ## Paste this at the start of your next session
 
-Fetch HANDOFF.md and all src/ and api/ files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content, confirmed Session 22). Report every file's line count before doing anything else; stop and propose a split if any file exceeds 3,800 lines (none do currently — `shared.jsx` is the largest at 3,108).
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content, reconfirmed Session 30). Report every file's line count before doing anything else; none are near the 3,800-line limit currently (`shared.jsx` is largest at 3,168).
 
-Remind Bryant of the next priority task: the privacy policy is still the highest-leverage blocked item (needs him to contact a lawyer — not actionable by Claude). Bryant was asked (end of Session 27) to pick a next no-Mac-needed priority from: finishing the PWA service-worker gap, drafting a privacy policy for lawyer review, store listing assets/screenshots, or Capgo live-update setup -- he hasn't picked yet, got pulled into two more live bug reports instead (Session 28: streak calendar; Session 27: day-conflict screen + loading wordmark). That question is still open for next session. Capacitor groundwork is started and branded (Sessions 25-26) — `android/` and `ios/` native projects exist, are committed, and use the pulse/heartbeat icon mark (`logo512.png`) for icons/splash, but nobody has opened/built them yet; next concrete step is opening `android/` in Android Studio on his Windows PC to confirm it builds (iOS needs a Mac, not attempted). PWA manifest/service-worker gaps are still open too. Flagged, not resolved: confirm with Bryant whether the pulse/heartbeat icon mark is actually the intended app-icon symbol before touching the Capacitor icons again. He may also want to discuss punch-list item NINTH — building real exercise-variety pools beyond the current one-primary/one-variation-per-slot swap — before more rotation work happens.
+Remind Bryant of the next priority task: **the weight-loss/cardio redesign is the big one on the table.** It's fully scoped in `DECISIONS.md` (August 9, 2026 entries) — real gaps confirmed in both the workout side (`lose_fat` is functionally the same lifting plan as every other goal, no true cardio integration, no bodyweight-only path) and the nutrition side (math is goal-correct but gets no extra UI emphasis for weight loss) — plus a full design direction Bryant worked through in conversation: separate lifting-days/cardio-days onboarding questions, `buildPlan()` spacing cardio away from heavy lifting days, activity type picked at the point of use (matches Strava/Apple Fitness/Garmin convention and an existing Hypergentiq design principle), a live start/stop timer with a real-time MET-based calorie estimate, and the same day-level cardio flag working for both AI-generated and hand-built (`CustomPlanScreen`) plans since they already share one data shape (`plan.customDays`). A chat-only visual mockup was shown and approved in direction. **Nothing is built yet** — needs Bryant's decisions on cardio-day count defaults and onboarding wording before real implementation starts.
 
-Current state: daily readiness check-in and the plate-math breakdown are both shipped and live-verified. The AI plan-staleness gap Bryant flagged (age-40 exclusion from exercise rotation) is fixed and logic-verified — every experience tier now rotates, beginners get a 6-week runway first, age plays no role anywhere in the rotation/deload gate. A minor cosmetic gap remains: the "Up next"/"After that" rest-screen preview cards don't reflect the readiness-adjusted weight yet. Capacitor is installed, configured, and both native projects are scaffolded, committed, and branded with the pulse/heartbeat icon mark for icons/splash screens (Sessions 25-26). The day-conflict/unfinished-workout prompt now gets its own screen instead of stacking over the readiness check-in, and the loading screen shows the real two-tone wordmark for Hypergentiq's own account (Session 27). The Progress screen's workout streak calendar now correctly lights up real logged workout days -- it was comparing UTC dates against locally-stored dates and so almost always looked empty regardless of real activity (Session 28). All three of the last sessions were live bug reports from Bryant using the real app, not planned roadmap work, and all three were live-verified fixed post-deploy on the WarmupTest account with test data cleaned up after.
+Also still open: the privacy policy (`PRIVACY_POLICY_DRAFT.md`, repo root) is blocked on Bryant forming a real legal business entity, not on finding a lawyer — don't suggest "contact a lawyer" as the next step, there's no entity to have counsel review yet. Capacitor's `android/`/`ios/` native projects are scaffolded and branded but still nobody has opened `android/` in Android Studio to confirm it actually builds. The Capgo live-update pipeline (STANDING GOAL step 3) hasn't been started.
+
+Current state: home-screen coach note is fixed and live-verified (correct exercise per day, regenerates on day switch, displays the right cached note when switching back). Five punch-list items shipped and build-verified this session (PWA service worker, privacy policy draft, Body fat est., Up next/After that readiness, grocery custom/recurring items) but none of the five have been live-clicked in the running app yet — worth a spot-check pass if there's ever a natural moment for one. The weight-loss/cardio redesign conversation is the dominant open thread heading into next session.
