@@ -2657,6 +2657,7 @@ function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
   const [parsed, setParsed] = useState(null);
   const [errMsg, setErrMsg] = useState("");
   const [saved, setSaved] = useState(false);
+  const [lastLogged, setLastLogged] = useState(null); // { activityType, durationMinutes, calories } captured right before reset() clears parsed, so the post-save confirmation can show real numbers instead of just "Saved"
   const recognitionRef = useRef(null);
 
   function reset() {
@@ -2707,9 +2708,10 @@ function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
       calories: parsed.calories,
     });
     if (!ok) { setErrMsg("Couldn't save -- try again."); setPhase("error"); return; }
+    setLastLogged({ activityType: parsed.activityType, durationMinutes: parsed.durationMinutes, calories: parsed.calories });
     reset();
     setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setTimeout(() => setSaved(false), 4000);
     onLogged?.();
   }
 
@@ -2769,7 +2771,16 @@ function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
           <button onClick={reset} style={{ background: accent, border: "none", borderRadius: 9, padding: "7px 20px", fontSize: 11, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
         </div>
       )}
-      {saved && <div style={{ textAlign: "center", fontSize: 11, color: accent, marginTop: 8 }}>Saved <Icon name="check" size={11} style={{ verticalAlign: "-1px" }} /></div>}
+      {saved && lastLogged && (
+        <div style={{ textAlign: "center", marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: accent, marginBottom: 2 }}>{lastLogged.activityType} saved <Icon name="check" size={11} style={{ verticalAlign: "-1px" }} /></div>
+          <div style={{ fontSize: 12, color: "#EDEEF0" }}>
+            <span style={{ fontWeight: 600 }}>{lastLogged.durationMinutes} min</span>
+            <span style={{ color: "#6E7480" }}> &middot; </span>
+            <span style={{ fontWeight: 600 }}>~{lastLogged.calories} cal</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3106,6 +3117,42 @@ function WeightChart({ data, accent }) {
   );
 }
 
+// CardioWeeklyChart — simple bar chart of total cardio minutes per week,
+// same minimal SVG style as WeightChart above (same viewBox scale, font,
+// muted label color) so it reads as part of the same chart family instead
+// of a one-off. data: [{ label, minutes }], oldest week first -- caller
+// (ProgressScreen.jsx) buckets the raw cardioLogs into weeks; this
+// component only draws what it's given. Requested by Bryant so members can
+// see a week/month cardio trend at a glance, not just the two totals cards.
+function CardioWeeklyChart({ data, accent }) {
+  const W = 260, H = 90, PAD = 10;
+  if (!data || data.length === 0) return null;
+  const maxV = Math.max(...data.map(d => d.minutes), 1);
+  const slot = (W - PAD * 2) / data.length;
+  const barW = slot * 0.6;
+  const toH = v => (v / maxV) * (H - PAD * 2 - 14);
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      {data.map((d, i) => {
+        const barH = d.minutes > 0 ? Math.max(toH(d.minutes), 2) : 0;
+        const x = PAD + i * slot + (slot - barW) / 2;
+        const y = H - 14 - barH;
+        const isCurrent = i === data.length - 1;
+        return (
+          <g key={i}>
+            <rect x={x} y={H - 14 - 2} width={barW} height={2} rx={1} fill="#242730" />
+            {barH > 0 && <rect x={x} y={y} width={barW} height={barH} rx={3} fill={accent} opacity={isCurrent ? 1 : 0.5} />}
+            <text x={x + barW / 2} y={H - 3} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.label}</text>
+            {d.minutes > 0 && (
+              <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={isCurrent ? accent : "#9BA0AA"} fontWeight="600">{d.minutes}</text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 function MonthlyTrendLineChart({ series }) {
   // series: [{ label, color, data: [{ label, count }, ...] }, ...]
   // All series are expected to share the same month labels/order.
@@ -3353,7 +3400,7 @@ export {
   // Utility functions
   getFallbackReply, fetchAIReply,
   // Progress screen sub-components
-  WeightChart, StreakCalendar, getWeekStreakFromDates,
+  WeightChart, CardioWeeklyChart, StreakCalendar, getWeekStreakFromDates,
   // Admin dashboard sub-components
   MonthlyTrendLineChart,
   // Billing / paywall

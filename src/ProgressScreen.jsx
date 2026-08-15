@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   useApp, theme, sb, localDateStr,
   Layout, Spinner, CardioQuickLog,
-  WeightChart, StreakCalendar,
+  WeightChart, CardioWeeklyChart, StreakCalendar,
   PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon,
 } from "./shared.jsx";
 
@@ -346,6 +346,36 @@ function ProgressScreen() {
               );
             })()}
 
+            {/* 6-week cardio trend -- lets a member see "how much cardio have I
+                actually been doing" at a glance instead of just this-week/this-
+                month numbers. Bucketed here (Monday-start weeks, same convention
+                as the totals cards above); CardioWeeklyChart (shared.jsx) just
+                draws whatever it's handed. Requested alongside the cardio
+                confirmation-detail change, same session. */}
+            {cardioLogs.length > 0 && (() => {
+              const weeks = [];
+              for (let i = 5; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i * 7);
+                const dow = d.getDay();
+                const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow + (dow === 0 ? -6 : 1));
+                const mondayStr = localDateStr(monday);
+                const sunday = new Date(monday);
+                sunday.setDate(sunday.getDate() + 6);
+                const sundayStr = localDateStr(sunday);
+                const minutes = cardioLogs
+                  .filter(c => c.logged_date >= mondayStr && c.logged_date <= sundayStr)
+                  .reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
+                weeks.push({ label: i === 0 ? "This wk" : monday.toLocaleDateString("en-US", { month: "short", day: "numeric" }), minutes });
+              }
+              return (
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "12px 10px", marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6, paddingLeft: 4 }}>Cardio minutes, last 6 weeks</div>
+                  <CardioWeeklyChart data={weeks} accent={a} />
+                </div>
+              );
+            })()}
+
             <button onClick={() => navigate("cardio")} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}>
               Start a cardio session
             </button>
@@ -356,7 +386,7 @@ function ProgressScreen() {
               <>
                 <div style={sL}>Recent cardio</div>
                 <div style={{ background:"#212429", borderRadius:14, overflow:"hidden" }}>
-                  {cardioLogs.slice(0, 5).map((c, i, arr) => (
+                  {cardioLogs.slice(0, 12).map((c, i, arr) => (
                     <div key={c.id} style={{ padding:"10px 14px", borderBottom: i < arr.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <div>
                         <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{c.activity_type}</div>

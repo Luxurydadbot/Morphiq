@@ -1189,10 +1189,10 @@ function HomeDashboardScreen() {
           the spot needs to be just as reachable as a scheduled day, not
           buried inside one. See DECISIONS.md, session 32. */}
       <div style={{ padding: "0.75rem 1.25rem 0" }}>
-        <button onClick={() => navigate("cardio")} style={{ width: "100%", background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 14, padding: ".7rem 1rem", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontFamily: "inherit" }}>
-          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#0A1628", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="flame" size={15} /></div>
-          <span style={{ fontSize: 13, fontWeight: 500, color: theme.text, flex: 1, textAlign: "left" }}>Log cardio</span>
-          <Icon name="arrow-right" size={14} color={theme.textDim} />
+        <button onClick={() => navigate("cardio")} style={{ width: "100%", background: "rgba(76,141,255,0.1)", border: `0.5px solid rgba(76,141,255,0.35)`, borderRadius: 14, padding: ".75rem 1rem", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontFamily: "inherit" }}>
+          <div style={{ width: 32, height: 32, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#0B1E3D" }}><Icon name="flame" size={16} /></div>
+          <span style={{ fontSize: 14, fontWeight: 600, color: theme.text, flex: 1, textAlign: "left" }}>Log cardio</span>
+          <Icon name="arrow-right" size={15} color={a} />
         </button>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>

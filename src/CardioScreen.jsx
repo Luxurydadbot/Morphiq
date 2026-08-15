@@ -67,6 +67,7 @@ function CardioScreen() {
   const [running, setRunning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [lastLogged, setLastLogged] = useState(null); // { minutes, calories, activity } captured right before reset, so the post-save confirmation can show real numbers instead of just a checkmark
   const intervalRef = useRef(null);
 
   useEffect(() => () => clearInterval(intervalRef.current), []);
@@ -104,16 +105,18 @@ function CardioScreen() {
     // spirit as the confirm-before-log pattern used elsewhere in the app.
     if (elapsed < 15) { setActivity(null); setElapsed(0); return; }
     setSaving(true);
+    const durationMinutes = Math.max(1, Math.round(elapsed / 60));
     const ok = await sb.insertCardioLog(supabaseUser?.id, {
       activityType: activity.id,
-      durationMinutes: Math.max(1, Math.round(elapsed / 60)),
+      durationMinutes,
       calories,
     });
     setSaving(false);
     if (ok) {
+      setLastLogged({ minutes: durationMinutes, calories, activity: activity.id });
       setSaved(true);
       loadHistoricalData?.(supabaseUser?.id);
-      setTimeout(() => setSaved(false), 2500);
+      setTimeout(() => setSaved(false), 4000);
     }
     setActivity(null);
     setElapsed(0);
@@ -208,9 +211,16 @@ function CardioScreen() {
           </div>
         )}
 
-        {saved && (
-          <div style={{ textAlign: "center", fontSize: 12, color: theme.success, marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-            <Icon name="check" size={12} /> Cardio session logged
+        {saved && lastLogged && (
+          <div style={{ textAlign: "center", background: "#0A1A14", border: "1px solid rgba(76,141,255,0.25)", borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
+            <div style={{ fontSize: 12, color: theme.success, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, marginBottom: 4 }}>
+              <Icon name="check" size={12} /> {lastLogged.activity} logged
+            </div>
+            <div style={{ fontSize: 13, color: theme.text }}>
+              <span style={{ fontWeight: 600 }}>{lastLogged.minutes} min</span>
+              <span style={{ color: theme.textDim }}> &middot; </span>
+              <span style={{ fontWeight: 600 }}>~{lastLogged.calories} cal</span>
+            </div>
           </div>
         )}
       </div>
