@@ -396,7 +396,7 @@ function OnboardingScreen() {
               <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
               <button onClick={() => setCardioDaysPerWeek(d => Math.min(4, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(76,141,255,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
             </div>
-            <div style={{ fontSize: 11, color: ob.muted, marginTop: 4, textAlign: "center", lineHeight: 1.5 }}>{cardioDaysPerWeek === 0 ? "No dedicated cardio days -- you can still log cardio anytime from Progress." : "Pick the activity (run, bike, row...) each time you start one."}</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 4, textAlign: "center", lineHeight: 1.5 }}>{cardioDaysPerWeek === 0 ? "No dedicated cardio days -- you can still log cardio anytime from Home or Progress." : "Pick the activity (run, bike, row...) each time you start one."}</div>
           </div>
           <button onClick={() => setStep(8)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
         </div>}
@@ -552,7 +552,9 @@ function OnboardingScreen() {
               <div style={{ width: 28, height: 28, borderRadius: "50%", background: ob.tealDk, border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 700, flexShrink: 0 }}>AI</div>
               <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 13, color: ob.body, lineHeight: 1.55, flex: 1 }}>
                 {goal === "lose_fat"
-                  ? `${name}, you're all set. ${daysPerWeek} days a week is the sweet spot for fat loss — enough to burn, enough rest to recover. Here's exactly what week one looks like.`
+                  ? (cardioDaysPerWeek > 0
+                      ? `${name}, you're all set. ${daysPerWeek} lifting days plus ${cardioDaysPerWeek} cardio days a week is the sweet spot for fat loss — enough to burn, enough rest to recover. Here's exactly what week one looks like.`
+                      : `${name}, you're all set. ${daysPerWeek} days a week is the sweet spot for fat loss — enough to burn, enough rest to recover. Here's exactly what week one looks like.`)
                   : goal === "build_muscle"
                   ? `${name}, your muscle-building plan is locked in. ${daysPerWeek} training days with progressive overload built in from day one. This is how size gets built. Let's go.`
                   : `${name}, your plan is ready. ${daysPerWeek} days a week, balanced workouts, and nutrition targets tailored to you. Everything adjusts as you progress.`}
