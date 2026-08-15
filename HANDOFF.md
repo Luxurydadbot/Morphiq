@@ -1,4 +1,4 @@
-# Hypergentiq — Session 35 master handoff (cardio work from Sessions 31-32 now live-verified)
+# Hypergentiq — Session 36 master handoff
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -6,121 +6,93 @@ This file is the handoff. At the start of every session, fetch this file from th
 
 No change this session — untouched. Step list: (1) fix PWA gaps — done, Session 30, (2) add Capacitor + generate native projects — done (Session 25), still not opened/built in Android Studio or Xcode, (3) set up Capgo live-update pipeline — still open, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service), (6) privacy policy — hard gate for both stores, blocked on Bryant forming a real legal business entity (draft exists, see punch list FIRST), (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit.
 
-## Session 35 — no code changes; live-tested all the cardio work from Sessions 31-32, everything passed
+## Session 36 — copy nits, CustomPlanScreen cardio, cardio visibility pass, Progress screen restructure, Nutrition tab
 
-**What happened:** With both multi-day resume bugs closed out and verified last session, this session was pure live testing of the cardio feature set on the real production app — no code was touched. Same disposable **WarmupTest** account (identity re-confirmed via the profile screen before starting, consistent with this project's standing rule about verifying accounts before writing test data).
+Five pieces of work, all shipped, none live-tested yet in the running app (this session had no browser/device access — every change was verified with esbuild syntax checks on each touched file plus a full app bundle check from `src/index.js`, which catches cross-file import/reference errors but not runtime/UI behavior).
 
-**Test 1 — goal-agnostic reach, on an account NOT set to lose_fat.** WarmupTest's profile was "Get fit & healthy" (not lose_fat) with no scheduled cardio days. Confirmed the persistent "Log cardio" row still appears on Home regardless of goal, opens `CardioScreen` correctly, and the live-timer flow works end to end: picked Treadmill, effort "Moderate," watched the elapsed timer and the estimated-calorie-burn figure both update live (00:09 → 2 cal, 00:40 → 9 cal), stopped after 40 seconds (clear of the 15-second accidental-log guard), got a "Cardio session logged" confirmation.
+**1. Two copy nits (Session 35's THIRD priority item), commit `d4218c0`.** Onboarding's cardio-days helper text now says "Home or Progress" instead of just "Progress" (cardio logging is also reachable from Home now). The lose_fat plan-build confirmation message now credits cardio days alongside lifting days when `cardioDaysPerWeek > 0`, instead of only ever mentioning lifting days regardless of plan.
 
-**Test 2 — manual "log a past session" entry.** Typed "25 minutes of biking yesterday, felt moderate" into the quick-log text box. `/api/parse-cardio` correctly extracted "Cycling · 25 min · ~150 cal" onto a confirm screen; confirmed and it logged successfully.
+**2. CustomPlanScreen cardio-day scheduling (Session 35's FOURTH priority item), commit `b33e277`.** Hand-built plans can now add 0-4 dedicated cardio days/week via a new wizard step (dial picker, mirrors OnboardingScreen's cardio question) between the days-per-week and rest-preference steps. Goal-agnostic by design — unlike the AI path (`buildPlan()`, still lose_fat-only), any custom-plan member can add cardio days. The even-distribution interleave math was pulled out of `buildPlan()` into a new shared `interleaveCardioDays()` (`shared.jsx`) so both paths call one copy instead of two. Wizard renumbered: steps 3-5 shifted to 4-6 (rest/exercises/review), total step count 6→7. Review screen shows a cardio summary line when cardio days are added.
 
-**Test 3 — Progress weekly/monthly cardio totals.** Progress → Workouts tab showed a new CARDIO card: "26 min · This week · 2 sessions" and the same for "This month" — correctly summing the ~40-second live session (rounds to ~1 min) and the 25-minute manual entry, both counted.
+**3. Cardio visibility pass, commit `939db84`.** Bryant felt the Home screen's "Log cardio" row blended in next to "Start workout." Shown a 3-way visual mockup before writing code; picked the accent-tinted middle ground (tinted background/border, solid-accent icon circle, bolder 14px label) over matching Start Workout's solid fill exactly — two identical solid buttons would compete as "the" primary action for the day. Also: both cardio logging paths (live timer in `CardioScreen.jsx`, manual quick-log `CardioQuickLog` in `shared.jsx`) now show real minutes + calories in their post-save confirmation instead of just a checkmark. New `CardioWeeklyChart` (`shared.jsx`) — 6-week cardio-minutes bar chart — added to Progress's cardio section (at the time, still a Workouts subsection). Recent-cardio list expanded from 5 to 12 entries.
 
-**Test 4 — the actual onboarding question + `buildPlan()` interleaving, on a real lose_fat account.** Used WarmupTest's own "Restart onboarding quiz" option (a real, current, self-service path already in the app — no fake account needed) to redo onboarding as lose_fat, 3 lifting days/week, and this time answered "2" on the cardio-days question. The plan summary before building correctly listed "Cardio days/week: 2×" alongside "Days/week: 3×." After building, Home's week-view tabs read **Full Body, Cardio, Full Body, Cardio, Full Body** — 5 total days, cardio evenly spaced between lifting days exactly as the interleaving algorithm intends (not clumped at the end or start). Tapping the "Cardio" tab showed "Today's a dedicated cardio day — pick your activity when you start" with a correctly-labeled "Start cardio" button (confirming the `isCardio ? "Start cardio" : "Start workout"` label logic), and tapping it opened `CardioScreen` directly, matching Session 32's design.
+**4. Progress screen restructured, commit `d6a23f1`.** Bryant asked for competitive research before deciding the shape. Findings applied (full detail in DECISIONS.md, Aug 15 continued section): Fitbod/Hevy/GainFrame give body comp and strength progress their own focused views rather than one broad tab; Google Health's redesign crammed more onto fewer screens and drew a 65x spike in negative layout reviews; Strong keeps PRs findable without giving them equal nav billing. Cardio promoted from a buried Workouts subsection to its own top-level tab (Body / Workouts / Cardio, was Body / Workouts / Bests). "Bests" is no longer a tab — its full content (current-bests list with expandable strength charts, volume-this-month bars) now lives as a "Personal bests" section at the bottom of the Workouts tab. Nothing was deleted, only relocated.
 
-**Everything tested passed.** No new bugs found this session.
+**5. Nutrition tab, commit `2b662fb`.** Fourth Progress tab. Bryant explicitly asked for the scope to be decided from research into top apps and their reviews, not picked directly. Findings applied: MacroFactor (~4.8/19,500 App Store ratings, repeatedly named best-in-class 2026) combines trend charts + adherence percentages together, not one or the other; MyFitnessPal's complaints trace to paywalls and extra-click redesigns, not to that combination. Built the fuller shape (matches the Cardio tab's own pattern): avg-calories-this-week and days-hit-protein-target stat cards, a 14-day calorie trend chart with a dashed target line (new `NutritionTrendChart`, `shared.jsx`), and a recent-days list. Required one new backend piece: `sb.getMealLogs()` (`shared.jsx`), date-bounded (35-day window) since a member can log several food entries a day — wired into `loadHistoricalData()` (`Morphiq.jsx`) alongside the existing workout/weight/cardio fetches, exposed as `historicalData.mealLogs`.
 
-**Two minor copy nits noticed, not bugs, not fixed (flagging for whenever convenient):**
-1. The onboarding cardio-days screen's helper text still reads "you can still log cardio anytime from Progress" — it's also now reachable from Home's persistent quick-access row, so the copy is stale, not wrong.
-2. The AI's plan-build confirmation message says "3 days a week is the sweet spot for fat loss," referencing only the lifting days and not acknowledging the 2 additional cardio days in the same plan. Not incorrect, just incomplete.
+## Files touched this session (final line counts)
 
-**Side effect worth knowing:** using "Restart onboarding quiz" to test the lose_fat + cardio flow overwrote WarmupTest's previous profile (it had been "Get fit & healthy," Push/Pull/Legs, 5 days/week) with a fresh "Lose fat," Full Body, 3 lifting + 2 cardio days/week plan. This is expected and fine for a disposable test account, but the next session should know WarmupTest's current plan is the lose_fat one, not the old PPL one, if it picks up testing again from here.
+| File | Before | After |
+| --- | --- | --- |
+| `src/shared.jsx` | 3,349 | 3,478 |
+| `src/WorkoutScreen.jsx` | 2,817 | 2,865 |
+| `src/Morphiq.jsx` | 1,654 | 1,656 |
+| `src/OnboardingScreen.jsx` | 620 | 622 |
+| `src/ProgressScreen.jsx` | 492 | 613 |
+| `src/CardioScreen.jsx` | 221 | 231 |
 
-## Files touched this session
-
-None — zero code changes. Pure live QA. Line counts are unchanged from Session 34:
-
-| File | Lines |
-| --- | --- |
-| src/shared.jsx | 3,349 |
-| src/WorkoutScreen.jsx | 2,817 |
-| src/Morphiq.jsx | 1,654 |
-| src/GymOwnerDashboard.jsx | 927 |
-| src/MealScreen.jsx | 831 |
-| src/OnboardingScreen.jsx | 620 |
-| src/ProgressScreen.jsx | 492 |
-| src/SuperAdminDashboard.jsx | 343 |
-| src/ChatScreen.jsx | 300 |
-| src/GymSignupScreen.jsx | 269 |
-| src/CardioScreen.jsx | 221 |
-| api/chat.js | 259 |
-| api/report-usage.js | 165 |
-| api/stripe-webhook.js | 161 |
-| api/coach-note.js | 115 |
-| api/admin-gym-action.js | 110 |
-| api/monthly-usage-report.js | 101 |
-| api/create-checkout.js | 89 |
-| api/photo-meal.js | 76 |
-| api/parse-meal.js | 62 |
-| api/parse-cardio.js | 62 |
-| api/plan.js | 31 |
-| api/_sentry.js | 32 |
-| api/ping.js | 12 |
-| src/index.js | 64 |
-| src/serviceWorkerRegistration.js | 23 |
-
-All well under the 3,800-line hard limit. `WorkoutScreen.jsx` (2,817) is the one to keep an eye on next time it's touched.
+All other files untouched this session. All well under the 3,800-line hard limit — `shared.jsx` (3,478) remains the one to watch, `WorkoutScreen.jsx` (2,865) next.
 
 ## Latest commit
 
-No code commit this session (docs-only). This file's own commit is on top of `00c301b` on `main`.
+`2b662fb` on `main`. Full commit sequence this session: `d4218c0` → `b33e277` → `939db84` → `d6a23f1` → `2b662fb`.
 
 ## Confirmed working vs still open
 
-**Live-verified this session, in the real running app:** onboarding's cardio-days question (correctly gated to lose_fat, correctly captured into the plan-build summary), `buildPlan()`'s even interleaving of cardio days among lifting days (5-day week showed Full Body / Cardio / Full Body / Cardio / Full Body), Home's scheduled-cardio-day card and its correct "Start cardio" label and routing, the persistent Home "Log cardio" quick-access row on a non-lose_fat account, `CardioScreen`'s live timer (elapsed time + calorie estimate both updating live) and its save-on-stop, the manual "log a past session" flow via `/api/parse-cardio` natural-language parsing, and Progress's weekly/monthly cardio totals aggregation. Combined with Sessions 33-34's resume-bug fixes (also live-verified), **the entire weight-loss/cardio feature set built over the last several sessions is now confirmed working end to end.**
+**Verified this session:** every changed file passes an individual `esbuild` syntax check, and the full app bundles cleanly from `src/index.js` (catches cross-file import/reference mistakes — this caught and fixed one real bug mid-session, `interleaveCardioDays()` accidentally being nested inside `buildPlan()` instead of at module scope). Manual code review confirms `CustomPlanScreen`'s wizard step numbering is fully consistent (all 8 steps present, every `setStep()` target verified), and the Progress screen's tab-condition strings (`body`/`workouts`/`cardio`/`nutrition`) each appear exactly once with no leftover `bests` references.
 
-**Not yet tested / not in scope this session:** voice input specifically for the cardio quick-log (typed text was tested, not the mic button itself), the "Other" cardio activity type, `CustomPlanScreen` cardio support (doesn't exist yet — see punch list), and cross-device sync of cardio logs (only tested in a single browser session).
+**NOT live-tested this session — no browser/device access available.** Everything below needs a real pass in the running app before being called done:
+- The accent-tinted Log cardio button, and both cardio confirmation banners (live timer + manual quick-log) showing real numbers.
+- CustomPlanScreen's new cardio wizard step end-to-end — including a plan with 0 cardio days (should behave exactly as before) and a plan with cardio days that outnumber lifting days (edge case where the interleave algorithm could front-load a cardio day as Day 1 — see `interleaveCardioDays()` comment in `shared.jsx`).
+- Progress screen: all three existing tabs after the restructure (especially the relocated "Personal bests" section's tap-to-expand strength chart, now nested one level deeper), plus the brand-new Cardio and Nutrition tabs on an account with real logged data.
+- The Nutrition tab specifically has never been exercised against real Supabase data — `getMealLogs()` is new code with no live confirmation yet that the date-bucketing produces sane output against actual `meal_logs` rows.
 
 ## Punch list, in priority order
 
 **FIRST — unblock the privacy policy.** Unchanged. Blocked on Bryant forming a real legal business entity.
 
-**SECOND — no-blocker App Store groundwork.** Unchanged. Capacitor scaffolded/branded, PWA service worker shipped but unverified live. Capgo pipeline not started.
+**SECOND — live-test everything from this session.** New top priority — five features shipped with only static verification (esbuild + bundle check), zero live-testing. See "Confirmed working vs still open" above for the specific list. Do this before starting new feature work.
 
-**THIRD — polish the two copy nits found this session (low effort, whenever convenient).** Update the onboarding cardio-days helper text to mention Home, not just Progress. Update the plan-build confirmation message to acknowledge cardio days alongside lifting days.
+**THIRD — no-blocker App Store groundwork.** Unchanged. Capacitor scaffolded/branded, PWA service worker shipped but unverified live. Capgo pipeline not started. Android project has never been opened in Android Studio to confirm it builds.
 
-**FOURTH — weight-loss/cardio redesign, remaining pieces.** `CustomPlanScreen` still doesn't support scheduled cardio days. Wearable sync (Apple HealthKit/Fitbit) remains a deliberately separate, not-yet-scoped future initiative. Voice input on the cardio quick-log and the "Other" activity type haven't been live-tested yet (lower priority — likely fine, just not click-tested).
+**FOURTH — the two Session 35 copy nits are now done** (see Session 36 item 1 above) — removed from this list.
 
-**FIFTH through TENTH — unchanged from Session 30, still open:** live-test `WarmupTest` full week start-to-finish (partially covered across recent sessions, but not the full original scope — nutrition/rest-timer/stats steps still unverified); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion); expand exercise variety beyond primary/variation binary swap. Full detail in Session 30's version of this file (`git show 4337c5e:HANDOFF.md`).
+**FIFTH — weight-loss/cardio redesign, remaining pieces.** `CustomPlanScreen` cardio support is now done (Session 36 item 2). Still open: wearable sync (Apple HealthKit/Fitbit) remains a deliberately separate, not-yet-scoped future initiative. Voice input on the cardio quick-log and the "Other" activity type haven't been live-tested (lower priority — likely fine, just not click-tested).
 
-**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only). WarmupTest's plan is now the fresh lose_fat/cardio plan from this session's testing (see note above) — not urgent, just know its current state before reusing it.
+**SIXTH through ELEVENTH — unchanged from Session 30/35, still open:** live-test `WarmupTest` full week start-to-finish (partially covered across recent sessions, but not the full original scope — nutrition/rest-timer/stats steps still unverified, and this is now somewhat superseded by the SECOND priority above covering the same account for the newer features); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion, see DECISIONS.md Aug 8 2026); expand exercise variety beyond primary/variation binary swap; the weight-loss/cardio redesign's still-undecided open questions from DECISIONS.md Aug 9 2026 that haven't been revisited (whether `lose_fat` should restructure the week itself further, nutrition-screen UI emphasis for that goal specifically).
+
+**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only); WarmupTest's plan is the lose_fat/cardio plan from Session 35's testing — know its current state before reusing it.
 
 ## Technical notes carried forward
 
-**MANDATORY fetch method — git clone only.** `api.github.com` and direct HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked by this environment's proxy allowlist; `raw.githubusercontent.com` via web-fetch can also silently serve stale cached content. `git clone`/`git push` over authenticated HTTPS from a plain scratch directory (not the mounted Windows output folder) remains the only trusted fetch method.
+**MANDATORY fetch method — git clone only.** `api.github.com` and direct HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked by this environment's proxy allowlist; `raw.githubusercontent.com` via web-fetch can also silently serve stale cached content — this happened again at the start of this session (fetched a Session-10-vintage HANDOFF.md and file set via web-fetch before switching to `git clone`, which correctly showed the real Session 35 state). `git clone`/`git push` over authenticated HTTPS from a plain scratch directory (not the mounted Windows output folder) remains the only trusted fetch method.
 
-**A feature's own onboarding "restart" option is a legitimate, no-setup way to live-test a flow that's otherwise only reachable at first signup.** This session used WarmupTest's existing "Restart onboarding quiz" button (Progress screen, scroll to bottom) to re-run the lose_fat + cardio-days onboarding path without creating a new test account or touching Supabase directly. Worth remembering for any future feature gated behind first-time onboarding.
+**When moving a block of JSX/JS into a new location via multi-line string replacement, verify the destination scope, not just that the anchor text matches.** This session's one real bug: `interleaveCardioDays()` was inserted textually before a comment that turned out to be inside `buildPlan()`'s function body (indentation looked top-level; brace nesting was not). The function became invisible outside `buildPlan()`, caught immediately by the full-bundle esbuild check ("not declared in this file") rather than by the individual per-file syntax check, which passed fine since the code was still syntactically valid JS. The full-bundle check earned its place in the verification routine this session specifically because of this — keep running it after any change that adds a new exported helper.
 
-**Live-testing is worth doing even when a feature "looks done" in code review — it either confirms confidence or catches something a read-through misses.** This session found no new bugs, which is itself useful signal: the cardio feature set, built over two prior sessions, held up under real interaction across goal-agnostic access, live timing, manual entry, aggregation, and the original lose_fat scheduling path it was designed around.
+**When cutting and reassembling large JSX blocks (e.g. the Progress screen tab restructure), slice by 1-indexed line number against the original file content in one pass, not via sequential destructive string replacements.** Off-by-one slice boundaries are easy to introduce and easy to catch early with a quick assert-and-print step before writing — worth doing for any restructuring that moves more than roughly 20-30 lines.
 
-**Verify identity before assuming a live-test account, every time, not just once.** Re-checked WarmupTest's profile name via the UI before starting this session's testing, same as last session — cheap and removes any doubt before writing test data.
+**A feature's own onboarding "restart" option is a legitimate, no-setup way to live-test a flow that's otherwise only reachable at first signup.** (Carried forward from Session 35 — still relevant, not exercised this session since no live testing happened at all.)
 
-**Client-side progress persistence has TWO layers, both must be cleared for a clean test reset.** `localStorage` key (`morphiq_workout_progress_<supabase_user_id>`) and the Supabase `workout_progress` column — always clear both together. Not directly exercised this session (no resume testing), but still a live constraint to remember.
+`profiles.supabase_user_id` is the auth link, `profiles.id` is the FK used everywhere else. Fire-and-forget `.catch(() => {})` pattern for all new Supabase writes — `getMealLogs()` and the `interleaveCardioDays()` helper both follow this where relevant. `AuthScreen` lives in `Morphiq.jsx`, not `shared.jsx`. The `exercises` table is still just a reference/classification table, not wired into live plan generation.
 
-**Native `window.confirm()`/`alert()`/`prompt()` dialogs block Claude-in-Chrome browser automation entirely.** No workaround found. Not hit this session.
+**No live Node/npm toolchain in this sandbox by default.** `esbuild` (installed standalone via `npx --yes esbuild ...`, no persistent install needed) is the fast syntax/JSX sanity check when code changes — used on every touched file this session, individually and via a full-bundle check from `src/index.js` with `react`/`react-dom`/`@sentry/react`/`web-vitals` externalized.
 
-`profiles.supabase_user_id` is the auth link, `profiles.id` is the FK used everywhere else. Fire-and-forget `.catch(() => {})` pattern for all new Supabase writes. `AuthScreen` lives in `Morphiq.jsx`, not `shared.jsx`. The `exercises` table is still just a reference/classification table, not wired into live plan generation.
+## Session 36 close-out summary
 
-**No live Node/npm toolchain in this sandbox by default.** `esbuild` (installed standalone via `npm install --no-save esbuild --prefix /tmp/esbuild-check`) is the fast syntax/JSX sanity check when code does change. Not needed this session since nothing was touched.
+**Everything built/changed this session:** two copy nits; CustomPlanScreen cardio-day scheduling (goal-agnostic); Log cardio button restyle + real numbers in both cardio confirmation paths + a new 6-week cardio chart; Progress screen restructured from Body/Workouts/Bests to Body/Workouts/Cardio (Bests relocated into Workouts, not deleted); a brand-new Nutrition tab with a new backend query, a new trend-chart component, and adherence stats.
 
-## Session 35 close-out summary
+**Confirmed working:** all changed files pass individual esbuild syntax checks and a full-app bundle check; manual review confirms wizard step numbering and tab-condition integrity.
 
-**Everything built/changed this session:** nothing — pure live QA, no commits to app code.
+**Still needs testing — nothing from this session has been live-tested in the running app.** This is the single most important thing for the next session to know. See "Confirmed working vs still open" above for the specific checklist.
 
-**Confirmed working, live, in the real production app:** the entire cardio feature set from Sessions 31-32 — onboarding question, `buildPlan()` interleaving, Home's scheduled-day card and persistent quick-access row, `CardioScreen`'s live timer and manual entry, and Progress's weekly/monthly totals. Combined with Sessions 33-34's resume-bug fixes, the full recent body of work (multi-day resume correctness + the weight-loss/cardio redesign) is now live-verified end to end.
+**Next priority task:** live-test everything shipped this session (SECOND on the punch list above) before starting new feature work. After that: App Store groundwork (Capacitor Android Studio build check is the next unblocked item), or privacy policy once Bryant has a business entity.
 
-**Still needs testing:** the cardio quick-log's voice/mic input specifically (typed text was tested), the "Other" activity type, `CustomPlanScreen` cardio support (not built yet), cross-device cardio-log sync.
+**Final line counts, all files:** see table above — `shared.jsx` 3,478 (largest), `WorkoutScreen.jsx` 2,865, both well under the 3,800 limit. All other files unchanged from Session 35's table (see that file's git history, or re-fetch fresh via git clone as always).
 
-**Next priority task:** the two low-effort copy nits (onboarding helper text, plan-build confirmation message) whenever convenient, or move on to `CustomPlanScreen` cardio support, or resume the App Store punch list (Capacitor Android Studio build check is the next unblocked item there). Privacy policy remains the overall FIRST priority once Bryant has a business entity.
-
-**Final line counts, all files:** unchanged from Session 34 — see table above.
-
-**Latest commit:** `00c301b` on `main` (last code commit); this file's docs commit sits on top of it.
+**Latest commit:** `2b662fb` on `main`.
 
 ## Paste this at the start of your next session
 
-Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,349, `WorkoutScreen.jsx` next at 2,817).
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,478, `WorkoutScreen.jsx` next at 2,865).
 
-Remind Bryant: the entire cardio feature set (Sessions 31-32) and both multi-day resume bugs (Sessions 33-34) are now live-verified with no open issues. Two tiny copy nits are flagged in the punch list if there's nothing more pressing. Otherwise the next real chunks of work are: `CustomPlanScreen` cardio support, or picking the App Store punch list back up (privacy policy is blocked on Bryant's business entity; Capacitor's `android/` project has never been opened in Android Studio to confirm it builds — that's the next unblocked step there).
-
-Also note: WarmupTest's account currently has a fresh "Lose fat" plan (3 lifting + 2 cardio days/week) from this session's onboarding test, not its earlier "Get fit & healthy" PPL plan — know this before reusing the account.
+Remind Bryant: five things shipped this session (copy nits, CustomPlanScreen cardio, cardio button/confirmation/chart polish, Progress screen restructure into Body/Workouts/Cardio with Bests relocated, and a new Nutrition tab) but **none of it has been live-tested yet** — only static syntax and full-bundle checks. That's the top priority for the next session before anything new: walk through each feature in the real running app, ideally on the WarmupTest account (know its current plan state — see Session 35's note, still accurate). After that, the App Store punch list (Capacitor's `android/` project has never been opened in Android Studio) and the privacy policy (blocked on Bryant's business entity) are the standing next chunks of work.

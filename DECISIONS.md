@@ -117,6 +117,35 @@ Updated automatically at the end of every session. Never delete entries — appe
 
 ---
 
+## August 15, 2026 (continued) -- Session 36: CustomPlanScreen cardio, Progress screen restructure, Nutrition tab
+
+### Decision: CustomPlanScreen cardio-day scheduling is goal-agnostic
+- Punch-list item from Session 35 (`CustomPlanScreen` never got cardio-day support when the rest of the cardio redesign shipped). Built this session.
+- **Decision:** unlike `buildPlan()`'s AI path (still `lose_fat`-only, unchanged), hand-built plans let any goal add 0-4 dedicated cardio days/week. Reasoning: matches the Aug 15 "goal-agnostic cardio" decision above -- a self-directed custom-plan member should get the same option regardless of goal, same logic Bryant already applied to `CardioScreen` itself.
+- Extracted the even-distribution interleave math out of `buildPlan()` into a shared `interleaveCardioDays()` (`shared.jsx`) so both the AI path and the custom-plan path call one copy, not two -- per the "duplicate logic is the recurring root cause of real bugs" note in HANDOFF's technical notes.
+- Shipped commit `b33e277`.
+
+### Decision: Log cardio button restyled -- accent-tinted, not a full match to Start Workout
+- Bryant felt the Home screen's "Log cardio" row blended in too much next to "Start workout" and proposed three options, including matching the accent fill exactly.
+- Showed a 3-way visual mockup before writing code. **Decision: accent-tinted middle ground** (tinted background/border, solid-accent icon circle, bolder label) -- not the full solid-fill match. Reasoning: two identically-styled solid buttons stacked would compete as "the" primary action for today, undermining Start Workout's primacy. Bryant confirmed this direction.
+- Also added: both cardio logging paths (live timer in `CardioScreen.jsx`, manual quick-log `CardioQuickLog` in `shared.jsx`) now show actual minutes + calories in their post-save confirmation instead of just a checkmark. New `CardioWeeklyChart` (`shared.jsx`) -- 6-week cardio-minutes bar chart -- added to the Cardio section of Progress.
+- Shipped commit `939db84`.
+
+### Decision: Progress screen restructured to Body / Workouts / Cardio (Bests relocated, not deleted)
+- Bryant proposed splitting Progress into more, more-focused tabs and asked for competitive research on progress-reporting UX before deciding on the shape.
+- **Research applied:** Fitbod, Hevy, and GainFrame each give body composition and strength progress their own focused, purpose-built views rather than folding everything into a few broad tabs. Counter-examples: Google Health's redesign crammed more onto fewer screens and drew a 65x spike in negative layout reviews (30 -> 1,940 in 74 days); MyFitnessPal's clutter/navigation complaints are a recurring theme. Strong keeps personal records easy to find (surfaced live + a detail view) without giving them equal billing in main navigation.
+- **Decision:** Cardio promoted from a buried subsection of the Workouts tab to its own top-level tab. "Bests" removed as a top-level tab; its full content (current-bests list with expandable strength charts, volume-this-month bars) relocated to a "Personal bests" section at the bottom of the Workouts tab -- findable, not primary, matching Strong's pattern and Bryant's own framing. No content deleted, only moved.
+- Shipped commit `d6a23f1`.
+
+### Decision: Nutrition tab scope -- trend chart + adherence stats, not adherence-only
+- Fourth Progress tab. Bryant explicitly asked for the scope decision to be based on research into top apps and their reviews, rather than picked directly.
+- **Research applied:** MacroFactor (~4.8/19,500 App Store ratings, repeatedly named best-in-class 2026 macro tracker) combines trend charts, targets, and adherence percentages on one screen -- not raw numbers alone, not a chart alone. MyFitnessPal's complaints trace to paywalled features and extra-click redesigns, not to combining a chart with adherence stats -- so that combination isn't the kind of clutter those reviews warn about.
+- **Decision:** built the fuller shape (matches the Cardio tab's own pattern) over a stripped-down adherence-only alternative: avg-calories-this-week and days-hit-protein-target stat cards, a 14-day calorie trend chart with a dashed target reference line (new `NutritionTrendChart`, `shared.jsx`), and a recent-days list.
+- Required one new backend piece that didn't exist before: `sb.getMealLogs()` (`shared.jsx`), date-bounded like `getCardioDatesForStreak` rather than row-limited since a member can log several food entries a day. Wired into `loadHistoricalData()` alongside the existing workout/weight/cardio fetches.
+- Shipped commit `2b662fb`.
+
+---
+
 ## Standing technical decisions
 
 - **File structure:** Morphiq.jsx (3,714 lines), WorkoutScreen.jsx (1,421 lines), MealScreen.jsx (585 lines), GymOwnerDashboard.jsx (separate)
