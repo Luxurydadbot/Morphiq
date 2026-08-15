@@ -36,21 +36,35 @@ Bryant's ask, working from the live app on his phone: on the live cardio-timer s
 
 End-to-end verified in the browser: picked Treadmill, started the timer, watched calories climb live, hit Stop, and the new confirmation card (checkmark badge, "Treadmill logged", "1 min · ~5 cal") appeared front-and-center above the activity grid exactly as designed -- zero scroll overflow at every step, confirmed via `shell.scrollHeight - shell.clientHeight === 0` on all three screen states (picker, live timer, post-stop confirmation).
 
+## Session 37, part 2 — Progress screen cleanup: drop the top summary stats, trim Body tab, add a Protein card to Nutrition
+
+Second ask this session, working from the live app: the Progress screen had a "Your Progress" title + 3-stat row (Weight change / Week streak / PBs logged) and a "N weigh-ins logged" line sitting ABOVE the Body/Workouts/Cardio/Nutrition tab selector -- Bryant wanted all of that gone so the tab selector itself is the top of the screen, with everything else living inside whichever tab it actually belongs to. He also flagged the Body tab's "Workout streak" calendar as out of place there (it's workout data, not body data) and asked for it removed outright -- Body should only cover body-specific elements. Workouts and Cardio tabs were both confirmed fine as-is, untouched.
+
+**What changed, commit `cb93493`:**
+1. Removed the "Your Progress" title, the weigh-ins-logged subtitle, and the 3-card Weight change / Week streak / PBs logged summary row entirely -- the Body/Workouts/Cardio/Nutrition tab bar is now the first thing rendered on the screen.
+2. Removed the Body tab's "Workout streak" section (the `StreakCalendar` component + its legend) -- Body tab now only shows the weight-trend chart and the measurements list. `StreakCalendar` import dropped from `ProgressScreen.jsx` since nothing else in the file used it (component itself untouched in `shared.jsx`, still available if needed elsewhere later).
+3. Added a Protein card to the Nutrition tab, directly below the existing Calories card, built the same way: a 14-day trend chart against `plan.protein` as the target line, sourced from the same `byDate` buckets the Calories trend and "Recent days" list already use (so all three always agree). Required generalizing `NutritionTrendChart` (`shared.jsx`) with a `valueKey` prop (defaults to `"calories"` so the original caller needs no changes) instead of duplicating the whole chart component for protein.
+4. Per a follow-up request mid-session, both the Calories and Protein card headers were changed from a small 10px uppercase caption ("Calories, last 14 days") into an actual focal-point header: a bold 20px "Calories" / "Protein" title with a smaller "Last 14 days" line underneath, so they read as real section headers rather than a caption easy to skim past.
+
+**Live-tested this session, not just static-checked.** Walked all four Progress tabs in Chrome at a phone viewport: Body (weight chart + measurements only, no streak calendar, confirmed), Workouts (unchanged, confirmed), Cardio (unchanged, confirmed), Nutrition (logged a real test meal -- "Grilled Chicken Breast with Rice", 350 cal / 35g protein -- to get past the empty state, then confirmed both the Calories and Protein cards render with the new bold headers, correct target lines, and matching numbers in "Recent days"). Note: that test meal is now real logged data on the account used for testing (the same "W" test account used for the cardio live-test earlier this session) -- harmless, but worth knowing it's there if that account's nutrition history gets reviewed later.
+
 ## Files touched this session (final line counts)
 
-**Session 37:**
+**Session 37 (both parts -- cardio screen redesign, then Progress screen cleanup):**
 
-| File | Before | After |
+| File | Before session | After session |
 | --- | --- | --- |
-| `src/CardioScreen.jsx` | 231 | 232 |
+| `src/CardioScreen.jsx` | 231 | 234 |
+| `src/ProgressScreen.jsx` | 613 | 588 |
+| `src/shared.jsx` | 3,478 | 3,482 |
 
 All other files untouched this session (Session 36's table above this line is historical -- re-fetch fresh via `git clone` for current state of every other file, as always).
 
-**Full current file set (fetched fresh via git clone at the start of Session 37, all well under the 3,800-line hard limit):** `src/shared.jsx` 3,478 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,656, `src/MealScreen.jsx` 831, `src/OnboardingScreen.jsx` 622, `src/ProgressScreen.jsx` 613, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/GymSignupScreen.jsx` 269, `src/CardioScreen.jsx` 232, `src/GymOwnerDashboard.jsx` 927. `api/` files are all small (12-259 lines each), none near any size concern.
+**Full current file set, all well under the 3,800-line hard limit:** `src/shared.jsx` 3,482 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,656, `src/MealScreen.jsx` 831, `src/OnboardingScreen.jsx` 622, `src/ProgressScreen.jsx` 588, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/GymSignupScreen.jsx` 269, `src/CardioScreen.jsx` 234, `src/GymOwnerDashboard.jsx` 927. `api/` files are all small (12-259 lines each), none near any size concern.
 
 ## Latest commit
 
-`7bc49b6` on `main`. Full commit sequence this session: `7bc49b6` (only commit this session, on top of Session 36's `2b662fb`).
+`cb93493` on `main`. Full Session 37 commit sequence: `7bc49b6` → `a133b25` → `828fc03` (docs) → `c8ab3d5` → `57f418f` (docs) → `cb93493`.
 
 ## Confirmed working vs still open
 
@@ -64,11 +78,13 @@ All other files untouched this session (Session 36's table above this line is hi
 
 **Session 37 addition -- live-tested and confirmed working in Chrome at a 390x844 phone viewport:** the cardio screen redesign (paired timer/calorie stat card, screen-fill layout on both the activity picker and the live timer, prominent post-Stop confirmation card). Full start-to-stop flow exercised: pick Treadmill → Start → calories climb live → Stop → confirmation card shows real numbers. Zero scroll overflow confirmed on all three states. Not yet tested on an actual physical phone (only a resized desktop Chrome window) or in Safari/iOS -- worth a real-device glance next time Bryant has the app open, but the DOM-level height math should hold since it's not relying on any desktop-only API.
 
+**Session 37 part 2 addition -- also live-tested and confirmed working:** the Progress screen cleanup (top summary stats removed, Body tab trimmed to weight chart + measurements only, new Protein card on Nutrition with bold focal headers on both Calories and Protein). Walked all four tabs in Chrome; logged a real test meal to get the Nutrition tab past its empty state and confirmed both trend cards render correctly with matching target lines and numbers. Note this left one real test meal log ("Grilled Chicken Breast with Rice", 350 cal / 35g protein) on the test account used this session -- see Session 37 part 2 writeup above.
+
 ## Punch list, in priority order
 
 **FIRST — unblock the privacy policy.** Unchanged. Blocked on Bryant forming a real legal business entity.
 
-**SECOND — live-test everything from Session 36.** Top priority — Session 36's five items still have zero live-testing (only static esbuild/bundle checks). Session 37's cardio-screen redesign is now the exception: it WAS live-tested this session (see above) and confirmed working end-to-end. Do the Session 36 pass before starting new feature work.
+**SECOND — live-test what remains from Session 36.** Session 36 shipped five things; two are now covered by Session 37's live-testing (the cardio-screen work, and the Progress screen -- though Progress has since been further changed, see below, so test its CURRENT state, not the original Session 36 restructure). Still fully untested: CustomPlanScreen cardio-day scheduling end-to-end, the Nutrition tab's `getMealLogs()` date-bucketing against real data at scale (Session 37 only exercised one single test meal, not multiple days/edge cases), and the two copy nits. Do this before starting new feature work.
 
 **THIRD — no-blocker App Store groundwork.** Unchanged. Capacitor scaffolded/branded, PWA service worker shipped but unverified live. Capgo pipeline not started. Android project has never been opened in Android Studio to confirm it builds.
 
@@ -96,20 +112,24 @@ All other files untouched this session (Session 36's table above this line is hi
 
 ## Session 37 close-out summary
 
-**Everything built/changed this session:** `CardioScreen.jsx` live-timer view redesigned -- timer and calorie estimate merged into one equally-weighted paired stat card (54px, matching size/weight, side by side with a divider), both the live-timer view and the activity-picker view now fill available phone-screen height instead of leaving black space below the footer, and the post-Stop "session logged" confirmation moved from a small easy-to-miss bar to a large accent-colored card shown front-and-center at the top of the activity-picker screen. Two follow-up fixes after getting live browser access mid-session: corrected a height-fill miscalibration that pushed the bottom nav off-screen (needed to scroll to reach it), and extended the same fill treatment to the activity-picker view which had the same gap but wasn't in the first pass.
+**Everything built/changed this session, two parts:**
 
-**Confirmed working:** esbuild checks (individual file + full bundle) pass clean. Also live-tested end-to-end in Chrome at a 390x844 phone viewport: full Treadmill start → running timer/calories → Stop → confirmation card flow, zero scroll overflow on any of the three screen states, verified via direct DOM measurement (`shell.scrollHeight === shell.clientHeight`) not just a visual check.
+Part 1 -- Cardio screen redesign: timer and calorie estimate merged into one equally-weighted paired stat card, both the live-timer view and the activity-picker view now fill available phone-screen height, post-Stop confirmation moved to a large front-and-center card. Two follow-up fixes after getting live browser access mid-session (a height-fill miscalibration, and extending the fill treatment to the activity-picker view).
 
-**Still needs testing:** Session 36's five features remain untested in the running app -- that's still the top open item. Session 37's cardio redesign is now confirmed working (see above), though only on a resized desktop Chrome window, not a real physical phone or Safari/iOS.
+Part 2 -- Progress screen cleanup: removed the top-of-screen title + 3-stat summary row (Weight change / Week streak / PBs logged) and the weigh-ins-logged line, so the Body/Workouts/Cardio/Nutrition tab bar is now the top of the screen. Removed the Body tab's Workout streak calendar (Body now only shows weight-specific content). Added a Protein trend card to Nutrition, matching the existing Calories card, via a generalized `NutritionTrendChart` (`valueKey` prop). Bolded and enlarged both the Calories and Protein card headers per a mid-session follow-up so they read as real focal points.
 
-**Next priority task:** live-test Session 36's five features (Progress screen restructure, Nutrition tab, CustomPlanScreen cardio scheduling, cardio visibility pass, the two copy nits). After that: App Store groundwork (Capacitor Android Studio build check is the next unblocked item), or privacy policy once Bryant has a business entity.
+**Confirmed working:** esbuild checks (individual files + full bundle) pass clean throughout. Both parts were live-tested end-to-end in Chrome at a 390x844 phone viewport, not just statically checked -- full cardio Treadmill start-to-stop flow, and all four Progress tabs including a real logged meal to exercise the new Nutrition cards.
 
-**Final line counts:** see table above — `src/CardioScreen.jsx` now 232 (was 231). `shared.jsx` still largest at 3,478, `WorkoutScreen.jsx` next at 2,865, both well under the 3,800 limit. All other files unchanged from Session 36.
+**Still needs testing:** Session 36's CustomPlanScreen cardio-day scheduling, the two copy nits, and the Nutrition tab's date-bucketing against more than one day of real data. Neither Session 37 change has been tried on an actual physical phone yet (only a resized desktop Chrome window).
 
-**Latest commit:** `c8ab3d5` on `main`. Session 37 commit sequence: `7bc49b6` → `a133b25` → `828fc03` (docs) → `c8ab3d5`.
+**Next priority task:** live-test the remaining Session 36 items (see punch list SECOND above) and, when convenient, a real-device glance at both of this session's changes. After that: App Store groundwork (Capacitor Android Studio build check is the next unblocked item), or privacy policy once Bryant has a business entity.
+
+**Final line counts:** see table above — `src/CardioScreen.jsx` 234, `src/ProgressScreen.jsx` 588 (down from 613), `src/shared.jsx` 3,482 (largest, still well under the 3,800 limit).
+
+**Latest commit:** `cb93493` on `main`. Full Session 37 commit sequence: `7bc49b6` → `a133b25` → `828fc03` (docs) → `c8ab3d5` → `57f418f` (docs) → `cb93493`.
 
 ## Paste this at the start of your next session
 
-Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` -- can silently serve stale cached content; `api.github.com` is also blocked in this environment's sandbox -- `git clone`/`git push` over an authenticated HTTPS URL, e.g. `https://<token>@github.com/Luxurydadbot/Morphiq.git`, from a plain scratch directory is the only method confirmed to work). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,478, `WorkoutScreen.jsx` next at 2,865).
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` -- can silently serve stale cached content; `api.github.com` is also blocked in this environment's sandbox -- `git clone`/`git push` over an authenticated HTTPS URL, e.g. `https://<token>@github.com/Luxurydadbot/Morphiq.git`, from a plain scratch directory is the only method confirmed to work). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,482, `WorkoutScreen.jsx` next at 2,865).
 
-Remind Bryant: Session 36 shipped five things (copy nits, CustomPlanScreen cardio, cardio button/confirmation/chart polish, Progress screen restructure into Body/Workouts/Cardio, Nutrition tab) -- **none of it has been live-tested yet**, only static syntax/bundle checks. That's the top priority for the next session before anything new: walk through each feature in the real running app. Session 37's cardio-screen redesign (paired timer/calorie card, screen-fill layout, prominent stop confirmation) IS already live-tested and confirmed working (Chrome, 390x844 viewport, full Treadmill start-to-stop flow) -- just not yet on an actual physical phone, worth a quick real-device glance when convenient but not urgent. After the Session 36 test pass, the App Store punch list (Capacitor's `android/` project has never been opened in Android Studio) and the privacy policy (blocked on Bryant's business entity) are the standing next chunks of work.
+Remind Bryant: two things are live-tested and confirmed working this session (Session 37) -- the cardio-screen redesign (paired timer/calorie card, screen-fill layout, prominent stop confirmation) and the Progress screen cleanup (top summary stats removed, Body tab trimmed to weight-only content, new Protein card on Nutrition with bold focal headers) -- both walked end-to-end in Chrome at a phone viewport, just not yet on an actual physical device. Still untested from Session 36: CustomPlanScreen's cardio-day scheduling wizard, the two copy nits, and the Nutrition tab's date-bucketing beyond a single test meal. That's the top priority before anything new. After that, the App Store punch list (Capacitor's `android/` project has never been opened in Android Studio) and the privacy policy (blocked on Bryant's business entity) are the standing next chunks of work.
