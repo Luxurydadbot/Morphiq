@@ -1,4 +1,4 @@
-# Hypergentiq — Session 34 master handoff (both multi-day resume bugs fixed AND live-verified)
+# Hypergentiq — Session 35 master handoff (cardio work from Sessions 31-32 now live-verified)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -6,25 +6,29 @@ This file is the handoff. At the start of every session, fetch this file from th
 
 No change this session — untouched. Step list: (1) fix PWA gaps — done, Session 30, (2) add Capacitor + generate native projects — done (Session 25), still not opened/built in Android Studio or Xcode, (3) set up Capgo live-update pipeline — still open, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service), (6) privacy policy — hard gate for both stores, blocked on Bryant forming a real legal business entity (draft exists, see punch list FIRST), (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit.
 
-## Session 34 — live-tested Session 33's fix, found and fixed a second related bug, both now verified live
+## Session 35 — no code changes; live-tested all the cardio work from Sessions 31-32, everything passed
 
-**What happened:** Bryant asked to actually live-test Session 33's day-swap fix rather than just trust it. Real browser testing (Claude-in-Chrome, against the live production app, on the existing disposable **WarmupTest** account — confirmed by checking `localStorage`'s cached plan, not assumed) confirmed the Session 33 fix works:
-- Started Pull day, logged 2 sets, did a real hard page reload (closest browser equivalent to fully closing/reopening the app) — resumed correctly on Pull with the right exercise and both sets intact. Verified `dayIndex: 1` in the persisted snapshot survived the reload.
-- Logged a 3rd set, then deliberately triggered the "unfinished Pull workout" conflict banner by picking Legs from Home and hitting Start — tapped "Continue Pull," and it correctly reopened Pull with the right exercise, not a different day.
+**What happened:** With both multi-day resume bugs closed out and verified last session, this session was pure live testing of the cardio feature set on the real production app — no code was touched. Same disposable **WarmupTest** account (identity re-confirmed via the profile screen before starting, consistent with this project's standing rule about verifying accounts before writing test data).
 
-**But testing surfaced a second, real, related bug** (exactly the kind of thing Bryant asked to "snuff out"): resuming mid-rest right after the FINAL set of an exercise didn't advance to the next exercise. Instead it left the member on the same exercise pointed at a set index past its real count (verified: `exIdx: 0, setIdx: 3` on a 3-set exercise, i.e. "set 4 of 3"). Root cause: all three resume paths (local reload, cross-device cloud sync, and the day-conflict "Continue" handler) always just did `setIdx + 1` when resuming from "rest" state, with no check for whether that rest was actually after the exercise's LAST set.
+**Test 1 — goal-agnostic reach, on an account NOT set to lose_fat.** WarmupTest's profile was "Get fit & healthy" (not lose_fat) with no scheduled cardio days. Confirmed the persistent "Log cardio" row still appears on Home regardless of goal, opens `CardioScreen` correctly, and the live-timer flow works end to end: picked Treadmill, effort "Moderate," watched the elapsed timer and the estimated-calorie-burn figure both update live (00:09 → 2 cal, 00:40 → 9 cal), stopped after 40 seconds (clear of the 15-second accidental-log guard), got a "Cardio session logged" confirmation.
 
-**Fix, commit `00c301b`:** new `computeResumedPosition()` helper (mirrors the same same-exercise-vs-next-exercise boundary check `advanceSet()` already uses elsewhere in the file) replaces the naive `+1` math in all three resume paths. Boundary comes from the exercise's own warmup-ramp length (via the shared `buildWarmupRamp()`, not a second copy) plus its working-set count — deliberately NOT the full render-time `setPlan` computation (which needs readiness/autoregulation state not available this early in a resume), since autoregulated weights change per-set *values*, not the total *count*. Also reordered the cloud-resume and `continueOldWorkout()` branches so an exercise-list swap (when resuming a different day) happens *before* the boundary check runs, not after.
+**Test 2 — manual "log a past session" entry.** Typed "25 minutes of biking yesterday, felt moderate" into the quick-log text box. `/api/parse-cardio` correctly extracted "Cycling · 25 min · ~150 cal" onto a confirm screen; confirmed and it logged successfully.
 
-**Re-verified live after deploying the second fix:** cleared the stale pre-fix corrupted snapshot from WarmupTest, redid the scenario fresh — logged all 3 sets of exercise 2 (Chest-supported DB row), hard-reloaded during the rest period right after that final set. Confirmed: "Picked up where you left off — Exercise 3, Working set 1" — correctly landed on exercise 3 (Dumbbell bicep curl), not stuck on exercise 2. **Both resume bugs are now fixed and live-verified**, not just fixed-and-hoped.
+**Test 3 — Progress weekly/monthly cardio totals.** Progress → Workouts tab showed a new CARDIO card: "26 min · This week · 2 sessions" and the same for "This month" — correctly summing the ~40-second live session (rounds to ~1 min) and the 25-minute manual entry, both counted.
 
-**Housekeeping note:** WarmupTest's workout history now has some test noise from this session (a few real logged sets, a duplicate set-2 entry from an intentionally-reproduced pre-fix corrupted state, a couple of real PR triggers). It's a disposable test account by design (same one used in prior sessions), so this wasn't treated as a concern, but flagging in case Bryant wants to reset it before using it for something else.
+**Test 4 — the actual onboarding question + `buildPlan()` interleaving, on a real lose_fat account.** Used WarmupTest's own "Restart onboarding quiz" option (a real, current, self-service path already in the app — no fake account needed) to redo onboarding as lose_fat, 3 lifting days/week, and this time answered "2" on the cardio-days question. The plan summary before building correctly listed "Cardio days/week: 2×" alongside "Days/week: 3×." After building, Home's week-view tabs read **Full Body, Cardio, Full Body, Cardio, Full Body** — 5 total days, cardio evenly spaced between lifting days exactly as the interleaving algorithm intends (not clumped at the end or start). Tapping the "Cardio" tab showed "Today's a dedicated cardio day — pick your activity when you start" with a correctly-labeled "Start cardio" button (confirming the `isCardio ? "Start cardio" : "Start workout"` label logic), and tapping it opened `CardioScreen` directly, matching Session 32's design.
 
-## Files touched this session (final line counts)
+**Everything tested passed.** No new bugs found this session.
 
-- `src/WorkoutScreen.jsx`: 2,761 → 2,817 (+56) — `computeResumedPosition()`/`totalSetsForExercise()` helpers, applied to all three resume paths
+**Two minor copy nits noticed, not bugs, not fixed (flagging for whenever convenient):**
+1. The onboarding cardio-days screen's helper text still reads "you can still log cardio anytime from Progress" — it's also now reachable from Home's persistent quick-access row, so the copy is stale, not wrong.
+2. The AI's plan-build confirmation message says "3 days a week is the sweet spot for fat loss," referencing only the lifting days and not acknowledging the 2 additional cardio days in the same plan. Not incorrect, just incomplete.
 
-All files, current full line counts:
+**Side effect worth knowing:** using "Restart onboarding quiz" to test the lose_fat + cardio flow overwrote WarmupTest's previous profile (it had been "Get fit & healthy," Push/Pull/Legs, 5 days/week) with a fresh "Lose fat," Full Body, 3 lifting + 2 cardio days/week plan. This is expected and fine for a disposable test account, but the next session should know WarmupTest's current plan is the lose_fat one, not the old PPL one, if it picks up testing again from here.
+
+## Files touched this session
+
+None — zero code changes. Pure live QA. Line counts are unchanged from Session 34:
 
 | File | Lines |
 | --- | --- |
@@ -55,17 +59,17 @@ All files, current full line counts:
 | src/index.js | 64 |
 | src/serviceWorkerRegistration.js | 23 |
 
-All well under the 3,800-line hard limit. `WorkoutScreen.jsx` (2,817) is getting closer to the ~3,000-line watch point flagged in earlier sessions — worth a look next time it's touched, not urgent yet. `shared.jsx` (3,349) unchanged this session.
+All well under the 3,800-line hard limit. `WorkoutScreen.jsx` (2,817) is the one to keep an eye on next time it's touched.
 
 ## Latest commit
 
-`00c301b` on `main` ("Fix: resuming mid-rest after an exercise's last set didn't advance to the next exercise"), on top of Session 33's `33cd01f` (and Session 34's own docs commit that produced this file, on top of that).
+No code commit this session (docs-only). This file's own commit is on top of `00c301b` on `main`.
 
 ## Confirmed working vs still open
 
-**Live-verified this session, in the real running app (not just build-checked):** both the Session 33 day-swap fix (reload-resume, and the day-conflict "Continue" path) AND this session's last-set-boundary fix (reload-resume specifically at the moment right after an exercise's final set). Both tested against real interactions on the WarmupTest account, with the underlying `localStorage` snapshot inspected directly (not just visually eyeballed) to confirm the actual persisted state was correct, not just what happened to render.
+**Live-verified this session, in the real running app:** onboarding's cardio-days question (correctly gated to lose_fat, correctly captured into the plan-build summary), `buildPlan()`'s even interleaving of cardio days among lifting days (5-day week showed Full Body / Cardio / Full Body / Cardio / Full Body), Home's scheduled-cardio-day card and its correct "Start cardio" label and routing, the persistent Home "Log cardio" quick-access row on a non-lose_fat account, `CardioScreen`'s live timer (elapsed time + calorie estimate both updating live) and its save-on-stop, the manual "log a past session" flow via `/api/parse-cardio` natural-language parsing, and Progress's weekly/monthly cardio totals aggregation. Combined with Sessions 33-34's resume-bug fixes (also live-verified), **the entire weight-loss/cardio feature set built over the last several sessions is now confirmed working end to end.**
 
-**Not yet live-tested:** Sessions 31-32's cardio work (onboarding cardio-days question, `buildPlan()` scheduling, the live-timer `CardioScreen`, the Home quick-access button, Progress's weekly/monthly totals). This is next, per Bryant's plan to test the two pieces of work one at a time.
+**Not yet tested / not in scope this session:** voice input specifically for the cardio quick-log (typed text was tested, not the mic button itself), the "Other" cardio activity type, `CustomPlanScreen` cardio support (doesn't exist yet — see punch list), and cross-device sync of cardio logs (only tested in a single browser session).
 
 ## Punch list, in priority order
 
@@ -73,52 +77,50 @@ All well under the 3,800-line hard limit. `WorkoutScreen.jsx` (2,817) is getting
 
 **SECOND — no-blocker App Store groundwork.** Unchanged. Capacitor scaffolded/branded, PWA service worker shipped but unverified live. Capgo pipeline not started.
 
-**THIRD — live-verify Sessions 31-32's cardio work (new top priority — the resume bugs are now closed out).** Onboard a test member as `lose_fat` with nonzero cardio days → confirm the plan builds/displays correctly including the scheduled cardio day on Home → tap into it, confirm `CardioScreen` opens and a live session logs correctly → separately tap the persistent "Log cardio" row on Home as a non-cardio-day / different-goal member → confirm it's reachable and works → check Progress's weekly/monthly cardio totals reflect what was logged → try the "Log a past session" manual toggle. Recommend testing one scenario at a time, same approach that worked well this session (caught a second real bug along the way).
+**THIRD — polish the two copy nits found this session (low effort, whenever convenient).** Update the onboarding cardio-days helper text to mention Home, not just Progress. Update the plan-build confirmation message to acknowledge cardio days alongside lifting days.
 
-**FOURTH — weight-loss/cardio redesign, remaining pieces.** `CustomPlanScreen` still doesn't support scheduled cardio days. Wearable sync (Apple HealthKit/Fitbit) remains a deliberately separate, not-yet-scoped future initiative.
+**FOURTH — weight-loss/cardio redesign, remaining pieces.** `CustomPlanScreen` still doesn't support scheduled cardio days. Wearable sync (Apple HealthKit/Fitbit) remains a deliberately separate, not-yet-scoped future initiative. Voice input on the cardio quick-log and the "Other" activity type haven't been live-tested yet (lower priority — likely fine, just not click-tested).
 
-**FIFTH through TENTH — unchanged from Session 30, still open:** live-test `WarmupTest` full week start-to-finish (partially covered by this session's testing, but not the full original scope — nutrition/rest-timer/stats steps still unverified); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion); expand exercise variety beyond primary/variation binary swap. Full detail in Session 30's version of this file (`git show 4337c5e:HANDOFF.md`).
+**FIFTH through TENTH — unchanged from Session 30, still open:** live-test `WarmupTest` full week start-to-finish (partially covered across recent sessions, but not the full original scope — nutrition/rest-timer/stats steps still unverified); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion); expand exercise variety beyond primary/variation binary swap. Full detail in Session 30's version of this file (`git show 4337c5e:HANDOFF.md`).
 
-**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only). New: WarmupTest's data has some test noise from this session's live-testing (see Session 34 housekeeping note above) — not urgent, flag if it ever gets confusing to test against.
+**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only). WarmupTest's plan is now the fresh lose_fat/cardio plan from this session's testing (see note above) — not urgent, just know its current state before reusing it.
 
 ## Technical notes carried forward
 
 **MANDATORY fetch method — git clone only.** `api.github.com` and direct HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked by this environment's proxy allowlist; `raw.githubusercontent.com` via web-fetch can also silently serve stale cached content. `git clone`/`git push` over authenticated HTTPS from a plain scratch directory (not the mounted Windows output folder) remains the only trusted fetch method.
 
-**Live-testing a fix is genuinely worth doing, not just a formality — it found a second real bug this session.** The Session 33 fix was correct as far as it went, but only live-clicking through the exact resume scenario (not just reading the code or compiling it) surfaced the last-set boundary bug, which a code read-through alone hadn't caught. When a fix touches state that only manifests through specific user timing (like resuming exactly mid-rest, exactly after the last set), reproduce that exact timing live before considering it done.
+**A feature's own onboarding "restart" option is a legitimate, no-setup way to live-test a flow that's otherwise only reachable at first signup.** This session used WarmupTest's existing "Restart onboarding quiz" button (Progress screen, scroll to bottom) to re-run the lose_fat + cardio-days onboarding path without creating a new test account or touching Supabase directly. Worth remembering for any future feature gated behind first-time onboarding.
 
-**Verify identity before assuming a live-test account.** Before logging test data, checked `localStorage`'s cached plan for the signed-in profile's actual name (`WarmupTest`) rather than assuming an already-logged-in browser session was Bryant's real account or a stranger's — cheap, fast, removed all doubt before writing any test data.
+**Live-testing is worth doing even when a feature "looks done" in code review — it either confirms confidence or catches something a read-through misses.** This session found no new bugs, which is itself useful signal: the cardio feature set, built over two prior sessions, held up under real interaction across goal-agnostic access, live timing, manual entry, aggregation, and the original lose_fat scheduling path it was designed around.
 
-**When a value needs to survive across renders unchanged except at specific, intentional moments, it belongs in `useState`, not a plain `const` re-derived from other reactive values.** Carried forward from Session 33 — still the general shape to watch for.
+**Verify identity before assuming a live-test account, every time, not just once.** Re-checked WarmupTest's profile name via the UI before starting this session's testing, same as last session — cheap and removes any doubt before writing test data.
 
-**Reuse existing shared logic instead of a second copy, even for boundary/count checks.** This session's `totalSetsForExercise()` calls the same `buildWarmupRamp()` already used at plan-build time and elsewhere in `WorkoutScreen.jsx`, rather than a third implementation of warmup-ramp math.
+**Client-side progress persistence has TWO layers, both must be cleared for a clean test reset.** `localStorage` key (`morphiq_workout_progress_<supabase_user_id>`) and the Supabase `workout_progress` column — always clear both together. Not directly exercised this session (no resume testing), but still a live constraint to remember.
 
-**Client-side progress persistence has TWO layers, both must be cleared for a clean test reset.** `localStorage` key (`morphiq_workout_progress_<supabase_user_id>`) and the Supabase `workout_progress` column — always clear both together. Directly relevant this session: had to clear the local key to get a clean re-test after the second fix, since the stale corrupted snapshot from before the fix didn't retroactively repair itself (the fix prevents new corruption, it doesn't un-corrupt old saved state — expected and fine, just worth knowing when re-testing).
-
-**Native `window.confirm()`/`alert()`/`prompt()` dialogs block Claude-in-Chrome browser automation entirely.** No workaround found — avoid clicks expected to trigger one during automated testing, or be ready to close and reopen the tab. Not hit this session (no dialogs triggered), but still a live constraint for future live-testing.
+**Native `window.confirm()`/`alert()`/`prompt()` dialogs block Claude-in-Chrome browser automation entirely.** No workaround found. Not hit this session.
 
 `profiles.supabase_user_id` is the auth link, `profiles.id` is the FK used everywhere else. Fire-and-forget `.catch(() => {})` pattern for all new Supabase writes. `AuthScreen` lives in `Morphiq.jsx`, not `shared.jsx`. The `exercises` table is still just a reference/classification table, not wired into live plan generation.
 
-**No live Node/npm toolchain in this sandbox by default.** `esbuild` (installed standalone via `npm install --no-save esbuild --prefix /tmp/esbuild-check`) is the fast syntax/JSX sanity check. A full cross-file bundle built from `Morphiq.jsx` catches export/import mismatches a per-file check misses.
+**No live Node/npm toolchain in this sandbox by default.** `esbuild` (installed standalone via `npm install --no-save esbuild --prefix /tmp/esbuild-check`) is the fast syntax/JSX sanity check when code does change. Not needed this session since nothing was touched.
 
-## Session 34 close-out summary
+## Session 35 close-out summary
 
-**Everything built/changed this session:** live-tested Session 33's day-swap fix (passed, on two real scenarios), found and fixed a second, related resume bug (getting stuck past an exercise's last set when resuming mid-rest), then live-re-tested THAT fix too. One commit, `00c301b`. Both bugs Bryant could hit are now closed out with real evidence, not just code review.
+**Everything built/changed this session:** nothing — pure live QA, no commits to app code.
 
-**Confirmed working:** everything above, live, in the real production app, with the underlying persisted state inspected directly via `localStorage`, not just the UI eyeballed.
+**Confirmed working, live, in the real production app:** the entire cardio feature set from Sessions 31-32 — onboarding question, `buildPlan()` interleaving, Home's scheduled-day card and persistent quick-access row, `CardioScreen`'s live timer and manual entry, and Progress's weekly/monthly totals. Combined with Sessions 33-34's resume-bug fixes, the full recent body of work (multi-day resume correctness + the weight-loss/cardio redesign) is now live-verified end to end.
 
-**Still needs testing:** Sessions 31-32's cardio work — onboarding cardio-days question, `buildPlan()` scheduling, `CardioScreen`, Home's cardio quick-access, Progress's weekly/monthly totals. This is the planned next step.
+**Still needs testing:** the cardio quick-log's voice/mic input specifically (typed text was tested), the "Other" activity type, `CustomPlanScreen` cardio support (not built yet), cross-device cardio-log sync.
 
-**Next priority task:** live-verify the cardio work (punch list THIRD). After that: `CustomPlanScreen` cardio support, wearable sync. Privacy policy remains blocked on business entity formation. Capacitor `android/` still needs an Android Studio build check.
+**Next priority task:** the two low-effort copy nits (onboarding helper text, plan-build confirmation message) whenever convenient, or move on to `CustomPlanScreen` cardio support, or resume the App Store punch list (Capacitor Android Studio build check is the next unblocked item there). Privacy policy remains the overall FIRST priority once Bryant has a business entity.
 
-**Final line counts, all files:** see table above. Nothing near the 3,800-line limit; `shared.jsx` is largest at 3,349, `WorkoutScreen.jsx` next at 2,817 (worth a look, not urgent).
+**Final line counts, all files:** unchanged from Session 34 — see table above.
 
-**Latest commit:** `00c301b` on `main`.
+**Latest commit:** `00c301b` on `main` (last code commit); this file's docs commit sits on top of it.
 
 ## Paste this at the start of your next session
 
 Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,349, `WorkoutScreen.jsx` next at 2,817).
 
-Remind Bryant of the next priority task: **live-verify the cardio work from Sessions 31-32**, now that both multi-day workout resume bugs are fixed and live-confirmed. Walk through: onboarding a `lose_fat` test member with nonzero cardio days, confirming the plan and the scheduled cardio day show correctly on Home, opening `CardioScreen` from both the scheduled-day card and the persistent Home quick-access button, running a live timed session, checking Progress's weekly/monthly cardio totals, and trying the manual "log a past session" toggle. Test one scenario at a time and actually click through it in a real browser — this approach caught a second real bug last session that a code review alone had missed.
+Remind Bryant: the entire cardio feature set (Sessions 31-32) and both multi-day resume bugs (Sessions 33-34) are now live-verified with no open issues. Two tiny copy nits are flagged in the punch list if there's nothing more pressing. Otherwise the next real chunks of work are: `CustomPlanScreen` cardio support, or picking the App Store punch list back up (privacy policy is blocked on Bryant's business entity; Capacitor's `android/` project has never been opened in Android Studio to confirm it builds — that's the next unblocked step there).
 
-Also still open: the privacy policy (blocked on Bryant forming a real legal business entity). Capacitor's `android/`/`ios/` native projects are scaffolded and branded but nobody has opened `android/` in Android Studio to confirm it builds. The Capgo live-update pipeline hasn't been started. `CustomPlanScreen` doesn't support cardio days yet. Wearable sync (Apple HealthKit/Fitbit) is a deliberately separate, not-yet-scoped future initiative. The WarmupTest account has some test-data noise from Session 34's live-testing — not urgent to clean up, but worth knowing about.
+Also note: WarmupTest's account currently has a fresh "Lose fat" plan (3 lifting + 2 cardio days/week) from this session's onboarding test, not its earlier "Get fit & healthy" PPL plan — know this before reusing the account.
