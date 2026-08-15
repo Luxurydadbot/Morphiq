@@ -479,10 +479,32 @@ function WaterTracker({ userId }) {
   const [showCustom, setShowCustom] = useState(false);
   const [justAdded, setJustAdded] = useState(null); // brief "+Xoz" flash
 
+  // Session 37: water used to be localStorage-only -- today's count, one
+  // device, gone tomorrow. Now backed by water_logs in Supabase (event-log
+  // style, one row per add/remove tap, see sb.getWaterLogs/insertWaterLog
+  // in shared.jsx). localStorage's cached value above is still what paints
+  // first (instant, no loading flicker), then this reconciles it against
+  // the real server total for today the moment it loads -- catches the
+  // "logged on your phone this morning, opening on desktop now" case that
+  // pure localStorage could never handle. Writes stay fire-and-forget
+  // (.catch(() => {})) same as every other new Supabase write in the app --
+  // a failed save should never block the UI from updating.
+  useEffect(() => {
+    if (!userId) return;
+    sb.getWaterLogs(userId, 1).then(rows => {
+      const today = localDateStr();
+      const todayTotal = rows.filter(r => r.logged_date === today).reduce((sum, r) => sum + (r.amount_oz || 0), 0);
+      setOz(Math.max(0, todayTotal));
+      try { localStorage.setItem(waterKey, String(Math.max(0, todayTotal))); } catch {}
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
   function addWater(amount) {
     const next = Math.min(oz + amount, 999);
     setOz(next);
     try { localStorage.setItem(waterKey, String(next)); } catch {}
+    if (userId) sb.insertWaterLog(userId, amount).catch(() => {});
     setJustAdded(`+${amount}oz`);
     setTimeout(() => setJustAdded(null), 1500);
   }
@@ -500,6 +522,7 @@ function WaterTracker({ userId }) {
     const next = Math.max(0, oz - amount);
     setOz(next);
     try { localStorage.setItem(waterKey, String(next)); } catch {}
+    if (userId) sb.insertWaterLog(userId, -amount).catch(() => {});
   }
 
   const pct = Math.min(100, Math.round((oz / WATER_GOAL_OZ) * 100));

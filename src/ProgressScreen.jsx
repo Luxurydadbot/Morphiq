@@ -35,6 +35,7 @@ function ProgressScreen() {
   const strengthLogs = realLogs ? realLogs.filter(r => !r.is_cardio) : null;
   const cardioLogs = historicalData?.cardioLogs ?? [];
   const mealLogs = historicalData?.mealLogs ?? [];
+  const waterLogs = historicalData?.waterLogs ?? [];
 
   const realSessions = useRealWorkoutData ? (() => {
     const byDate = {};
@@ -493,6 +494,7 @@ function ProgressScreen() {
         {tab === "nutrition" && (() => {
           const calGoal = plan?.calories || 1800;
           const proteinGoal = plan?.protein || 140;
+          const waterGoalOz = 64; // 8 glasses -- same goal WaterTracker (MealScreen.jsx) uses
 
           // Bucket every logged entry into a per-day total.
           const byDate = {};
@@ -502,6 +504,18 @@ function ProgressScreen() {
             byDate[m.date].protein += m.logged_protein || 0;
           });
           const loggedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+          // Water lives in its own table (water_logs -- event-log style, one
+          // row per add/remove tap, amount_oz negative for a removal) rather
+          // than meal_logs, so it gets its own byDate bucket keyed off
+          // logged_date instead of piggybacking on the meal one -- a member
+          // can log water on a day they never logged a meal.
+          const waterByDate = {};
+          waterLogs.forEach(w => {
+            if (!waterByDate[w.logged_date]) waterByDate[w.logged_date] = 0;
+            waterByDate[w.logged_date] += w.amount_oz || 0;
+          });
+          const loggedWaterDates = Object.keys(waterByDate).filter(d => waterByDate[d] > 0);
 
           const now = new Date();
           const dow = now.getDay();
@@ -517,6 +531,7 @@ function ProgressScreen() {
           // other and with "Recent days".
           const trend = [];
           const proteinTrend = [];
+          const waterTrend = [];
           for (let i = 13; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
@@ -524,6 +539,7 @@ function ProgressScreen() {
             const label = d.toLocaleDateString("en-US", { day: "numeric" });
             trend.push({ label, calories: byDate[dStr]?.cal || 0 });
             proteinTrend.push({ label, protein: byDate[dStr]?.protein || 0 });
+            waterTrend.push({ label, waterOz: Math.max(0, waterByDate[dStr] || 0) });
           }
 
           return (
@@ -546,16 +562,33 @@ function ProgressScreen() {
                     <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Last 14 days</div>
                     <NutritionTrendChart data={trend} target={calGoal} accent={a} valueKey="calories" />
                   </div>
-                  <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "14px 12px 12px", marginBottom: 14 }}>
+                  <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "14px 12px 12px", marginBottom: 10 }}>
                     <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 2 }}>Protein</div>
                     <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Last 14 days</div>
                     <NutritionTrendChart data={proteinTrend} target={proteinGoal} accent={a} valueKey="protein" />
                   </div>
                 </>
               ) : (
-                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "18px 14px", textAlign: "center", marginBottom: 14 }}>
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "18px 14px", textAlign: "center", marginBottom: 10 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>No meals logged yet</div>
                   <div style={{ fontSize: 11, color: "#6E7480", marginTop: 4 }}>Log food on the Meals tab and your trend will show up here.</div>
+                </div>
+              )}
+
+              {/* Water -- own table (water_logs), own card, same treatment as
+                  Calories/Protein above but gated on its own data rather than
+                  loggedDates, since a member can log water without logging a
+                  meal that day. */}
+              {loggedWaterDates.length > 0 ? (
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "14px 12px 12px", marginBottom: 14 }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 2 }}>Water</div>
+                  <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Last 14 days</div>
+                  <NutritionTrendChart data={waterTrend} target={waterGoalOz} accent={a} valueKey="waterOz" />
+                </div>
+              ) : (
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "18px 14px", textAlign: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>No water logged yet</div>
+                  <div style={{ fontSize: 11, color: "#6E7480", marginTop: 4 }}>Log water on the Meals tab and your trend will show up here.</div>
                 </div>
               )}
 

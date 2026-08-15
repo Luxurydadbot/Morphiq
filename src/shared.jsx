@@ -1072,6 +1072,50 @@ const sb = {
     } catch { return []; }
   },
 
+  // ── WATER LOGS ────────────────────────────────────────────────────────────
+  // Session 37: water was previously localStorage-only (see WaterTracker,
+  // MealScreen.jsx) -- today's count only, per device, no history. Table
+  // created to match weight_logs' shape (same open RLS policy too), but
+  // event-log style like meal_logs/cardio_logs rather than one-row-per-day
+  // like weight_logs, since a day's water is several small additions (and
+  // occasionally a correction) rather than one single value -- each add/
+  // remove tap writes its own row (amount_oz negative for a removal) and
+  // callers sum by logged_date to get a day's total, same division of
+  // responsibility as getMealLogs()'s per-day byDate bucketing.
+  async insertWaterLog(supabaseUserId, amountOz) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await sbFetchRetry(`${SUPABASE_URL}/rest/v1/water_logs`, () => ({
+        method: "POST",
+        headers: SB_HEADERS(),
+        body: JSON.stringify({
+          user_id: profileId,
+          amount_oz: amountOz,
+          logged_date: new Date().toISOString().slice(0, 10),
+          logged_at: new Date().toISOString(),
+        }),
+      }));
+      return res.ok;
+    } catch { return false; }
+  },
+
+  async getWaterLogs(supabaseUserId, daysBack = 35) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - daysBack);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/water_logs?user_id=eq.${profileId}&logged_date=gte.${cutoffStr}&order=logged_date.desc&limit=500`,
+        { headers: SB_GET() }
+      );
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows : [];
+    } catch { return []; }
+  },
+
   // ── GYM OWNER DATA ────────────────────────────────────────────────────────
   // Fetch all profiles for a gym
   async getGymMembers(gymId = "demo-gym") {
