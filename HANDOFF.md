@@ -1,4 +1,4 @@
-# Hypergentiq — Session 33 master handoff (live bug fixed: multi-day workouts could silently swap days)
+# Hypergentiq — Session 34 master handoff (both multi-day resume bugs fixed AND live-verified)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -6,28 +6,30 @@ This file is the handoff. At the start of every session, fetch this file from th
 
 No change this session — untouched. Step list: (1) fix PWA gaps — done, Session 30, (2) add Capacitor + generate native projects — done (Session 25), still not opened/built in Android Studio or Xcode, (3) set up Capgo live-update pipeline — still open, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service), (6) privacy policy — hard gate for both stores, blocked on Bryant forming a real legal business entity (draft exists, see punch list FIRST), (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit.
 
-## Session 33 — live bug report: multi-day workout silently swapped to a different day mid-session
+## Session 34 — live-tested Session 33's fix, found and fixed a second related bug, both now verified live
 
-**Bryant's live report, verbatim scenario:** started his Day 4 workout (incline bench press), logged roughly 4 sets successfully, then noticed the screen was showing seated leg curls — a completely different day's exercise. Follow-up detail that cracked the root cause: he'd closed and reopened the app partway through, and it came back on Day 3 instead of Day 4, requiring a manual switch back. Bryant's explicit ask: the app should always resume the exact day he was last on, not re-derive a guess.
+**What happened:** Bryant asked to actually live-test Session 33's day-swap fix rather than just trust it. Real browser testing (Claude-in-Chrome, against the live production app, on the existing disposable **WarmupTest** account — confirmed by checking `localStorage`'s cached plan, not assumed) confirmed the Session 33 fix works:
+- Started Pull day, logged 2 sets, did a real hard page reload (closest browser equivalent to fully closing/reopening the app) — resumed correctly on Pull with the right exercise and both sets intact. Verified `dayIndex: 1` in the persisted snapshot survived the reload.
+- Logged a 3rd set, then deliberately triggered the "unfinished Pull workout" conflict banner by picking Legs from Home and hitting Start — tapped "Continue Pull," and it correctly reopened Pull with the right exercise, not a different day.
 
-**Root cause, found by reading (not guessing):** `activeDayIdx` (which day of a multi-day plan is currently active) was a plain `const` in `WorkoutScreen.jsx`, recomputed fresh on every render from a priority chain — explicit day pick (`selectedDayOverride`) → same-day local saved progress → `getAutoWorkoutDayIndex()` auto-pick. `selectedDayOverride` is deliberately cleared back to `null` moments after mount (a documented "one-time nudge" so a manual day pick from Home doesn't stick around forever). Once it cleared, later renders' `activeDayIdx` expression could fall through to a *different* source than whichever one determined which exercises actually got loaded into React state at mount. The `exercises` array itself is frozen in state at mount (a `useState` lazy initializer, not re-derived), so it correctly kept showing the right day for the rest of that live session — Bryant's 4 sets on incline bench press were genuinely fine. But every progress-persist write after that (there's a `useEffect` that saves `{ ...progress, dayIndex: activeDayIdx }` to localStorage + Supabase every time a set is logged) silently saved the *drifted*, wrong day index alongside the correct set data. That mismatch was invisible during the live session — it only surfaced the next time the app reopened, rebuilt the exercise list fresh from that wrongly-persisted day, and landed on a totally different day's (correctly-logged-progress-position but wrong-exercise-list) session.
+**But testing surfaced a second, real, related bug** (exactly the kind of thing Bryant asked to "snuff out"): resuming mid-rest right after the FINAL set of an exercise didn't advance to the next exercise. Instead it left the member on the same exercise pointed at a set index past its real count (verified: `exIdx: 0, setIdx: 3` on a 3-set exercise, i.e. "set 4 of 3"). Root cause: all three resume paths (local reload, cross-device cloud sync, and the day-conflict "Continue" handler) always just did `setIdx + 1` when resuming from "rest" state, with no check for whether that rest was actually after the exercise's LAST set.
 
-**Fix, commit `33cd01f`:** `activeDayIdx` is now pinned into real React state (`useState`), computed once at mount using the exact same priority order as before, instead of being a live-recomputed `const`. It's now *only* ever changed by the two places in the code that legitimately switch days mid-session — the cross-device cloud-resume branch, and `continueOldWorkout()` (the "continue my unfinished day" conflict-resolution handler) — and both of those now call `setActiveDayIdx(...)` explicitly, right alongside the `setExercises(...)` call that changes the displayed exercise list, so the two values can never drift apart again. Also added `activeDayIdx` to the progress-persist effect's dependency list for correctness now that it's real state.
+**Fix, commit `00c301b`:** new `computeResumedPosition()` helper (mirrors the same same-exercise-vs-next-exercise boundary check `advanceSet()` already uses elsewhere in the file) replaces the naive `+1` math in all three resume paths. Boundary comes from the exercise's own warmup-ramp length (via the shared `buildWarmupRamp()`, not a second copy) plus its working-set count — deliberately NOT the full render-time `setPlan` computation (which needs readiness/autoregulation state not available this early in a resume), since autoregulated weights change per-set *values*, not the total *count*. Also reordered the cloud-resume and `continueOldWorkout()` branches so an exercise-list swap (when resuming a different day) happens *before* the boundary check runs, not after.
 
-**Verified this session:** `esbuild` on the individual file and the full cross-file bundle (from `Morphiq.jsx`). Manually diffed the fixed file against its pre-fix version line by line — confirmed exactly the three intended change sites, nothing else touched, the one `try/catch` block near the edit is intact and unmodified.
+**Re-verified live after deploying the second fix:** cleared the stale pre-fix corrupted snapshot from WarmupTest, redid the scenario fresh — logged all 3 sets of exercise 2 (Chest-supported DB row), hard-reloaded during the rest period right after that final set. Confirmed: "Picked up where you left off — Exercise 3, Working set 1" — correctly landed on exercise 3 (Dumbbell bicep curl), not stuck on exercise 2. **Both resume bugs are now fixed and live-verified**, not just fixed-and-hoped.
 
-**Not verified:** this is a live-usage bug fix for real logged workout data, and it has not been live-clicked yet. Combined with Sessions 31-32's un-tested cardio work, there are now three sessions of un-live-tested changes stacked up. This should be the very next thing done, and this particular fix (multi-day resume correctness) is arguably the highest-stakes of the three to verify, since it touches real workout logging for every multi-day-plan member, not just cardio.
+**Housekeeping note:** WarmupTest's workout history now has some test noise from this session (a few real logged sets, a duplicate set-2 entry from an intentionally-reproduced pre-fix corrupted state, a couple of real PR triggers). It's a disposable test account by design (same one used in prior sessions), so this wasn't treated as a concern, but flagging in case Bryant wants to reset it before using it for something else.
 
 ## Files touched this session (final line counts)
 
-- `src/WorkoutScreen.jsx`: 2,734 → 2,761 (+27) — `activeDayIdx` pinned into state, two explicit sync points added
+- `src/WorkoutScreen.jsx`: 2,761 → 2,817 (+56) — `computeResumedPosition()`/`totalSetsForExercise()` helpers, applied to all three resume paths
 
 All files, current full line counts:
 
 | File | Lines |
 | --- | --- |
 | src/shared.jsx | 3,349 |
-| src/WorkoutScreen.jsx | 2,761 |
+| src/WorkoutScreen.jsx | 2,817 |
 | src/Morphiq.jsx | 1,654 |
 | src/GymOwnerDashboard.jsx | 927 |
 | src/MealScreen.jsx | 831 |
@@ -53,17 +55,17 @@ All files, current full line counts:
 | src/index.js | 64 |
 | src/serviceWorkerRegistration.js | 23 |
 
-All well under the 3,800-line hard limit. `WorkoutScreen.jsx` (2,761) still has headroom before the ~3,000-line watch point noted in earlier sessions. `shared.jsx` (3,349) unchanged this session.
+All well under the 3,800-line hard limit. `WorkoutScreen.jsx` (2,817) is getting closer to the ~3,000-line watch point flagged in earlier sessions — worth a look next time it's touched, not urgent yet. `shared.jsx` (3,349) unchanged this session.
 
 ## Latest commit
 
-`33cd01f` on `main` ("Fix: multi-day workout could silently swap to a different day's exercises"), on top of Session 32's `7ad436d`.
+`00c301b` on `main` ("Fix: resuming mid-rest after an exercise's last set didn't advance to the next exercise"), on top of Session 33's `33cd01f` (and Session 34's own docs commit that produced this file, on top of that).
 
 ## Confirmed working vs still open
 
-**Verified this session:** `esbuild` compile (individual + full cross-file bundle) on `WorkoutScreen.jsx`. Full line-by-line diff review against the pre-fix file confirmed the change is scoped to exactly the three intended sites.
+**Live-verified this session, in the real running app (not just build-checked):** both the Session 33 day-swap fix (reload-resume, and the day-conflict "Continue" path) AND this session's last-set-boundary fix (reload-resume specifically at the moment right after an exercise's final set). Both tested against real interactions on the WarmupTest account, with the underlying `localStorage` snapshot inspected directly (not just visually eyeballed) to confirm the actual persisted state was correct, not just what happened to render.
 
-**Not live-tested — now three sessions deep:** Session 31 (onboarding cardio-days + `buildPlan()` scheduling), Session 32 (the cardio-logging screen), and this session's multi-day-resume fix have all shipped without a live click-through. Recommend testing this session's fix specifically first, since it's a correctness fix for real workout data already in production use, not a new feature nobody's touched yet.
+**Not yet live-tested:** Sessions 31-32's cardio work (onboarding cardio-days question, `buildPlan()` scheduling, the live-timer `CardioScreen`, the Home quick-access button, Progress's weekly/monthly totals). This is next, per Bryant's plan to test the two pieces of work one at a time.
 
 ## Punch list, in priority order
 
@@ -71,52 +73,52 @@ All well under the 3,800-line hard limit. `WorkoutScreen.jsx` (2,761) still has 
 
 **SECOND — no-blocker App Store groundwork.** Unchanged. Capacitor scaffolded/branded, PWA service worker shipped but unverified live. Capgo pipeline not started.
 
-**THIRD — live-verify three sessions' worth of changes (new top priority, supersedes the old THIRD).** In priority order:
-  1. **This session's multi-day resume fix.** Start a multi-day plan's Day 2 or 3 (not Day 1), log a couple of sets, then actually close and reopen the app (not just navigate within it) — confirm it resumes on the *same* day with the *same* exercises, matching what's shown in the persisted `dayIndex`. This is the exact scenario Bryant hit live.
-  2. **Sessions 31-32's cardio work.** Onboard a test member as `lose_fat` with nonzero cardio days → confirm the plan builds/displays correctly including the scheduled cardio day on Home → tap into it, confirm `CardioScreen` opens and a live session logs correctly → separately tap the persistent "Log cardio" row on Home as a non-cardio-day / different-goal member → confirm it's reachable and works → check Progress's weekly/monthly cardio totals reflect what was logged → try the "Log a past session" manual toggle.
+**THIRD — live-verify Sessions 31-32's cardio work (new top priority — the resume bugs are now closed out).** Onboard a test member as `lose_fat` with nonzero cardio days → confirm the plan builds/displays correctly including the scheduled cardio day on Home → tap into it, confirm `CardioScreen` opens and a live session logs correctly → separately tap the persistent "Log cardio" row on Home as a non-cardio-day / different-goal member → confirm it's reachable and works → check Progress's weekly/monthly cardio totals reflect what was logged → try the "Log a past session" manual toggle. Recommend testing one scenario at a time, same approach that worked well this session (caught a second real bug along the way).
 
 **FOURTH — weight-loss/cardio redesign, remaining pieces.** `CustomPlanScreen` still doesn't support scheduled cardio days. Wearable sync (Apple HealthKit/Fitbit) remains a deliberately separate, not-yet-scoped future initiative.
 
-**FIFTH through TENTH — unchanged from Session 30, still open:** live-test `WarmupTest` full week start-to-finish; get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion); expand exercise variety beyond primary/variation binary swap. Full detail in Session 30's version of this file (`git show 4337c5e:HANDOFF.md`).
+**FIFTH through TENTH — unchanged from Session 30, still open:** live-test `WarmupTest` full week start-to-finish (partially covered by this session's testing, but not the full original scope — nutrition/rest-timer/stats steps still unverified); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion); expand exercise variety beyond primary/variation binary swap. Full detail in Session 30's version of this file (`git show 4337c5e:HANDOFF.md`).
 
-**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only).
+**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only). New: WarmupTest's data has some test noise from this session's live-testing (see Session 34 housekeeping note above) — not urgent, flag if it ever gets confusing to test against.
 
 ## Technical notes carried forward
 
-**MANDATORY fetch method — git clone only.** `api.github.com` and direct HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked by this environment's proxy allowlist; `raw.githubusercontent.com` via web-fetch can also silently serve stale cached content. `git clone`/`git push` over authenticated HTTPS from a plain scratch directory (not the mounted Windows output folder — git lock files don't survive that mount; use `/tmp` or equivalent) remains the only trusted fetch method.
+**MANDATORY fetch method — git clone only.** `api.github.com` and direct HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked by this environment's proxy allowlist; `raw.githubusercontent.com` via web-fetch can also silently serve stale cached content. `git clone`/`git push` over authenticated HTTPS from a plain scratch directory (not the mounted Windows output folder) remains the only trusted fetch method.
 
-**When a value needs to survive across renders unchanged except at specific, intentional moments, it belongs in `useState`, not a plain `const` re-derived from other reactive values.** This session's bug is the general shape to watch for: a `const` computed from a priority-fallback chain (explicit choice → saved state → auto-derived default) looks stable but silently re-evaluates on every render — if any of its *inputs* change for reasons unrelated to the value it's supposed to represent (here, `selectedDayOverride` clearing itself out as a deliberate one-time nudge), the derived value can drift out from under state that WAS correctly pinned (here, `exercises`), with no error, no crash, just a quietly wrong persisted value. When two pieces of state need to always agree with each other, prefer explicit, paired `set` calls at the few legitimate transition points over letting one re-derive from live inputs and hoping it lands on the same answer.
+**Live-testing a fix is genuinely worth doing, not just a formality — it found a second real bug this session.** The Session 33 fix was correct as far as it went, but only live-clicking through the exact resume scenario (not just reading the code or compiling it) surfaced the last-set boundary bug, which a code read-through alone hadn't caught. When a fix touches state that only manifests through specific user timing (like resuming exactly mid-rest, exactly after the last set), reproduce that exact timing live before considering it done.
 
-**Reuse existing logging paths instead of building parallel ones.** Session 32's `CardioQuickLog` reuse still stands as the pattern to follow.
+**Verify identity before assuming a live-test account.** Before logging test data, checked `localStorage`'s cached plan for the signed-in profile's actual name (`WarmupTest`) rather than assuming an already-logged-in browser session was Bryant's real account or a stranger's — cheap, fast, removed all doubt before writing any test data.
 
-**Verify the real Supabase schema via the Supabase MCP tool before writing any DB code, don't just grep the frontend.** No DB schema changes this session.
+**When a value needs to survive across renders unchanged except at specific, intentional moments, it belongs in `useState`, not a plain `const` re-derived from other reactive values.** Carried forward from Session 33 — still the general shape to watch for.
 
-**Client-side progress persistence has TWO layers, both must be cleared for a clean test reset.** `localStorage` key (`morphiq_workout_progress_<supabase_user_id>`) and the Supabase `workout_progress` column — always clear both together. Directly relevant this session: the bug lived in exactly this persistence path.
+**Reuse existing shared logic instead of a second copy, even for boundary/count checks.** This session's `totalSetsForExercise()` calls the same `buildWarmupRamp()` already used at plan-build time and elsewhere in `WorkoutScreen.jsx`, rather than a third implementation of warmup-ramp math.
 
-**Native `window.confirm()`/`alert()`/`prompt()` dialogs block Claude-in-Chrome browser automation entirely.** No workaround found — avoid clicks expected to trigger one during automated testing, or be ready to close and reopen the tab.
+**Client-side progress persistence has TWO layers, both must be cleared for a clean test reset.** `localStorage` key (`morphiq_workout_progress_<supabase_user_id>`) and the Supabase `workout_progress` column — always clear both together. Directly relevant this session: had to clear the local key to get a clean re-test after the second fix, since the stale corrupted snapshot from before the fix didn't retroactively repair itself (the fix prevents new corruption, it doesn't un-corrupt old saved state — expected and fine, just worth knowing when re-testing).
+
+**Native `window.confirm()`/`alert()`/`prompt()` dialogs block Claude-in-Chrome browser automation entirely.** No workaround found — avoid clicks expected to trigger one during automated testing, or be ready to close and reopen the tab. Not hit this session (no dialogs triggered), but still a live constraint for future live-testing.
 
 `profiles.supabase_user_id` is the auth link, `profiles.id` is the FK used everywhere else. Fire-and-forget `.catch(() => {})` pattern for all new Supabase writes. `AuthScreen` lives in `Morphiq.jsx`, not `shared.jsx`. The `exercises` table is still just a reference/classification table, not wired into live plan generation.
 
-**No live Node/npm toolchain in this sandbox by default.** `esbuild` (installed standalone via `npm install --no-save esbuild --prefix /tmp/esbuild-check`) is the fast syntax/JSX sanity check. A full cross-file bundle built from `Morphiq.jsx` (not externalizing local imports) catches export/import name mismatches a per-file check misses — worth doing whenever a session adds a new shared export or cross-file import, and cheap enough to just always do.
+**No live Node/npm toolchain in this sandbox by default.** `esbuild` (installed standalone via `npm install --no-save esbuild --prefix /tmp/esbuild-check`) is the fast syntax/JSX sanity check. A full cross-file bundle built from `Morphiq.jsx` catches export/import mismatches a per-file check misses.
 
-## Session 33 close-out summary
+## Session 34 close-out summary
 
-**Everything built/changed this session:** investigated and fixed a live bug Bryant hit mid-workout — a multi-day plan's active day could silently drift out of sync with its own persisted progress, surfacing as the wrong exercises loading on app reopen. Root cause traced to `activeDayIdx` being a live-recomputed `const` instead of pinned state; fixed by converting it to `useState` with two explicit, paired sync points. One commit, `33cd01f`.
+**Everything built/changed this session:** live-tested Session 33's day-swap fix (passed, on two real scenarios), found and fixed a second, related resume bug (getting stuck past an exercise's last set when resuming mid-rest), then live-re-tested THAT fix too. One commit, `00c301b`. Both bugs Bryant could hit are now closed out with real evidence, not just code review.
 
-**Confirmed working:** `esbuild` compile (individual + full cross-file bundle). Manual diff review confirmed the fix is scoped to exactly three sites, nothing else touched, the nearby `try/catch` intact.
+**Confirmed working:** everything above, live, in the real production app, with the underlying persisted state inspected directly via `localStorage`, not just the UI eyeballed.
 
-**Still needs testing:** this fix, plus Sessions 31 and 32's cardio work — none of it has been live-clicked. See punch list THIRD for the exact order and steps.
+**Still needs testing:** Sessions 31-32's cardio work — onboarding cardio-days question, `buildPlan()` scheduling, `CardioScreen`, Home's cardio quick-access, Progress's weekly/monthly totals. This is the planned next step.
 
-**Next priority task:** live-verify this session's resume fix first (highest stakes — real workout data), then the cardio work from Sessions 31-32. After that: `CustomPlanScreen` cardio support, wearable sync. Privacy policy remains blocked on business entity formation. Capacitor `android/` still needs an Android Studio build check.
+**Next priority task:** live-verify the cardio work (punch list THIRD). After that: `CustomPlanScreen` cardio support, wearable sync. Privacy policy remains blocked on business entity formation. Capacitor `android/` still needs an Android Studio build check.
 
-**Final line counts, all files:** see table above. Nothing near the 3,800-line limit; `shared.jsx` is largest at 3,349.
+**Final line counts, all files:** see table above. Nothing near the 3,800-line limit; `shared.jsx` is largest at 3,349, `WorkoutScreen.jsx` next at 2,817 (worth a look, not urgent).
 
-**Latest commit:** `33cd01f` on `main`.
+**Latest commit:** `00c301b` on `main`.
 
 ## Paste this at the start of your next session
 
-Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,349).
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,349, `WorkoutScreen.jsx` next at 2,817).
 
-Remind Bryant of the next priority task: **live-verify what's shipped over the last three sessions, starting with the multi-day workout resume fix.** Session 33 fixed a real bug he hit live — closing and reopening the app mid-workout could land on the wrong day with the wrong exercises, because the app's internal "which day is active" tracking could silently drift from what was actually being displayed and logged. The fix pins that value in state instead of letting it re-derive. Test it exactly the way it broke: start a non-Day-1 workout on a multi-day plan, log a couple of sets, actually close and reopen the app (not just navigate within it), and confirm it resumes the same day with the same exercises. After that, walk through Sessions 31-32's cardio work (onboarding cardio-days question, `buildPlan()` scheduling, the live-timer `CardioScreen`, the Home quick-access button, Progress's weekly/monthly totals) — full checklist in the punch list THIRD entry.
+Remind Bryant of the next priority task: **live-verify the cardio work from Sessions 31-32**, now that both multi-day workout resume bugs are fixed and live-confirmed. Walk through: onboarding a `lose_fat` test member with nonzero cardio days, confirming the plan and the scheduled cardio day show correctly on Home, opening `CardioScreen` from both the scheduled-day card and the persistent Home quick-access button, running a live timed session, checking Progress's weekly/monthly cardio totals, and trying the manual "log a past session" toggle. Test one scenario at a time and actually click through it in a real browser — this approach caught a second real bug last session that a code review alone had missed.
 
-Also still open: the privacy policy (blocked on Bryant forming a real legal business entity, not on finding a lawyer). Capacitor's `android/`/`ios/` native projects are scaffolded and branded but nobody has opened `android/` in Android Studio to confirm it builds. The Capgo live-update pipeline hasn't been started. `CustomPlanScreen` doesn't support cardio days yet. Wearable sync (Apple HealthKit/Fitbit) is a deliberately separate, not-yet-scoped future initiative.
+Also still open: the privacy policy (blocked on Bryant forming a real legal business entity). Capacitor's `android/`/`ios/` native projects are scaffolded and branded but nobody has opened `android/` in Android Studio to confirm it builds. The Capgo live-update pipeline hasn't been started. `CustomPlanScreen` doesn't support cardio days yet. Wearable sync (Apple HealthKit/Fitbit) is a deliberately separate, not-yet-scoped future initiative. The WarmupTest account has some test-data noise from Session 34's live-testing — not urgent to clean up, but worth knowing about.
