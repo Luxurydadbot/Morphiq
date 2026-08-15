@@ -144,7 +144,7 @@ function CardioScreen() {
         )}
 
         {mode === "live" && !activity && (
-          <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 244px)" }}>
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 326px)" }}>
             {saved && lastLogged && (
               <div style={{ textAlign: "center", background: theme.accentDim, border: `2px solid ${a}`, borderRadius: 16, padding: "22px 18px", marginBottom: 20 }}>
                 <div style={{ width: 46, height: 46, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
@@ -172,7 +172,7 @@ function CardioScreen() {
         )}
 
         {mode === "live" && activity && (
-          <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 244px)", paddingBottom: "1.5rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 326px)", paddingBottom: "1.5rem" }}>
             <button onClick={() => { clearInterval(intervalRef.current); setActivity(null); setElapsed(0); setRunning(false); }}
               style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, padding: "0 0 .8rem", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontFamily: "inherit" }}>
               <Icon name="arrow-left" size={14} /> Change activity
