@@ -1662,6 +1662,7 @@ function buildPlan(userProfile, existingMacros) {
     equipment = "dumbbell",
     injuries = "none",
     restPref = null,
+    cardioDaysPerWeek: cardioDaysPerWeekRaw = 0,
   } = userProfile;
 
   // Resolve experience tier
@@ -1987,6 +1988,54 @@ function buildPlan(userProfile, existingMacros) {
     customDays = null;
   }
 
+  // ── Cardio-day scheduling (lose_fat goal only, Aug 2026 redesign) ──
+  // Member picks a separate cardio-days/week count in onboarding, kept apart
+  // from the lifting daysPerWeek question above (see OnboardingScreen.jsx
+  // step 7, DECISIONS.md Aug 9 2026 entries). When present, this expands the
+  // plan's day rotation into a full weekly sequence -- cycling through the
+  // lifting day-type(s) already built above (Full Body / Upper-Lower /
+  // Push-Pull-Legs) exactly daysPerWeek times, then interleaving
+  // cardioDaysPerWeek cardio-only days as evenly as possible among them (an
+  // even-distribution interleave, the same idea as Bresenham's line
+  // algorithm) so cardio days don't cluster at the end or land back-to-back.
+  // Not pinned to real calendar weekdays -- customDays entries are worked
+  // through in order whenever the member actually trains (see
+  // getAutoWorkoutDayIndex below), so "spacing" here means spacing within
+  // that sequence, not a specific day like Tuesday. A cardio day carries no
+  // exercises -- the real cardio-day experience (activity-type picker, live
+  // timer, MET-based calorie estimate) is a separate, not-yet-built screen
+  // (DECISIONS.md, Aug 9 2026). For now it's a correctly-scheduled slot the
+  // rest of the app already treats safely: every customDays consumer in this
+  // file reads day.exercises defensively (`day.exercises || []`), and
+  // Morphiq.jsx's "Start workout" button checks upcomingDay.isCardio before
+  // ever routing into WorkoutScreen, which still assumes a real exercise
+  // list and would break on an empty one.
+  const cardioDaysPerWeekNum = Math.max(0, Math.min(4, parseInt(cardioDaysPerWeekRaw) || 0));
+  if (goal === "lose_fat" && cardioDaysPerWeekNum > 0) {
+    const liftingDayTypes = (customDays && customDays.length > 0)
+      ? customDays
+      : [{ dayLabel: daysPerWeek <= 3 ? "Full Body" : "Full Body", exercises }];
+    const liftingSequence = Array.from({ length: daysPerWeek }, (_, i) => liftingDayTypes[i % liftingDayTypes.length]);
+    const cardioSequence = Array.from({ length: cardioDaysPerWeekNum }, () => ({ dayLabel: "Cardio", isCardio: true, exercises: [] }));
+    const total = liftingSequence.length + cardioSequence.length;
+    const weekSequence = [];
+    let liftUsed = 0, cardioUsed = 0;
+    for (let i = 0; i < total; i++) {
+      // Whichever group is proportionally furthest behind its fair share
+      // goes next -- classic even-distribution interleave.
+      const liftDue = (liftUsed + 1) / liftingSequence.length;
+      const cardioDue = (cardioUsed + 1) / cardioSequence.length;
+      if (cardioUsed < cardioSequence.length && (liftUsed >= liftingSequence.length || cardioDue <= liftDue)) {
+        weekSequence.push(cardioSequence[cardioUsed]);
+        cardioUsed++;
+      } else {
+        weekSequence.push(liftingSequence[liftUsed]);
+        liftUsed++;
+      }
+    }
+    customDays = weekSequence;
+  }
+
   // ── Workout structure ─────────────────────────────────────────────
   const workoutType = daysPerWeek <= 3 ? "Full Body"
     : daysPerWeek === 4 ? "Upper / Lower"
@@ -2003,6 +2052,7 @@ function buildPlan(userProfile, existingMacros) {
     weekNumber: 1,
     weekStartDate: new Date().toISOString().split("T")[0],
     daysPerWeek,
+    cardioDaysPerWeek: cardioDaysPerWeekNum,
     workoutType,
     workoutDuration,
     restSeconds: effectiveRestCompound,

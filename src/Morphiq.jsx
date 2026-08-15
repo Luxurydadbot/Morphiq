@@ -1121,7 +1121,7 @@ function HomeDashboardScreen() {
               <div style={{ padding: "1.1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 500, color: "#EDEEF0" }}>Week {weekNum} · {workoutType}</div>
-                  <div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>{exerciseCount} exercises · ~{workoutDuration} min</div>
+                  <div style={{ fontSize: 13, color: theme.textDim, marginTop: 4 }}>{upcomingDay?.isCardio ? "Pick your activity when you start" : `${exerciseCount} exercises · ~${workoutDuration} min`}</div>
                 </div>
                 <div style={{ background: "rgba(76,141,255,0.1)", border: "0.5px solid rgba(76,141,255,0.25)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: a, fontWeight: 500 }}>{workoutType}</div>
               </div>
@@ -1141,7 +1141,20 @@ function HomeDashboardScreen() {
                 </div>
                 <div style={{ fontSize: 12, color: theme.textDim }}>{weeklyDone} of {weeklyTarget} workouts done this week</div>
               </div>
-              {upcomingExercises?.length > 0 && (
+              {/* Cardio day (see buildPlan()'s cardio-day scheduling, shared.jsx) --
+                  isCardio days carry no exercises, so route to Progress's
+                  existing cardio quick-log instead of WorkoutScreen, which
+                  still assumes a real exercise list and would break on an
+                  empty one. The full guided cardio-day screen (activity
+                  picker, live timer, MET-based calorie estimate) is scoped
+                  but not yet built -- see DECISIONS.md, Aug 9 2026 entries. */}
+              {upcomingDay?.isCardio ? (
+                <div style={{ padding: "0 1.25rem .75rem" }}>
+                  <div style={{ background: "#0A1628", border: "0.5px solid rgba(76,141,255,0.2)", borderRadius: 12, padding: "0.85rem 1rem", fontSize: 13, color: theme.textDim, lineHeight: 1.5 }}>
+                    Today's a dedicated cardio day. Log it from Progress when you're done -- a full guided cardio screen with a live timer is coming soon.
+                  </div>
+                </div>
+              ) : upcomingExercises?.length > 0 && (
                 <div style={{ padding: "0 1.25rem .75rem", display: "flex", flexDirection: "column", gap: 6 }}>
                   {upcomingExercises.slice(0, 5).map((ex, idx) => (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1162,8 +1175,8 @@ function HomeDashboardScreen() {
                 </div>
               )}
               <div style={{ padding: "0 1.25rem 1.25rem" }}>
-                <button onClick={() => navigate("workout")} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                  Start workout <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px" }} />
+                <button onClick={() => navigate(upcomingDay?.isCardio ? "progress" : "workout")} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                  {upcomingDay?.isCardio ? "Log cardio" : "Start workout"} <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px" }} />
                 </button>
               </div>
             </>

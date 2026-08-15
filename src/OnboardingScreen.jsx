@@ -21,6 +21,7 @@ function OnboardingScreen() {
   const [weight, setWeight] = useState("");
   const [age, setAge] = useState("");
   const [daysPerWeek, setDaysPerWeek] = useState(3);
+  const [cardioDaysPerWeek, setCardioDaysPerWeek] = useState(0); // dedicated cardio days/week, lose_fat goal only
   const [injuries, setInjuries] = useState("");
   const [equipment, setEquipment] = useState(null);
   const [trainingHistory, setTrainingHistory] = useState(null);
@@ -32,9 +33,9 @@ function OnboardingScreen() {
   const [checklistVisible, setChecklistVisible] = useState([false, false, false, false]);
   const [revealStep, setRevealStep] = useState(0); // 0=hidden, 1=header, 2=ai msg, 3=workouts, 4=targets, 5=button
 
-  // When step 13 (plan reveal) is reached, stagger in each section for a celebration feel
+  // When step 14 (plan reveal) is reached, stagger in each section for a celebration feel
   useEffect(() => {
-    if (step !== 13) { setRevealStep(0); return; }
+    if (step !== 14) { setRevealStep(0); return; }
     setRevealStep(0);
     const delays = [120, 380, 640, 900, 1180];
     const timers = delays.map((d, i) => setTimeout(() => setRevealStep(i + 1), d));
@@ -42,7 +43,7 @@ function OnboardingScreen() {
   }, [step]);
 
   useEffect(() => {
-    if (step !== 12) return;
+    if (step !== 13) return;
     let cancelled = false;
     [0,1,2,3].forEach(i => {
       // Item appears (fades in) first, then turns teal shortly after
@@ -66,13 +67,14 @@ function OnboardingScreen() {
       const profileForPlan = {
         goal, sex, age, trainingHistory, recentActivity,
         daysPerWeek, equipment, injuries,
+        cardioDaysPerWeek: goal === "lose_fat" ? cardioDaysPerWeek : 0, // only lose_fat plans get dedicated cardio days
         restPref, // Fix (June 2026): restPref was captured in onboarding but never passed to buildPlan — rest times were always calculated from age/goal, ignoring the user's choice
       };
 
       try {
         const parsed = buildPlan(profileForPlan, macrosForPlan);
         if (!cancelled) {
-          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, cardioDaysPerWeek: goal === "lose_fat" ? cardioDaysPerWeek : 0, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
           // Cache plan locally FIRST so it's never lost, even if the save below fails —
           // this is a safety net, not a substitute for confirming the cloud save succeeded.
           const _saveUid = supabaseUserIdRef?.current || supabaseUser?.id;
@@ -106,7 +108,7 @@ function OnboardingScreen() {
           if (!cancelled) {
             setUser(userData);
             setPlan(parsed);
-            setTimeout(() => { if (!cancelled) setStep(13); }, 400);
+            setTimeout(() => { if (!cancelled) setStep(14); }, 400);
           }
         }
       } catch (planErr) {
@@ -117,13 +119,13 @@ function OnboardingScreen() {
       }
     }
 
-    if (step === 12) generatePlan();
+    if (step === 13) generatePlan();
     return () => { cancelled = true; };
   }, [step]);
 
   const bodyValid = heightFt && parseInt(heightFt) > 0 && parseInt(heightFt) < 9 && weight && parseFloat(weight) > 0;
   const ageValid = age && parseInt(age) >= 13 && parseInt(age) <= 100;
-  const progressPct = [10, 18, 26, 34, 44, 54, 62, 70, 78, 86, 93, 100, 100][step] || 10;
+  const progressPct = [8, 15, 22, 29, 36, 43, 50, 57, 64, 71, 79, 100, 100, 100, 100][step] || 8;
   const goalLabel = GOAL_OPTIONS.find(g => g.id === goal)?.label || "";
 
   const s = {
@@ -151,6 +153,7 @@ function OnboardingScreen() {
     ["Age", age ? `${age} yrs` : "—"], ["Experience", HISTORY_LABELS[trainingHistory] || "—"],
     ["Recent activity", ACTIVITY_LABELS[recentActivity] || "—"],
     ["Days/week", daysPerWeek ? `${daysPerWeek}×` : "—"],
+    ...(goal === "lose_fat" && cardioDaysPerWeek > 0 ? [["Cardio days/week", `${cardioDaysPerWeek}×`]] : []),
     ["Rest between sets", REST_LABELS[restPref] || "2 min"],
     ["Equipment", EQUIP_LABELS[equipment] || "—"],
     ["Injuries", injuries.trim() || "None"],
@@ -165,7 +168,7 @@ function OnboardingScreen() {
         </div>
         <span style={{ fontSize: 9, color: ob.muted }}><PoweredByHypergentiq /></span>
       </div>
-      {step < 10 && (
+      {step < 11 && (
         <div style={{ padding: "8px 14px 0", flexShrink: 0 }}>
           <div style={{ height: 3, background: ob.card, borderRadius: 2 }}>
             <div style={{ height: 3, background: a, borderRadius: 2, width: `${progressPct}%`, transition: "width .5s ease" }} />
@@ -360,11 +363,45 @@ function OnboardingScreen() {
             </div>
             <div style={{ fontSize: 11, color: ob.muted, marginTop: 4, textAlign: "center", lineHeight: 1.5 }}>Do them any day that works for you — the app always shows your next workout.</div>
           </div>
-          <button onClick={() => setStep(7)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
+          <button onClick={() => setStep(goal === "lose_fat" ? 7 : 8)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
         </div>}
 
-        
-        {step === 7 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {/* Cardio days -- lose_fat goal only. Member picks dedicated cardio days
+            separately from lifting days/week above (Aug 9, 2026 decision, see
+            DECISIONS.md) -- buildPlan() spaces these away from the heaviest
+            lifting days rather than bolting cardio onto an existing lift day. */}
+        {step === 7 && goal === "lose_fat" && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Cardio</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>Days of cardio, on their own?</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Separate from your {daysPerWeek} lifting day{daysPerWeek === 1 ? "" : "s"} -- we'll space them out for you</div>
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <div style={{ position: "relative", width: 140, height: 140 }}>
+              <svg width="140" height="140" viewBox="0 0 140 140" style={{ transform: "rotate(-90deg)" }}>
+                <circle cx="70" cy="70" r="58" fill="none" stroke={ob.card} strokeWidth="12"/>
+                <circle cx="70" cy="70" r="58" fill="none" stroke={a} strokeWidth="12" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 58}
+                  strokeDashoffset={2 * Math.PI * 58 * (1 - cardioDaysPerWeek / 4)}
+                  style={{ transition: "stroke-dashoffset .35s cubic-bezier(.4,0,.2,1)" }}
+                />
+              </svg>
+              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center" }}>
+                <div style={{ fontSize: 38, fontWeight: 700, color: ob.white, lineHeight: 1 }}>{cardioDaysPerWeek}</div>
+                <div style={{ fontSize: 10, color: ob.muted, marginTop: 2 }}>cardio days/week</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+              <button onClick={() => setCardioDaysPerWeek(d => Math.max(0, d - 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.card, border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: ob.muted, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>−</button>
+              <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
+              <button onClick={() => setCardioDaysPerWeek(d => Math.min(4, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(76,141,255,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
+            </div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 4, textAlign: "center", lineHeight: 1.5 }}>{cardioDaysPerWeek === 0 ? "No dedicated cardio days -- you can still log cardio anytime from Progress." : "Pick the activity (run, bike, row...) each time you start one."}</div>
+          </div>
+          <button onClick={() => setStep(8)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
+        </div>}
+
+        {step === 8 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Rest preference</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>How long to rest between sets?</div>
@@ -372,7 +409,7 @@ function OnboardingScreen() {
           </div>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
             {[[60, "1 minute", "High intensity, keep the burn going", <Icon name="flame" size={22} />], [120, "2 minutes", "Balanced — works for most people", <Icon name="bolt" size={22} />], [180, "3 minutes", "Full recovery, lift heavier", <Icon name="flex" size={22} />]].map(([secs, label, sub, icon]) => (
-              <button key={secs} onClick={() => { setRestPref(secs); setTimeout(() => setStep(8), 180); }}
+              <button key={secs} onClick={() => { setRestPref(secs); setTimeout(() => setStep(9), 180); }}
                 style={{ background: restPref === secs ? ob.tealDk : ob.card, border: `2px solid ${restPref === secs ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "all .15s" }}>
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: restPref === secs ? "rgba(76,141,255,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: restPref === secs ? a : ob.muted }}>{icon}</div>
                 <div style={{ textAlign: "left", flex: 1 }}>
@@ -386,7 +423,7 @@ function OnboardingScreen() {
           <div style={{ fontSize: 10, color: ob.muted, textAlign: "center", marginTop: 12 }}>This is your default — tap during rest to adjust on the fly</div>
         </div>}
 
-        {step === 8 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 9 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Injuries & limits</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>Anything to avoid?</div>
@@ -405,15 +442,15 @@ function OnboardingScreen() {
           </div>
           <textarea value={injuries} onChange={e => setInjuries(e.target.value)} placeholder="Or type anything else (e.g. no overhead pressing)..." style={{ ...s.numInput, minHeight: 64, resize: "none", lineHeight: 1.5, fontSize: 12 }} maxLength={200} />
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button onClick={() => { setInjuries(""); setStep(9); }} style={{ ...s.outlineBtn, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>None <Icon name="arrow-right" size={13} /></button>
-            <button onClick={() => setStep(9)} style={{ ...s.tealBtn(false), flex: 2, marginTop: 0, padding: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
+            <button onClick={() => { setInjuries(""); setStep(10); }} style={{ ...s.outlineBtn, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>None <Icon name="arrow-right" size={13} /></button>
+            <button onClick={() => setStep(10)} style={{ ...s.tealBtn(false), flex: 2, marginTop: 0, padding: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
           </div>
         </div>}
 
 
 
 
-        {step === 9 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 10 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Equipment</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>What will you be training with?</div>
@@ -426,7 +463,7 @@ function OnboardingScreen() {
               { id: "kettlebell", label: "Kettlebells & bodyweight", sub: "Functional, explosive training", icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 3a3 3 0 0 1 3 3c0 1.5-1 2.5-2 3l2 9H9l2-9c-1-.5-2-1.5-2-3a3 3 0 0 1 3-3z"/><path d="M9 18h6"/></svg>) },
               { id: "machine", label: "Machines mostly", sub: "Guided equipment, great for beginners", icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="6" width="4" height="12" rx="1"/><rect x="17" y="6" width="4" height="12" rx="1"/><path d="M7 12h10"/></svg>) },
             ].map(eq => (
-              <button key={eq.id} onClick={() => { setEquipment(eq.id); setTimeout(() => setStep(10), 180); }}
+              <button key={eq.id} onClick={() => { setEquipment(eq.id); setTimeout(() => setStep(11), 180); }}
                 style={{ background: equipment === eq.id ? ob.tealDk : ob.card, border: `1.5px solid ${equipment === eq.id ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all .15s" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: equipment === eq.id ? `rgba(76,141,255,0.15)` : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: equipment === eq.id ? a : ob.muted }}>
                   {eq.icon}
@@ -441,7 +478,7 @@ function OnboardingScreen() {
           </div>
         </div>}
 
-        {step === 10 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 11 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 10 }}><AiAvatar /><div style={s.aiBubble}>Before I build your plan, please review the health disclaimer below. Your safety comes first.</div></div>
           <div style={{ background: ob.card, borderRadius: 12, padding: "12px 14px", marginBottom: 10, flex: 1, overflowY: "auto" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: ob.white, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}><Icon name="alert" size={13} color={theme.amber} /> Health & Fitness Disclaimer</div>
@@ -452,13 +489,13 @@ function OnboardingScreen() {
               By tapping "I agree", you confirm you are at least 13 years old and accept these terms.
             </div>
           </div>
-          <button onClick={() => setStep(11)} style={{ ...s.tealBtn(false), marginTop: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>I agree — build my plan <Icon name="sparkle" size={13} /></button>
+          <button onClick={() => setStep(12)} style={{ ...s.tealBtn(false), marginTop: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>I agree — build my plan <Icon name="sparkle" size={13} /></button>
           <div style={{ textAlign: "center", marginTop: 8 }}>
             <button onClick={() => navigate("auth")} style={{ fontSize: 10, color: ob.muted, background: "none", border: "none", cursor: "pointer", fontFamily: ob.font }}>Decline — go back</button>
           </div>
         </div>}
 
-        {step === 11 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 12 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", gap: 7, marginBottom: 8 }}><AiAvatar /><div style={s.aiBubble}>Perfect, {name}. {goalLabel}, {daysPerWeek} days a week, {restPref === 60 ? "1-min" : restPref === 180 ? "3-min" : "2-min"} rest{injuries.trim() ? `, noting: ${injuries.trim()}` : ""}. Building your 4-week plan now.</div></div>
           <div style={{ background: ob.card, borderRadius: 10, padding: "6px 10px", marginBottom: 8 }}>
             {confirmRows.map(([k, v]) => (
@@ -468,16 +505,16 @@ function OnboardingScreen() {
               </div>
             ))}
           </div>
-          <button onClick={() => { setChecklist([false, false, false, false]); setChecklistVisible([false, false, false, false]); setStep(12); }} style={{ ...s.tealBtn(false), marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Build my plan <Icon name="sparkle" size={13} /></button>
+          <button onClick={() => { setChecklist([false, false, false, false]); setChecklistVisible([false, false, false, false]); setStep(13); }} style={{ ...s.tealBtn(false), marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Build my plan <Icon name="sparkle" size={13} /></button>
           <button onClick={() => setStep(0)} style={{ ...s.outlineBtn, width: "100%", marginTop: 6 }}>Start over</button>
         </div>}
 
-        {step === 12 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+        {step === 13 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
           {planError ? (
             <>
               <div style={{ fontSize: 13, color: "#F87171", textAlign: "center", fontWeight: 600 }}>Something went wrong</div>
               <div style={{ fontSize: 11, color: ob.muted, textAlign: "center", padding: "0 20px" }}>{planError}</div>
-              <button onClick={() => { setPlanError(""); setStep(11); }} style={{ background: a, border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 12, color: ob.tealDk, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, marginTop: 8 }}>Try again</button>
+              <button onClick={() => { setPlanError(""); setStep(12); }} style={{ background: a, border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 12, color: ob.tealDk, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, marginTop: 8 }}>Try again</button>
             </>
           ) : (
             <>
@@ -494,7 +531,7 @@ function OnboardingScreen() {
           )}
         </div>}
 
-        {step === 13 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {step === 14 && plan && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
 
           {/* ── Celebration header — fades in first ── */}
           <div style={{ opacity: revealStep >= 1 ? 1 : 0, transform: revealStep >= 1 ? "translateY(0)" : "translateY(-10px)", transition: "opacity .4s ease, transform .4s ease" }}>
