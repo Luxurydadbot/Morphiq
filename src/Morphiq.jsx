@@ -451,16 +451,18 @@ function AppProvider({ children }) {
     async function loadHistoricalData(uid) {
     if (!uid || uid.startsWith("sim-") || uid === "dev-001") return;
     try {
-      const [wLogs, wtLogs, streakDates, cLogs, cardioStreakDates] = await Promise.all([
+      const [wLogs, wtLogs, streakDates, cLogs, cardioStreakDates, mLogs] = await Promise.all([
         sb.getWorkoutLogs(uid, 60),
         sb.getWeightLogs(uid, 12),
         sb.getWorkoutDatesForStreak(uid, 370),
         sb.getCardioLogs(uid, 60),
         sb.getCardioDatesForStreak(uid, 370),
+        sb.getMealLogs(uid, 35),
       ]);
       const strengthLogs = Array.isArray(wLogs) ? wLogs : [];
       const weightLogs  = Array.isArray(wtLogs) ? wtLogs : [];
       const cardioLogs = Array.isArray(cLogs) ? cLogs : [];
+      const mealLogs = Array.isArray(mLogs) ? mLogs : [];
       // Cardio sessions count the same as a strength day toward the weekly
       // workout target/streak. Rather than duplicating that logic in every
       // place that already reads workoutLogs (Home screen, WorkoutScreen's
@@ -511,7 +513,7 @@ function AppProvider({ children }) {
         weightChange = (last - first).toFixed(1);
       }
 
-      setHistoricalData({ workoutLogs, weightLogs, cardioLogs, streak, weekStreak, totalWorkouts, lastSession, weightChange });
+      setHistoricalData({ workoutLogs, weightLogs, cardioLogs, mealLogs, streak, weekStreak, totalWorkouts, lastSession, weightChange });
     } catch(e) { console.warn("[Morphiq] historicalData load failed:", e); }
   }
 

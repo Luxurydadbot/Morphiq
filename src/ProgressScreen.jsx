@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   useApp, theme, sb, localDateStr,
   Layout, Spinner, CardioQuickLog,
-  WeightChart, CardioWeeklyChart, StreakCalendar,
+  WeightChart, CardioWeeklyChart, NutritionTrendChart, StreakCalendar,
   PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon,
 } from "./shared.jsx";
 
@@ -34,6 +34,7 @@ function ProgressScreen() {
   // so they'd otherwise show up as a bogus "0 lbs" exercise/personal best.
   const strengthLogs = realLogs ? realLogs.filter(r => !r.is_cardio) : null;
   const cardioLogs = historicalData?.cardioLogs ?? [];
+  const mealLogs = historicalData?.mealLogs ?? [];
 
   const realSessions = useRealWorkoutData ? (() => {
     const byDate = {};
@@ -150,7 +151,7 @@ function ProgressScreen() {
         </div>
 
         <div style={{ display:"flex", background:"#212429", borderRadius:10, padding:3, marginBottom:16 }}>
-          {[["body","Body"],["workouts","Workouts"],["cardio","Cardio"]].map(([t, label]) => (
+          {[["body","Body"],["workouts","Workouts"],["cardio","Cardio"],["nutrition","Nutrition"]].map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
               style={{ flex:1, padding:"7px 6px", background:tab===t ? a : "transparent", border:"none", borderRadius:8, fontSize:12, fontWeight:500, color:tab===t ? "#0B1E3D" : theme.textDim, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
               {label}
@@ -518,6 +519,90 @@ function ProgressScreen() {
 
           </div>
         )}
+
+        {/* Nutrition tab -- same shape as Cardio: stat cards, a trend chart,
+            a recent-days list. Scoped from research (MacroFactor's App Store
+            rating sits around 4.8/19,500 ratings, and its screen combines
+            trend charts + adherence percentages together, not one or the
+            other) rather than a bare adherence-only view. Bucketed here by
+            calendar date from mealLogs (raw per-entry rows -- a member can
+            log several foods a day, see getMealLogs() in shared.jsx);
+            NutritionTrendChart just draws whatever it's handed, same
+            division of responsibility as CardioWeeklyChart. */}
+        {tab === "nutrition" && (() => {
+          const calGoal = plan?.calories || 1800;
+          const proteinGoal = plan?.protein || 140;
+
+          // Bucket every logged entry into a per-day total.
+          const byDate = {};
+          mealLogs.forEach(m => {
+            if (!byDate[m.date]) byDate[m.date] = { cal: 0, protein: 0 };
+            byDate[m.date].cal += m.logged_cal || 0;
+            byDate[m.date].protein += m.logged_protein || 0;
+          });
+          const loggedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+          const now = new Date();
+          const dow = now.getDay();
+          const mondayStr = localDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow + (dow === 0 ? -6 : 1)));
+          const weekDates = loggedDates.filter(d => d >= mondayStr);
+          const avgCalThisWeek = weekDates.length > 0 ? Math.round(weekDates.reduce((s, d) => s + byDate[d].cal, 0) / weekDates.length) : null;
+          const proteinHitDays = weekDates.filter(d => byDate[d].protein >= proteinGoal).length;
+
+          // 14-day trend, oldest first -- zero-filled for days with no log
+          // so gaps are visible instead of silently skipped.
+          const trend = [];
+          for (let i = 13; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dStr = localDateStr(d);
+            trend.push({ label: d.toLocaleDateString("en-US", { day: "numeric" }), calories: byDate[dStr]?.cal || 0 });
+          }
+
+          return (
+            <div className="mq-fade">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: ".85rem .75rem" }}>
+                  <div style={{ fontSize: 18, fontWeight: 500, color: theme.text }}>{avgCalThisWeek ?? "—"}{avgCalThisWeek ? <span style={{ fontSize: 12, color: theme.textDim }}> cal</span> : ""}</div>
+                  <div style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>Avg calories this week</div>
+                </div>
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: ".85rem .75rem" }}>
+                  <div style={{ fontSize: 18, fontWeight: 500, color: theme.text }}>{proteinHitDays} of {weekDates.length || 7}</div>
+                  <div style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>Days hit protein target</div>
+                </div>
+              </div>
+
+              {loggedDates.length > 0 ? (
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "12px 10px", marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6, paddingLeft: 4 }}>Calories, last 14 days</div>
+                  <NutritionTrendChart data={trend} target={calGoal} accent={a} />
+                </div>
+              ) : (
+                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "18px 14px", textAlign: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>No meals logged yet</div>
+                  <div style={{ fontSize: 11, color: "#6E7480", marginTop: 4 }}>Log food on the Meals tab and your trend will show up here.</div>
+                </div>
+              )}
+
+              {loggedDates.length > 0 && (
+                <>
+                  <div style={sL}>Recent days</div>
+                  <div style={{ background: "#212429", borderRadius: 14, overflow: "hidden" }}>
+                    {loggedDates.slice(0, 12).map((d, i, arr) => (
+                      <div key={d} style={{ padding: "10px 14px", borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 13, color: byDate[d].cal > calGoal * 1.1 ? "#F59E0B" : a, fontWeight: 600 }}>{Math.round(byDate[d].cal)} cal</div>
+                          <div style={{ fontSize: 11, color: "#6E7480" }}>{Math.round(byDate[d].protein)}g protein</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
 
       </div>
     </Layout>

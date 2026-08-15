@@ -647,6 +647,29 @@ const sb = {
     } catch { return {}; }
   },
 
+  // Fetch raw meal_logs rows over a lookback window, for the Progress screen's
+  // Nutrition tab -- daysBack bounds by date (not row count) since a member
+  // can log several entries per day, same reasoning as getCardioDatesForStreak's
+  // date-based cutoff. 35 days comfortably covers both the 14-day trend chart
+  // and a "this month" stat with room to spare. Each row already carries
+  // logged_cal/logged_protein/logged_carbs/logged_fat (see insertMealLog above)
+  // -- callers bucket by date client-side, same pattern as cardioLogs.
+  async getMealLogs(supabaseUserId, daysBack = 35) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - daysBack);
+      const cutoffStr = localDateStr(cutoff);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/meal_logs?user_id=eq.${profileId}&date=gte.${cutoffStr}&order=date.desc&limit=500`,
+        { headers: SB_GET() }
+      );
+      if (!res.ok) return [];
+      return await res.json();
+    } catch { return []; }
+  },
+
   // ── GYM OWNER LOOKUP ─────────────────────────────────────────────────────
   async getGymByOwnerEmail(email) {
     try {
@@ -3153,6 +3176,47 @@ function CardioWeeklyChart({ data, accent }) {
   );
 }
 
+// NutritionTrendChart -- daily calories vs. target, last N days. Same
+// minimal bar-chart family as CardioWeeklyChart above, plus a dashed
+// target reference line -- the one feature every well-reviewed macro
+// tracker (MacroFactor in particular) leads with: not just raw daily
+// numbers, but numbers shown against a target so adherence is visible at
+// a glance rather than requiring mental math. data: [{ label, calories }],
+// oldest day first. target: plan.calories (or null if no target set, in
+// which case the line is simply omitted -- never draws a target at 0).
+function NutritionTrendChart({ data, target, accent }) {
+  const W = 260, H = 100, PAD = 10;
+  if (!data || data.length === 0) return null;
+  const maxV = Math.max(...data.map(d => d.calories), target || 0, 1) * 1.1;
+  const slot = (W - PAD * 2) / data.length;
+  const barW = slot * 0.62;
+  const toY = v => (H - 16) - (v / maxV) * (H - PAD - 16);
+  const targetY = target ? toY(target) : null;
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      {targetY !== null && (
+        <>
+          <line x1={PAD} y1={targetY} x2={W - PAD} y2={targetY} stroke="#9BA0AA" strokeWidth="1" strokeDasharray="3,3" />
+          <text x={W - PAD} y={targetY - 3} textAnchor="end" fontSize="8" fontFamily="'Inter', system-ui, sans-serif" fill="#9BA0AA">target {target}</text>
+        </>
+      )}
+      {data.map((d, i) => {
+        const barH = d.calories > 0 ? Math.max((H - 16) - toY(d.calories), 2) : 0;
+        const x = PAD + i * slot + (slot - barW) / 2;
+        const y = (H - 16) - barH;
+        const isCurrent = i === data.length - 1;
+        const overTarget = target && d.calories > target * 1.1;
+        return (
+          <g key={i}>
+            {barH > 0 && <rect x={x} y={y} width={barW} height={barH} rx={2} fill={overTarget ? "#F59E0B" : accent} opacity={isCurrent ? 1 : 0.5} />}
+            <text x={x + barW / 2} y={H - 3} textAnchor="middle" fontSize="8" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.label}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 function MonthlyTrendLineChart({ series }) {
   // series: [{ label, color, data: [{ label, count }, ...] }, ...]
   // All series are expected to share the same month labels/order.
@@ -3400,7 +3464,7 @@ export {
   // Utility functions
   getFallbackReply, fetchAIReply,
   // Progress screen sub-components
-  WeightChart, CardioWeeklyChart, StreakCalendar, getWeekStreakFromDates,
+  WeightChart, CardioWeeklyChart, NutritionTrendChart, StreakCalendar, getWeekStreakFromDates,
   // Admin dashboard sub-components
   MonthlyTrendLineChart,
   // Billing / paywall
