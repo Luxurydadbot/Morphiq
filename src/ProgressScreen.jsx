@@ -150,7 +150,7 @@ function ProgressScreen() {
         </div>
 
         <div style={{ display:"flex", background:"#212429", borderRadius:10, padding:3, marginBottom:16 }}>
-          {[["body","Body"],["workouts","Workouts"],["bests","Bests"]].map(([t, label]) => (
+          {[["body","Body"],["workouts","Workouts"],["cardio","Cardio"]].map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
               style={{ flex:1, padding:"7px 6px", background:tab===t ? a : "transparent", border:"none", borderRadius:8, fontSize:12, fontWeight:500, color:tab===t ? "#0B1E3D" : theme.textDim, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
               {label}
@@ -316,8 +316,122 @@ function ProgressScreen() {
               ))}
             </div>
 
-            <div style={{ ...sL, marginTop: 18 }}>Cardio</div>
+            <div style={{ ...sL, marginTop: 18 }}>Personal bests</div>
 
+            {(() => {
+              // Build real volume-per-exercise from workout logs for the current month
+              const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+              const volColors = [a, "#7C93B8", "#5FA8E0", "#2D5FA8"];
+              const realVolBars = useRealWorkoutData ? (() => {
+                const vol = {};
+                strengthLogs.forEach(row => {
+                  if (!row.workout_date?.startsWith(thisMonth)) return;
+                  const k = row.exercise_name;
+                  if (!vol[k]) vol[k] = 0;
+                  vol[k] += (row.weight || 0) * (row.reps || 0);
+                });
+                const entries = Object.entries(vol).sort((a, b) => b[1] - a[1]).slice(0, 4);
+                if (!entries.length) return null;
+                const maxVol = entries[0][1];
+                return entries.map(([label, v], i) => ({
+                  label, pct: Math.round((v / maxVol) * 100), color: volColors[i % volColors.length],
+                  total: v.toLocaleString() + " lbs",
+                }));
+              })() : null;
+
+              const pbCount = useRealWorkoutData ? realPBs.length : 0;
+              const pbMsg = useRealWorkoutData
+                ? (realPBs.length > 0
+                    ? `You have ${pbCount} exercise best${pbCount !== 1 ? "s" : ""} on record. Keep adding weight to keep growing.`
+                    : "No workouts logged yet. Complete your first session to start tracking personal bests.")
+                : "You've set 8 personal bests this month. Progressive overload is working.";
+
+              return (
+                <div className="mq-fade">
+                  <div style={{ background:"#0A1628", borderLeft:"2px solid #4C8DFF", borderRadius:"0 10px 10px 0", padding:"8px 12px", marginBottom:14 }}>
+                    <div style={{ fontSize:12, color:"#9BA0AA", lineHeight:1.5 }}>{pbMsg}</div>
+                  </div>
+                  {realPBs.length > 0 && (
+                    <>
+                      <div style={sL}>Current bests</div>
+                      <div style={{ background:"#212429", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
+                        {realPBs.map((pb, i) => {
+                          const isOpen = selectedExercise === pb.exercise;
+                          return (
+                            <div key={pb.exercise}>
+                              {/* Tappable row — tap to expand/collapse strength chart */}
+                              <div
+                                onClick={() => {
+                                  if (isOpen) { setSelectedExercise(null); return; }
+                                  setSelectedExercise(pb.exercise);
+                                  setExerciseHistory([]);
+                                  setExerciseHistoryLoading(true);
+                                  sb.getExerciseHistory(supabaseUser.id, pb.exercise)
+                                    .then(data => { setExerciseHistory(data); setExerciseHistoryLoading(false); })
+                                    .catch(() => setExerciseHistoryLoading(false));
+                                }}
+                                style={{ padding:"11px 14px", borderBottom: (!isOpen && i < realPBs.length-1) ? "1px solid rgba(255,255,255,0.04)" : "none", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}
+                              >
+                                <div>
+                                  <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
+                                  <div style={{ fontSize:11, color:"#6E7480", marginTop:2 }}>
+                                    {pb.date ? new Date(pb.date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "—"}
+                                  </div>
+                                </div>
+                                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                                  <div style={{ textAlign:"right" }}>
+                                    <div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div>
+                                    <div style={{ fontSize:11, color:"#6E7480" }}>{pb.reps} reps</div>
+                                  </div>
+                                  <div style={{ fontSize:14, color:"#6E7480", transition:"transform .2s", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</div>
+                                </div>
+                              </div>
+                              {/* Inline strength chart — shown when this exercise is selected */}
+                              {isOpen && (
+                                <div className="mq-fade" style={{ background:"#0A1628", borderTop:"1px solid rgba(255,255,255,0.04)", padding:"12px 14px 14px", borderBottom: i < realPBs.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                                  <div style={{ fontSize:10, color:a, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Strength over time</div>
+                                  {exerciseHistoryLoading ? (
+                                    <div style={{ display:"flex", justifyContent:"center", padding:"12px 0" }}><Spinner size={20} color={a} /></div>
+                                  ) : exerciseHistory.length < 2 ? (
+                                    <div style={{ fontSize:12, color:"#6E7480", textAlign:"center", padding:"10px 0" }}>
+                                      {exerciseHistory.length === 1 ? "Log one more session to see your trend" : "No history found for this exercise"}
+                                    </div>
+                                  ) : (
+                                    <WeightChart data={exerciseHistory} accent={a} />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {realVolBars && (
+                    <div style={{ background:"#212429", borderRadius:14, padding:"12px 14px" }}>
+                      <div style={{ fontSize:11, color:"#6E7480", textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Volume this month</div>
+                      {realVolBars.map(bar => (
+                        <div key={bar.label} style={{ marginBottom:8 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                            <span style={{ fontSize:11, color:theme.textMuted }}>{bar.label}</span>
+                            <span style={{ fontSize:11, color:bar.color, fontWeight:600 }}>{bar.total}</span>
+                          </div>
+                          <div style={{ height:4, background:"#0F1922", borderRadius:2 }}>
+                            <div style={{ height:4, borderRadius:2, background:bar.color, width:`${bar.pct}%`, transition:"width .8s ease" }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+          </div>
+        )}
+
+        {tab === "cardio" && (
+          <div className="mq-fade">
             {/* Weekly/monthly cardio totals -- simple sum over cardioLogs
                 (bounded to the 60 most recent sessions historicalData
                 already fetches, same window every other Progress stat uses;
@@ -401,117 +515,9 @@ function ProgressScreen() {
                 </div>
               </>
             )}
+
           </div>
         )}
-
-        {tab === "bests" && (() => {
-          // Build real volume-per-exercise from workout logs for the current month
-          const thisMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-          const volColors = [a, "#7C93B8", "#5FA8E0", "#2D5FA8"];
-          const realVolBars = useRealWorkoutData ? (() => {
-            const vol = {};
-            strengthLogs.forEach(row => {
-              if (!row.workout_date?.startsWith(thisMonth)) return;
-              const k = row.exercise_name;
-              if (!vol[k]) vol[k] = 0;
-              vol[k] += (row.weight || 0) * (row.reps || 0);
-            });
-            const entries = Object.entries(vol).sort((a, b) => b[1] - a[1]).slice(0, 4);
-            if (!entries.length) return null;
-            const maxVol = entries[0][1];
-            return entries.map(([label, v], i) => ({
-              label, pct: Math.round((v / maxVol) * 100), color: volColors[i % volColors.length],
-              total: v.toLocaleString() + " lbs",
-            }));
-          })() : null;
-
-          const pbCount = useRealWorkoutData ? realPBs.length : 0;
-          const pbMsg = useRealWorkoutData
-            ? (realPBs.length > 0
-                ? `You have ${pbCount} exercise best${pbCount !== 1 ? "s" : ""} on record. Keep adding weight to keep growing.`
-                : "No workouts logged yet. Complete your first session to start tracking personal bests.")
-            : "You've set 8 personal bests this month. Progressive overload is working.";
-
-          return (
-            <div className="mq-fade">
-              <div style={{ background:"#0A1628", borderLeft:"2px solid #4C8DFF", borderRadius:"0 10px 10px 0", padding:"8px 12px", marginBottom:14 }}>
-                <div style={{ fontSize:12, color:"#9BA0AA", lineHeight:1.5 }}>{pbMsg}</div>
-              </div>
-              {realPBs.length > 0 && (
-                <>
-                  <div style={sL}>Current bests</div>
-                  <div style={{ background:"#212429", borderRadius:14, overflow:"hidden", marginBottom:14 }}>
-                    {realPBs.map((pb, i) => {
-                      const isOpen = selectedExercise === pb.exercise;
-                      return (
-                        <div key={pb.exercise}>
-                          {/* Tappable row — tap to expand/collapse strength chart */}
-                          <div
-                            onClick={() => {
-                              if (isOpen) { setSelectedExercise(null); return; }
-                              setSelectedExercise(pb.exercise);
-                              setExerciseHistory([]);
-                              setExerciseHistoryLoading(true);
-                              sb.getExerciseHistory(supabaseUser.id, pb.exercise)
-                                .then(data => { setExerciseHistory(data); setExerciseHistoryLoading(false); })
-                                .catch(() => setExerciseHistoryLoading(false));
-                            }}
-                            style={{ padding:"11px 14px", borderBottom: (!isOpen && i < realPBs.length-1) ? "1px solid rgba(255,255,255,0.04)" : "none", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}
-                          >
-                            <div>
-                              <div style={{ fontSize:13, fontWeight:600, color:theme.text }}>{pb.exercise}</div>
-                              <div style={{ fontSize:11, color:"#6E7480", marginTop:2 }}>
-                                {pb.date ? new Date(pb.date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "—"}
-                              </div>
-                            </div>
-                            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                              <div style={{ textAlign:"right" }}>
-                                <div style={{ fontSize:15, fontWeight:700, color:a }}>{pb.weight}</div>
-                                <div style={{ fontSize:11, color:"#6E7480" }}>{pb.reps} reps</div>
-                              </div>
-                              <div style={{ fontSize:14, color:"#6E7480", transition:"transform .2s", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</div>
-                            </div>
-                          </div>
-                          {/* Inline strength chart — shown when this exercise is selected */}
-                          {isOpen && (
-                            <div className="mq-fade" style={{ background:"#0A1628", borderTop:"1px solid rgba(255,255,255,0.04)", padding:"12px 14px 14px", borderBottom: i < realPBs.length-1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                              <div style={{ fontSize:10, color:a, textTransform:"uppercase", letterSpacing:"1px", marginBottom:8 }}>Strength over time</div>
-                              {exerciseHistoryLoading ? (
-                                <div style={{ display:"flex", justifyContent:"center", padding:"12px 0" }}><Spinner size={20} color={a} /></div>
-                              ) : exerciseHistory.length < 2 ? (
-                                <div style={{ fontSize:12, color:"#6E7480", textAlign:"center", padding:"10px 0" }}>
-                                  {exerciseHistory.length === 1 ? "Log one more session to see your trend" : "No history found for this exercise"}
-                                </div>
-                              ) : (
-                                <WeightChart data={exerciseHistory} accent={a} />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-              {realVolBars && (
-                <div style={{ background:"#212429", borderRadius:14, padding:"12px 14px" }}>
-                  <div style={{ fontSize:11, color:"#6E7480", textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Volume this month</div>
-                  {realVolBars.map(bar => (
-                    <div key={bar.label} style={{ marginBottom:8 }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                        <span style={{ fontSize:11, color:theme.textMuted }}>{bar.label}</span>
-                        <span style={{ fontSize:11, color:bar.color, fontWeight:600 }}>{bar.total}</span>
-                      </div>
-                      <div style={{ height:4, background:"#0F1922", borderRadius:2 }}>
-                        <div style={{ height:4, borderRadius:2, background:bar.color, width:`${bar.pct}%`, transition:"width .8s ease" }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
 
       </div>
     </Layout>
