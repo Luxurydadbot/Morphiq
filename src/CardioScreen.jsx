@@ -144,7 +144,7 @@ function CardioScreen() {
         )}
 
         {mode === "live" && !activity && (
-          <>
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 244px)" }}>
             {saved && lastLogged && (
               <div style={{ textAlign: "center", background: theme.accentDim, border: `2px solid ${a}`, borderRadius: 16, padding: "22px 18px", marginBottom: 20 }}>
                 <div style={{ width: 46, height: 46, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
@@ -156,21 +156,23 @@ function CardioScreen() {
                 </div>
               </div>
             )}
-            <div style={{ fontSize: 15, fontWeight: 500, color: theme.text, marginBottom: 10 }}>What are you doing today?</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {CARDIO_ACTIVITIES.map(act => (
-                <button key={act.id} onClick={() => pickActivity(act)}
-                  style={{ background: theme.card, border: `1.5px solid ${theme.border}`, borderRadius: 12, padding: "12px 10px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, cursor: "pointer", fontFamily: "inherit" }}>
-                  <ActivityIcon name={act.icon} size={18} color={theme.textDim} />
-                  <span style={{ fontSize: 12, fontWeight: 500, color: theme.text }}>{act.id}</span>
-                </button>
-              ))}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <div style={{ fontSize: 15, fontWeight: 500, color: theme.text, marginBottom: 12 }}>What are you doing today?</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {CARDIO_ACTIVITIES.map(act => (
+                  <button key={act.id} onClick={() => pickActivity(act)}
+                    style={{ background: theme.card, border: `1.5px solid ${theme.border}`, borderRadius: 12, padding: "18px 10px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10, cursor: "pointer", fontFamily: "inherit" }}>
+                    <ActivityIcon name={act.icon} size={20} color={theme.textDim} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: theme.text }}>{act.id}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </>
+          </div>
         )}
 
         {mode === "live" && activity && (
-          <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 230px)", paddingBottom: "1.5rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 244px)", paddingBottom: "1.5rem" }}>
             <button onClick={() => { clearInterval(intervalRef.current); setActivity(null); setElapsed(0); setRunning(false); }}
               style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, padding: "0 0 .8rem", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontFamily: "inherit" }}>
               <Icon name="arrow-left" size={14} /> Change activity
