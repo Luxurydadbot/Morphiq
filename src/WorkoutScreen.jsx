@@ -392,6 +392,46 @@ function WorkoutScreen() {
     };
   }
 
+  // Bug fix (session 34): every resume path (local reload, cross-device
+  // cloud sync, and the day-conflict "Continue" banner) used to just bump
+  // setIdx by 1 whenever resuming from "rest" state, with no check for
+  // whether that rest was actually AFTER the exercise's last set. If it
+  // was, this left exIdx unmoved and setIdx pointing past that exercise's
+  // real set count (e.g. "set 4" of a 3-set exercise) instead of correctly
+  // rolling over to the next exercise at set 1 -- found live-testing the
+  // day-index fix above (see git history). Mirrors the same same-exercise-
+  // vs-next-exercise boundary check advanceSet() already uses elsewhere in
+  // this file, computed from the exercise's own warmup-ramp length +
+  // working-set count (the same buildWarmupRamp() used at plan-build time,
+  // not a second copy) rather than the full render-time setPlan --
+  // autoregulated weights/reps change per-set VALUES, not the total COUNT,
+  // so this stays accurate without needing readiness/autoregulation state
+  // that isn't available yet this early in a resume.
+  function totalSetsForExercise(exObj) {
+    if (!exObj) return 1;
+    const warmups = (Array.isArray(exObj.warmupSets) && exObj.warmupSets.length > 0)
+      ? exObj.warmupSets
+      : buildWarmupRamp(exObj.weight, exObj.name);
+    return (warmups?.length || 0) + (exObj.sets || 1);
+  }
+  function computeResumedPosition(rawExIdx, rawSetIdx, rawState, exList) {
+    const list = Array.isArray(exList) && exList.length > 0 ? exList : [null];
+    let exIdxR = Math.min(Math.max(rawExIdx ?? 0, 0), list.length - 1);
+    let setIdxR = rawSetIdx ?? 0;
+    if (rawState === "rest") {
+      const total = totalSetsForExercise(list[exIdxR]);
+      if (setIdxR + 1 < total) {
+        setIdxR = setIdxR + 1;
+      } else if (exIdxR < list.length - 1) {
+        exIdxR = exIdxR + 1;
+        setIdxR = 0;
+      } else {
+        setIdxR = Math.max(0, total - 1); // last set of last exercise -- hold in place, don't overflow
+      }
+    }
+    return { exIdx: exIdxR, setIdx: setIdxR };
+  }
+
   // Use AI-generated exercises if available, else fall back to defaults.
   // Stored in state (not const) so swapping an exercise updates it live.
   const [exercises, setExercises] = useState(() => {
@@ -423,8 +463,9 @@ function WorkoutScreen() {
   const [warmupStep, setWarmupStep] = useState(savedProgress?.warmupStep ?? 0);
   const [cooldownStep, setCooldownStep] = useState(savedProgress?.cooldownStep ?? 0);
 
-  const [exIdx, setExIdx] = useState(savedProgress?.exIdx ?? 0);
-  const [setIdx, setSetIdx] = useState((savedProgress?.setIdx ?? 0) + (savedProgress?.state === "rest" ? 1 : 0));
+  const initialResumePos = computeResumedPosition(savedProgress?.exIdx, savedProgress?.setIdx, savedProgress?.state, exercises);
+  const [exIdx, setExIdx] = useState(initialResumePos.exIdx);
+  const [setIdx, setSetIdx] = useState(initialResumePos.setIdx);
   const [loggedSets, setLoggedSets] = useState(savedProgress?.loggedSets ?? []);
   const [state, setState] = useState("active");
   // Daily readiness check-in answer ("rough" | "ok" | "great" | null before
@@ -479,23 +520,30 @@ function WorkoutScreen() {
       setPhase(cloud.phase ?? (warmupExercises.length > 0 ? "warmup" : "readiness"));
       setWarmupStep(cloud.warmupStep ?? 0);
       setCooldownStep(cloud.cooldownStep ?? 0);
-      setExIdx(cloud.exIdx ?? 0);
-      setSetIdx((cloud.setIdx ?? 0) + (cloud.state === "rest" ? 1 : 0));
       setLoggedSets(cloud.loggedSets ?? []);
       setReadiness(cloud.readiness ?? null);
       // Fix (session 9): if this cloud progress belongs to a different day
       // than the one this device guessed at mount, rebuild the exercise list
       // from the correct day -- otherwise exIdx/setIdx above would point into
       // the wrong day's exercises (same bug as the local-storage resume path).
+      // Bug fix (session 34): this swap now happens BEFORE computing the
+      // resumed exIdx/setIdx (below), not after -- so the last-set boundary
+      // check uses the exercise list that's actually about to be shown,
+      // not whatever was loaded at mount.
+      let cloudExerciseList = exercises;
       if (isMultiDay && typeof cloud.dayIndex === "number" && cloud.dayIndex !== activeDayIdx && cloud.dayIndex < plan.customDays.length) {
         const dayData = plan.customDays[cloud.dayIndex];
         if (dayData?.exercises?.length > 0) {
-          setExercises(dayData.exercises.map(normalizeExercise));
+          cloudExerciseList = dayData.exercises.map(normalizeExercise);
+          setExercises(cloudExerciseList);
           // Keep the pinned day index in lockstep with the exercise list it
           // now describes -- same fix as above, applied to this branch too.
           setActiveDayIdx(cloud.dayIndex);
         }
       }
+      const cloudResumePos = computeResumedPosition(cloud.exIdx, cloud.setIdx, cloud.state, cloudExerciseList);
+      setExIdx(cloudResumePos.exIdx);
+      setSetIdx(cloudResumePos.setIdx);
       if (cloud.exIdx > 0 || cloud.setIdx > 0 || (cloud.loggedSets || []).length > 0) {
         setShowResumeBanner(true);
       }
@@ -964,15 +1012,23 @@ function WorkoutScreen() {
   function continueOldWorkout() {
     if (!dayConflict) return;
     const { savedDayIndex, raw } = dayConflict;
+    let resumeExerciseList = exercises;
     try {
       const dayData = plan.customDays[savedDayIndex];
-      if (dayData?.exercises?.length > 0) setExercises(dayData.exercises.map(normalizeExercise));
+      if (dayData?.exercises?.length > 0) {
+        resumeExerciseList = dayData.exercises.map(normalizeExercise);
+        setExercises(resumeExerciseList);
+      }
     } catch {}
     setPhase(raw.phase ?? (warmupExercises.length > 0 ? "warmup" : "readiness"));
     setWarmupStep(raw.warmupStep ?? 0);
     setCooldownStep(raw.cooldownStep ?? 0);
-    setExIdx(raw.exIdx ?? 0);
-    setSetIdx((raw.setIdx ?? 0) + (raw.state === "rest" ? 1 : 0));
+    // Bug fix (session 34): use the just-loaded resumeExerciseList (not the
+    // stale one from mount) so the last-set boundary check is accurate --
+    // same fix as the cloud-resume branch above.
+    const continueResumePos = computeResumedPosition(raw.exIdx, raw.setIdx, raw.state, resumeExerciseList);
+    setExIdx(continueResumePos.exIdx);
+    setSetIdx(continueResumePos.setIdx);
     setLoggedSets(raw.loggedSets ?? []);
     setReadiness(raw.readiness ?? null);
     // Bug fix (session 33): activeDayIdx is now pinned state (see above),
