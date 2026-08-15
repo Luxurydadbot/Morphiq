@@ -1651,6 +1651,40 @@ function impliedWorkingWeight(exerciseName, overriddenWeight) {
   return Math.max(roundTo, Math.round((overriddenWeight / lastPct) / roundTo) * roundTo);
 }
 
+// Evenly interleaves dedicated cardio days into a lifting-day rotation so
+// cardio days never cluster at the end or land back-to-back with each other
+// (even-distribution interleave, same idea as Bresenham's line algorithm).
+// liftingDays: array of already-built day objects (the lifting rotation,
+// expanded to however many lifting slots/week the caller wants). cardioNum:
+// 0-4 dedicated cardio days/week. Returns the merged weekly sequence
+// unchanged (liftingDays as-is) if cardioNum is 0 or liftingDays is empty.
+// Shared by buildPlan() (AI-generated lose_fat plans) and CustomPlanScreen's
+// savePlan() (WorkoutScreen.jsx, hand-built plans) so there is exactly one
+// copy of this logic -- see "duplicate logic is the recurring root cause of
+// real bugs" note in HANDOFF.md technical notes.
+function interleaveCardioDays(liftingDays, cardioNum) {
+  if (!cardioNum || cardioNum <= 0 || !liftingDays?.length) return liftingDays;
+  const liftingSequence = liftingDays;
+  const cardioSequence = Array.from({ length: cardioNum }, () => ({ dayLabel: "Cardio", isCardio: true, exercises: [] }));
+  const total = liftingSequence.length + cardioSequence.length;
+  const weekSequence = [];
+  let liftUsed = 0, cardioUsed = 0;
+  for (let i = 0; i < total; i++) {
+    // Whichever group is proportionally furthest behind its fair share
+    // goes next -- classic even-distribution interleave.
+    const liftDue = (liftUsed + 1) / liftingSequence.length;
+    const cardioDue = (cardioUsed + 1) / cardioSequence.length;
+    if (cardioUsed < cardioSequence.length && (liftUsed >= liftingSequence.length || cardioDue <= liftDue)) {
+      weekSequence.push(cardioSequence[cardioUsed]);
+      cardioUsed++;
+    } else {
+      weekSequence.push(liftingSequence[liftUsed]);
+      liftUsed++;
+    }
+  }
+  return weekSequence;
+}
+
 function buildPlan(userProfile, existingMacros) {
   const {
     goal = "get_fit",
@@ -2016,24 +2050,7 @@ function buildPlan(userProfile, existingMacros) {
       ? customDays
       : [{ dayLabel: daysPerWeek <= 3 ? "Full Body" : "Full Body", exercises }];
     const liftingSequence = Array.from({ length: daysPerWeek }, (_, i) => liftingDayTypes[i % liftingDayTypes.length]);
-    const cardioSequence = Array.from({ length: cardioDaysPerWeekNum }, () => ({ dayLabel: "Cardio", isCardio: true, exercises: [] }));
-    const total = liftingSequence.length + cardioSequence.length;
-    const weekSequence = [];
-    let liftUsed = 0, cardioUsed = 0;
-    for (let i = 0; i < total; i++) {
-      // Whichever group is proportionally furthest behind its fair share
-      // goes next -- classic even-distribution interleave.
-      const liftDue = (liftUsed + 1) / liftingSequence.length;
-      const cardioDue = (cardioUsed + 1) / cardioSequence.length;
-      if (cardioUsed < cardioSequence.length && (liftUsed >= liftingSequence.length || cardioDue <= liftDue)) {
-        weekSequence.push(cardioSequence[cardioUsed]);
-        cardioUsed++;
-      } else {
-        weekSequence.push(liftingSequence[liftUsed]);
-        liftUsed++;
-      }
-    }
-    customDays = weekSequence;
+    customDays = interleaveCardioDays(liftingSequence, cardioDaysPerWeekNum);
   }
 
   // ── Workout structure ─────────────────────────────────────────────
@@ -3320,6 +3337,7 @@ export {
   theme, css,
   // Plan engine
   buildPlan, progressPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
+  interleaveCardioDays,
   detectPlateau, shouldTriggerDeloadFromPlateau,
   isBarbellExercise, getPlateBreakdown, formatPlateBreakdown,
   applyReadinessToWeight,

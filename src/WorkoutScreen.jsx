@@ -3,7 +3,7 @@ import { useApp, sb, Pill, Spinner, MicIcon, VoiceBtn, Layout, NavIcon, Icon,
          SUPABASE_URL, SUPABASE_ANON, SB_HEADERS, SB_GET, theme,
          WORKOUT_EXERCISES, localDateStr, AppContext, buildPlan, buildSetDetails, buildWarmupRamp, reRampWarmups, impliedWorkingWeight,
          isMultiDayPlan, getAutoWorkoutDayIndex, calcMacros as calcMacrosShared, getWeightIncrement, clearWorkoutProgress,
-         isBarbellExercise, getPlateBreakdown, formatPlateBreakdown, applyReadinessToWeight } from "./shared.jsx";
+         isBarbellExercise, getPlateBreakdown, formatPlateBreakdown, applyReadinessToWeight, interleaveCardioDays } from "./shared.jsx";
 
 function SetDots({ total, current }) {
   const { gymBranding } = useApp();
@@ -2234,6 +2234,10 @@ function CustomPlanScreen() {
   const [goal, setGoal]         = useState(null);
   const [name, setName] = useState(user?.name || "");
   const [daysPerWeek, setDays]  = useState(3);
+  const [cardioDaysPerWeek, setCardioDaysPerWeek] = useState(0); // dedicated cardio days/week, separate from lifting days.
+  // Goal-agnostic here on purpose (unlike AI onboarding's lose_fat-only gating) -- matches the Aug 15, 2026
+  // "goal-agnostic cardio" decision in DECISIONS.md: a self-directed member building their own plan should
+  // get the same cardio scheduling option regardless of goal.
   const [currentDay, setCurrentDay] = useState(0); // which day we're adding exercises for
   const [dayExercises, setDayExercises] = useState([]); // exercises for the current day being built
   const [allDays, setAllDays]   = useState([]); // [{dayLabel, exercises:[{name,sets,reps,weight}]}]
@@ -2357,7 +2361,7 @@ function CustomPlanScreen() {
       setPending(null);
       setQuery("");
       setEditDayIndex(null);
-      setStep(5);
+      setStep(6);
       return;
     }
     const dayLabel = `Day ${currentDay + 1}`;
@@ -2369,7 +2373,7 @@ function CustomPlanScreen() {
     if (currentDay + 1 < daysPerWeek) {
       setCurrentDay(currentDay + 1);
     } else {
-      setStep(5); // all days done — go to review/macros
+      setStep(6); // all days done — go to review/macros
     }
   }
 
@@ -2394,14 +2398,23 @@ function CustomPlanScreen() {
       usePyramid: e.loadStyle === "ramp_up" || e.loadStyle === "ramp_down",
       setDetails: e.setDetails || null, loadStyle: e.loadStyle || "same",
     }));
+    // Interleave dedicated cardio days into the lifting-day rotation, same
+    // even-distribution logic buildPlan() uses for AI-generated lose_fat
+    // plans (shared interleaveCardioDays() in shared.jsx -- one copy, not a
+    // second hand-rolled version, per the "duplicate logic" lesson in
+    // HANDOFF.md). Goal-agnostic here: any custom-plan member can add
+    // cardio days, not just lose_fat (see cardioDaysPerWeek state comment
+    // above). allDays itself (the lifting-only day list) stays untouched --
+    // it's still what the review screen's per-day "Edit" buttons operate on.
+    const customDays = interleaveCardioDays(allDays, cardioDaysPerWeek);
     const plan = {
       calories: parseInt(calories) || calc?.calories || null,
       protein:  parseInt(protein)  || calc?.protein  || null,
       carbs: calc?.carbs || null, fat: calc?.fat || null,
       weekNumber: 1, weekStartDate: new Date().toISOString().split("T")[0],
-      daysPerWeek, workoutType: "Custom", workoutDuration: 45,
+      daysPerWeek, cardioDaysPerWeek, workoutType: "Custom", workoutDuration: 45,
       restSeconds: restPref || repDefaults.rest,
-      customDays: allDays, // store all days for future rotation
+      customDays, // lifting days + interleaved cardio days, in weekly rotation order
       isCustomPlan: true,  // flag so app knows this wasn't AI-generated
       weeklyFocus: "Your plan, your rules. Keep showing up and the results will follow.",
       tip: "Track every set. The data is what lets us push your weights forward each week.",
@@ -2441,16 +2454,16 @@ function CustomPlanScreen() {
       {/* Header */}
       <div style={{ padding: "14px 16px 0", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
         <button onClick={() => {
-          if (editDayIndex !== null) { setEditDayIndex(null); setDayExercises([]); setPending(null); setStep(5); return; }
+          if (editDayIndex !== null) { setEditDayIndex(null); setDayExercises([]); setPending(null); setStep(6); return; }
           step > -1 ? setStep(step - 1) : navigate("onboarding");
         }}
           style={{ background: "transparent", border: "none", color: ob.muted, cursor: "pointer", lineHeight: 1, padding: 0, display: "flex", alignItems: "center" }}><Icon name="arrow-left" size={20} /></button>
         <span style={{ fontSize: 13, fontWeight: 600, color: ob.white }}>Build your own plan</span>
-        <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step === -1 ? "Name" : `${step + 1} of 6`}</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: ob.muted }}>{step === -1 ? "Name" : `${step + 1} of 7`}</span>
       </div>
       {/* Progress bar */}
       <div style={{ height: 3, background: ob.card, margin: "10px 16px 0", borderRadius: 2, flexShrink: 0 }}>
-        <div style={{ height: 3, background: a, borderRadius: 2, width: `${((step + 1) / 6) * 100}%`, transition: "width .4s ease" }} />
+        <div style={{ height: 3, background: a, borderRadius: 2, width: `${((step + 1) / 7) * 100}%`, transition: "width .4s ease" }} />
       </div>
 
       <div style={s.inner}>
@@ -2555,14 +2568,44 @@ function CustomPlanScreen() {
           </button>
         </div>}
 
-        {/* ── STEP 3: Rest preference (optional) ── */}
-        {step === 3 && <div className="mq-fade">
+        {/* ── STEP 3: Cardio days (optional) ── */}
+        {step === 3 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <div style={s.hdr}>Cardio (optional)</div>
+          <div style={s.title}>Dedicated cardio days, separate from lifting?</div>
+          <div style={s.sub}>We&apos;ll space these out from your {daysPerWeek} lifting day{daysPerWeek === 1 ? "" : "s"} automatically.</div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <div style={{ position: "relative", width: 120, height: 120 }}>
+              <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: "rotate(-90deg)" }}>
+                <circle cx="60" cy="60" r="50" fill="none" stroke={ob.card} strokeWidth="10"/>
+                <circle cx="60" cy="60" r="50" fill="none" stroke={a} strokeWidth="10" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 50}
+                  strokeDashoffset={2 * Math.PI * 50 * (1 - cardioDaysPerWeek / 4)}
+                  style={{ transition: "stroke-dashoffset .35s cubic-bezier(.4,0,.2,1)" }}
+                />
+              </svg>
+              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center" }}>
+                <div style={{ fontSize: 32, fontWeight: 700, color: ob.white, lineHeight: 1 }}>{cardioDaysPerWeek}</div>
+                <div style={{ fontSize: 9, color: ob.muted, marginTop: 2 }}>cardio days/week</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+              <button onClick={() => setCardioDaysPerWeek(d => Math.max(0, d - 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.card, border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: ob.muted, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>−</button>
+              <div style={{ fontSize: 11, color: ob.muted }}>adjust</div>
+              <button onClick={() => setCardioDaysPerWeek(d => Math.min(4, d + 1))} style={{ width: 44, height: 44, borderRadius: "50%", background: ob.tealDk, border: `1px solid rgba(76,141,255,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: a, cursor: "pointer", fontFamily: ob.font, lineHeight: 1 }}>+</button>
+            </div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 4, textAlign: "center", lineHeight: 1.5 }}>{cardioDaysPerWeek === 0 ? "No dedicated cardio days -- you can still log cardio anytime from Home or Progress." : "Pick the activity (run, bike, row...) each time you start one."}</div>
+          </div>
+          <button onClick={() => setStep(4)} style={{ ...s.tealBtn(false), marginTop: 8, padding: 12, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Continue <Icon name="arrow-right" size={13} /></button>
+        </div>}
+
+        {/* ── STEP 4: Rest preference (optional) ── */}
+        {step === 4 && <div className="mq-fade">
           <div style={s.hdr}>Rest preference (optional)</div>
           <div style={s.title}>How long to rest between sets?</div>
           <div style={s.sub}>You can always change this mid-workout. Skip to use the recommended default for your goal.</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 8 }}>
             {[[60, "1 minute", "High intensity, keep the burn going", <Icon name="flame" size={20} />], [120, "2 minutes", "Balanced — works for most people", <Icon name="bolt" size={20} />], [180, "3 minutes", "Full recovery, lift heavier", <Icon name="flex" size={20} />]].map(([secs, label, sub, icon]) => (
-              <button key={secs} onClick={() => { setRestPref(secs); setTimeout(() => setStep(4), 180); }}
+              <button key={secs} onClick={() => { setRestPref(secs); setTimeout(() => setStep(5), 180); }}
                 style={{ background: restPref === secs ? ob.tealDk : ob.card, border: `1.5px solid ${restPref === secs ? a : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: restPref === secs ? "rgba(76,141,255,0.15)" : "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: restPref === secs ? a : ob.muted }}>{icon}</div>
                 <div style={{ textAlign: "left", flex: 1 }}>
@@ -2573,14 +2616,14 @@ function CustomPlanScreen() {
               </button>
             ))}
           </div>
-          <button onClick={() => setStep(4)}
+          <button onClick={() => setStep(5)}
             style={{ background: "transparent", border: "none", color: ob.muted, fontSize: 11, cursor: "pointer", fontFamily: ob.font, padding: "10px 0", textAlign: "center", width: "100%" }}>
             Skip — use recommended default for my goal
           </button>
         </div>}
 
-        {/* ── STEP 4: Exercises per day ── */}
-        {step === 4 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        {/* ── STEP 5: Exercises per day ── */}
+        {step === 5 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={s.hdr}>Day {currentDay + 1} of {daysPerWeek}</div>
           <div style={s.title}>Add your exercises</div>
           <div style={{ fontSize: 11, color: ob.muted, marginBottom: 12 }}>
@@ -2757,8 +2800,8 @@ function CustomPlanScreen() {
           </div>
         </div>}
 
-        {/* ── STEP 5: Macros + review ── */}
-        {step === 5 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* ── STEP 6: Macros + review ── */}
+        {step === 6 && <div className="mq-fade" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <div style={s.hdr}>Almost done</div>
           <div style={s.title}>Daily targets (optional)</div>
           <div style={{ fontSize: 11, color: ob.muted, marginBottom: 14 }}>
@@ -2780,11 +2823,16 @@ function CustomPlanScreen() {
 
           {/* Plan summary */}
           <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Your plan</div>
+          {cardioDaysPerWeek > 0 && (
+            <div style={{ fontSize: 11, color: ob.muted, marginBottom: 10, lineHeight: 1.5 }}>
+              Plus <span style={{ color: ob.white, fontWeight: 600 }}>{cardioDaysPerWeek} cardio day{cardioDaysPerWeek === 1 ? "" : "s"}/week</span>, spaced automatically between your lifting days -- pick the activity each time you start one.
+            </div>
+          )}
           {allDays.map((day, di) => (
             <div key={di} style={s.card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: ob.white }}>{day.dayLabel}</div>
-                <button onClick={() => { setDayExercises(day.exercises); setCurrentDay(di); setEditDayIndex(di); setStep(4); }}
+                <button onClick={() => { setDayExercises(day.exercises); setCurrentDay(di); setEditDayIndex(di); setStep(5); }}
                   style={{ background: "transparent", border: "none", color: a, fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, padding: 0 }}>
                   Edit
                 </button>
