@@ -145,6 +145,17 @@ function CardioScreen() {
 
         {mode === "live" && !activity && (
           <>
+            {saved && lastLogged && (
+              <div style={{ textAlign: "center", background: theme.accentDim, border: `2px solid ${a}`, borderRadius: 16, padding: "22px 18px", marginBottom: 20 }}>
+                <div style={{ width: 46, height: 46, borderRadius: "50%", background: a, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+                  <Icon name="check" size={24} color="#0B1E3D" />
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, marginBottom: 8 }}>{lastLogged.activity} logged</div>
+                <div style={{ fontSize: 30, fontWeight: 700, color: theme.text, lineHeight: 1.2 }}>
+                  {lastLogged.minutes} min <span style={{ color: theme.textDim, fontWeight: 400 }}>&middot;</span> <span style={{ color: a }}>~{lastLogged.calories} cal</span>
+                </div>
+              </div>
+            )}
             <div style={{ fontSize: 15, fontWeight: 500, color: theme.text, marginBottom: 10 }}>What are you doing today?</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {CARDIO_ACTIVITIES.map(act => (
@@ -159,7 +170,7 @@ function CardioScreen() {
         )}
 
         {mode === "live" && activity && (
-          <div style={{ paddingBottom: "1.5rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 230px)", paddingBottom: "1.5rem" }}>
             <button onClick={() => { clearInterval(intervalRef.current); setActivity(null); setElapsed(0); setRunning(false); }}
               style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, padding: "0 0 .8rem", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontFamily: "inherit" }}>
               <Icon name="arrow-left" size={14} /> Change activity
@@ -170,9 +181,20 @@ function CardioScreen() {
               <span style={{ fontSize: 13, fontWeight: 500, color: theme.text }}>{activity.id}</span>
             </div>
 
-            <div style={{ textAlign: "center", padding: ".5rem 0 1.1rem" }}>
-              <div style={{ fontSize: 44, fontWeight: 600, color: theme.text, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{fmtTimer(elapsed)}</div>
-              <div style={{ fontSize: 11, color: theme.textDim, marginTop: 4 }}>elapsed</div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <div style={{ background: "#0A1628", border: `1.5px solid ${theme.border}`, borderRadius: 18, padding: "1.75rem 0.5rem", display: "flex", alignItems: "stretch" }}>
+                <div style={{ flex: 1, textAlign: "center" }}>
+                  <div style={{ fontSize: 54, fontWeight: 700, color: theme.text, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{fmtTimer(elapsed)}</div>
+                  <div style={{ fontSize: 11, color: theme.textDim, marginTop: 8, textTransform: "uppercase", letterSpacing: "1px" }}>Time</div>
+                </div>
+                <div style={{ width: 1, background: theme.border, margin: "2px 0" }} />
+                <div style={{ flex: 1, textAlign: "center" }}>
+                  <div style={{ fontSize: 54, fontWeight: 700, color: a, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{calories}</div>
+                  <div style={{ fontSize: 11, color: theme.textDim, marginTop: 8, textTransform: "uppercase", letterSpacing: "1px", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                    <Icon name="flame" size={11} color={theme.textDim} /> Calories
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div style={{ marginBottom: 16 }}>
@@ -187,39 +209,18 @@ function CardioScreen() {
               </div>
             </div>
 
-            <div style={{ background: "#0A1628", borderRadius: 12, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <div>
-                <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px" }}>Estimated burn</div>
-                <div style={{ fontSize: 22, fontWeight: 600, color: a, marginTop: 2 }}>{calories} cal</div>
-              </div>
-              <Icon name="flame" size={22} color={a} />
-            </div>
-
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={toggleTimer} disabled={saving}
-                style={{ flex: 2, background: a, color: "#0B1E3D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: saving ? 0.6 : 1 }}>
+                style={{ flex: 2, background: a, color: "#0B1E3D", border: "none", borderRadius: 12, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: saving ? 0.6 : 1 }}>
                 {running ? "Pause" : elapsed > 0 ? "Resume" : "Start"}
               </button>
               <button onClick={stopAndLog} disabled={saving}
-                style={{ flex: 1, background: "transparent", color: theme.red, border: `1.5px solid rgba(248,113,113,0.35)`, borderRadius: 12, padding: ".85rem", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.6 : 1 }}>
+                style={{ flex: 1, background: "transparent", color: theme.red, border: `1.5px solid rgba(248,113,113,0.35)`, borderRadius: 12, padding: "1rem", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", opacity: saving ? 0.6 : 1 }}>
                 Stop
               </button>
             </div>
             <div style={{ fontSize: 10, color: theme.textFaint, marginTop: 10, textAlign: "center", lineHeight: 1.5 }}>
               Estimate only, from your logged weight and effort -- not a wearable measurement.
-            </div>
-          </div>
-        )}
-
-        {saved && lastLogged && (
-          <div style={{ textAlign: "center", background: "#0A1A14", border: "1px solid rgba(76,141,255,0.25)", borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
-            <div style={{ fontSize: 12, color: theme.success, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, marginBottom: 4 }}>
-              <Icon name="check" size={12} /> {lastLogged.activity} logged
-            </div>
-            <div style={{ fontSize: 13, color: theme.text }}>
-              <span style={{ fontWeight: 600 }}>{lastLogged.minutes} min</span>
-              <span style={{ color: theme.textDim }}> &middot; </span>
-              <span style={{ fontWeight: 600 }}>~{lastLogged.calories} cal</span>
             </div>
           </div>
         )}
