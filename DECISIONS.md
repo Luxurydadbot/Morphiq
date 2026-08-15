@@ -105,6 +105,18 @@ Updated automatically at the end of every session. Never delete entries — appe
 
 ---
 
+## August 15, 2026 (continued) — cardio screen scope expanded beyond lose_fat
+
+- Showed Bryant a working mockup of the cardio-day screen (activity picker, live timer, effort toggle, live calorie estimate) before writing real code -- he confirmed the direction, including that the existing green `theme.success` color (used for the "logged" confirmation) is correct, not a stray color; it's the same green already used for "Week complete!".
+- **Scope expanded in three ways during review, all confirmed:**
+  1. **Manual "log a session I already did" entry**, alongside the live timer -- for someone who forgot to start the timer.
+  2. **Goal-agnostic, not lose_fat-only.** Bryant's point: a bodybuilding/hypertrophy/strength member who does cardio on their own should get the same screen, not a lesser one. Researched top apps (Strava, Fitbod) to answer his follow-up question about home-screen quick access -- confirmed the universal pattern is a persistent, always-reachable entry point (Strava's Record button) rather than cardio logging being buried inside one specific goal's scheduled plan days.
+  3. **Weekly/monthly cardio totals**, so cardio effort is visible in aggregate, not just as a list of individual sessions.
+- **Decision: build all three.** Screen lives in a new shared `CardioScreen.jsx`, reachable from a persistent "Log cardio" row on Home (visible for every goal, not gated to lose_fat or a scheduled cardio day) and from Progress. Manual entry reuses the existing `CardioQuickLog` component (moved into `shared.jsx` so both screens can share it) rather than building a second logging path. Weekly/monthly totals are a simple minutes + session-count card on Progress, per the earlier "simple totals" default Bryant confirmed.
+- **Shipped this session, commit `766a096`.** See HANDOFF.md session 32 for the full build detail.
+
+---
+
 ## Standing technical decisions
 
 - **File structure:** Morphiq.jsx (3,714 lines), WorkoutScreen.jsx (1,421 lines), MealScreen.jsx (585 lines), GymOwnerDashboard.jsx (separate)
