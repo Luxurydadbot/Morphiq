@@ -2626,6 +2626,137 @@ function Spinner({ size = 28, color = "#4C8DFF", trackColor = "#212429" }) {
   return <div style={{ width: size, height: size, border: `3px solid ${trackColor}`, borderTopColor: color, borderRadius: "50%", animation: "spin .9s linear infinite", flexShrink: 0 }} />;
 }
 
+// ─── CardioQuickLog — voice + text quick-add for a PAST cardio session ─────
+// Moved here from ProgressScreen.jsx (session 31) so it can be shared with
+// the new CardioScreen.jsx's manual-entry mode, instead of duplicating this
+// logic in a second file -- same reasoning as every other shared/*.jsx
+// component. Mirrors the voice/text pattern already used for meal logging
+// (LogInput in MealScreen.jsx): say or type what you did, AI fills in
+// type/duration/an estimated calorie burn, you confirm. No GPS/heart-rate --
+// that needs a connected wearable this app doesn't integrate with yet.
+function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
+  const [phase, setPhase] = useState("idle"); // idle | listening | processing | confirming | error
+  const [textVal, setTextVal] = useState("");
+  const [parsed, setParsed] = useState(null);
+  const [errMsg, setErrMsg] = useState("");
+  const [saved, setSaved] = useState(false);
+  const recognitionRef = useRef(null);
+
+  function reset() {
+    recognitionRef.current?.abort();
+    setPhase("idle"); setTextVal(""); setParsed(null); setErrMsg("");
+  }
+
+  function startVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setErrMsg("Microphone not available on this browser -- type instead."); setPhase("error"); return; }
+    const rec = new SR();
+    rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
+    recognitionRef.current = rec;
+    rec.onresult = (e) => { const text = e.results[0][0].transcript; setTextVal(text); parseText(text); };
+    rec.onerror = () => { setErrMsg("Microphone error -- try typing instead."); setPhase("error"); };
+    setPhase("listening");
+    rec.start();
+  }
+
+  function submitText() {
+    if (!textVal.trim()) return;
+    parseText(textVal.trim());
+  }
+
+  async function parseText(text) {
+    setPhase("processing");
+    try {
+      const res = await fetch("/api/parse-cardio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.activityType) { setErrMsg(data?.error || "Couldn't log that -- try again."); setPhase("error"); return; }
+      setParsed(data);
+      setPhase("confirming");
+    } catch {
+      setErrMsg("Network error -- check your connection."); setPhase("error");
+    }
+  }
+
+  async function confirmLog() {
+    if (!parsed) return;
+    setPhase("processing");
+    const ok = await sb.insertCardioLog(supabaseUserId, {
+      activityType: parsed.activityType,
+      durationMinutes: parsed.durationMinutes,
+      calories: parsed.calories,
+    });
+    if (!ok) { setErrMsg("Couldn't save -- try again."); setPhase("error"); return; }
+    reset();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+    onLogged?.();
+  }
+
+  return (
+    <div style={{ background: "#212429", border: "1px solid " + theme.borderSubtle, borderRadius: 14, padding: "14px", marginBottom: 12 }}>
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <button onClick={startVoice}
+              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(76,141,255,0.25)", borderRadius: 10, padding: "10px 6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", fontFamily: "inherit" }}>
+              <MicIcon size={14} color={accent} /> <span style={{ fontSize: 12, color: accent, fontWeight: 600 }}>Voice</span>
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={textVal}
+              onChange={e => setTextVal(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submitText()}
+              placeholder="e.g. 30 minutes of running"
+              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#EDEEF0", outline: "none", fontFamily: "inherit" }}
+            />
+            <button onClick={submitText} disabled={!textVal.trim()}
+              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", color: "#0B1E3D", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4 }}>Log</button>
+          </div>
+        </>
+      )}
+      {phase === "listening" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 10 }}>Listening... say what cardio you did</div>
+          <button onClick={reset} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+        </div>
+      )}
+      {phase === "processing" && (
+        <div style={{ textAlign: "center", padding: "8px 0" }}>
+          <Spinner size={22} color={accent} />
+        </div>
+      )}
+      {phase === "confirming" && parsed && (
+        <>
+          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 8 }}>Does this look right?</div>
+          <div style={{ background: "#1B1D21", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#EDEEF0", marginBottom: 6 }}>{parsed.activityType}</div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <span style={{ fontSize: 13, color: accent, fontWeight: 600 }}>{parsed.durationMinutes} min</span>
+              <span style={{ fontSize: 13, color: "#6E7480" }}>~{parsed.calories} cal</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "8px", fontSize: 11, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
+            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log this session</button>
+          </div>
+        </>
+      )}
+      {phase === "error" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8 }}>{errMsg}</div>
+          <button onClick={reset} style={{ background: accent, border: "none", borderRadius: 9, padding: "7px 20px", fontSize: 11, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
+        </div>
+      )}
+      {saved && <div style={{ textAlign: "center", fontSize: 11, color: accent, marginTop: 8 }}>Saved <Icon name="check" size={11} style={{ verticalAlign: "-1px" }} /></div>}
+    </div>
+  );
+}
+
 function NavIcon({ id }) {
   if (id === "home") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9L9 2l7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M4 7v8h4v-4h2v4h4V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   if (id === "workout") return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="10" y="3" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="3" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><rect x="10" y="10" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /></svg>;
@@ -3195,7 +3326,7 @@ export {
   // Exercise data
   EXERCISE_LIBRARY, STARTING_WEIGHTS, DEFAULT_WEIGHT,
   // UI components
-  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq, GymLogo,
+  MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq, GymLogo, CardioQuickLog,
   // Screen data constants
   GOAL_ICONS, GOAL_OPTIONS, EQUIPMENT_OPTIONS,
   WORKOUT_EXERCISES, MEAL_DATA, GROCERY_DATA,

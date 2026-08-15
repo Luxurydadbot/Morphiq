@@ -1,141 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  useApp, theme, sb,
-  Layout, Spinner,
+  useApp, theme, sb, localDateStr,
+  Layout, Spinner, CardioQuickLog,
   WeightChart, StreakCalendar,
-  PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon, MicIcon,
+  PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon,
 } from "./shared.jsx";
 
-// ─── CardioQuickLog — voice + text quick-add for cardio sessions ────────────
-// Mirrors the voice/text pattern already used for meal logging (LogInput in
-// MealScreen.jsx): say or type what you did, AI fills in type/duration/an
-// estimated calorie burn, you confirm. No GPS/heart-rate -- that needs a
-// connected wearable this app doesn't integrate with yet.
-function CardioQuickLog({ accent, supabaseUserId, onLogged }) {
-  const [phase, setPhase] = useState("idle"); // idle | listening | processing | confirming | error
-  const [textVal, setTextVal] = useState("");
-  const [parsed, setParsed] = useState(null);
-  const [errMsg, setErrMsg] = useState("");
-  const [saved, setSaved] = useState(false);
-  const recognitionRef = useRef(null);
-
-  function reset() {
-    recognitionRef.current?.abort();
-    setPhase("idle"); setTextVal(""); setParsed(null); setErrMsg("");
-  }
-
-  function startVoice() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setErrMsg("Microphone not available on this browser -- type instead."); setPhase("error"); return; }
-    const rec = new SR();
-    rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 1;
-    recognitionRef.current = rec;
-    rec.onresult = (e) => { const text = e.results[0][0].transcript; setTextVal(text); parseText(text); };
-    rec.onerror = () => { setErrMsg("Microphone error -- try typing instead."); setPhase("error"); };
-    setPhase("listening");
-    rec.start();
-  }
-
-  function submitText() {
-    if (!textVal.trim()) return;
-    parseText(textVal.trim());
-  }
-
-  async function parseText(text) {
-    setPhase("processing");
-    try {
-      const res = await fetch("/api/parse-cardio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.activityType) { setErrMsg(data?.error || "Couldn't log that -- try again."); setPhase("error"); return; }
-      setParsed(data);
-      setPhase("confirming");
-    } catch {
-      setErrMsg("Network error -- check your connection."); setPhase("error");
-    }
-  }
-
-  async function confirmLog() {
-    if (!parsed) return;
-    setPhase("processing");
-    const ok = await sb.insertCardioLog(supabaseUserId, {
-      activityType: parsed.activityType,
-      durationMinutes: parsed.durationMinutes,
-      calories: parsed.calories,
-    });
-    if (!ok) { setErrMsg("Couldn't save -- try again."); setPhase("error"); return; }
-    reset();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-    onLogged?.();
-  }
-
-  return (
-    <div style={{ background: "#212429", border: "1px solid " + theme.borderSubtle, borderRadius: 14, padding: "14px", marginBottom: 12 }}>
-      {phase === "idle" && (
-        <>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button onClick={startVoice}
-              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(76,141,255,0.25)", borderRadius: 10, padding: "10px 6px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", fontFamily: "inherit" }}>
-              <MicIcon size={14} color={accent} /> <span style={{ fontSize: 12, color: accent, fontWeight: 600 }}>Voice</span>
-            </button>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              value={textVal}
-              onChange={e => setTextVal(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && submitText()}
-              placeholder="e.g. 30 minutes of running"
-              style={{ flex: 1, background: "#1B1D21", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", fontSize: 13, color: "#EDEEF0", outline: "none", fontFamily: "inherit" }}
-            />
-            <button onClick={submitText} disabled={!textVal.trim()}
-              style={{ background: accent, border: "none", borderRadius: 8, padding: "9px 14px", color: "#0B1E3D", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: textVal.trim() ? 1 : 0.4 }}>Log</button>
-          </div>
-        </>
-      )}
-      {phase === "listening" && (
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 10 }}>Listening... say what cardio you did</div>
-          <button onClick={reset} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "5px 16px", fontSize: 10, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-        </div>
-      )}
-      {phase === "processing" && (
-        <div style={{ textAlign: "center", padding: "8px 0" }}>
-          <Spinner size={22} color={accent} />
-        </div>
-      )}
-      {phase === "confirming" && parsed && (
-        <>
-          <div style={{ fontSize: 11, color: "#6E7480", marginBottom: 8 }}>Does this look right?</div>
-          <div style={{ background: "#1B1D21", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#EDEEF0", marginBottom: 6 }}>{parsed.activityType}</div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <span style={{ fontSize: 13, color: accent, fontWeight: 600 }}>{parsed.durationMinutes} min</span>
-              <span style={{ fontSize: 13, color: "#6E7480" }}>~{parsed.calories} cal</span>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, padding: "8px", fontSize: 11, color: "#6E7480", cursor: "pointer", fontFamily: "inherit" }}>Redo</button>
-            <button onClick={confirmLog} style={{ flex: 2, background: accent, border: "none", borderRadius: 9, padding: "8px", fontSize: 12, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Log this session</button>
-          </div>
-        </>
-      )}
-      {phase === "error" && (
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: "#F87171", marginBottom: 8 }}>{errMsg}</div>
-          <button onClick={reset} style={{ background: accent, border: "none", borderRadius: 9, padding: "7px 20px", fontSize: 11, color: "#0B1E3D", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
-        </div>
-      )}
-      {saved && <div style={{ textAlign: "center", fontSize: 11, color: accent, marginTop: 8 }}>Saved <Icon name="check" size={11} style={{ verticalAlign: "-1px" }} /></div>}
-    </div>
-  );
-}
-
 function ProgressScreen() {
-  const { gymBranding, supabaseUser, user, plan, historicalData, loadHistoricalData } = useApp();
+  const { navigate, gymBranding, supabaseUser, user, plan, historicalData, loadHistoricalData } = useApp();
   const a = gymBranding.accent;
   const [tab, setTab] = useState("body");
   const sL = { ...theme.sL, fontSize: 10, letterSpacing: "1.2px", marginBottom: 10, fontWeight: 500 };
@@ -444,7 +316,40 @@ function ProgressScreen() {
               ))}
             </div>
 
-            <div style={{ ...sL, marginTop: 18 }}>Log cardio</div>
+            <div style={{ ...sL, marginTop: 18 }}>Cardio</div>
+
+            {/* Weekly/monthly cardio totals -- simple sum over cardioLogs
+                (bounded to the 60 most recent sessions historicalData
+                already fetches, same window every other Progress stat uses;
+                60 cardio sessions inside one month would be 2+/day, well
+                past what this needs to cover in practice). Answers "am I
+                doing enough cardio" directly, requested alongside the
+                cardio-day redesign -- see DECISIONS.md session 32. */}
+            {(() => {
+              const now = new Date();
+              const dow = now.getDay();
+              const mondayDiff = now.getDate() - dow + (dow === 0 ? -6 : 1);
+              const mondayStr = localDateStr(new Date(now.getFullYear(), now.getMonth(), mondayDiff));
+              const monthStr = localDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+              const weekLogs = cardioLogs.filter(c => c.logged_date >= mondayStr);
+              const monthLogs = cardioLogs.filter(c => c.logged_date >= monthStr);
+              const sumMin = rows => rows.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+                  {[["This week", weekLogs], ["This month", monthLogs]].map(([label, rows]) => (
+                    <div key={label} style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: ".85rem .75rem" }}>
+                      <div style={{ fontSize: 18, fontWeight: 500, color: theme.text }}>{sumMin(rows)} min</div>
+                      <div style={{ fontSize: 12, color: theme.textDim, marginTop: 4 }}>{label} · {rows.length} session{rows.length === 1 ? "" : "s"}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            <button onClick={() => navigate("cardio")} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}>
+              Start a cardio session
+            </button>
+
             <CardioQuickLog accent={a} supabaseUserId={supabaseUser?.id} onLogged={() => loadHistoricalData(supabaseUser.id)} />
 
             {cardioLogs.length > 0 && (

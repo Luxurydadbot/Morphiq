@@ -7,6 +7,7 @@ import { GymSignupScreen } from "./GymSignupScreen.jsx";
 import { OnboardingScreen } from "./OnboardingScreen.jsx";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { ChatScreen } from "./ChatScreen.jsx";
+import { CardioScreen } from "./CardioScreen.jsx";
 import {
   sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY, isGymBlocked,
   isMultiDayPlan, getAutoWorkoutDayIndex, calcMacros,
@@ -1142,16 +1143,14 @@ function HomeDashboardScreen() {
                 <div style={{ fontSize: 12, color: theme.textDim }}>{weeklyDone} of {weeklyTarget} workouts done this week</div>
               </div>
               {/* Cardio day (see buildPlan()'s cardio-day scheduling, shared.jsx) --
-                  isCardio days carry no exercises, so route to Progress's
-                  existing cardio quick-log instead of WorkoutScreen, which
+                  isCardio days carry no exercises, so route straight into
+                  CardioScreen (session 32) instead of WorkoutScreen, which
                   still assumes a real exercise list and would break on an
-                  empty one. The full guided cardio-day screen (activity
-                  picker, live timer, MET-based calorie estimate) is scoped
-                  but not yet built -- see DECISIONS.md, Aug 9 2026 entries. */}
+                  empty one. */}
               {upcomingDay?.isCardio ? (
                 <div style={{ padding: "0 1.25rem .75rem" }}>
                   <div style={{ background: "#0A1628", border: "0.5px solid rgba(76,141,255,0.2)", borderRadius: 12, padding: "0.85rem 1rem", fontSize: 13, color: theme.textDim, lineHeight: 1.5 }}>
-                    Today's a dedicated cardio day. Log it from Progress when you're done -- a full guided cardio screen with a live timer is coming soon.
+                    Today's a dedicated cardio day -- pick your activity when you start.
                   </div>
                 </div>
               ) : upcomingExercises?.length > 0 && (
@@ -1175,13 +1174,26 @@ function HomeDashboardScreen() {
                 </div>
               )}
               <div style={{ padding: "0 1.25rem 1.25rem" }}>
-                <button onClick={() => navigate(upcomingDay?.isCardio ? "progress" : "workout")} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                  {upcomingDay?.isCardio ? "Log cardio" : "Start workout"} <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px" }} />
+                <button onClick={() => navigate(upcomingDay?.isCardio ? "cardio" : "workout")} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 12, padding: ".85rem", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                  {upcomingDay?.isCardio ? "Start cardio" : "Start workout"} <Icon name="arrow-right" size={15} style={{ verticalAlign: "-2px" }} />
                 </button>
               </div>
             </>
           )}
         </div>
+      </div>
+      {/* Persistent cardio quick-access -- deliberately separate from the
+          card above and NOT gated to a lose_fat goal or a scheduled cardio
+          day. Matches the pattern researched for top apps (Strava's Record
+          button, Fitbod's cardio logging): cardio someone decides to do on
+          the spot needs to be just as reachable as a scheduled day, not
+          buried inside one. See DECISIONS.md, session 32. */}
+      <div style={{ padding: "0.75rem 1.25rem 0" }}>
+        <button onClick={() => navigate("cardio")} style={{ width: "100%", background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 14, padding: ".7rem 1rem", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontFamily: "inherit" }}>
+          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#0A1628", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="flame" size={15} /></div>
+          <span style={{ fontSize: 13, fontWeight: 500, color: theme.text, flex: 1, textAlign: "left" }}>Log cardio</span>
+          <Icon name="arrow-right" size={14} color={theme.textDim} />
+        </button>
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Your progress</div>
@@ -1616,6 +1628,7 @@ function AppRouter() {
   if (screen === "custom_plan") return <CustomPlanScreen />;
   if (screen === "meals") return <MealPlanScreen />;
   if (screen === "progress") return <ProgressScreen />;
+  if (screen === "cardio") return <CardioScreen />;
   if (screen === "profile") return <ProfileScreen />;
   if (screen === "owner") return <GymOwnerDashboard />;
   if (screen === "super_admin") return <SuperAdminDashboard />;
