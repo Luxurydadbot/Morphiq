@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   useApp, theme, sb, localDateStr,
   Layout, Spinner, CardioQuickLog,
-  WeightChart, CardioWeeklyChart, NutritionTrendChart, StreakCalendar,
+  WeightChart, CardioWeeklyChart, NutritionTrendChart,
   PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon,
 } from "./shared.jsx";
 
@@ -130,27 +130,7 @@ function ProgressScreen() {
   return (
     <Layout activeNav="progress">
       <div style={{ padding:"1.25rem 1.25rem 0" }}>
-        <div style={{ marginBottom:16 }}>
-          <div style={{ fontSize:20, fontWeight:600, color:theme.text }}>Your Progress</div>
-          <div style={{ fontSize:12, color:theme.textDim, marginTop:2 }}>
-            {useRealWeightData ? `${weightLogs.length} weigh-ins logged` : "Week 6 · Fat loss plan"}
-          </div>
-        </div>
-
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
-          {[
-            { val: lost > 0 ? `−${lost} lbs` : `+${Math.abs(lost)} lbs`, lbl:"Weight change", color: lost >= 0 ? a : "#F87171" },
-            { val: (() => { var ws = historicalData?.weekStreak ?? 0; return ws > 0 ? <><Icon name="flame" size={14} style={{verticalAlign:"-2px", marginRight:2}} />{ws}</> : "—"; })(), lbl:"Week streak", color:"#F59E0B" },
-            { val: String(realPBs.length || 0), lbl:"PBs logged", color:"#5FA8E0" },
-          ].map(({ val, lbl, color }) => (
-            <div key={lbl} style={{ background:"#212429", borderRadius:12, padding:"10px 8px", textAlign:"center" }}>
-              <div style={{ fontSize:18, fontWeight:700, color }}>{val}</div>
-              <div style={{ fontSize:10, color:"#6E7480", marginTop:3, lineHeight:1.3 }}>{lbl}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display:"flex", background:"#212429", borderRadius:10, padding:3, marginBottom:16 }}>
+        <div style={{ display:"flex", background:"#212429", borderRadius:10, padding:3, marginBottom:16, marginTop:6 }}>
           {[["body","Body"],["workouts","Workouts"],["cardio","Cardio"],["nutrition","Nutrition"]].map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
               style={{ flex:1, padding:"7px 6px", background:tab===t ? a : "transparent", border:"none", borderRadius:8, fontSize:12, fontWeight:500, color:tab===t ? "#0B1E3D" : theme.textDim, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
@@ -248,25 +228,6 @@ function ProgressScreen() {
                   {row.delta && <div style={{ fontSize:11, color:row.dColor, fontWeight:600, minWidth:52, textAlign:"right" }}>{row.delta}</div>}
                 </div>
               ))}
-            </div>
-
-            <div style={sL}>Workout streak</div>
-            <div style={{ background:"#212429", borderRadius:14, padding:"14px" }}>
-              <StreakCalendar accent={a} workoutDates={
-                useRealWorkoutData
-                  ? [...new Set(realLogs.map(r => r.workout_date))]
-                  : []
-              } />
-              <div style={{ display:"flex", gap:14, marginTop:10 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                  <div style={{ width:10, height:10, borderRadius:3, background:a }} />
-                  <span style={{ fontSize:10, color:"#6E7480" }}>Workout done</span>
-                </div>
-                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                  <div style={{ width:10, height:10, borderRadius:3, background:"#212429", border:"1px solid #2B2E34" }} />
-                  <span style={{ fontSize:10, color:"#6E7480" }}>Rest day</span>
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -550,13 +511,19 @@ function ProgressScreen() {
           const proteinHitDays = weekDates.filter(d => byDate[d].protein >= proteinGoal).length;
 
           // 14-day trend, oldest first -- zero-filled for days with no log
-          // so gaps are visible instead of silently skipped.
+          // so gaps are visible instead of silently skipped. Two parallel
+          // trends (calories + protein) built the same way, off the same
+          // byDate buckets, so the two cards below always agree with each
+          // other and with "Recent days".
           const trend = [];
+          const proteinTrend = [];
           for (let i = 13; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const dStr = localDateStr(d);
-            trend.push({ label: d.toLocaleDateString("en-US", { day: "numeric" }), calories: byDate[dStr]?.cal || 0 });
+            const label = d.toLocaleDateString("en-US", { day: "numeric" });
+            trend.push({ label, calories: byDate[dStr]?.cal || 0 });
+            proteinTrend.push({ label, protein: byDate[dStr]?.protein || 0 });
           }
 
           return (
@@ -573,10 +540,18 @@ function ProgressScreen() {
               </div>
 
               {loggedDates.length > 0 ? (
-                <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "12px 10px", marginBottom: 14 }}>
-                  <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6, paddingLeft: 4 }}>Calories, last 14 days</div>
-                  <NutritionTrendChart data={trend} target={calGoal} accent={a} />
-                </div>
+                <>
+                  <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "14px 12px 12px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 2 }}>Calories</div>
+                    <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Last 14 days</div>
+                    <NutritionTrendChart data={trend} target={calGoal} accent={a} valueKey="calories" />
+                  </div>
+                  <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "14px 12px 12px", marginBottom: 14 }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 2 }}>Protein</div>
+                    <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Last 14 days</div>
+                    <NutritionTrendChart data={proteinTrend} target={proteinGoal} accent={a} valueKey="protein" />
+                  </div>
+                </>
               ) : (
                 <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "18px 14px", textAlign: "center", marginBottom: 14 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>No meals logged yet</div>

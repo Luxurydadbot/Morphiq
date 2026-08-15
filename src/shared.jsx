@@ -3176,18 +3176,21 @@ function CardioWeeklyChart({ data, accent }) {
   );
 }
 
-// NutritionTrendChart -- daily calories vs. target, last N days. Same
-// minimal bar-chart family as CardioWeeklyChart above, plus a dashed
-// target reference line -- the one feature every well-reviewed macro
-// tracker (MacroFactor in particular) leads with: not just raw daily
-// numbers, but numbers shown against a target so adherence is visible at
-// a glance rather than requiring mental math. data: [{ label, calories }],
-// oldest day first. target: plan.calories (or null if no target set, in
-// which case the line is simply omitted -- never draws a target at 0).
-function NutritionTrendChart({ data, target, accent }) {
+// NutritionTrendChart -- daily calories (or any single numeric metric) vs.
+// a target, last N days. Same minimal bar-chart family as CardioWeeklyChart
+// above, plus a dashed target reference line -- the one feature every
+// well-reviewed macro tracker (MacroFactor in particular) leads with: not
+// just raw daily numbers, but numbers shown against a target so adherence
+// is visible at a glance rather than requiring mental math. data:
+// [{ label, [valueKey]: number }], oldest day first. target: the goal value
+// (or null if no target set, in which case the line is simply omitted --
+// never draws a target at 0). valueKey defaults to "calories" (original
+// caller) -- Session 37's Protein card on the Nutrition tab passes
+// valueKey="protein" against the same component instead of duplicating it.
+function NutritionTrendChart({ data, target, accent, valueKey = "calories" }) {
   const W = 260, H = 100, PAD = 10;
   if (!data || data.length === 0) return null;
-  const maxV = Math.max(...data.map(d => d.calories), target || 0, 1) * 1.1;
+  const maxV = Math.max(...data.map(d => d[valueKey]), target || 0, 1) * 1.1;
   const slot = (W - PAD * 2) / data.length;
   const barW = slot * 0.62;
   const toY = v => (H - 16) - (v / maxV) * (H - PAD - 16);
@@ -3201,11 +3204,12 @@ function NutritionTrendChart({ data, target, accent }) {
         </>
       )}
       {data.map((d, i) => {
-        const barH = d.calories > 0 ? Math.max((H - 16) - toY(d.calories), 2) : 0;
+        const val = d[valueKey];
+        const barH = val > 0 ? Math.max((H - 16) - toY(val), 2) : 0;
         const x = PAD + i * slot + (slot - barW) / 2;
         const y = (H - 16) - barH;
         const isCurrent = i === data.length - 1;
-        const overTarget = target && d.calories > target * 1.1;
+        const overTarget = target && val > target * 1.1;
         return (
           <g key={i}>
             {barH > 0 && <rect x={x} y={y} width={barW} height={barH} rx={2} fill={overTarget ? "#F59E0B" : accent} opacity={isCurrent ? 1 : 0.5} />}
