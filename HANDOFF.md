@@ -1,4 +1,4 @@
-# Hypergentiq — Session 36 master handoff
+# Hypergentiq — Session 37 master handoff
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -20,22 +20,33 @@ Five pieces of work, all shipped, none live-tested yet in the running app (this 
 
 **5. Nutrition tab, commit `2b662fb`.** Fourth Progress tab. Bryant explicitly asked for the scope to be decided from research into top apps and their reviews, not picked directly. Findings applied: MacroFactor (~4.8/19,500 App Store ratings, repeatedly named best-in-class 2026) combines trend charts + adherence percentages together, not one or the other; MyFitnessPal's complaints trace to paywalls and extra-click redesigns, not to that combination. Built the fuller shape (matches the Cardio tab's own pattern): avg-calories-this-week and days-hit-protein-target stat cards, a 14-day calorie trend chart with a dashed target line (new `NutritionTrendChart`, `shared.jsx`), and a recent-days list. Required one new backend piece: `sb.getMealLogs()` (`shared.jsx`), date-bounded (35-day window) since a member can log several food entries a day — wired into `loadHistoricalData()` (`Morphiq.jsx`) alongside the existing workout/weight/cardio fetches, exposed as `historicalData.mealLogs`.
 
+## Session 37 — Cardio screen redesign: timer/calorie pairing, screen fill, prominent stop confirmation
+
+Bryant's ask, working from the live app on his phone: on the live cardio-timer screen (`CardioScreen.jsx`), the timer felt too small, the calorie estimate looked like an afterthought next to it instead of an equally important number, there was noticeable black space below the "Powered by Hypergentiq" footer on his phone screen, and the "session logged" confirmation after tapping Stop was a small, easy-to-miss bar buried at the bottom.
+
+**What changed, commit `7bc49b6`.** Four things, all in the `mode === "live" && activity` view of `CardioScreen.jsx`:
+1. Timer and calorie estimate are now a single paired stat card (`#0A1628` background, matches the app's existing dark-card style) with a vertical divider -- both numbers at the same 54px/700-weight size, tabular-nums, timer on the left labeled "Time," calories on the right labeled "Calories" with a small flame icon. Replaces the old setup where the timer stood alone at 44px and calories were a small 22px line inside a separate "Estimated burn" box.
+2. That stat card sits inside a flex container (`flex: 1, justifyContent: 'center'`) inside an outer wrapper with `minHeight: calc(100dvh - 230px)`, so the live-timer view now stretches to fill the available phone-screen height between the header and the bottom nav instead of leaving it short.
+3. The post-Stop confirmation (activity name + minutes + calories) moved from a small 12px-font bar squeezed below the Stop button to a large, bordered, accent-colored card (44px checkmark badge, 30px bold numbers) that now appears at the *top* of the activity-picker screen the moment you're taken back to it after stopping -- first thing visible, not last.
+4. Start/Stop buttons got a small bump too (padding .85rem→1rem, font 13-14px→14-15px) so they read proportionally with the bigger card above them.
+
+**NOT live-tested this session -- no browser/device access available from this environment.** Verified with `npx esbuild` on the individual file and the full `src/index.js` bundle (catches cross-file reference errors) -- both passed clean, no errors. Bryant was about to live-test on the treadmill right after this ships; next session should confirm his read on it before doing anything further here.
+
 ## Files touched this session (final line counts)
+
+**Session 37:**
 
 | File | Before | After |
 | --- | --- | --- |
-| `src/shared.jsx` | 3,349 | 3,478 |
-| `src/WorkoutScreen.jsx` | 2,817 | 2,865 |
-| `src/Morphiq.jsx` | 1,654 | 1,656 |
-| `src/OnboardingScreen.jsx` | 620 | 622 |
-| `src/ProgressScreen.jsx` | 492 | 613 |
-| `src/CardioScreen.jsx` | 221 | 231 |
+| `src/CardioScreen.jsx` | 231 | 232 |
 
-All other files untouched this session. All well under the 3,800-line hard limit — `shared.jsx` (3,478) remains the one to watch, `WorkoutScreen.jsx` (2,865) next.
+All other files untouched this session (Session 36's table above this line is historical -- re-fetch fresh via `git clone` for current state of every other file, as always).
+
+**Full current file set (fetched fresh via git clone at the start of Session 37, all well under the 3,800-line hard limit):** `src/shared.jsx` 3,478 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,656, `src/MealScreen.jsx` 831, `src/OnboardingScreen.jsx` 622, `src/ProgressScreen.jsx` 613, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/GymSignupScreen.jsx` 269, `src/CardioScreen.jsx` 232, `src/GymOwnerDashboard.jsx` 927. `api/` files are all small (12-259 lines each), none near any size concern.
 
 ## Latest commit
 
-`2b662fb` on `main`. Full commit sequence this session: `d4218c0` → `b33e277` → `939db84` → `d6a23f1` → `2b662fb`.
+`7bc49b6` on `main`. Full commit sequence this session: `7bc49b6` (only commit this session, on top of Session 36's `2b662fb`).
 
 ## Confirmed working vs still open
 
@@ -47,11 +58,13 @@ All other files untouched this session. All well under the 3,800-line hard limit
 - Progress screen: all three existing tabs after the restructure (especially the relocated "Personal bests" section's tap-to-expand strength chart, now nested one level deeper), plus the brand-new Cardio and Nutrition tabs on an account with real logged data.
 - The Nutrition tab specifically has never been exercised against real Supabase data — `getMealLogs()` is new code with no live confirmation yet that the date-bucketing produces sane output against actual `meal_logs` rows.
 
+**Session 37 addition -- also not live-tested:** the cardio screen redesign (paired timer/calorie stat card, screen-fill layout, prominent post-Stop confirmation card). Static checks (esbuild individual + full bundle) passed clean; needs a real phone pass, ideally right after this ships since Bryant was mid-session on the treadmill when this was built.
+
 ## Punch list, in priority order
 
 **FIRST — unblock the privacy policy.** Unchanged. Blocked on Bryant forming a real legal business entity.
 
-**SECOND — live-test everything from this session.** New top priority — five features shipped with only static verification (esbuild + bundle check), zero live-testing. See "Confirmed working vs still open" above for the specific list. Do this before starting new feature work.
+**SECOND — live-test everything from Session 36 AND Session 37.** Top priority — six features/changes now shipped with only static verification (esbuild + bundle check), zero live-testing: Session 36's five items plus Session 37's cardio-screen redesign. See "Confirmed working vs still open" above for the specific list. Do this before starting new feature work.
 
 **THIRD — no-blocker App Store groundwork.** Unchanged. Capacitor scaffolded/branded, PWA service worker shipped but unverified live. Capgo pipeline not started. Android project has never been opened in Android Studio to confirm it builds.
 
@@ -77,22 +90,22 @@ All other files untouched this session. All well under the 3,800-line hard limit
 
 **No live Node/npm toolchain in this sandbox by default.** `esbuild` (installed standalone via `npx --yes esbuild ...`, no persistent install needed) is the fast syntax/JSX sanity check when code changes — used on every touched file this session, individually and via a full-bundle check from `src/index.js` with `react`/`react-dom`/`@sentry/react`/`web-vitals` externalized.
 
-## Session 36 close-out summary
+## Session 37 close-out summary
 
-**Everything built/changed this session:** two copy nits; CustomPlanScreen cardio-day scheduling (goal-agnostic); Log cardio button restyle + real numbers in both cardio confirmation paths + a new 6-week cardio chart; Progress screen restructured from Body/Workouts/Bests to Body/Workouts/Cardio (Bests relocated into Workouts, not deleted); a brand-new Nutrition tab with a new backend query, a new trend-chart component, and adherence stats.
+**Everything built/changed this session:** `CardioScreen.jsx` live-timer view redesigned -- timer and calorie estimate merged into one equally-weighted paired stat card (54px, matching size/weight, side by side with a divider), that card's wrapper now fills available phone-screen height instead of leaving black space below the footer, and the post-Stop "session logged" confirmation moved from a small easy-to-miss bar to a large accent-colored card shown front-and-center at the top of the activity-picker screen.
 
-**Confirmed working:** all changed files pass individual esbuild syntax checks and a full-app bundle check; manual review confirms wizard step numbering and tab-condition integrity.
+**Confirmed working:** individual-file and full-app-bundle esbuild checks both pass clean, no syntax or cross-file reference errors.
 
-**Still needs testing — nothing from this session has been live-tested in the running app.** This is the single most important thing for the next session to know. See "Confirmed working vs still open" above for the specific checklist.
+**Still needs testing — nothing from Session 36 or Session 37 has been live-tested in the running app.** This remains the single most important thing for the next session to know.
 
-**Next priority task:** live-test everything shipped this session (SECOND on the punch list above) before starting new feature work. After that: App Store groundwork (Capacitor Android Studio build check is the next unblocked item), or privacy policy once Bryant has a business entity.
+**Next priority task:** live-test Session 36's five features AND Session 37's cardio-screen redesign (Bryant was about to test the redesign on a treadmill right after this shipped -- check with him first). After that: App Store groundwork (Capacitor Android Studio build check is the next unblocked item), or privacy policy once Bryant has a business entity.
 
-**Final line counts, all files:** see table above — `shared.jsx` 3,478 (largest), `WorkoutScreen.jsx` 2,865, both well under the 3,800 limit. All other files unchanged from Session 35's table (see that file's git history, or re-fetch fresh via git clone as always).
+**Final line counts:** see table above — `src/CardioScreen.jsx` now 232 (was 231). `shared.jsx` still largest at 3,478, `WorkoutScreen.jsx` next at 2,865, both well under the 3,800 limit. All other files unchanged from Session 36.
 
-**Latest commit:** `2b662fb` on `main`.
+**Latest commit:** `7bc49b6` on `main`.
 
 ## Paste this at the start of your next session
 
-Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` — can silently serve stale cached content). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,478, `WorkoutScreen.jsx` next at 2,865).
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` -- can silently serve stale cached content; `api.github.com` is also blocked in this environment's sandbox -- `git clone`/`git push` over an authenticated HTTPS URL, e.g. `https://<token>@github.com/Luxurydadbot/Morphiq.git`, from a plain scratch directory is the only method confirmed to work). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,478, `WorkoutScreen.jsx` next at 2,865).
 
-Remind Bryant: five things shipped this session (copy nits, CustomPlanScreen cardio, cardio button/confirmation/chart polish, Progress screen restructure into Body/Workouts/Cardio with Bests relocated, and a new Nutrition tab) but **none of it has been live-tested yet** — only static syntax and full-bundle checks. That's the top priority for the next session before anything new: walk through each feature in the real running app, ideally on the WarmupTest account (know its current plan state — see Session 35's note, still accurate). After that, the App Store punch list (Capacitor's `android/` project has never been opened in Android Studio) and the privacy policy (blocked on Bryant's business entity) are the standing next chunks of work.
+Remind Bryant: Session 36 shipped five things (copy nits, CustomPlanScreen cardio, cardio button/confirmation/chart polish, Progress screen restructure into Body/Workouts/Cardio, Nutrition tab) and Session 37 shipped a cardio-screen visual redesign (paired timer/calorie card, screen-fill layout, prominent stop confirmation) -- **none of it has been live-tested yet**, only static syntax/bundle checks. That's the top priority for the next session before anything new: walk through each feature in the real running app, starting with the Session 37 cardio redesign since Bryant was mid-test on a treadmill when it shipped. After that, the App Store punch list (Capacitor's `android/` project has never been opened in Android Studio) and the privacy policy (blocked on Bryant's business entity) are the standing next chunks of work.
