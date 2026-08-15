@@ -48,23 +48,41 @@ Second ask this session, working from the live app: the Progress screen had a "Y
 
 **Live-tested this session, not just static-checked.** Walked all four Progress tabs in Chrome at a phone viewport: Body (weight chart + measurements only, no streak calendar, confirmed), Workouts (unchanged, confirmed), Cardio (unchanged, confirmed), Nutrition (logged a real test meal -- "Grilled Chicken Breast with Rice", 350 cal / 35g protein -- to get past the empty state, then confirmed both the Calories and Protein cards render with the new bold headers, correct target lines, and matching numbers in "Recent days"). Note: that test meal is now real logged data on the account used for testing (the same "W" test account used for the cardio live-test earlier this session) -- harmless, but worth knowing it's there if that account's nutrition history gets reviewed later.
 
+## Session 37, part 3 — Water intake tracking, now saved to Supabase (new water_logs table)
+
+Third ask this session: Bryant asked whether water intake should get the same trend-card treatment as Calories and Protein. Turned out water was localStorage-only the whole time -- today's count, one device, nothing saved past midnight -- unlike calories/protein which already lived in Supabase via meal_logs. Bryant didn't realize this and, once he understood the gap, wanted it fixed: "that's an important metric, especially for things like weight loss and recovery and general well-being."
+
+**Database change -- new `water_logs` table.** This session is also the first time a Supabase MCP connector was connected mid-session (Bryant connected the official Supabase tool after being told the app's own `sb_publishable_...` key can read/write existing tables but can never create new ones -- that's a Postgres/Supabase permissions distinction, not a workaround). With that connected, created `public.water_logs` directly (migration `create_water_logs`): `id` (uuid, `gen_random_uuid()`), `user_id` (uuid, references `profiles(id)`), `amount_oz` (integer), `logged_date` (date, defaults `CURRENT_DATE`), `logged_at` (timestamptz, defaults `now()`) -- same shape as `weight_logs`, same open/permissive RLS policy (`using (true) / with check (true)`, matching every other log table in this app). Ran `get_advisors` (security) after creating it -- no new issues introduced, only pre-existing unrelated ones (a `leads` table RLS gap, a security-definer view, some auth settings) were surfaced.
+
+Chose event-log style (one row per add/remove tap, `amount_oz` negative for a removal, summed client-side by `logged_date`) over one-row-per-day-upsert, matching `meal_logs`/`cardio_logs`'s pattern rather than `weight_logs`'s -- water is several small taps across a day, not one value logged once.
+
+**App changes, commit `ed1397b`:**
+1. `shared.jsx`: new `sb.insertWaterLog(supabaseUserId, amountOz)` and `sb.getWaterLogs(supabaseUserId, daysBack)`, same shape/fire-and-forget pattern as the weight/meal equivalents.
+2. `MealScreen.jsx`: `WaterTracker` now writes to Supabase on every add/remove (fire-and-forget, same as everywhere else), and on mount fetches today's real total from Supabase to reconcile against the localStorage-cached value that still paints first for instant UI -- fixes the "logged water on my phone, opened the app on desktop, it says zero" gap pure localStorage could never close.
+3. `Morphiq.jsx`: `loadHistoricalData()` now also fetches `sb.getWaterLogs(uid, 35)`, exposed as `historicalData.waterLogs` alongside the existing workout/weight/cardio/meal fetches.
+4. `ProgressScreen.jsx`: new Water card on the Nutrition tab, directly below Protein, same bold-header treatment, own `byDate` bucket keyed off `logged_date` (separate from the meal one, since a member can log water without logging food that day), 14-day trend against a 64oz/day target (same goal `WaterTracker` already uses) via the same generalized `NutritionTrendChart` (`valueKey="waterOz"`). Gated on its own "any water logged" check, not on `loggedDates` from meals, with its own empty-state card ("No water logged yet").
+
+**Live-tested end-to-end, not just static-checked.** Logged 16oz on the Meals tab in Chrome, confirmed the write actually landed in `water_logs` via a direct SQL query (not just trusting the UI), then confirmed the new Water card on Progress > Nutrition rendered correctly with the day's bar and the 64oz target line, matching Calories and Protein exactly.
+
 ## Files touched this session (final line counts)
 
-**Session 37 (both parts -- cardio screen redesign, then Progress screen cleanup):**
+**Session 37 (three parts -- cardio screen redesign, Progress screen cleanup, water tracking):**
 
 | File | Before session | After session |
 | --- | --- | --- |
 | `src/CardioScreen.jsx` | 231 | 234 |
-| `src/ProgressScreen.jsx` | 613 | 588 |
-| `src/shared.jsx` | 3,478 | 3,482 |
+| `src/ProgressScreen.jsx` | 613 | 621 |
+| `src/shared.jsx` | 3,478 | 3,526 |
+| `src/MealScreen.jsx` | 831 | 854 |
+| `src/Morphiq.jsx` | 1,656 | 1,658 |
 
-All other files untouched this session (Session 36's table above this line is historical -- re-fetch fresh via `git clone` for current state of every other file, as always).
+Plus one new Supabase table this session: `public.water_logs` (not a code file, but part of what changed -- see Session 37 part 3 above). All other files untouched this session (Session 36's table above this line is historical -- re-fetch fresh via `git clone` for current state of every other file, as always).
 
-**Full current file set, all well under the 3,800-line hard limit:** `src/shared.jsx` 3,482 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,656, `src/MealScreen.jsx` 831, `src/OnboardingScreen.jsx` 622, `src/ProgressScreen.jsx` 588, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/GymSignupScreen.jsx` 269, `src/CardioScreen.jsx` 234, `src/GymOwnerDashboard.jsx` 927. `api/` files are all small (12-259 lines each), none near any size concern.
+**Full current file set, all well under the 3,800-line hard limit:** `src/shared.jsx` 3,526 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,658, `src/MealScreen.jsx` 854, `src/OnboardingScreen.jsx` 622, `src/ProgressScreen.jsx` 621, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/GymSignupScreen.jsx` 269, `src/CardioScreen.jsx` 234, `src/GymOwnerDashboard.jsx` 927. `api/` files are all small (12-259 lines each), none near any size concern.
 
 ## Latest commit
 
-`cb93493` on `main`. Full Session 37 commit sequence: `7bc49b6` → `a133b25` → `828fc03` (docs) → `c8ab3d5` → `57f418f` (docs) → `cb93493`.
+`ed1397b` on `main`. Full Session 37 commit sequence: `7bc49b6` → `a133b25` → `828fc03` (docs) → `c8ab3d5` → `57f418f` (docs) → `cb93493` → `31c9548` (docs) → `ed1397b`.
 
 ## Confirmed working vs still open
 
@@ -79,6 +97,8 @@ All other files untouched this session (Session 36's table above this line is hi
 **Session 37 addition -- live-tested and confirmed working in Chrome at a 390x844 phone viewport:** the cardio screen redesign (paired timer/calorie stat card, screen-fill layout on both the activity picker and the live timer, prominent post-Stop confirmation card). Full start-to-stop flow exercised: pick Treadmill → Start → calories climb live → Stop → confirmation card shows real numbers. Zero scroll overflow confirmed on all three states. Not yet tested on an actual physical phone (only a resized desktop Chrome window) or in Safari/iOS -- worth a real-device glance next time Bryant has the app open, but the DOM-level height math should hold since it's not relying on any desktop-only API.
 
 **Session 37 part 2 addition -- also live-tested and confirmed working:** the Progress screen cleanup (top summary stats removed, Body tab trimmed to weight chart + measurements only, new Protein card on Nutrition with bold focal headers on both Calories and Protein). Walked all four tabs in Chrome; logged a real test meal to get the Nutrition tab past its empty state and confirmed both trend cards render correctly with matching target lines and numbers. Note this left one real test meal log ("Grilled Chicken Breast with Rice", 350 cal / 35g protein) on the test account used this session -- see Session 37 part 2 writeup above.
+
+**Session 37 part 3 addition -- also live-tested and confirmed working:** water intake now saves to a new `water_logs` Supabase table instead of localStorage-only. Logged 16oz on the Meals tab in Chrome, confirmed via a direct SQL query that the row actually landed in the database (not just trusting the UI), then confirmed the new Water card on Progress > Nutrition rendered with the correct bar and 64oz target line, matching Calories and Protein. This also left one real water log (16oz, today) on the same test account.
 
 ## Punch list, in priority order
 
@@ -98,6 +118,8 @@ All other files untouched this session (Session 36's table above this line is hi
 
 ## Technical notes carried forward
 
+**Supabase MCP connector now connected (new this session).** The app's own `sb_publishable_...` key (used by the running app itself) can only read/write rows in tables that already exist -- it can never create or alter a table, regardless of how it's used. That's a Postgres/Supabase permissions boundary, not a workaround-able limitation. When Bryant needs a new table going forward, connect/use the official Supabase MCP tool (`mcp__<id>__apply_migration` for schema changes, `execute_sql` for one-off queries, `list_tables` with `verbose: true` to check real column names/types before writing any app code against them, `get_advisors` after any DDL change) instead of asking Bryant to click through the Supabase dashboard by hand -- much faster and no risk of a typo'd column name. Ask Bryant to connect it if it's not already connected in a given session.
+
 **MANDATORY fetch method — git clone only.** `api.github.com` and direct HTTP calls to `github.com`/`raw.githubusercontent.com` are blocked by this environment's proxy allowlist; `raw.githubusercontent.com` via web-fetch can also silently serve stale cached content — this happened again at the start of this session (fetched a Session-10-vintage HANDOFF.md and file set via web-fetch before switching to `git clone`, which correctly showed the real Session 35 state). `git clone`/`git push` over authenticated HTTPS from a plain scratch directory (not the mounted Windows output folder) remains the only trusted fetch method.
 
 **When moving a block of JSX/JS into a new location via multi-line string replacement, verify the destination scope, not just that the anchor text matches.** This session's one real bug: `interleaveCardioDays()` was inserted textually before a comment that turned out to be inside `buildPlan()`'s function body (indentation looked top-level; brace nesting was not). The function became invisible outside `buildPlan()`, caught immediately by the full-bundle esbuild check ("not declared in this file") rather than by the individual per-file syntax check, which passed fine since the code was still syntactically valid JS. The full-bundle check earned its place in the verification routine this session specifically because of this — keep running it after any change that adds a new exported helper.
@@ -112,24 +134,26 @@ All other files untouched this session (Session 36's table above this line is hi
 
 ## Session 37 close-out summary
 
-**Everything built/changed this session, two parts:**
+**Everything built/changed this session, three parts:**
 
-Part 1 -- Cardio screen redesign: timer and calorie estimate merged into one equally-weighted paired stat card, both the live-timer view and the activity-picker view now fill available phone-screen height, post-Stop confirmation moved to a large front-and-center card. Two follow-up fixes after getting live browser access mid-session (a height-fill miscalibration, and extending the fill treatment to the activity-picker view).
+Part 1 -- Cardio screen redesign: timer and calorie estimate merged into one paired stat card, both the live-timer and activity-picker views now fill available phone-screen height, post-Stop confirmation moved to a large front-and-center card. Two live-tested follow-up fixes (a height-fill miscalibration, and extending the fill to the activity-picker view).
 
-Part 2 -- Progress screen cleanup: removed the top-of-screen title + 3-stat summary row (Weight change / Week streak / PBs logged) and the weigh-ins-logged line, so the Body/Workouts/Cardio/Nutrition tab bar is now the top of the screen. Removed the Body tab's Workout streak calendar (Body now only shows weight-specific content). Added a Protein trend card to Nutrition, matching the existing Calories card, via a generalized `NutritionTrendChart` (`valueKey` prop). Bolded and enlarged both the Calories and Protein card headers per a mid-session follow-up so they read as real focal points.
+Part 2 -- Progress screen cleanup: removed the top-of-screen title + 3-stat summary row and the weigh-ins line (tab bar is now the top of the screen), removed the Body tab's Workout streak calendar, added a Protein trend card to Nutrition matching Calories, bolded/enlarged both card headers.
 
-**Confirmed working:** esbuild checks (individual files + full bundle) pass clean throughout. Both parts were live-tested end-to-end in Chrome at a 390x844 phone viewport, not just statically checked -- full cardio Treadmill start-to-stop flow, and all four Progress tabs including a real logged meal to exercise the new Nutrition cards.
+Part 3 -- Water intake tracking: connected the official Supabase MCP tool for the first time this session (the app's own API key can read/write but never create tables), created a new `water_logs` table matching the shape of the other log tables, wired real Supabase persistence into the existing `WaterTracker` (previously localStorage-only), and added a matching Water trend card to Nutrition below Protein.
 
-**Still needs testing:** Session 36's CustomPlanScreen cardio-day scheduling, the two copy nits, and the Nutrition tab's date-bucketing against more than one day of real data. Neither Session 37 change has been tried on an actual physical phone yet (only a resized desktop Chrome window).
+**Confirmed working:** esbuild checks (individual files + full bundle) pass clean throughout all three parts. All three were live-tested end-to-end in Chrome at a 390x844 phone viewport, not just statically checked -- including, for water, a direct SQL query confirming the write actually reached the database rather than just trusting what the UI showed.
 
-**Next priority task:** live-test the remaining Session 36 items (see punch list SECOND above) and, when convenient, a real-device glance at both of this session's changes. After that: App Store groundwork (Capacitor Android Studio build check is the next unblocked item), or privacy policy once Bryant has a business entity.
+**Still needs testing:** Session 36's CustomPlanScreen cardio-day scheduling, the two copy nits, and the Nutrition tab's date-bucketing against more than one day of real data. None of Session 37's three parts have been tried on an actual physical phone yet (only a resized desktop Chrome window).
 
-**Final line counts:** see table above — `src/CardioScreen.jsx` 234, `src/ProgressScreen.jsx` 588 (down from 613), `src/shared.jsx` 3,482 (largest, still well under the 3,800 limit).
+**Next priority task:** live-test the remaining Session 36 items (see punch list SECOND above) and, when convenient, a real-device glance at Session 37's three changes. After that: App Store groundwork (Capacitor Android Studio build check is the next unblocked item), or privacy policy once Bryant has a business entity.
 
-**Latest commit:** `cb93493` on `main`. Full Session 37 commit sequence: `7bc49b6` → `a133b25` → `828fc03` (docs) → `c8ab3d5` → `57f418f` (docs) → `cb93493`.
+**Final line counts:** see table above — `src/shared.jsx` 3,526 (largest, still well under the 3,800 limit), `src/MealScreen.jsx` 854, `src/ProgressScreen.jsx` 621, `src/Morphiq.jsx` 1,658, `src/CardioScreen.jsx` 234. Plus one new Supabase table (`water_logs`).
+
+**Latest commit:** `ed1397b` on `main`. Full Session 37 commit sequence: `7bc49b6` → `a133b25` → `828fc03` (docs) → `c8ab3d5` → `57f418f` (docs) → `cb93493` → `31c9548` (docs) → `ed1397b`.
 
 ## Paste this at the start of your next session
 
-Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` -- can silently serve stale cached content; `api.github.com` is also blocked in this environment's sandbox -- `git clone`/`git push` over an authenticated HTTPS URL, e.g. `https://<token>@github.com/Luxurydadbot/Morphiq.git`, from a plain scratch directory is the only method confirmed to work). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,482, `WorkoutScreen.jsx` next at 2,865).
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (never `raw.githubusercontent.com` -- can silently serve stale cached content; `api.github.com` is also blocked in this environment's sandbox -- `git clone`/`git push` over an authenticated HTTPS URL, e.g. `https://<token>@github.com/Luxurydadbot/Morphiq.git`, from a plain scratch directory is the only method confirmed to work). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,526, `WorkoutScreen.jsx` next at 2,865). If a new Supabase table is ever needed, connect the official Supabase MCP tool rather than asking Bryant to use the dashboard by hand -- the app's own API key can never create tables, see Technical notes above.
 
-Remind Bryant: two things are live-tested and confirmed working this session (Session 37) -- the cardio-screen redesign (paired timer/calorie card, screen-fill layout, prominent stop confirmation) and the Progress screen cleanup (top summary stats removed, Body tab trimmed to weight-only content, new Protein card on Nutrition with bold focal headers) -- both walked end-to-end in Chrome at a phone viewport, just not yet on an actual physical device. Still untested from Session 36: CustomPlanScreen's cardio-day scheduling wizard, the two copy nits, and the Nutrition tab's date-bucketing beyond a single test meal. That's the top priority before anything new. After that, the App Store punch list (Capacitor's `android/` project has never been opened in Android Studio) and the privacy policy (blocked on Bryant's business entity) are the standing next chunks of work.
+Remind Bryant: three things are live-tested and confirmed working this session (Session 37) -- the cardio-screen redesign, the Progress screen cleanup, and water intake now persisting to a new `water_logs` Supabase table with a matching trend card on Nutrition -- all walked end-to-end in Chrome at a phone viewport (water's write was also confirmed with a direct database query, not just the UI), just not yet on an actual physical device. Still untested from Session 36: CustomPlanScreen's cardio-day scheduling wizard, the two copy nits, and the Nutrition tab's date-bucketing beyond a single test meal. That's the top priority before anything new. After that, the App Store punch list (Capacitor's `android/` project has never been opened in Android Studio) and the privacy policy (blocked on Bryant's business entity) are the standing next chunks of work.
