@@ -95,6 +95,14 @@ Updated automatically at the end of every session. Never delete entries — appe
 - **Decision: live-updating estimate confirmed.** Also the more accurate approach, not just the more engaging one -- recalculating continuously off elapsed time means a pace change mid-session gets credited to the time it actually happened during, instead of an end-of-session calculation having to guess which pace applied to which stretch of the workout. Implementation-wise: same MET-based formula from the entry above, just re-evaluated on a running interval (e.g. every second) using elapsed time so far, rather than a single one-shot calculation on stop.
 - Mockup itself not committed anywhere (chat-only visual, not app code) -- this entry is the record of the decision it produced.
 
+## August 15, 2026
+
+### Decision: cardio-day count is member-picked at onboarding, not a fixed default
+- Resolved the one open question blocking implementation from the Aug 9, 2026 entries above: whether `lose_fat` plans should get a fixed default cardio-day count (e.g. always 3 lifting + 2 cardio) or let the member choose.
+- **Decision: member picks.** Matches Bryant's own proposed onboarding shape from the Aug 9 research conversation (ask lifting days/week as normal, then a separate "how many days of cardio, by themselves?" question) and the competitive research finding that flexibility, not a locked default, is the norm. A fixed default was simpler to build but would ignore how different members' schedules actually look (someone already lifting 5 days/week doesn't want 2 more cardio days forced on; someone tight on time might only want 1).
+- **Phase 1 shipped this session (commit `02dd791`):** the onboarding question itself (0-4 cardio days/week, `lose_fat` goal only) and `buildPlan()` scheduling (evenly interleaves cardio days into the weekly day rotation, never back-to-back, never all clustered at the end). Cardio days are real, correctly-scheduled slots in the plan (`isCardio: true`, no exercises yet) -- the home screen already routes them to Progress's existing cardio quick-log instead of crashing into WorkoutScreen.
+- **Not built yet:** the actual guided cardio-day screen this was all scoped around -- activity-type picker (treadmill/bike/stepper/rower/outdoor run/other, picked at point of use per the Strava/Apple Fitness pattern), live start/stop timer, live-updating MET-based calorie estimate. Also not built: cardio-day support in `CustomPlanScreen` (hand-built plans) -- only AI-generated `lose_fat` plans get cardio days so far. Both are the natural next steps.
+
 ---
 
 ## Standing technical decisions
