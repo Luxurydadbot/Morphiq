@@ -320,13 +320,33 @@ function WorkoutScreen() {
   const savedProgress = (savedProgressValid && overrideValid && rawSavedProgress.dayIndex !== selectedDayOverride)
     ? null // explicit pick conflicts with stale progress from a different day -- drop the stale progress
     : rawSavedProgress;
-  const activeDayIdx = isMultiDay
-    ? (overrideValid
-        ? selectedDayOverride
-        : savedProgressValid && savedProgress
-        ? savedProgress.dayIndex
-        : getAutoWorkoutDayIndex(plan, user, historicalData))
-    : null;
+  // Bug fix (session 33): activeDayIdx used to be a plain const, recomputed
+  // fresh on every render from selectedDayOverride/savedProgress/
+  // getAutoWorkoutDayIndex(). selectedDayOverride is deliberately cleared
+  // back to null moments after mount (the "one-time nudge" effect below) --
+  // and once it did, this expression could fall through to a DIFFERENT
+  // source than whichever one determined which exercises actually got
+  // loaded into state at mount. exercises (frozen in state right below)
+  // kept showing the correct day for the rest of the live session, but
+  // every later progress-persist write silently saved the WRONG day index
+  // alongside it. That only became visible the next time the app reopened
+  // and rebuilt the exercise list from that wrong, persisted day -- e.g. a
+  // member on Day 4 (incline bench press) reopening to find Day 3 (seated
+  // leg curls) loaded instead, with nothing having visibly gone wrong in
+  // the moment it actually drifted. Live bug report, session 33.
+  //
+  // Fix: pin this into state, computed once at mount with the exact same
+  // priority order as before, and only ever changed by the two places that
+  // legitimately switch days mid-session -- the cross-device cloud-resume
+  // branch and continueOldWorkout(), both below -- both now call
+  // setActiveDayIdx explicitly alongside setExercises so the two can never
+  // drift apart again.
+  const [activeDayIdx, setActiveDayIdx] = useState(() => {
+    if (!isMultiDay) return null;
+    if (overrideValid) return selectedDayOverride;
+    if (savedProgressValid && savedProgress) return savedProgress.dayIndex;
+    return getAutoWorkoutDayIndex(plan, user, historicalData);
+  });
 
   // When an explicit day pick conflicts with a stale in-progress workout
   // (local, above -- or a cross-device cloud one, detected further down),
@@ -471,6 +491,9 @@ function WorkoutScreen() {
         const dayData = plan.customDays[cloud.dayIndex];
         if (dayData?.exercises?.length > 0) {
           setExercises(dayData.exercises.map(normalizeExercise));
+          // Keep the pinned day index in lockstep with the exercise list it
+          // now describes -- same fix as above, applied to this branch too.
+          setActiveDayIdx(cloud.dayIndex);
         }
       }
       if (cloud.exIdx > 0 || cloud.setIdx > 0 || (cloud.loggedSets || []).length > 0) {
@@ -556,7 +579,7 @@ function WorkoutScreen() {
     if (supabaseUser?.id) {
       sb.syncWorkoutProgress(supabaseUser.id, progressSnapshot).catch(() => {});
     }
-  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state, readiness, progressKey, supabaseUser?.id]);
+  }, [phase, warmupStep, cooldownStep, exIdx, setIdx, loggedSets, state, readiness, progressKey, supabaseUser?.id, activeDayIdx]);
 
   // Clears saved progress — used when the workout finishes or the member
   // chooses to restart. Without this, a completed workout would try to resume.
@@ -952,10 +975,14 @@ function WorkoutScreen() {
     setSetIdx((raw.setIdx ?? 0) + (raw.state === "rest" ? 1 : 0));
     setLoggedSets(raw.loggedSets ?? []);
     setReadiness(raw.readiness ?? null);
-    // Re-point selectedDayOverride at the day actually being resumed, so
-    // activeDayIdx (and every place that reads it -- the progress-persist
-    // effect, recordWorkoutComplete's day-index write) lines up with what's
-    // now on screen instead of the originally-tapped day.
+    // Bug fix (session 33): activeDayIdx is now pinned state (see above),
+    // not a live const derived from selectedDayOverride -- so re-pointing
+    // selectedDayOverride alone no longer updates it. Set it directly so it
+    // lines up with the exercises just loaded above (the progress-persist
+    // effect and recordWorkoutComplete's day-index write both read it).
+    // selectedDayOverride is still updated too, since other code still
+    // reads it as "the day the member explicitly chose this visit."
+    setActiveDayIdx(savedDayIndex);
     setSelectedDayOverride(savedDayIndex);
     setDayConflict(null);
     setShowResumeBanner(true);
