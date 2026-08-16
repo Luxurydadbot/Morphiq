@@ -3175,18 +3175,42 @@ async function fetchAIReply(messages, user, context, workoutContext = null) {
 // than LABEL_MIN_GAP px to the last one drawn) so labels never overlap
 // regardless of how many days are plotted -- first and last day always
 // keep their label so the visible range is always legible.
+//
+// Bug fix (Aug 2026, found live-testing on a real phone-width viewport):
+// the first version compared the needed width against a hardcoded 260px
+// assumption instead of the card's real rendered width. Real cards are
+// often wider than 260px (measured ~432px in testing), so the computed
+// chart width often stayed *narrower* than the real card and "scrollable"
+// mode never actually produced anything to scroll -- swiping did nothing,
+// even with 11 days of data. Now measures the real container width via a
+// ref + resize listener and only switches into wide/scrollable mode once
+// the data genuinely doesn't fit in that real, measured space.
 function WeightChart({ data, accent }) {
   const H = 84, PAD = 10;
-  const MIN_W = 260;          // default/minimum width -- matches old fixed size
   const POINT_SPACING = 34;   // px per day once there are enough days to need scrolling
   const LABEL_MIN_GAP = 26;   // don't draw a date label closer than this to the last one drawn
+  const FALLBACK_W = 260;     // used only for the very first render, before we've measured the real card width
+  const containerRef = useRef(null);
   const scrollRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(null);
   const hasData = !!(data && data.length > 0);
   // Need at least 2 points for a line; duplicate single point so chart renders
   const chartData = hasData ? (data.length === 1 ? [data[0], data[0]] : data) : [];
   const neededW = hasData ? PAD * 2 + (chartData.length - 1) * POINT_SPACING : 0;
-  const W = Math.max(MIN_W, neededW);
-  const scrollable = hasData && W > MIN_W;
+  const availableW = containerWidth || FALLBACK_W;
+  const scrollable = hasData && neededW > availableW;
+  const W = scrollable ? neededW : availableW;
+
+  // Measure the real card width on mount and on resize/rotation -- see fix
+  // note above for why this can't be a hardcoded constant.
+  useEffect(() => {
+    function measure() {
+      if (containerRef.current) setContainerWidth(containerRef.current.clientWidth);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   // Open scrolled to the most recent entry (right edge) whenever the chart
   // is wide enough to scroll, or whenever the data changes length. Hooks
@@ -3200,7 +3224,7 @@ function WeightChart({ data, accent }) {
     }
   }, [scrollable, chartData.length]);
 
-  if (!hasData) return null;
+  if (!hasData) return <div ref={containerRef} />;
 
   const vals = chartData.map(d => d.weight);
   const minV = Math.min(...vals) - 1;
@@ -3236,27 +3260,29 @@ function WeightChart({ data, accent }) {
   const valueLabelAnchor = last[0] + 6 > W - PAD - 20 ? "end" : "start";
 
   return (
-    <div ref={scrollRef} style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : undefined}>
-      <svg width={scrollable ? W : "100%"} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-        <defs>
-          <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={accent} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill="url(#wg)" />
-        <path d={linePath} fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((p, i) => (
-          <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
-            fill={i === points.length - 1 ? accent : "#212429"} stroke={accent} strokeWidth="1.5" />
-        ))}
-        {chartData.map((d, i) => (
-          showLabel[i]
-            ? <text key={i} x={points[i][0]} y={H - 3} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
-            : null
-        ))}
-        <text x={valueLabelX} y={last[1] - 4} textAnchor={valueLabelAnchor} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
-      </svg>
+    <div ref={containerRef}>
+      <div ref={scrollRef} style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : undefined}>
+        <svg width={scrollable ? W : "100%"} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+          <defs>
+            <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={accent} stopOpacity="0.2" />
+              <stop offset="100%" stopColor={accent} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={areaPath} fill="url(#wg)" />
+          <path d={linePath} fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          {points.map((p, i) => (
+            <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
+              fill={i === points.length - 1 ? accent : "#212429"} stroke={accent} strokeWidth="1.5" />
+          ))}
+          {chartData.map((d, i) => (
+            showLabel[i]
+              ? <text key={i} x={points[i][0]} y={H - 3} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
+              : null
+          ))}
+          <text x={valueLabelX} y={last[1] - 4} textAnchor={valueLabelAnchor} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
+        </svg>
+      </div>
     </div>
   );
 }
