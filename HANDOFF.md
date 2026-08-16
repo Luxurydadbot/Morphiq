@@ -22,9 +22,11 @@ This session went through five rounds before it was actually correct. Each round
 
 **Round 5 — final live verification, this time actually swiping.** Seeded 18 distinct days on WarmupTest (enough to exceed the real 417px card by a real, visible margin), reloaded, and confirmed a visible scrollbar under the chart. Used the browser's scroll tool directly on the chart (not just DOM inspection this time) and watched `scrollLeft` move from its resting position (opened scrolled to the most recent entry) down to 0, revealing June 1/5/9/13/17 -- data that was genuinely off-screen -- sliding into view. This is the first round with an actual interaction, not just a DOM property read, behind the "scroll works" claim.
 
+**Round 6 — Bryant asked to confirm no visible scrollbar would show, just a plain swipe.** It would have: testing in round 5 showed a full OS-style scrollbar track with arrow buttons under the chart once scrollable. Fixed by explicitly hiding scrollbar chrome (`::-webkit-scrollbar { display: none }` via a small scoped `<style>` tag, plus `scrollbar-width`/`-ms-overflow-style` for Firefox/old Edge) -- first inline `<style>` tag in this codebase, needed because pseudo-elements can't be targeted via the inline `style` prop the rest of the file uses. Re-verified live with 16 seeded days: scroll still works exactly the same (dragged it, watched "Jun 1" slide fully into view), no scrollbar visible at any point. Also confirmed directly with Bryant: his real account has 7 distinct days right now, so nothing will visibly scroll for him yet -- worked out the real threshold with him (~13-14 distinct days on a typical phone width, since it's based on the real measured screen, not a fixed count) and he's going to test with his own phone/thumb once he's logged enough days, rather than me lowering the threshold artificially.
+
 **All test data lived only on the disposable WarmupTest profile (`user_id d1797ec8-8ae9-457f-b003-570a915a5b49`), never on Bryant's real account.** Restored to its exact original 3 rows at the end of every round (same row IDs, same timestamps, confirmed via a follow-up SELECT each time) -- including one moment mid-session where an "exact reproduction" step deleted those 3 original rows to make room for a byte-for-byte copy of Bryant's data, and cleanup afterward had to re-insert them with their original IDs to fully restore state, not just row count.
 
-**Final commits, in order: `df3b250` (hooks-order fix) → `49cc140` (real container-width measurement) → `def6d25` (last-label clipping fix).** All three are `READY` on Vercel; `def6d25` is what's live now.
+**Final commits, in order: `df3b250` (hooks-order fix) → `49cc140` (real container-width measurement) → `def6d25` (last-label clipping fix) → `41584ac` (hide scrollbar chrome).** All four are `READY` on Vercel; `41584ac` is what's live now.
 
 ## Session 38 recap — carried forward, unchanged this session
 
@@ -46,15 +48,15 @@ All other files untouched this session. **Full current file set, all well under 
 
 ## Latest commit
 
-`def6d25` on `main` (Session 39) — deployed and `READY` (Vercel deployment `dpl_ASCTcxVTFTPhuFmJAERYZMJzaeAk`). Full chain this session: `443d1f9` (ERROR) → `6e19851` (ERROR, docs-only, inherited the same broken code) → `df3b250` (READY, hooks-order fix) → `49cc140` (READY, real container-width fix) → `def6d25` (READY, last-label clipping fix, current).
+`41584ac` on `main` (Session 39) — deployed and `READY` (Vercel deployment `dpl_BMW73RvzdHgSFMvZXocHgTukeK2v`). Full chain this session: `443d1f9` (ERROR) → `6e19851` (ERROR, docs-only, inherited the same broken code) → `df3b250` (READY, hooks-order fix) → `49cc140` (READY, real container-width fix) → `def6d25` (READY, last-label clipping fix) → `41584ac` (READY, hide scrollbar chrome, current).
 
 ## Confirmed working vs still open
 
 **Verified this session, live in the browser, with real interaction (not just static checks or DOM reads):** one-point-per-day collapsing of same-day weigh-ins; zero overlapping date labels at up to 18 distinct days; current-value label and last-date-label no longer clipped at the right edge; date labels render in correct chronological order (confirmed against Bryant's exact real data reproduced on the test profile); the swipe-scroll mechanism was actually scrolled via the browser's scroll tool and revealed genuinely off-screen history, with `scrollLeft` moving and the visible date range changing. `npm run build` (the real Vercel build command) confirmed clean on the final commit.
 
 **NOT yet verified:**
-- An actual touch/swipe gesture with a real finger on a real phone (this session's interaction was via the browser automation tool's scroll action on a resized browser window, not a physical device).
-- Bryant's own real account's chart post-fix (all verification this session used the disposable WarmupTest profile with data shaped to match his real account, never his real account directly).
+- An actual touch/swipe gesture with a real finger on a real phone (this session's interaction was via the browser automation tool's scroll action on a resized browser window, not a physical device). Bryant is going to test this himself once he's logged enough distinct days (~13-14 on a typical phone width) to actually trigger scroll mode -- he explicitly declined having the threshold artificially lowered, wants to test it as real users will experience it.
+- Bryant's own real account only has 7 distinct days right now (confirmed together this session), so nothing will visibly scroll for him yet -- expected, not a bug. He knows this and is watching for it as he keeps logging.
 - Everything already carried forward from Session 38 and earlier: the Water card restyle (Session 38); CustomPlanScreen's cardio wizard step end-to-end, both cardio-day edge cases, the relocated "Personal bests" tap-to-expand section, and the Nutrition tab against real multi-day data (Session 36/37 backlog).
 
 ## Punch list, in priority order
@@ -101,7 +103,7 @@ All other files untouched this session. **Full current file set, all well under 
 
 **Final line counts:** `src/shared.jsx` 3,640 (largest, still well under the 3,800 limit), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,658, `src/ProgressScreen.jsx` 639 (touched this session), `src/MealScreen.jsx` 855, `src/CardioScreen.jsx` 234.
 
-**Latest commit:** `def6d25` on `main`, deployed and `READY`.
+**Latest commit:** `41584ac` on `main`, deployed and `READY`.
 
 ## Paste this at the start of your next session
 
