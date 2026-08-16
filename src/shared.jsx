@@ -3275,11 +3275,22 @@ function WeightChart({ data, accent }) {
             <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
               fill={i === points.length - 1 ? accent : "#212429"} stroke={accent} strokeWidth="1.5" />
           ))}
-          {chartData.map((d, i) => (
-            showLabel[i]
-              ? <text key={i} x={points[i][0]} y={H - 3} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
-              : null
-          ))}
+          {chartData.map((d, i) => {
+            if (!showLabel[i]) return null;
+            // Fix (Aug 2026): same right-edge clipping bug as the value
+            // label above -- a date label centered (textAnchor="middle")
+            // on a point sitting near the right edge of the viewBox runs
+            // half its text past W, and SVG's default clipping cuts it
+            // (observed live: "Aug 10" rendered as "Aug 1"). Anchor labels
+            // near either edge inward instead of centering them past it;
+            // everything else keeps the normal centered anchor.
+            const x = points[i][0];
+            const nearRight = x > W - PAD - 16;
+            const nearLeft = x < PAD + 16;
+            const anchor = nearRight ? "end" : nearLeft ? "start" : "middle";
+            const labelX = nearRight ? Math.min(x + 8, W - PAD) : nearLeft ? Math.max(x - 8, PAD) : x;
+            return <text key={i} x={labelX} y={H - 3} textAnchor={anchor} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>;
+          })}
           <text x={valueLabelX} y={last[1] - 4} textAnchor={valueLabelAnchor} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
         </svg>
       </div>
