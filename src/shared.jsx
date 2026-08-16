@@ -3181,14 +3181,26 @@ function WeightChart({ data, accent }) {
   const POINT_SPACING = 34;   // px per day once there are enough days to need scrolling
   const LABEL_MIN_GAP = 26;   // don't draw a date label closer than this to the last one drawn
   const scrollRef = useRef(null);
-
-  if (!data || data.length === 0) return null;
+  const hasData = !!(data && data.length > 0);
   // Need at least 2 points for a line; duplicate single point so chart renders
-  const chartData = data.length === 1 ? [data[0], data[0]] : data;
-
-  const neededW = PAD * 2 + (chartData.length - 1) * POINT_SPACING;
+  const chartData = hasData ? (data.length === 1 ? [data[0], data[0]] : data) : [];
+  const neededW = hasData ? PAD * 2 + (chartData.length - 1) * POINT_SPACING : 0;
   const W = Math.max(MIN_W, neededW);
-  const scrollable = W > MIN_W;
+  const scrollable = hasData && W > MIN_W;
+
+  // Open scrolled to the most recent entry (right edge) whenever the chart
+  // is wide enough to scroll, or whenever the data changes length. Hooks
+  // must run unconditionally on every render (React's rules-of-hooks --
+  // this exact ordering issue broke the production build once already,
+  // see HANDOFF.md), so this stays above the `!hasData` early return below
+  // and just no-ops when there's nothing to scroll.
+  useEffect(() => {
+    if (scrollable && scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [scrollable, chartData.length]);
+
+  if (!hasData) return null;
 
   const vals = chartData.map(d => d.weight);
   const minV = Math.min(...vals) - 1;
@@ -3213,13 +3225,15 @@ function WeightChart({ data, accent }) {
     return false;
   });
 
-  // Open scrolled to the most recent entry (right edge) whenever the chart
-  // is wide enough to scroll, or whenever the data changes length.
-  useEffect(() => {
-    if (scrollable && scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-    }
-  }, [scrollable, chartData.length]);
+  // Fix (Aug 2026, found live-testing this session): the current-value label
+  // next to the last point used to be positioned at last[0]+6 with no regard
+  // for the right edge of the viewBox, so on any chart where the last point
+  // landed near the edge (the common case -- it's the most recent entry),
+  // SVG's default clipping cut the label down to just its first character
+  // (e.g. "185" rendered as "1"). Now right-aligned and pulled inward
+  // instead of left-aligned and pushed outward, so it can't run past W.
+  const valueLabelX = Math.min(last[0] + 6, W - PAD);
+  const valueLabelAnchor = last[0] + 6 > W - PAD - 20 ? "end" : "start";
 
   return (
     <div ref={scrollRef} style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : undefined}>
@@ -3241,7 +3255,7 @@ function WeightChart({ data, accent }) {
             ? <text key={i} x={points[i][0]} y={H - 3} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
             : null
         ))}
-        <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
+        <text x={valueLabelX} y={last[1] - 4} textAnchor={valueLabelAnchor} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
       </svg>
     </div>
   );
