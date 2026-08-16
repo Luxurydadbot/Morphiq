@@ -3259,9 +3259,20 @@ function WeightChart({ data, accent }) {
   const valueLabelX = Math.min(last[0] + 6, W - PAD);
   const valueLabelAnchor = last[0] + 6 > W - PAD - 20 ? "end" : "start";
 
+  // Bug fix (Aug 2026): the browser's own scrollbar track (with arrow
+  // buttons) was showing up under the chart whenever it scrolled -- fine on
+  // most phones, where the OS hides it by default, but ugly on desktop and
+  // some Android browsers, and not what "swipe to see more" is supposed to
+  // look like. Hidden explicitly (WebKit/Blink + Firefox + old Edge) so the
+  // chart is swipeable everywhere without ever showing scrollbar chrome.
   return (
     <div ref={containerRef}>
-      <div ref={scrollRef} style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : undefined}>
+      <style>{`.mq-weightchart-scroll::-webkit-scrollbar { display: none; }`}</style>
+      <div
+        ref={scrollRef}
+        className="mq-weightchart-scroll"
+        style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" } : undefined}
+      >
         <svg width={scrollable ? W : "100%"} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
           <defs>
             <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
