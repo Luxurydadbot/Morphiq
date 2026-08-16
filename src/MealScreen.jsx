@@ -538,15 +538,15 @@ function WaterTracker({ userId }) {
   // the redesign. Same features (3 quick-add amounts, custom entry, undo),
   // just sized to match its actual importance.
   return (
-    <div style={{ background: theme.surface, border: `1px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "10px 12px", marginBottom: 14 }}>
-      {/* Header row */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+    <div style={{ background: "#212429", border: "1px solid " + theme.borderSubtle, borderRadius: 14, padding: "14px", marginBottom: 12 }}>
+      {/* Header — matches the "Log a meal" card's header treatment */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 2 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M12 2C12 2 5 10 5 15a7 7 0 0 0 14 0c0-5-7-13-7-13z" fill="rgba(76,141,255,0.2)" stroke={a} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <div style={{ fontSize: 12, fontWeight: 600, color: theme.textDim }}>Water</div>
-          {done && <Icon name="check" size={11} style={{ color: a }} />}
+          <div style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>Log Water</div>
+          {done && <Icon name="check" size={13} style={{ color: a }} />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {justAdded && (
@@ -556,6 +556,7 @@ function WaterTracker({ userId }) {
           <span style={{ fontSize: 11, color: theme.textDim }}>/{goalGlasses} glasses</span>
         </div>
       </div>
+      <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 12 }}>Tap a size, or enter your own</div>
 
       {/* Progress bar */}
       <div style={{ height: 4, background: theme.borderSubtle, borderRadius: 2, marginBottom: 8 }}>
