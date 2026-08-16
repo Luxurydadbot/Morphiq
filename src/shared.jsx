@@ -1060,15 +1060,22 @@ const sb = {
     } catch { return false; }
   },
 
-  async getWeightLogs(supabaseUserId, limit = 12) {
+  // Bug fix (Aug 2026): this used to fetch order=asc (oldest first) with a
+  // limit, which silently returns only the OLDEST N entries ever logged --
+  // once a member passed the limit, every new weigh-in they logged would
+  // never appear on the chart again, forever. Now fetches the most recent
+  // `limit` entries (order=desc) and reverses to ascending before returning,
+  // so callers always see their latest history regardless of total count.
+  async getWeightLogs(supabaseUserId, limit = 180) {
     try {
       const profileId = await this.getProfileId(supabaseUserId);
       if (!profileId) return [];
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/weight_logs?user_id=eq.${profileId}&order=logged_date.asc&limit=${limit}`,
+        `${SUPABASE_URL}/rest/v1/weight_logs?user_id=eq.${profileId}&order=logged_date.desc&limit=${limit}`,
         { headers: SB_GET() }
       );
-      return await res.json();
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows.reverse() : rows;
     } catch { return []; }
   },
 
@@ -3148,11 +3155,41 @@ async function fetchAIReply(messages, user, context, workoutContext = null) {
 }
 
 
+// WeightChart (Aug 2026 rewrite): the old version squeezed every entry into
+// a fixed 260px box, so frequent weigh-ins (multiple same-day entries, or
+// just months of history piling up) made the date labels overlap into an
+// unreadable smear -- reported by Bryant after a day (June 21) with four
+// same-day weigh-ins ran its labels together.
+//
+// Two-part fix, following iOS Health / Apple's own weight-trend pattern:
+// 1. Caller (ProgressScreen.jsx) now collapses same-day entries to one point
+//    per day before this ever renders, so a single day can never produce
+//    more than one dot/label.
+// 2. This component grows wider (fixed px-per-day spacing) instead of
+//    squeezing once there are more days than comfortably fit, and becomes
+//    horizontally scrollable -- opens scrolled to the most recent entry,
+//    swipe/scroll left for history. Below that point count it still fills
+//    the card at 100% width exactly like before, so the common case (a
+//    handful of entries) looks unchanged.
+// Date labels are thinned dynamically (skip a label if it would land closer
+// than LABEL_MIN_GAP px to the last one drawn) so labels never overlap
+// regardless of how many days are plotted -- first and last day always
+// keep their label so the visible range is always legible.
 function WeightChart({ data, accent }) {
-  const W = 260, H = 84, PAD = 10;
+  const H = 84, PAD = 10;
+  const MIN_W = 260;          // default/minimum width -- matches old fixed size
+  const POINT_SPACING = 34;   // px per day once there are enough days to need scrolling
+  const LABEL_MIN_GAP = 26;   // don't draw a date label closer than this to the last one drawn
+  const scrollRef = useRef(null);
+
   if (!data || data.length === 0) return null;
   // Need at least 2 points for a line; duplicate single point so chart renders
   const chartData = data.length === 1 ? [data[0], data[0]] : data;
+
+  const neededW = PAD * 2 + (chartData.length - 1) * POINT_SPACING;
+  const W = Math.max(MIN_W, neededW);
+  const scrollable = W > MIN_W;
+
   const vals = chartData.map(d => d.weight);
   const minV = Math.min(...vals) - 1;
   const maxV = Math.max(...vals) + 1;
@@ -3162,25 +3199,51 @@ function WeightChart({ data, accent }) {
   const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
   const areaPath = linePath + ` L${points[points.length-1][0].toFixed(1)},${H-12} L${PAD},${H-12} Z`;
   const last = points[points.length - 1];
+
+  // Always show the first and last date label; otherwise only show a label
+  // if it's far enough from the last label actually drawn.
+  let lastLabelX = -Infinity;
+  const showLabel = chartData.map((d, i) => {
+    const isEdge = i === 0 || i === chartData.length - 1;
+    const x = points[i][0];
+    if (isEdge || x - lastLabelX >= LABEL_MIN_GAP) {
+      lastLabelX = x;
+      return true;
+    }
+    return false;
+  });
+
+  // Open scrolled to the most recent entry (right edge) whenever the chart
+  // is wide enough to scroll, or whenever the data changes length.
+  useEffect(() => {
+    if (scrollable && scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [scrollable, chartData.length]);
+
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-      <defs>
-        <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={accent} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill="url(#wg)" />
-      <path d={linePath} fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      {points.map((p, i) => (
-        <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
-          fill={i === points.length - 1 ? accent : "#212429"} stroke={accent} strokeWidth="1.5" />
-      ))}
-      {chartData.map((d, i) => (
-        <text key={i} x={points[i][0]} y={H - 3} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
-      ))}
-      <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
-    </svg>
+    <div ref={scrollRef} style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : undefined}>
+      <svg width={scrollable ? W : "100%"} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+        <defs>
+          <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={accent} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={accent} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill="url(#wg)" />
+        <path d={linePath} fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((p, i) => (
+          <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
+            fill={i === points.length - 1 ? accent : "#212429"} stroke={accent} strokeWidth="1.5" />
+        ))}
+        {chartData.map((d, i) => (
+          showLabel[i]
+            ? <text key={i} x={points[i][0]} y={H - 3} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{d.week}</text>
+            : null
+        ))}
+        <text x={last[0] + 6} y={last[1] - 4} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={accent} fontWeight="600">{chartData[chartData.length-1].weight}</text>
+      </svg>
+    </div>
   );
 }
 

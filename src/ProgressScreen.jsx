@@ -84,8 +84,26 @@ function ProgressScreen() {
 
   // Build chart data: real entries or mock fallback
   const useRealWeightData = weightLogs !== null && weightLogs.length >= 1;
+  // Fix (Aug 2026): weighing in more than once a day used to add a separate
+  // point + date label for every single entry, so a day with several
+  // weigh-ins (e.g. 4 on the same day) crammed that many overlapping labels
+  // into the same spot and made them unreadable. Collapse to one point per
+  // calendar day -- the day's last reading -- before charting. Every
+  // individual weigh-in is still saved in Supabase; this only changes what
+  // the trend line plots. A Map keyed by date naturally keeps dates in
+  // ascending order while letting a later same-day entry overwrite the
+  // earlier one, so no separate sort is needed.
+  const weightByDay = useRealWeightData
+    ? Array.from(
+        weightLogs.reduce((map, r) => {
+          map.set(r.logged_date, r);
+          return map;
+        }, new Map())
+        .values()
+      )
+    : [];
   const weightChartData = useRealWeightData
-    ? weightLogs.map((r) => ({
+    ? weightByDay.map((r) => ({
         // Fix (June 2026): labels were W1/W2/W3 by entry order, not real dates.
         // Now shows the actual date (e.g. "Jun 3") so two weigh-ins on the same
         // day get the same label, and the chart reflects real time spacing.

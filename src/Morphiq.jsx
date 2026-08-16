@@ -453,7 +453,7 @@ function AppProvider({ children }) {
     try {
       const [wLogs, wtLogs, streakDates, cLogs, cardioStreakDates, mLogs, waLogs] = await Promise.all([
         sb.getWorkoutLogs(uid, 60),
-        sb.getWeightLogs(uid, 12),
+        sb.getWeightLogs(uid, 180), // ~6 months headroom; ProgressScreen collapses to one point/day
         sb.getWorkoutDatesForStreak(uid, 370),
         sb.getCardioLogs(uid, 60),
         sb.getCardioDatesForStreak(uid, 370),
