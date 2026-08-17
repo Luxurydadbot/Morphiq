@@ -1,10 +1,30 @@
-# Hypergentiq — Session 39 master handoff
+# Hypergentiq — Session 40 master handoff
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
 ## STANDING GOAL — App Store + Google Play submission roadmap (carry forward every session, do not delete until fully checked off)
 
 No change this session — untouched. Step list: (1) fix PWA gaps — done, Session 30, (2) add Capacitor + generate native projects — done (Session 25), still not opened/built in Android Studio or Xcode, (3) set up Capgo live-update pipeline — still open, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service), (6) privacy policy — hard gate for both stores, blocked on Bryant forming a real legal business entity (draft exists, see punch list FIRST), (7) store listing assets (icon done, need screenshots + descriptions), (8) confirm no Apple IAP conflict, (9) submit.
+
+## Session 40 — cardio timer stopped when the screen dimmed/locked (live-tested by Bryant, fixed same session)
+
+Bryant tested the cardio feature (live start/stop timer, `CardioScreen.jsx`) and reported: when the screen dims into sleep mode mid-session, the timer stops. Asked to either keep the screen awake or keep the timer running through sleep -- did both.
+
+**Root cause confirmed by reading the code, not guessed.** `toggleTimer()` used a naive tick counter -- `setInterval(() => setElapsed(e => e + 1), 1000)`. Mobile browsers throttle or fully suspend `setInterval` callbacks once the screen locks/dims or the tab is backgrounded, so the count silently stops advancing. `WorkoutScreen.jsx`'s rest timer already solves this exact problem correctly (anchors to `Date.now()` and recomputes elapsed on every poll instead of trusting the tick count) -- `CardioScreen.jsx`'s timer just predates that pattern and never got it.
+
+**Fix, two parts, both in `src/CardioScreen.jsx` only:**
+1. **Wall-clock anchoring (the real fix).** `toggleTimer()` now sets `startRef.current = Date.now() - elapsed * 1000` when starting/resuming, and every tick recomputes `elapsed` as `Math.floor((Date.now() - startRef.current) / 1000)` instead of incrementing a counter. Even if ticks get suspended while the screen is off, elapsed jumps to the correct real value the instant the screen wakes and a tick fires again -- it can no longer freeze or drift. Same pattern as the WorkoutScreen rest timer, just applied here for the first time.
+2. **Screen Wake Lock API (belt-and-suspenders).** Requests `navigator.wakeLock.request("screen")` when the timer starts/resumes, releases it on pause/stop/change-activity/unmount, and re-acquires it on `visibilitychange` if the timer is still running (browsers auto-release the lock whenever the tab loses focus, e.g. a brief app-switch). Not supported in every browser, so it's a nice-to-have layered on top of fix #1, not a replacement for it -- fix #1 alone guarantees the timer is never wrong even where wake lock isn't available.
+
+**Verified before pushing:** read the full diff back inline (matches the "after every edit, read back the changed section" rule), confirmed no other section of the file was touched, confirmed hooks are all called unconditionally at the top of the component with no early return above them (the exact bug class that broke the weight chart's build twice earlier this session-chain) before pushing. `esbuild` syntax check passed, and — per this project's own standing rule not to trust esbuild alone — confirmed the real Vercel build too: pushed commit `bbecf59`, polled the Vercel MCP connector's `list_deployments`/`get_deployment`, confirmed `state: READY` on the resulting deployment (`dpl_4d7Pm1Ct3GTFQFVhhLnaiScvWZ7U`), aliased live to `hypergentiq.com` / `morphiq-nine.vercel.app`.
+
+**Not yet done:** live-tapped on an actual phone with the screen genuinely locking (this fix was verified by code review + a clean production build, not yet by Bryant physically locking his phone mid-cardio-session and watching the number keep pace with a real stopwatch). That's the natural next check.
+
+## Session 39 recap (parts 1 & 2) — carried forward, unchanged
+
+**Part 1 — weight chart.** Five rounds to fix label crowding, a stale-data pagination bug, two build-breaking hook-order errors (caught via the Vercel MCP connector), a scroll-threshold bug (fake 260px assumption vs. the real measured card width), a clipped right-edge date label, and a visible scrollbar track Bryant didn't want. Final commit `41584ac`, `READY`, live. Established the standing rule in this codebase: never trust `esbuild` alone as a pre-push check -- it doesn't run ESLint, and this project's CRA build treats `react-hooks/rules-of-hooks` violations as a hard error.
+
+**Part 2 — full live-testing pass.** Water card restyle, Nutrition tab date-bucketing (23 seeded `meal_logs` + 5 `water_logs` rows), Session 36's two copy nits, and the CustomPlanScreen cardio wizard (including confirming the actual day-tab schedule interleaves cardio days, not just the copy) -- all confirmed correct live, no code changes needed.
 
 ## Session 39, part 2 — full UI testing pass on the accumulated backlog (Water card, Nutrition tab, copy nits, CustomPlanScreen wizard)
 
@@ -56,15 +76,13 @@ Cardio screen redesign (commit `7bc49b6`, live-tested and confirmed). Progress s
 
 | File | Before session | After session |
 | --- | --- | --- |
-| `src/shared.jsx` | 3,526 | 3,640 |
-| `src/ProgressScreen.jsx` | 621 | 639 |
-| `src/Morphiq.jsx` | 1,658 | 1,658 (one line edited, net 0) |
+| `src/CardioScreen.jsx` | 234 | 286 |
 
-No files were touched during the part 2 UI testing pass — everything checked out already correct, so nothing needed a code change. **Full current file set, all well under the 3,800-line hard limit:** `src/shared.jsx` 3,640 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,658, `src/ProgressScreen.jsx` 639 (touched this session), `src/MealScreen.jsx` 855, `src/GymOwnerDashboard.jsx` 927, `src/OnboardingScreen.jsx` 622, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/GymSignupScreen.jsx` 269, `src/CardioScreen.jsx` 234. `api/` files all small (12-259 lines each), none near any size concern.
+Only file touched this session. **Full current file set, all well under the 3,800-line hard limit:** `src/shared.jsx` 3,640 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,658, `src/ProgressScreen.jsx` 639, `src/MealScreen.jsx` 855, `src/GymOwnerDashboard.jsx` 927, `src/OnboardingScreen.jsx` 622, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/GymSignupScreen.jsx` 269, `src/CardioScreen.jsx` 286 (touched this session). `api/` files all small (12-259 lines each), none near any size concern.
 
 ## Latest commit
 
-`41584ac` on `main` (Session 39, part 1) — deployed and `READY` (Vercel deployment `dpl_BMW73RvzdHgSFMvZXocHgTukeK2v`). No new commits from part 2 (testing only, nothing needed fixing). Full chain: `443d1f9` (ERROR) → `6e19851` (ERROR, docs-only, inherited the same broken code) → `df3b250` (READY, hooks-order fix) → `49cc140` (READY, real container-width fix) → `def6d25` (READY, last-label clipping fix) → `41584ac` (READY, hide scrollbar chrome, current).
+`bbecf59` on `main` (Session 40) — "Fix: cardio timer stopping when screen dims -- anchor to wall-clock time, add screen wake lock". Deployed and `READY` (Vercel deployment `dpl_4d7Pm1Ct3GTFQFVhhLnaiScvWZ7U`), live on `hypergentiq.com` / `morphiq-nine.vercel.app`. Previous latest was `41584ac` (Session 39 part 1, weight chart scrollbar fix).
 
 ## Confirmed working vs still open
 
