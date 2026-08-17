@@ -69,8 +69,50 @@ function CardioScreen() {
   const [saved, setSaved] = useState(false);
   const [lastLogged, setLastLogged] = useState(null); // { minutes, calories, activity } captured right before reset, so the post-save confirmation can show real numbers instead of just a checkmark
   const intervalRef = useRef(null);
+  // Anchors the timer to a real timestamp instead of counting ticks. Ticks
+  // silently stop or slow down once the screen dims/locks (mobile browsers
+  // throttle or suspend JS timers in the background), which used to freeze
+  // the displayed time at whatever it was when the screen went dark.
+  // Recomputing elapsed from Date.now() on every tick means the number
+  // always catches up to the real elapsed time the moment the screen wakes
+  // back up -- same wall-clock pattern already used for the rest timer in
+  // WorkoutScreen.jsx.
+  const startRef = useRef(null);
+  // Screen Wake Lock -- keeps the screen from dimming/locking at all while a
+  // cardio session is running, so the member doesn't have to keep tapping
+  // the screen mid-run. Not supported in every browser, so the timestamp-
+  // based timer above is the real fix; this is a nice-to-have on top of it.
+  const wakeLockRef = useRef(null);
 
-  useEffect(() => () => clearInterval(intervalRef.current), []);
+  async function requestWakeLock() {
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+      }
+    } catch {
+      // Not fatal -- e.g. low battery mode can block this. The wall-clock
+      // timer still keeps accurate time even if the screen does dim.
+    }
+  }
+
+  function releaseWakeLock() {
+    wakeLockRef.current?.release().catch(() => {});
+    wakeLockRef.current = null;
+  }
+
+  useEffect(() => () => { clearInterval(intervalRef.current); releaseWakeLock(); }, []);
+
+  // The wake lock is automatically released by the browser whenever the tab/
+  // screen loses visibility (e.g. member briefly switches apps). Re-acquire
+  // it as soon as the page is visible again, as long as the timer is still
+  // meant to be running.
+  useEffect(() => {
+    function onVisibility() {
+      if (document.visibilityState === "visible" && running) requestWakeLock();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [running]);
 
   // Body weight comes from the member's own profile (userData.weight is
   // stored as e.g. "175 lbs" -- see OnboardingScreen.jsx). Falls back to a
@@ -82,6 +124,7 @@ function CardioScreen() {
 
   function pickActivity(act) {
     clearInterval(intervalRef.current);
+    releaseWakeLock();
     setActivity(act);
     setElapsed(0);
     setRunning(false);
@@ -91,15 +134,24 @@ function CardioScreen() {
   function toggleTimer() {
     if (running) {
       clearInterval(intervalRef.current);
+      releaseWakeLock();
       setRunning(false);
     } else {
-      intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+      // Re-anchor the start timestamp to "now minus what's already elapsed"
+      // so pausing and resuming (or the tab being backgrounded and coming
+      // back) never loses or duplicates time.
+      startRef.current = Date.now() - elapsed * 1000;
+      intervalRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+      }, 1000);
+      requestWakeLock();
       setRunning(true);
     }
   }
 
   async function stopAndLog() {
     clearInterval(intervalRef.current);
+    releaseWakeLock();
     setRunning(false);
     // Guard against an accidental tap logging a 0-second session -- same
     // spirit as the confirm-before-log pattern used elsewhere in the app.
@@ -173,7 +225,7 @@ function CardioScreen() {
 
         {mode === "live" && activity && (
           <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 326px)", paddingBottom: "1.5rem" }}>
-            <button onClick={() => { clearInterval(intervalRef.current); setActivity(null); setElapsed(0); setRunning(false); }}
+            <button onClick={() => { clearInterval(intervalRef.current); releaseWakeLock(); setActivity(null); setElapsed(0); setRunning(false); }}
               style={{ background: "none", border: "none", color: theme.textDim, fontSize: 12, padding: "0 0 .8rem", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontFamily: "inherit" }}>
               <Icon name="arrow-left" size={14} /> Change activity
             </button>
