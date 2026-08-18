@@ -1,4 +1,3 @@
-<!-- push-access-test: Session 43 confirmed GitHub write access via Claude in Chrome browser editor, 2026-08-18 -->
 # Hypergentiq — Session 40 master handoff
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
