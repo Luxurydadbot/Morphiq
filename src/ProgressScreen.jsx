@@ -512,14 +512,18 @@ function ProgressScreen() {
         {tab === "nutrition" && (() => {
           const calGoal = plan?.calories || 1800;
           const proteinGoal = plan?.protein || 140;
+          const carbsGoal = plan?.carbs || 160;
+          const fatGoal = plan?.fat || 55;
           const waterGoalOz = 64; // 8 glasses -- same goal WaterTracker (MealScreen.jsx) uses
 
           // Bucket every logged entry into a per-day total.
           const byDate = {};
           mealLogs.forEach(m => {
-            if (!byDate[m.date]) byDate[m.date] = { cal: 0, protein: 0 };
+            if (!byDate[m.date]) byDate[m.date] = { cal: 0, protein: 0, carbs: 0, fat: 0 };
             byDate[m.date].cal += m.logged_cal || 0;
             byDate[m.date].protein += m.logged_protein || 0;
+            byDate[m.date].carbs += m.logged_carbs || 0;
+            byDate[m.date].fat += m.logged_fat || 0;
           });
           const loggedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
 
@@ -549,6 +553,8 @@ function ProgressScreen() {
           // other and with "Recent days".
           const trend = [];
           const proteinTrend = [];
+          const carbsTrend = [];
+          const fatTrend = [];
           const waterTrend = [];
           for (let i = 13; i >= 0; i--) {
             const d = new Date();
@@ -557,6 +563,8 @@ function ProgressScreen() {
             const label = d.toLocaleDateString("en-US", { day: "numeric" });
             trend.push({ label, calories: byDate[dStr]?.cal || 0 });
             proteinTrend.push({ label, protein: byDate[dStr]?.protein || 0 });
+            carbsTrend.push({ label, carbs: byDate[dStr]?.carbs || 0 });
+            fatTrend.push({ label, fat: byDate[dStr]?.fat || 0 });
             waterTrend.push({ label, waterOz: Math.max(0, waterByDate[dStr] || 0) });
           }
 
@@ -584,6 +592,16 @@ function ProgressScreen() {
                     <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 2 }}>Protein</div>
                     <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Last 14 days</div>
                     <NutritionTrendChart data={proteinTrend} target={proteinGoal} accent={a} valueKey="protein" />
+                  </div>
+                  <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "14px 12px 12px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 2 }}>Carbs</div>
+                    <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Last 14 days</div>
+                    <NutritionTrendChart data={carbsTrend} target={carbsGoal} accent={a} valueKey="carbs" />
+                  </div>
+                  <div style={{ background: theme.surface, border: `0.5px solid ${theme.borderSubtle}`, borderRadius: 12, padding: "14px 12px 12px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 2 }}>Fat</div>
+                    <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 10 }}>Last 14 days</div>
+                    <NutritionTrendChart data={fatTrend} target={fatGoal} accent={a} valueKey="fat" />
                   </div>
                 </>
               ) : (

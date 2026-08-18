@@ -1,21 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useApp, sb, Pill, Spinner, VoiceBtn, Layout, theme, GROCERY_DATA, localDateStr, Icon } from "./shared.jsx";
-
-// ─── MacroBar ────────────────────────────────────────────────────────────────
-function MacroBar({ label, current, goal, color }) {
-  const pct = Math.min(100, Math.round((current / goal) * 100));
-  return (
-    <div style={{ flex: 1, background: "#212429", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
-      <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{current}</div>
-      <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>of {goal}g</div>
-      <div style={{ height: 5, background: "#0F1922", borderRadius: 3 }}>
-        <div style={{ height: 5, borderRadius: 3, background: color, width: `${pct}%`, transition: "width .6s" }} />
-      </div>
-      <div style={{ fontSize: 10, color: color, marginTop: 4, fontWeight: 600 }}>{pct}%</div>
-    </div>
-  );
-}
+import { useApp, sb, Pill, Spinner, VoiceBtn, Layout, theme, GROCERY_DATA, localDateStr, Icon, MacroBar } from "./shared.jsx";
 
 // ─── GroceryList ─────────────────────────────────────────────────────────────
 // onAdd/onDelete manage custom items only (item.custom === true) -- the
@@ -157,7 +141,7 @@ function buildGroceryFromPlan(plan) {
 }
 
 // ─── HungryButton ─────────────────────────────────────────────────────────────
-function HungryButton({ calsLeft, proteinLeft, goal }) {
+function HungryButton({ calsLeft, proteinLeft, carbsLeft, fatLeft, goal }) {
   const { gymBranding } = useApp();
   const a = gymBranding.accent;
   const [state, setState] = useState("idle");
@@ -199,9 +183,11 @@ function HungryButton({ calsLeft, proteinLeft, goal }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: state === "idle" ? 0 : 10 }}>
         <div>
           <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>Remaining today</div>
-          <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "baseline" }}>
             <div><span style={{ fontSize: 24, fontWeight: 700, color: "#EDEEF0" }}>{calsLeft}</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>cal</span></div>
             <div><span style={{ fontSize: 24, fontWeight: 700, color: "#7C93B8" }}>{proteinLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>protein</span></div>
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#5FA8E0" }}>{carbsLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>carbs</span></div>
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#2D5FA8" }}>{fatLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>fat</span></div>
           </div>
         </div>
         {state === "idle" && (
@@ -817,6 +803,8 @@ function MealPlanScreen() {
             <HungryButton
               calsLeft={CAL_GOAL - totals.cal}
               proteinLeft={Math.max(0, PROTEIN_GOAL - totals.protein)}
+              carbsLeft={Math.max(0, CARBS_GOAL - totals.carbs)}
+              fatLeft={Math.max(0, FAT_GOAL - totals.fat)}
               goal={plan?.goal}
             />
           </div>

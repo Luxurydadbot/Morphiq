@@ -3390,6 +3390,40 @@ function NutritionTrendChart({ data, target, accent, valueKey = "calories" }) {
   );
 }
 
+// MacroBar — shared protein/carbs/fat progress indicator. Full-size mode
+// matches the original card used on the Meals screen's calorie header;
+// compact mode is a smaller version (small text, no percentage line) for
+// tight spots like the Home screen and Progress > Nutrition, so every
+// screen that shows macros uses the same component instead of each screen
+// inventing its own. Nutrition-consistency request from Bryant, Aug 2026.
+function MacroBar({ label, current, goal, color, compact }) {
+  const pct = Math.min(100, Math.round((current / goal) * 100));
+  if (compact) {
+    return (
+      <div style={{ flex: 1, textAlign: "center" }}>
+        <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color, marginBottom: 4, lineHeight: 1 }}>
+          {current}<span style={{ fontSize: 10, color: theme.textDim, fontWeight: 400 }}>/{goal}g</span>
+        </div>
+        <div style={{ height: 4, background: "#242730", borderRadius: 2 }}>
+          <div style={{ height: 4, borderRadius: 2, background: color, width: `${pct}%`, transition: "width .5s" }} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ flex: 1, background: "#212429", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+      <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1, marginBottom: 2 }}>{current}</div>
+      <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>of {goal}g</div>
+      <div style={{ height: 5, background: "#0F1922", borderRadius: 3 }}>
+        <div style={{ height: 5, borderRadius: 3, background: color, width: `${pct}%`, transition: "width .6s" }} />
+      </div>
+      <div style={{ fontSize: 10, color: color, marginTop: 4, fontWeight: 600 }}>{pct}%</div>
+    </div>
+  );
+}
+
 function MonthlyTrendLineChart({ series }) {
   // series: [{ label, color, data: [{ label, count }, ...] }, ...]
   // All series are expected to share the same month labels/order.
@@ -3637,7 +3671,7 @@ export {
   // Utility functions
   getFallbackReply, fetchAIReply,
   // Progress screen sub-components
-  WeightChart, CardioWeeklyChart, NutritionTrendChart, StreakCalendar, getWeekStreakFromDates,
+  WeightChart, CardioWeeklyChart, NutritionTrendChart, StreakCalendar, getWeekStreakFromDates, MacroBar,
   // Admin dashboard sub-components
   MonthlyTrendLineChart,
   // Billing / paywall

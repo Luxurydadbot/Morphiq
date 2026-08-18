@@ -20,7 +20,7 @@ import {
   FALLBACK_REPLIES, CHAT_SUGGESTIONS,
   WEIGHT_DATA_MOCK, PERSONAL_BESTS,
   getFallbackReply, fetchAIReply,
-  WeightChart, StreakCalendar, getWeekStreakFromDates,
+  WeightChart, StreakCalendar, getWeekStreakFromDates, MacroBar,
 } from "./shared.jsx";
 
 const useApp = () => useContext(AppContext);
@@ -812,15 +812,23 @@ function HomeDashboardScreen() {
   const a = gymBranding.accent;
   // Read today's logged calories from MealScreen's localStorage (new v2 flat-entry format)
   const calGoal = plan?.calories || 1800;
+  const proteinGoal = plan?.protein || 140;
+  const carbsGoal = plan?.carbs || 160;
+  const fatGoal = plan?.fat || 55;
   const todayNutritionKey = `morphiq_meals_v2_${supabaseUser?.id || user?.id || "anon"}_${localDateStr()}`;
-  const todayNutritionCals = (() => {
+  const todayMacroTotals = (() => {
     try {
       const saved = JSON.parse(localStorage.getItem(todayNutritionKey) || "[]");
       // v2 format: flat array of {id, name, cal, protein, carbs, fat, loggedAt}
-      return saved.reduce((sum, e) => sum + (e.cal || 0), 0);
-    } catch { return 0; }
+      return saved.reduce((acc, e) => ({
+        cal: acc.cal + (e.cal || 0),
+        protein: acc.protein + (e.protein || 0),
+        carbs: acc.carbs + (e.carbs || 0),
+        fat: acc.fat + (e.fat || 0),
+      }), { cal: 0, protein: 0, carbs: 0, fat: 0 });
+    } catch { return { cal: 0, protein: 0, carbs: 0, fat: 0 }; }
   })();
-  const cals = todayNutritionCals;
+  const cals = todayMacroTotals.cal;
   const h = new Date().getHours();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   const sL = theme.sL;
@@ -1234,6 +1242,11 @@ function HomeDashboardScreen() {
             <div style={{ height: 6, background: "#242730", borderRadius: 3 }}>
               <div style={{ height: 6, borderRadius: 3, background: a, width: `${Math.round((cals / calGoal) * 100)}%`, transition: "width .5s" }} />
             </div>
+          </div>
+          <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 6 }}>
+            <MacroBar compact label="Protein" current={Math.round(todayMacroTotals.protein)} goal={proteinGoal} color="#7C93B8" />
+            <MacroBar compact label="Carbs"   current={Math.round(todayMacroTotals.carbs)}   goal={carbsGoal}   color="#5FA8E0" />
+            <MacroBar compact label="Fat"     current={Math.round(todayMacroTotals.fat)}     goal={fatGoal}     color="#2D5FA8" />
           </div>
           {nextMeal ? (
             <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
