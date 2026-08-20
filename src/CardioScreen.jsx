@@ -21,8 +21,16 @@ import {
 
 // MET (metabolic equivalent) values -- standard exercise-science constants,
 // not app-specific tuning. calories = MET × body weight (kg) × hours.
+// NOTE (fixed Aug 20 2026): "Treadmill" used to be a single entry hardcoded to
+// met: 9.8, which is the value for running ~6mph -- so a slow treadmill
+// walk got calculated as if it were a moderate-pace run, wildly
+// overestimating calories (a 12-min walk could show ~300 cal instead of a
+// realistic ~50-90). Split into "Walk" and "Run" so the MET actually
+// matches what the member is doing. If this gets touched again, don't
+// re-merge them back into one generic "Treadmill" entry.
 const CARDIO_ACTIVITIES = [
-  { id: "Treadmill",    met: 9.8, icon: "run" },
+  { id: "Walk",         met: 3.5, icon: "walk" },
+  { id: "Run",          met: 9.8, icon: "run" },
   { id: "Bike",         met: 7.5, icon: "bike" },
   { id: "Stepper",      met: 8.8, icon: "stepper" },
   { id: "Rower",        met: 7.0, icon: "rower" },
@@ -42,6 +50,7 @@ const EFFORT_LEVELS = [
 function ActivityIcon({ name, size = 18, color = "currentColor" }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
   switch (name) {
+    case "walk": return <svg {...common}><circle cx="12" cy="4" r="2" /><path d="M12 6v5l-3 2v6M12 11l3 2-1 5" /></svg>;
     case "run": return <svg {...common}><circle cx="13" cy="4" r="2" /><path d="M4 17l4-3 3 2 2-5 4 1-1 4 3 3" /></svg>;
     case "bike": return <svg {...common}><circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" /><path d="M9 17h6l-3-9-4 5h7M6 17l4-9" /></svg>;
     case "stepper": return <svg {...common}><path d="M3 20h4v-4h4v-4h4v-4h4V4" /></svg>;
