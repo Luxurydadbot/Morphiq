@@ -3399,11 +3399,19 @@ function NutritionTrendChart({ data, target, accent, valueKey = "calories" }) {
 function MacroBar({ label, current, goal, color, compact }) {
   const pct = Math.min(100, Math.round((current / goal) * 100));
   if (compact) {
+    // Stacked full-width row (label + current/goal left-right, then a
+    // full-width thin bar underneath) -- matches the visual pattern of the
+    // Calories bar above it on the Home screen, instead of the old 3-across
+    // layout where each macro only got a third of the card's width.
+    // Bryant, Aug 2026: "wouldn't it make more sense to stack them one on
+    // top of the other at the exact same width?"
     return (
-      <div style={{ flex: 1, textAlign: "center" }}>
-        <div style={{ fontSize: 10, color: theme.textDim, marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color, marginBottom: 4, lineHeight: 1 }}>
-          {current}<span style={{ fontSize: 10, color: theme.textDim, fontWeight: 400 }}>/{goal}g</span>
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textDim, marginBottom: 4 }}>
+          <span style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</span>
+          <span style={{ color: theme.text }}>
+            <span style={{ color, fontWeight: 600 }}>{current}</span>/{goal}g
+          </span>
         </div>
         <div style={{ height: 4, background: "#242730", borderRadius: 2 }}>
           <div style={{ height: 4, borderRadius: 2, background: color, width: `${pct}%`, transition: "width .5s" }} />

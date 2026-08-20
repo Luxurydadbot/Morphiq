@@ -1243,7 +1243,7 @@ function HomeDashboardScreen() {
               <div style={{ height: 6, borderRadius: 3, background: a, width: `${Math.round((cals / calGoal) * 100)}%`, transition: "width .5s" }} />
             </div>
           </div>
-          <div style={{ padding: "0 1.25rem .9rem", display: "flex", gap: 6 }}>
+          <div style={{ padding: "0 1.25rem .9rem", display: "flex", flexDirection: "column", gap: 10 }}>
             <MacroBar compact label="Protein" current={Math.round(todayMacroTotals.protein)} goal={proteinGoal} color="#7C93B8" />
             <MacroBar compact label="Carbs"   current={Math.round(todayMacroTotals.carbs)}   goal={carbsGoal}   color="#5FA8E0" />
             <MacroBar compact label="Fat"     current={Math.round(todayMacroTotals.fat)}     goal={fatGoal}     color="#2D5FA8" />
