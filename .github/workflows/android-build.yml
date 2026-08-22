@@ -33,6 +33,8 @@ jobs:
 
       - name: Build the web app
         run: npm run build
+        env:
+          CI: false
 
       - name: Sync web build into the Android project
         run: npx cap sync android
