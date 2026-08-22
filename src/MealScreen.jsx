@@ -744,22 +744,39 @@ function MealPlanScreen() {
     <Layout activeNav="meals" chatTarget="chat_meals">
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
 
-        {/* ── Calorie header ── */}
+        {/* ── Calorie header ──
+            Bryant, Aug 2026: wanted nutrition stats laid out the same way
+            and in the same order (Calories, Protein, Carbs, Fat) on every
+            screen so they're instantly recognizable page to page. Calories
+            used to be just a number in the top-right corner here (the real
+            eaten/goal + bar treatment only existed down in the "Remaining
+            today" strip) -- now it gets its own row with a progress bar,
+            matching the Home screen's "Nutrition today" card exactly.
+            Protein/Carbs/Fat switched from the old 3-across MacroBar layout
+            to MacroBar's `compact` (stacked, full-width) mode -- same
+            component Home already uses, just reused here instead of
+            re-implemented. */}
         <div style={{ background: "#212429", borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-            <div>
-              <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 3 }}>Today's Food</div>
-              <div style={{ fontSize: 12, color: theme.textDim }}>{dayName} · {goalLabel}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: totals.cal > CAL_GOAL * 1.05 ? "#F59E0B" : a, lineHeight: 1 }}>{totals.cal}</div>
-              <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>of {CAL_GOAL} cal</div>
+          <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 3 }}>Today's Food</div>
+          <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 12 }}>{dayName} · {goalLabel}</div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "#EDEEF0" }}>Calories</div>
+            <div style={{ fontSize: 13, color: totals.cal > CAL_GOAL * 1.05 ? "#F59E0B" : a, fontWeight: 500 }}>
+              {Math.max(0, CAL_GOAL - totals.cal)} remaining
             </div>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <MacroBar label="Protein" current={totals.protein} goal={PROTEIN_GOAL} color="#7C93B8" />
-            <MacroBar label="Carbs"   current={totals.carbs}   goal={CARBS_GOAL}   color="#5FA8E0" />
-            <MacroBar label="Fat"     current={totals.fat}     goal={FAT_GOAL}     color="#2D5FA8" />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: theme.textDim, marginBottom: 6 }}>
+            <span>{totals.cal} eaten</span><span>{CAL_GOAL} goal</span>
+          </div>
+          <div style={{ height: 6, background: "#242730", borderRadius: 3, marginBottom: 14 }}>
+            <div style={{ height: 6, borderRadius: 3, background: a, width: `${Math.min(100, Math.round((totals.cal / CAL_GOAL) * 100))}%`, transition: "width .5s" }} />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <MacroBar compact label="Protein" current={totals.protein} goal={PROTEIN_GOAL} color="#7C93B8" />
+            <MacroBar compact label="Carbs"   current={totals.carbs}   goal={CARBS_GOAL}   color="#5FA8E0" />
+            <MacroBar compact label="Fat"     current={totals.fat}     goal={FAT_GOAL}     color="#2D5FA8" />
           </div>
         </div>
 
