@@ -1,0 +1,58 @@
+# Android build check
+#
+# Bryant, Aug 2026: this doesn't publish anything or touch the Play Store --
+# it just proves, on every push to main, that the Android app still
+# compiles. The cloud sandbox Claude works in can't reach Google's Android
+# build servers (blocked by its network safety rules), so this was the only
+# way to get real "does it build" verification without you needing Android
+# Studio open on your own machine. If this ever goes red, check the Actions
+# tab on GitHub for the error -- it means something in the last push broke
+# the Android build specifically (the web app itself may still be fine).
+name: Android build check
+
+"on":
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the web app
+        run: npm run build
+
+      - name: Sync web build into the Android project
+        run: npx cap sync android
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypergentiq-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
