@@ -25,6 +25,16 @@ Real progress this session: the single most important open item from Session 46 
 
 **Bottom line: the account-deletion feature works correctly, end-to-end, with no gaps found.** Apple Guideline 5.1.1(v) is now genuinely satisfied, not just "probably fine based on code review."
 
+## Session 47, part 2 — live-verified the post-onboarding "Plan ready" screen; the Session 45 Fat-tile/color fix is confirmed working
+
+Bryant asked to check the post-onboarding "Plan ready" screen live — this was Session 45's color/Fat-tile fix, which had only ever been code-reviewed, never actually looked at in the running app.
+
+**Read the actual code first** (`src/OnboardingScreen.jsx`, the "Daily targets" grid around line 578-591) to know exactly what "correct" should look like: a 2x2 grid of four tiles (Calories, Protein, Carbs, Fat), each tile's number colored with `gymBranding.accent` — the gym's own themeable brand color, not a hardcoded value.
+
+**Then confirmed it live** — created another disposable throwaway account ("PlanReadyCheck," same plain-email pattern as the account-deletion test, since the "+" alias trick still doesn't work on Bryant's email provider), ran through onboarding, and looked at the real rendered screen. All four tiles are present and rendering correctly: Calories, Protein, Carbs, Fat, all in a consistent color. Sent Bryant a screenshot directly. **The Session 45 fix works as intended — no gaps found.** Deleted the throwaway test account afterward the same verified way as the earlier test, so nothing was left behind.
+
+**One side finding, not a bug in what was tested, but worth Bryant's awareness:** the tile numbers render in blue (`#4C8DFF`), not the teal (`#00D4B1`) called out as Hypergentiq's primary brand color in the design standards. Checked the database directly — this is not a leftover hardcoded color or a bug. The `gyms` table has two different color columns for the base "demo-gym" (the un-white-labeled "Hypergentiq Gym" experience): `accent_color` is set to teal (`#00D4B1`), but the column the app actually reads (`accent`, via `sb.getGymBranding()` in shared.jsx) is set to blue (`#4C8DFF`). The other two gyms in the database (`test-gym-1`, `bryant-s-gym`) have both columns matching at teal. So this is a data/branding choice specific to the demo gym, not a code defect — but it does mean Hypergentiq's own un-white-labeled demo experience isn't currently showing the teal brand color the design standards describe. **Not fixed — flagged for Bryant to decide:** should `demo-gym`'s `accent` column be updated to `#00D4B1` to match the stated brand color, or is blue intentional? A one-line database update if he wants it changed.
+
 ## Session 46 recap — carried forward, unchanged
 
 Reviewed the privacy policy draft as a non-lawyer checklist pass, built and shipped in-app account deletion (the feature verified live this session), drafted Terms of Service for the first time, and worked around Vercel's Hobby-plan 12-function cap by merging two low-traffic billing-report tools into one file (`api/usage-report.js`). See prior version of this file (or `git log`) for full detail if needed.
@@ -35,7 +45,7 @@ Live-verified Session 44's fixes, fixed a real Meals-screen gap, unified nutriti
 
 ## Files touched this session (final line counts)
 
-No code files were changed this session — this was a live test only. Only `HANDOFF.md` was updated. File sizes are unchanged from Session 46: `src/shared.jsx` 3,716 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,742, `src/GymOwnerDashboard.jsx` 927, `src/MealScreen.jsx` 869, `src/ProgressScreen.jsx` 657, `src/OnboardingScreen.jsx` 622, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/CardioScreen.jsx` 295, `src/GymSignupScreen.jsx` 269. `api/` still has 12 files (the Vercel Hobby-plan cap) — none near any size concern individually.
+No code files were changed this session — this was live testing only (account deletion, then the Plan-ready screen). Only `HANDOFF.md` was updated. File sizes are unchanged from Session 46: `src/shared.jsx` 3,716 (largest, watch this one), `src/WorkoutScreen.jsx` 2,865, `src/Morphiq.jsx` 1,742, `src/GymOwnerDashboard.jsx` 927, `src/MealScreen.jsx` 869, `src/ProgressScreen.jsx` 657, `src/OnboardingScreen.jsx` 622, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 300, `src/CardioScreen.jsx` 295, `src/GymSignupScreen.jsx` 269. `api/` still has 12 files (the Vercel Hobby-plan cap) — none near any size concern individually.
 
 ## Latest commit
 
@@ -43,40 +53,40 @@ Unchanged from Session 46: `2778f85` — "Docs: Session 46 handoff -- account de
 
 ## Confirmed working vs still open
 
-**Confirmed live, this session, via direct database verification (not just code review or a clean deploy):**
+**Confirmed live, this session, via direct database verification and direct visual inspection (not just code review or a clean deploy):**
 - `api/delete-account.js` — deletes every table it's supposed to, in the correct order, with no foreign-key errors, and removes the actual Supabase Auth login record too. Tested against a real account with real data seeded in every relevant table.
 - The Profile screen's Danger Zone UI flow — button, confirm-are-you-sure step, loading state, and post-success sign-out — all work exactly as designed.
 - The account-deletion feature as a whole is now **fully live-verified**, not just code-reviewed.
+- The post-onboarding "Plan ready" screen's Session 45 fix — all four Daily Targets tiles (Calories/Protein/Carbs/Fat) present, consistently colored via `gymBranding.accent`. **Fully live-verified**, screenshot captured and sent to Bryant.
+
+**One side finding from the Plan-ready check, flagged for Bryant, not yet acted on:** `demo-gym`'s `accent` column (what the app actually themes with) is blue (`#4C8DFF`), while a separate, apparently-unused `accent_color` column on that same row is teal (`#00D4B1`, the documented brand color). Not a bug — just worth Bryant deciding whether the demo/un-white-labeled experience should actually be teal.
 
 **Two small unrelated items noticed in passing this session (not investigated, not part of this session's task, flagging for next session):**
-- Two "Android build check failed" GitHub Actions emails arrived in Bryant's inbox today (commits `c338427` and `3a12993`) — worth a look next session to see if the Android build is currently broken on `main`.
-- A "Failed production deployment" email from Vercel landed in Bryant's **Spam** folder today around 12:35 PM — easy to miss there. Worth checking `list_deployments` next session to see what failed and why, and possibly checking why Vercel's notification emails are landing in spam at all.
+- Two "Android build check failed" GitHub Actions emails arrived in Bryant's inbox today (commits `c338427` and `3a12993`) — **checked this session, already resolved.** Both failures were from the very first two attempts at setting up the Android CI workflow itself (a Node version mismatch), fixed the same day by a follow-up commit (`3f8f9e4`). Every build check since — including all of Session 46's work and this session's — has passed. No action needed, the emails were just late notifications of old, already-fixed failures.
+- A "Failed production deployment" email from Vercel landed in Bryant's **Spam** folder today around 12:35 PM — **checked this session, already resolved.** Confirmed via `list_deployments` that this is the exact Session 46 moment when adding the delete-account backend file pushed past Vercel's 12-function Hobby cap — already caught and fixed in that same session (the usage-report.js merge). Every deployment since has been `READY`. No action needed.
 
 **NOT yet verified / still open from prior sessions (unchanged):**
-- The post-onboarding "Plan ready" screen's color/Fat-tile fix from Session 45 — still only code-reviewed, not walked through live.
 - The weight chart real-phone swipe test.
 - The cardio timer real-phone lock-screen test.
 - Everything else on the punch list below.
 
 ## Punch list, in priority order
 
-**FIRST — check the two failed Android build emails and the spam-folder Vercel deploy-failure email** (all noticed today, none investigated yet — see above).
+**FIRST — unblock the privacy policy and terms of service.** Both drafts exist now. Both are still blocked on Bryant forming a real legal business entity, after which both documents need to go to an actual lawyer together.
 
-**SECOND — unblock the privacy policy and terms of service.** Both drafts exist now. Both are still blocked on Bryant forming a real legal business entity, after which both documents need to go to an actual lawyer together.
+**SECOND — (optional, cosmetic, low priority) decide on `demo-gym`'s accent color.** See the side finding above — a one-line database update if Bryant wants the demo experience to show teal (`#00D4B1`) instead of the current blue (`#4C8DFF`).
 
-**THIRD — walk through the post-onboarding "Plan ready" screen live** (carried from Session 45) to confirm its color/Fat-tile fix looks right in practice.
+**THIRD — design and build the weekly detection engine.** Unchanged — scoped, not started. Needs Bryant's input on exact plateau/macro-adherence thresholds before any code gets written.
 
-**FOURTH — design and build the weekly detection engine.** Unchanged — scoped, not started. Needs Bryant's input on exact plateau/macro-adherence thresholds before any code gets written.
+**FOURTH — App Store groundwork, next concrete step: open the Android project in real Android Studio at least once.** The GitHub Actions check proves the app compiles and is currently passing, but nobody has run it on a device or emulator yet. Capgo live-update pipeline still not started.
 
-**FIFTH — App Store groundwork, next concrete step: open the Android project in real Android Studio at least once.** The GitHub Actions check proves the app compiles (when it's passing — see FIRST above), but nobody has run it on a device or emulator yet. Capgo live-update pipeline still not started.
+**FIFTH — an actual finger-swipe test on a real phone for the weight chart** (Bryant's own task, waiting on him logging more days).
 
-**SIXTH — an actual finger-swipe test on a real phone for the weight chart** (Bryant's own task, waiting on him logging more days).
+**SIXTH — cardio timer real-phone test.** Session 40's wall-clock fix still hasn't been live-tapped by Bryant with the screen genuinely locking.
 
-**SEVENTH — cardio timer real-phone test.** Session 40's wall-clock fix still hasn't been live-tapped by Bryant with the screen genuinely locking.
+**SEVENTH — wearable sync (Apple HealthKit/Fitbit).** Unchanged, still not scoped.
 
-**EIGHTH — wearable sync (Apple HealthKit/Fitbit).** Unchanged, still not scoped.
-
-**NINTH through TWELFTH — unchanged, still open:** live-test `WarmupTest` full week start-to-finish (this profile is untouched and still available — tied to `cafe75designs+customtest2@gmail.com`, not Bryant's real email); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion, see DECISIONS.md Aug 8 2026); expand exercise variety beyond primary/variation binary swap; the weight-loss/cardio redesign's still-undecided open questions from DECISIONS.md Aug 9 2026; voice input on the cardio quick-log and the "Other" activity type haven't been live-tested; the manual/voice cardio-logging path's calorie accuracy (no body weight passed to the AI estimate).
+**EIGHTH through ELEVENTH — unchanged, still open:** live-test `WarmupTest` full week start-to-finish (this profile is untouched and still available — tied to `cafe75designs+customtest2@gmail.com`, not Bryant's real email); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion, see DECISIONS.md Aug 8 2026); expand exercise variety beyond primary/variation binary swap; the weight-loss/cardio redesign's still-undecided open questions from DECISIONS.md Aug 9 2026; voice input on the cardio quick-log and the "Other" activity type haven't been live-tested; the manual/voice cardio-logging path's calorie accuracy (no body weight passed to the AI estimate).
 
 **RULED OUT — do not re-propose without new information:** camera/video-based AI form-checking (Session 44 research).
 
@@ -92,9 +102,11 @@ Unchanged from Session 46: `2778f85` — "Docs: Session 46 handoff -- account de
 
 **Supabase test-data seeding pattern, useful for future live tests.** The Supabase MCP connector's `execute_sql` runs with full database access (not the app's own restricted anon key), so it can insert rows directly into any table — including tables normally reached only through specific app actions — for test setup, and can query `auth.users` directly to check whether a login record exists. Used this session to seed one row per table before testing deletion, and to get an exact before/after row count instead of relying on the app's UI to say "success." This is a reliable pattern for any future "does deletion/cleanup really work" test.
 
-**GitHub Actions Android build check.** `.github/workflows/android-build.yml` runs on every push to `main`. Two failure emails arrived today for commits `c338427` and `3a12993` — not investigated this session (out of scope for the account-deletion test), flagged as next session's first item.
+**GitHub Actions Android build check.** `.github/workflows/android-build.yml` runs on every push to `main`. Two failure emails arrived today for commits `c338427` and `3a12993` — **investigated and resolved this session**: those are the very first two attempts at setting up the workflow itself, fixed within the same original session by `3f8f9e4`. Every run since (including this session's) has passed. No open concern.
 
-**Vercel MCP connector.** Use `list_teams` → `list_projects` (project `morphiq`, id `prj_0KL9CirNTdNMnXEO34o3pdwd5wSM`, team `team_Iiv1x067TLmgX2XdP5mXO06v`) → `list_deployments` to check `state`. A "Failed production deployment" email arrived in Bryant's Spam folder today around 12:35 PM — not investigated this session, flagged as next session's first item.
+**Vercel MCP connector.** Use `list_teams` → `list_projects` (project `morphiq`, id `prj_0KL9CirNTdNMnXEO34o3pdwd5wSM`, team `team_Iiv1x067TLmgX2XdP5mXO06v`) → `list_deployments` to check `state`. A "Failed production deployment" email arrived in Bryant's Spam folder today around 12:35 PM — **investigated and resolved this session**: `list_deployments` confirmed it's the exact Session 46 Vercel-function-cap deployment (`d4f3b4f`, "add delete-account backend endpoint"), already fixed in that same session. Every deployment since has been `READY`. No open concern.
+
+**Demo-gym branding data inconsistency, found this session.** The `gyms` table has two accent-color columns per row: `accent_color` and `accent`. The app's `getGymBranding()` (shared.jsx) only reads `accent`. For `demo-gym` specifically, these two columns disagree (`accent_color` = `#00D4B1` teal, `accent` = `#4C8DFF` blue) — the other two gyms in the table have both columns matching. Not a bug in any code path, just a data choice worth Bryant's input on (see punch list).
 
 **WebFetch is not reliable for reading files from this repo — confirmed dangerous in multiple prior sessions.** Never use WebFetch for this repo's file contents — always `git clone` with the token embedded in the HTTPS URL.
 
@@ -104,4 +116,4 @@ Unchanged from Session 46: `2778f85` — "Docs: Session 46 handoff -- account de
 
 Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (reads work fine; do NOT use WebFetch for repo file contents). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest at 3,716). **GitHub push access:** still broken (platform-side git-proxy block) — use the Upload-files browser workaround, staging files in `/mnt/user-data/outputs/` specifically. **`api/` is at exactly 12 files — the Vercel Hobby-plan cap** — any new backend feature needs either a merge of two more low-traffic files or a decision from Bryant on Vercel Pro. **Never use a "+" alias on Bryant's real sbcglobal.net address** — AT&T/Yahoo Mail silently drops it; use the plain address for any test that needs to receive real email.
 
-Remind Bryant: this session live-tested the account-deletion feature end-to-end on the real production app — created a real throwaway test account, seeded it with data in every relevant table, deleted it through the actual Profile screen button, and confirmed via direct database check that every single row (11 tables) and the login itself were completely gone afterward. **It fully works — this closes out Session 46's #1 open item.** Two small unrelated things turned up along the way and are flagged for next session: two failed Android-build emails today, and a Vercel deployment-failure email that landed in Bryant's Spam folder. Both legal documents (privacy policy, terms of service) remain blocked on Bryant forming a real business entity before they can be finalized and sent to a lawyer.
+Remind Bryant: this session live-tested two things end-to-end on the real production app. (1) Account deletion — created a real throwaway test account, seeded it with data in every relevant table, deleted it through the actual Profile screen button, and confirmed via direct database check that every single row (11 tables) and the login itself were completely gone afterward. **It fully works — this closes out Session 46's #1 open item.** (2) The post-onboarding "Plan ready" screen from Session 45's fix — confirmed live (screenshot sent to Bryant) that all four Daily Targets tiles (Calories/Protein/Carbs/Fat) render correctly and consistently themed. **Also fully works.** Two small unrelated things turned up along the way and were investigated and closed out, not left open: two failed Android-build emails and a Vercel deployment-failure email in Bryant's Spam folder both turned out to be old, already-resolved issues from earlier the same day — no action needed on either. One new, low-priority item was flagged but not acted on: `demo-gym`'s theme color reads as blue rather than the documented teal brand color, due to a data inconsistency between two color columns on that gym's database row — Bryant's call whether to change it. Both legal documents (privacy policy, terms of service) remain blocked on Bryant forming a real business entity before they can be finalized and sent to a lawyer.
