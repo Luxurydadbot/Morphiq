@@ -1308,6 +1308,13 @@ function ProfileScreen() {
   const [editEquip, setEditEquip]       = useState(false);
   const [saving, setSaving]             = useState(false);
   const [savedMsg, setSavedMsg]         = useState("");
+  // Account deletion (Aug 22, 2026 — Apple App Store Guideline 5.1.1(v) requires
+  // this be doable from inside the app, not just by emailing support).
+  // "confirming" shows the warning panel; "deleting" is the in-flight request;
+  // idle/error otherwise. Kept as one state instead of separate booleans so
+  // only one of these views can ever be showing at once.
+  const [deleteState, setDeleteState] = useState("idle"); // idle | confirming | deleting
+  const [deleteError, setDeleteError] = useState("");
 
   // Local selections — initialised from live data
   const [selectedGoal,  setSelectedGoal]  = useState(user.goal || "lose_fat");
@@ -1367,6 +1374,23 @@ function ProfileScreen() {
     setSaving(false);
     setSavedMsg("Plan updated");
     setTimeout(() => setSavedMsg(""), 3000);
+  }
+
+  // Actually deletes the account (called only from the "Yes, permanently
+  // delete everything" button below, after the warning panel). Not
+  // fire-and-forget on purpose — this is the one save/write in this screen
+  // where silently failing would be genuinely bad (someone thinking their
+  // account and data are gone when they aren't).
+  async function handleDeleteAccount() {
+    setDeleteState("deleting");
+    setDeleteError("");
+    const result = await sb.deleteAccount();
+    if (result.ok) {
+      signOut(); // clears local tokens/state and returns to the sign-in screen
+    } else {
+      setDeleteError(result.error || "Something went wrong. Please try again.");
+      setDeleteState("confirming");
+    }
   }
 
   const StatRow = ({ label, value, sub }) => (
@@ -1547,6 +1571,34 @@ function ProfileScreen() {
         <button onClick={signOut} style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
           Sign out
         </button>
+
+        {deleteState === "idle" && (
+          <button onClick={() => setDeleteState("confirming")} style={{ width: "100%", background: "transparent", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: "10px", fontSize: 13, color: "#F87171", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+            Delete my account
+          </button>
+        )}
+
+        {(deleteState === "confirming" || deleteState === "deleting") && (
+          <div style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#F87171", marginBottom: 4 }}>Delete your account?</div>
+            <div style={{ fontSize: 12, color: theme.textDim, lineHeight: 1.5, marginBottom: 10 }}>
+              This permanently erases your workouts, meals, weight history, and progress. This can't be undone.
+            </div>
+            {deleteError && (
+              <div style={{ fontSize: 12, color: "#F87171", marginBottom: 10 }}>{deleteError}</div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { setDeleteState("idle"); setDeleteError(""); }} disabled={deleteState === "deleting"}
+                style={{ flex: 1, background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit", opacity: deleteState === "deleting" ? 0.6 : 1 }}>
+                Cancel
+              </button>
+              <button onClick={handleDeleteAccount} disabled={deleteState === "deleting"}
+                style={{ flex: 2, background: "#F87171", border: "none", borderRadius: 10, padding: "8px", fontSize: 12, fontWeight: 600, color: "#1A0000", cursor: "pointer", fontFamily: "inherit", opacity: deleteState === "deleting" ? 0.7 : 1 }}>
+                {deleteState === "deleting" ? "Deleting…" : "Yes, permanently delete"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

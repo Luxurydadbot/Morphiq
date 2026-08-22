@@ -247,6 +247,29 @@ const sb = {
     } catch { return false; }
   },
 
+  // Permanently deletes the signed-in member's own account and every row of
+  // their data (workouts, meals, weight, cardio, etc.) — not a fire-and-forget
+  // write like the rest of this file, since a silently-failed delete would
+  // leave someone thinking their account is gone when it isn't. Routed
+  // through /api/delete-account (not a direct Supabase call) because
+  // removing the actual login requires Supabase's service-role key, which
+  // must never reach the browser — same reasoning as setGymSuspended above.
+  // Returns { ok: true } or { ok: false, error } so the caller can show a
+  // real error instead of guessing.
+  async deleteAccount() {
+    try {
+      const res = await fetch(`/api/delete-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${getAuthToken()}` },
+      });
+      if (res.ok) return { ok: true };
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, error: data?.error || "Something went wrong. Please try again." };
+    } catch {
+      return { ok: false, error: "Couldn't reach the server. Check your connection and try again." };
+    }
+  },
+
   // ── HELPERS ───────────────────────────────────────────────────────────────
   // Resolves supabase_user_id → profiles.id (UUID used as FK in workout/meal logs)
   async logSyncIssue(supabaseUserId, gymId, reason) {
