@@ -773,10 +773,16 @@ function MealPlanScreen() {
             <div style={{ height: 6, borderRadius: 3, background: a, width: `${Math.min(100, Math.round((totals.cal / CAL_GOAL) * 100))}%`, transition: "width .5s" }} />
           </div>
 
+          {/* Bryant, Aug 2026: switched from three fixed macro-color blues
+              to the gym's own accent color (`a`), matching Home and the
+              Progress screen's nutrition charts -- see Morphiq.jsx for the
+              full reasoning (labels already differentiate the bars, and
+              hardcoded colors were ignoring gymBranding.accent on a
+              white-label app). */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <MacroBar compact label="Protein" current={totals.protein} goal={PROTEIN_GOAL} color="#7C93B8" />
-            <MacroBar compact label="Carbs"   current={totals.carbs}   goal={CARBS_GOAL}   color="#5FA8E0" />
-            <MacroBar compact label="Fat"     current={totals.fat}     goal={FAT_GOAL}     color="#2D5FA8" />
+            <MacroBar compact label="Protein" current={totals.protein} goal={PROTEIN_GOAL} color={a} />
+            <MacroBar compact label="Carbs"   current={totals.carbs}   goal={CARBS_GOAL}   color={a} />
+            <MacroBar compact label="Fat"     current={totals.fat}     goal={FAT_GOAL}     color={a} />
           </div>
         </div>
 

@@ -1244,9 +1244,18 @@ function HomeDashboardScreen() {
             </div>
           </div>
           <div style={{ padding: "0 1.25rem .9rem", display: "flex", flexDirection: "column", gap: 10 }}>
-            <MacroBar compact label="Protein" current={Math.round(todayMacroTotals.protein)} goal={proteinGoal} color="#7C93B8" />
-            <MacroBar compact label="Carbs"   current={Math.round(todayMacroTotals.carbs)}   goal={carbsGoal}   color="#5FA8E0" />
-            <MacroBar compact label="Fat"     current={Math.round(todayMacroTotals.fat)}     goal={fatGoal}     color="#2D5FA8" />
+            {/* Bryant, Aug 2026: color was three different fixed blues per
+                macro -- switched to the gym's own accent color (`a`, same
+                one the Calories bar above already uses) for two reasons:
+                (1) each bar already has its own text label, so the color
+                wasn't doing any real differentiation work, and (2) this is
+                a white-label app -- gymBranding.accent is supposed to theme
+                everything, and these hardcoded blues were quietly ignoring
+                a gym's actual brand color. Matches the Progress screen's
+                nutrition charts, which already used the accent color. */}
+            <MacroBar compact label="Protein" current={Math.round(todayMacroTotals.protein)} goal={proteinGoal} color={a} />
+            <MacroBar compact label="Carbs"   current={Math.round(todayMacroTotals.carbs)}   goal={carbsGoal}   color={a} />
+            <MacroBar compact label="Fat"     current={Math.round(todayMacroTotals.fat)}     goal={fatGoal}     color={a} />
           </div>
           {nextMeal ? (
             <div style={{ padding: ".75rem 1.25rem", borderTop: `0.5px solid ${theme.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
