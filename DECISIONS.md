@@ -146,6 +146,27 @@ Updated automatically at the end of every session. Never delete entries — appe
 
 ---
 
+## August 22, 2026
+
+### Decision: Vercel Hobby plan's 12-function cap resolved by merging files, not upgrading
+- Adding `api/delete-account.js` (see below) pushed the project to 13 serverless functions, one over Vercel's Hobby-plan limit — the deploy failed with `exceeded_serverless_functions_per_deployment`.
+- Bryant was offered two options directly: pay $20/mo for Vercel Pro (removes the cap entirely, zero code changes), or merge two of the least-used backend files for free.
+- **Decision: merge, stay on Hobby.** `api/monthly-usage-report.js` and `api/report-usage.js` — both manual, Bryant-only billing tools visited by typing a URL, never called by the live app — were combined into one file, `api/usage-report.js`, routed by whether `?gym_id=` is present. Nothing about what either tool does changed, only the URL: the old `/api/monthly-usage-report` and `/api/report-usage` no longer exist — use `/api/usage-report` (no `gym_id` = old all-gyms preview behavior; `?gym_id=X` = old single-gym report/live-report behavior) going forward.
+- **Worth revisiting if this happens again:** the next time a new backend endpoint is needed and the project is already at 12 functions, either upgrade to Pro or find another pair to merge — don't keep stacking merges indefinitely, since it makes the api/ folder harder to reason about. Bryant should know this cap exists and will recur.
+
+### Decision: privacy policy and terms of service reviewed/drafted together, non-lawyer pass
+- Bryant asked for a non-attorney review of the existing `PRIVACY_POLICY_DRAFT.md` "as though a lawyer, without holding Claude liable." Declined the liability-waiver framing directly (doesn't change that Claude isn't a lawyer) but did a thorough code-verified checklist review instead, delivered as a docx.
+- **Real findings, not just placeholder-filling:** the draft's own open "minimum age" placeholder is already answered by the code (13, self-attested at onboarding) and just needed transcribing in. Two real gaps found that aren't wording issues: no Terms of Service document exists anywhere despite being referenced by both the app and the privacy draft, and no in-app account-deletion feature existed — the latter is an Apple App Store hard requirement (Guideline 5.1.1(v)), not optional polish.
+- **Decision: built the missing account-deletion feature this session** (see below), and drafted `TERMS_OF_SERVICE_DRAFT.md` as a companion to the existing privacy draft, same treatment — factual first draft grounded in the actual code/business practices (pricing, 14-day trial, health disclaimer text reused verbatim from onboarding, etc.), openly flagged as NOT legal advice, with the same business-entity blocker. Both drafts should go to a real attorney together, not separately, since they cross-reference each other.
+
+### Decision: member account deletion — built, live, matches Apple's requirement
+- `src/Morphiq.jsx` (ProfileScreen, "Danger zone") now has a "Delete my account" button with a two-step confirm panel, wired to a new `sb.deleteAccount()` helper (`src/shared.jsx`) and a new backend endpoint (`api/delete-account.js`).
+- **Deletion order matters and was checked directly against the database**, not assumed: `meal_logs`, `weight_logs`, and `workout_logs` cascade automatically when a profile is deleted, but `ai_usage`, `cardio_logs`, `grocery_custom_items`, and `water_logs` are set to `NO ACTION` and must be deleted first or the profile delete fails on a foreign-key error. `user_settings` points at `auth.users` directly, also `NO ACTION`, so it's cleared before the actual login (the `auth.users` row) is deleted last via Supabase's admin API — the one step that requires the service-role key, which is why this had to be a backend endpoint and not a direct browser write.
+- Scope: this session built deletion for **Members only** (the account type used inside the branded mobile app being prepared for App Store submission). Gym Owner accounts have their own separate data in the `gyms` table and don't yet have an equivalent self-service deletion path — worth a future session if Gym Owners end up using the packaged app directly rather than the web dashboard.
+- **Not yet live-tested end-to-end** (click the real button, confirm the real account and all its rows actually disappear from Supabase) — deployed and confirmed building/routing correctly, but see punch list.
+
+---
+
 ## Standing technical decisions
 
 - **File structure:** Morphiq.jsx (3,714 lines), WorkoutScreen.jsx (1,421 lines), MealScreen.jsx (585 lines), GymOwnerDashboard.jsx (separate)
