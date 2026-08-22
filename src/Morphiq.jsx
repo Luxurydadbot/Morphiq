@@ -22,6 +22,7 @@ import {
   getFallbackReply, fetchAIReply,
   WeightChart, StreakCalendar, getWeekStreakFromDates, MacroBar,
 } from "./shared.jsx";
+import { computeWeightTrend, computeNutritionAdherence } from "./coachSignals.js";
 
 const useApp = () => useContext(AppContext);
 
@@ -515,7 +516,16 @@ function AppProvider({ children }) {
         weightChange = (last - first).toFixed(1);
       }
 
-      setHistoricalData({ workoutLogs, weightLogs, cardioLogs, mealLogs, waterLogs, streak, weekStreak, totalWorkouts, lastSession, weightChange });
+      // Weight-trend plateau + nutrition adherence signals for the AI coach
+      // (both the home-screen note and the chat) -- see coachSignals.js for
+      // the full method and why it's built this way. Computed here (not on
+      // the backend) because this is exactly where weightLogs/mealLogs are
+      // already loaded, same pattern as weightChange above -- no new
+      // database call, no new backend endpoint.
+      const weightTrend = computeWeightTrend(weightLogs);
+      const nutritionAdherence = computeNutritionAdherence(mealLogs, plan?.calories);
+
+      setHistoricalData({ workoutLogs, weightLogs, cardioLogs, mealLogs, waterLogs, streak, weekStreak, totalWorkouts, lastSession, weightChange, weightTrend, nutritionAdherence });
     } catch(e) { console.warn("[Morphiq] historicalData load failed:", e); }
   }
 
@@ -963,6 +973,7 @@ function HomeDashboardScreen() {
         goal: user.goal,
         weeklyDone, weeklyTarget, streak, totalWorkouts,
         weightChange, lastSession, weekNumber: weekNum, allDone,
+        weightTrend: historicalData?.weightTrend, nutritionAdherence: historicalData?.nutritionAdherence,
         seed: Math.floor(Math.random() * 10000),
         lastSessionExercises: exSummaryR,
         // Sourced from upcomingExercises — the same correctly-computed,
@@ -1044,6 +1055,8 @@ function HomeDashboardScreen() {
         lastSession,
         weekNumber: weekNum,
         allDone,
+        weightTrend: historicalData?.weightTrend,
+        nutritionAdherence: historicalData?.nutritionAdherence,
         seed: Math.floor(Math.random() * 10000),
         lastSessionExercises: exerciseSummary,
         nextWorkoutType: workoutType || null,

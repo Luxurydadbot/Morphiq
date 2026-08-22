@@ -7,7 +7,7 @@ import {
 } from "./shared.jsx";
 
 function ChatScreen({ fromScreen = "home" }) {
-  const { navigate, user, plan, gymBranding, workoutContext, supabaseUser, setPendingAISwap } = useApp();
+  const { navigate, user, plan, gymBranding, workoutContext, supabaseUser, setPendingAISwap, historicalData } = useApp();
   const [msgUsage, setMsgUsage] = useState(null);
   const a = gymBranding.accent;
   const [messages, setMessages] = useState([
@@ -67,7 +67,16 @@ function ChatScreen({ fromScreen = "home" }) {
       const profileId = await sb.getProfileId(supabaseUser?.id).catch(() => null);
       const { text: reply, action, chips, usageCount, usageLimit } = await fetchAIReply(
         userMessages,
-        { ...user, plan, gymName: gymBranding.name, profileId, gymId: gymBranding.gymId || "unknown" },
+        {
+          ...user, plan, gymName: gymBranding.name, profileId, gymId: gymBranding.gymId || "unknown",
+          // Weight-trend plateau + nutrition adherence -- computed once in
+          // Morphiq.jsx's loadHistoricalData (see coachSignals.js) and passed
+          // through context, not recalculated here. Lets the coach answer
+          // accurately if asked something like "why haven't I lost weight"
+          // instead of only knowing the single raw weightChange number.
+          weightTrend: historicalData?.weightTrend,
+          nutritionAdherence: historicalData?.nutritionAdherence,
+        },
         fromScreen,
         workoutContext   // null when not in workout, object when mid-workout
       );
