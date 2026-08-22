@@ -94,6 +94,26 @@ async function handler(req, res) {
   const recentActivity = user.recentActivity || "consistent";
   const goal = user.goal || "general_fitness";
 
+  // Weight-trend plateau + nutrition adherence -- computed client-side in
+  // coachSignals.js (multi-window trend averages, not a single scale
+  // reading; a 7-day rolling calorie average, not a pass/fail compliance
+  // score -- see that file for the full method and why). Passed through
+  // from ChatScreen.jsx so that if a member directly asks something like
+  // "why haven't I lost weight," the coach has the real answer instead of
+  // guessing from a single raw weight number.
+  const weightTrend = user.weightTrend || {};
+  const nutritionAdherence = user.nutritionAdherence || {};
+  let trendContext = "";
+  if (weightTrend.status === "plateau_confirmed") {
+    trendContext = `\nWEIGHT TREND: Flat for several weeks despite consistent logging (recent trend avg ${weightTrend.recentAvgLbs} lbs). If asked about progress or why weight isn't moving, say so plainly and suggest a concrete next step (e.g. reviewing calories/activity) -- never guilt language.`;
+  } else if (weightTrend.status === "plateau_possible") {
+    trendContext = `\nWEIGHT TREND: May be starting to flatten out, but not confirmed yet -- mention only if directly asked, and frame it as early/uncertain.`;
+  }
+  if (nutritionAdherence.status === "off_track") {
+    const dir = nutritionAdherence.pctOff > 0 ? "above" : "below";
+    trendContext += `\nNUTRITION: 7-day average calorie intake is ${Math.abs(nutritionAdherence.pctOff)}% ${dir} target (${nutritionAdherence.avgCalories} vs ${nutritionAdherence.targetCalories} target). If relevant, suggest an adjustment -- never scold or use guilt language.`;
+  }
+
   // Equipment swap rules — mirrors the constraints in the plan generator exactly.
   // When recommending a swap, Claude must respect these or the member can't do the exercise.
   const equipmentSwapRules = equipment === "barbell"
@@ -167,7 +187,7 @@ async function handler(req, res) {
   const system = `You are the Hypergentiq AI personal trainer inside ${user.gymName||"the gym"} app.
 Member: ${user.name||"Member"}, Goal: ${goal}, Weight: ${user.weight||"—"}, Age: ${user.age||"—"}.
 Plan: ${planSummary}.
-Context: Member is viewing ${ctxLabel}.${workoutDetail}
+Context: Member is viewing ${ctxLabel}.${workoutDetail}${trendContext}
 
 ${equipmentSwapRules}
 ${injurySwapRules ? injurySwapRules : "INJURIES: None reported."}

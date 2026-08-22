@@ -17,6 +17,7 @@ async function handler(req, res) {
     name, goal, weeklyDone, weeklyTarget, streak, totalWorkouts,
     weightChange, lastSession, weekNumber, allDone, seed,
     lastSessionExercises, nextWorkoutType, nextWorkoutExercises,
+    weightTrend, nutritionAdherence,
   } = body;
 
   const firstName = (name || "there").split(" ")[0];
@@ -43,6 +44,26 @@ async function handler(req, res) {
       : "Weight holding steady."
     : "";
 
+  // Weight-trend plateau + nutrition adherence -- computed client-side in
+  // coachSignals.js (multi-window trend averages, not a single scale
+  // reading -- see that file for the full method and why). Only turned
+  // into a line here when there's actually something worth mentioning --
+  // "trending"/"on_track"/"insufficient_data" add nothing, so the note
+  // stays about whatever's most useful instead of getting padded with
+  // non-news every single day.
+  let trendNote = "";
+  if (weightTrend?.status === "plateau_confirmed") {
+    trendNote = `Weight trend has been flat for a few weeks despite consistent logging (recent avg ${weightTrend.recentAvgLbs} lbs) — worth a forward-looking suggestion, never a guilt-trip.`;
+  } else if (weightTrend?.status === "plateau_possible") {
+    trendNote = `Weight trend looks like it may be starting to flatten out — soft signal, only mention if it fits naturally.`;
+  }
+
+  let adherenceNote = "";
+  if (nutritionAdherence?.status === "off_track") {
+    const dir = nutritionAdherence.pctOff > 0 ? "above" : "below";
+    adherenceNote = `7-day average calorie intake is ${Math.abs(nutritionAdherence.pctOff)}% ${dir} target (${nutritionAdherence.avgCalories} vs ${nutritionAdherence.targetCalories}) — if relevant, suggest adjusting the plan, never scold.`;
+  }
+
   // Prefer naming the actual next exercises (now sourced correctly from
   // the member's real, day-specific upcoming list on the frontend — see
   // Morphiq.jsx). Fall back to just the day label if exercise names aren't
@@ -64,6 +85,8 @@ WHAT YOU KNOW ABOUT THEM:
 - Total sessions: ${totalWorkouts || 0}
 - Streak: ${streak || 0} days
 - ${weightNote}
+- ${trendNote}
+- ${adherenceNote}
 - Seed: ${seed}
 
 WRITE ONE SENTENCE, max 20 words. Examples of the RIGHT tone:
