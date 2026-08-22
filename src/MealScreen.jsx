@@ -185,9 +185,12 @@ function HungryButton({ calsLeft, proteinLeft, carbsLeft, fatLeft, goal }) {
           <div style={{ fontSize: 11, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>Remaining today</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "baseline" }}>
             <div><span style={{ fontSize: 24, fontWeight: 700, color: "#EDEEF0" }}>{calsLeft}</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>cal</span></div>
-            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#7C93B8" }}>{proteinLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>protein</span></div>
-            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#5FA8E0" }}>{carbsLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>carbs</span></div>
-            <div><span style={{ fontSize: 24, fontWeight: 700, color: "#2D5FA8" }}>{fatLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>fat</span></div>
+            {/* Bryant, Aug 2026: matched to the gym accent color, same as the
+                Today's Food card above -- was three fixed macro-color blues,
+                now uniform with the rest of the nutrition stats on this page. */}
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: a }}>{proteinLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>protein</span></div>
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: a }}>{carbsLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>carbs</span></div>
+            <div><span style={{ fontSize: 24, fontWeight: 700, color: a }}>{fatLeft}g</span><span style={{ fontSize: 12, color: theme.textDim, marginLeft: 3 }}>fat</span></div>
           </div>
         </div>
         {state === "idle" && (

@@ -771,8 +771,16 @@ function PlanOverviewScreen() {
       </div>
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Daily targets</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
-          {[[plan?.calories?.toLocaleString() || "—", "Calories", "100%", a], [`${plan?.protein || "—"}g`, "Protein", "72%", "#7C93B8"], [`${plan?.carbs || "—"}g`, "Carbs", "55%", "#5FA8E0"]].map(([v, l, w, c]) => (
+        {/* Bryant, Aug 2026: was 3 tiles (Calories/Protein/Carbs) missing Fat
+            entirely -- added the 4th tile so this matches the Calories/
+            Protein/Carbs/Fat set shown everywhere else in the app. Colors
+            switched from fixed macro-color blues to the gym accent (`a`),
+            same reasoning as the other nutrition displays: the label next
+            to each number already differentiates it, and this is a
+            white-label app where gymBranding.accent should theme
+            everything, not just some of it. */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8 }}>
+          {[[plan?.calories?.toLocaleString() || "—", "Calories", "100%", a], [`${plan?.protein || "—"}g`, "Protein", "72%", a], [`${plan?.carbs || "—"}g`, "Carbs", "55%", a], [`${plan?.fat || "—"}g`, "Fat", "35%", a]].map(([v, l, w, c]) => (
             <div key={l} style={{ background: theme.surface, border: `0.5px solid ${theme.border}`, borderRadius: 12, padding: ".85rem .75rem" }}>
               <div style={{ fontSize: 20, fontWeight: 500, color: "#EDEEF0" }}>{v}</div>
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>{l}</div>
@@ -1515,7 +1523,9 @@ function ProfileScreen() {
         {/* Daily targets */}
         <div style={sL}>Daily Targets</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-          {[[(plan?.calories?.toLocaleString() || "1,800"), "Calories", a], [(plan?.protein ? plan.protein + "g" : "140g"), "Protein", "#7C93B8"], [(plan?.carbs ? plan.carbs + "g" : "160g"), "Carbs", "#5FA8E0"], [(plan?.fat ? plan.fat + "g" : "55g"), "Fat", "#2D5FA8"]].map(([v, l, c]) => (
+          {/* Bryant, Aug 2026: switched from fixed macro-color blues to the
+              gym accent color, matching Home/Meals/Progress/Plan-ready. */}
+          {[[(plan?.calories?.toLocaleString() || "1,800"), "Calories", a], [(plan?.protein ? plan.protein + "g" : "140g"), "Protein", a], [(plan?.carbs ? plan.carbs + "g" : "160g"), "Carbs", a], [(plan?.fat ? plan.fat + "g" : "55g"), "Fat", a]].map(([v, l, c]) => (
             <div key={l} style={{ background: "#212429", borderRadius: 12, padding: "10px 12px" }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: c }}>{v}</div>
               <div style={{ fontSize: 11, color: theme.textDim, marginTop: 2 }}>{l}</div>
