@@ -574,6 +574,14 @@ function WorkoutScreen() {
   // either case instead of needing two separate components.
   const [nudgeSource, setNudgeSource] = useState(null);
   const [showSwapSheet, setShowSwapSheet] = useState(false);  // controls the swap picker sheet
+  // "Switch exercise" — new this session, Bryant's ask via a member's real
+  // gym experience: someone's on the equipment you need, so let them jump
+  // straight to a different exercise already on today's list (any time,
+  // even mid-set) instead of waiting or picking a random substitute. This
+  // is deliberately separate from showSwapSheet above -- that one REPLACES
+  // an exercise with a different one; this one just changes which of
+  // today's already-planned exercises you're doing right now.
+  const [showExerciseList, setShowExerciseList] = useState(false);
   const [swapConfirmName, setSwapConfirmName] = useState(null); // shows "Swapped in X ✓" briefly
   const [voiceSwapActive, setVoiceSwapActive] = useState(false); // mic open inside swap sheet
   const [voiceSwapHeard, setVoiceSwapHeard] = useState("");     // what the mic captured
@@ -604,6 +612,115 @@ function WorkoutScreen() {
   const safeExIdx = Math.min(exIdx, exercises.length - 1);
   const ex = exercises[safeExIdx];
   const nextEx = exercises[safeExIdx + 1];
+
+  // ── "Switch exercise" feature (new this session) ──────────────────────
+  // How many DISTINCT set positions have been logged for a given exercise
+  // index so far, regardless of when/in-what-order they were logged. Uses a
+  // Set so a corrected/re-logged set never double-counts. This only works
+  // because logSet() already tags every entry with exIdx (see logSet()
+  // below) -- nothing about how sets get saved needed to change for
+  // jumping around to work correctly.
+  function loggedSetCountForExercise(idx) {
+    return new Set(loggedSets.filter(l => l.exIdx === idx).map(l => l.setIdx)).size;
+  }
+  function isExerciseComplete(idx) {
+    const exObj = exercises[idx];
+    if (!exObj) return true;
+    return loggedSetCountForExercise(idx) >= totalSetsForExercise(exObj);
+  }
+  // Pure lookup, no state changes: what should happen once the CURRENT
+  // exercise's own sets run out? Shared by the real transition (advanceSet,
+  // below) and the "Up next" preview shown during rest, so the two can
+  // never predict differently from each other.
+  //   - "done": every exercise on today's list is finished.
+  //   - "exercise": exactly one exercise is left and it's the very next one
+  //     in the list -- the normal, nothing-was-skipped case. Auto-continue
+  //     seamlessly, exactly like before this feature existed.
+  //   - "checkpoint": something got skipped earlier (or more than one
+  //     exercise is still open) -- pause and let the member choose, rather
+  //     than silently guessing which one they want next.
+  function resolveNextExercise(afterIdx) {
+    const stillOpen = exercises.map((_, i) => i).filter(i => i !== afterIdx && !isExerciseComplete(i));
+    if (stillOpen.length === 0) return { kind: "done" };
+    const naturalNext = afterIdx + 1;
+    if (stillOpen.length === 1 && stillOpen[0] === naturalNext) return { kind: "exercise", idx: naturalNext };
+    return { kind: "checkpoint" };
+  }
+  // Jump straight to a different exercise on today's list. Allowed any
+  // time, including mid-exercise/mid-set -- Bryant's call: someone's on the
+  // machine you need, so you switch right now and come back later, instead
+  // of waiting around or getting a random substitute exercise.
+  function jumpToExercise(targetIdx) {
+    setShowExerciseList(false);
+    if (targetIdx === exIdx) return; // already there
+    setShowBigJumpConfirm(false);
+    setRepCount(null);
+    setWeightOverride(null);
+    setNudgedWeight(null);
+    setNudgeSource(null);
+    nudgeAcceptedRef.current = false;
+    setExIdx(targetIdx);
+    // Resume the target exercise right where it was left off -- picks up
+    // after however many sets are already logged for it (same convention
+    // computeResumedPosition() above already uses for reopening the app
+    // mid-workout), or set 1 if it's never been started.
+    const total = totalSetsForExercise(exercises[targetIdx]);
+    setSetIdx(Math.min(loggedSetCountForExercise(targetIdx), Math.max(0, total - 1)));
+    setState("active");
+  }
+  // One row in the "today's list" picker -- shared by the full switch-
+  // exercise sheet and the shorter "exercises left" checkpoint screen below,
+  // so both always agree on each exercise's real progress.
+  function exerciseRow(i) {
+    const exObj = exercises[i];
+    if (!exObj) return null;
+    const total = totalSetsForExercise(exObj);
+    const done = Math.min(loggedSetCountForExercise(i), total);
+    const complete = done >= total;
+    const isCurrent = i === exIdx;
+    return (
+      <button key={i} onClick={() => jumpToExercise(i)}
+        style={{ width: "100%", background: isCurrent ? "#0A1628" : "#212429", border: isCurrent ? `1px solid rgba(76,141,255,0.4)` : "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#EDEEF0" }}>{i + 1}. {exObj.name}{isCurrent ? " · current" : ""}</div>
+          <div style={{ fontSize: 11, color: complete ? theme.success : "#6E7480", marginTop: 2 }}>
+            {complete ? <><Icon name="check" size={10} style={{ verticalAlign: "-1px", marginRight: 3 }} /> Done</> : done > 0 ? `${done} of ${total} sets done` : "Not started"}
+          </div>
+        </div>
+        {!isCurrent && (
+          <div style={{ background: "#0B1E3D", border: `1px solid rgba(76,141,255,0.25)`, borderRadius: 8, padding: "5px 10px", fontSize: 11, color: a, fontWeight: 600, flexShrink: 0, marginLeft: 10 }}>
+            {done > 0 && !complete ? "Continue" : "Switch"}
+          </div>
+        )}
+      </button>
+    );
+  }
+  // The full "today's list" sheet -- reachable from both the active-set
+  // screen and the rest screen (two separate early `return`s below), so
+  // it's written once here and called from both instead of copy-pasted
+  // twice. Copy-pasted JSX drifting apart between two spots is exactly what
+  // caused an earlier bug in this file (see normalizeExercise() comment
+  // above) -- not repeating that here.
+  function renderExerciseListSheet() {
+    if (!showExerciseList) return null;
+    return (
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end", borderRadius: 20 }}>
+        <div className="mq-fade" style={{ background: "#1B1D21", borderRadius: "20px 20px 20px 20px", padding: "20px 16px 24px", maxHeight: "80vh", overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#EDEEF0" }}>Today's exercises</div>
+              <div style={{ fontSize: 12, color: "#9BA0AA", marginTop: 2 }}>Tap any exercise to switch to it — your progress on each one is saved</div>
+            </div>
+            <button onClick={() => setShowExerciseList(false)}
+              style={{ background: "#212429", border: "none", borderRadius: 8, width: 30, height: 30, color: "#6E7480", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="x" size={15} /></button>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            {exercises.map((_, i) => exerciseRow(i))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Persist progress whenever position changes, so reopening resumes here.
   // Fire-and-forget — a storage failure must never crash the workout.
@@ -967,16 +1084,31 @@ function WorkoutScreen() {
       // Same exercise, next set in the plan (warm-up or working) — keep nudge
       setSetIdx(safeSetIdx + 1);
       setState("active");
-    } else if (exIdx < exercises.length - 1) {
-      // New exercise — clear nudge state, restart the plan at set 0
-      setNudgedWeight(null);
-      setNudgeSource(null);
-      nudgeAcceptedRef.current = false;
-      setExIdx(i => i + 1);
+      return;
+    }
+    // Just finished the last set of this exercise — clear nudge state
+    // either way, then figure out what's next. Used to just always move to
+    // exIdx+1 and call it "done" once the array ran out; now that members
+    // can jump around with "switch exercise" (see resolveNextExercise()
+    // above), the plain next-in-array slot might already be finished, or an
+    // earlier skipped exercise might still be open — so ask
+    // resolveNextExercise() instead of assuming.
+    setNudgedWeight(null);
+    setNudgeSource(null);
+    nudgeAcceptedRef.current = false;
+    const predicted = resolveNextExercise(exIdx);
+    if (predicted.kind === "done") {
+      setState("done");
+    } else if (predicted.kind === "exercise") {
+      // Nothing was skipped — seamless auto-continue, same as before.
+      setExIdx(predicted.idx);
       setSetIdx(0);
       setState("active");
     } else {
-      setState("done");
+      // Something else on today's list still needs finishing and it isn't
+      // simply "the next one" — pause and let the member pick, instead of
+      // silently guessing. See the "checkpoint" screen below.
+      setState("checkpoint");
     }
   }
 
@@ -1580,6 +1712,34 @@ function WorkoutScreen() {
     );
   }
 
+  // "Checkpoint" — new this session. Reached instead of the "done" screen
+  // when the member just finished an exercise but "switch exercise" was
+  // used to skip around earlier, so today's list isn't actually finished
+  // top to bottom yet (see resolveNextExercise() / advanceSet() above).
+  // Deliberately positive, no-guilt wording per the app's design rules —
+  // this is a normal thing to happen, not a mistake to call out.
+  if (state === "checkpoint") {
+    const stillOpen = exercises.map((_, i) => i).filter(i => !isExerciseComplete(i));
+    return (
+      <Layout activeNav="workout" chatTarget="chat_workout">
+        <div className="mq-fade" style={{ padding: "2rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1 }}>
+          <div style={{ marginBottom: 12, color: a }}><Icon name="clipboard" size={32} /></div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 4 }}>Nice work on {ex.name}!</div>
+          <div style={{ fontSize: 13, color: theme.textDim, marginBottom: "1.25rem" }}>
+            {stillOpen.length === 1 ? "1 exercise" : `${stillOpen.length} exercises`} left on today's list — pick one up whenever you're ready.
+          </div>
+          <div style={{ width: "100%", marginBottom: 14 }}>
+            {stillOpen.map(i => exerciseRow(i))}
+          </div>
+          <button onClick={() => setState("done")}
+            style={{ width: "100%", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "12px", fontSize: 13, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>
+            Finish workout without them
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
   if (state === "rest") {
     const RING_SIZE = 220;
     const wasSkipped = lastLoggedReps === 0;
@@ -1703,8 +1863,19 @@ function WorkoutScreen() {
           {(() => {
             const next = setPlan[safeSetIdx + 1];
             const afterNext = setPlan[safeSetIdx + 2];
-            const upNextIsNewExercise = !next && !!nextEx;
-            const upNextExercise = upNextIsNewExercise ? nextEx : ex;
+            // Bug fix, this session: this used to always assume "next
+            // exercise" meant exercises[safeExIdx + 1] (nextEx) — true only
+            // when nothing was ever skipped. Now that "switch exercise"
+            // lets members do their list out of order, ask the same
+            // resolveNextExercise() function advanceSet() itself uses, so
+            // this preview and the real transition can never disagree. If
+            // resolveNextExercise says the real next stop is the
+            // "checkpoint" screen (something skipped earlier still needs
+            // finishing), there's no single exercise to preview here.
+            const predictedNext = resolveNextExercise(exIdx);
+            const predictedNextEx = predictedNext.kind === "exercise" ? exercises[predictedNext.idx] : null;
+            const upNextIsNewExercise = !next && !!predictedNextEx;
+            const upNextExercise = upNextIsNewExercise ? predictedNextEx : ex;
             // "After that" now resolves to the TRUE next set in sequence:
             // another set of the CURRENT exercise if one remains after "up
             // next" (same exercise, own weight/reps), otherwise the
@@ -1715,7 +1886,9 @@ function WorkoutScreen() {
             // several sets in a row while silently skipping the sets that
             // were actually coming up sooner.
             const afterThatSet = !upNextIsNewExercise && afterNext ? afterNext : null;
-            const afterThatExercise = afterThatSet ? null : (upNextIsNewExercise ? exercises[safeExIdx + 2] : nextEx);
+            const afterThatExercise = afterThatSet ? null : (upNextIsNewExercise
+              ? (resolveNextExercise(predictedNext.idx).kind === "exercise" ? exercises[resolveNextExercise(predictedNext.idx).idx] : null)
+              : predictedNextEx);
             // Preview weight for an upcoming set of the CURRENT exercise --
             // both `next` and `afterThatSet` are pulled straight from this
             // exercise's own setPlan (see currentSpec above), same as
@@ -1748,7 +1921,7 @@ function WorkoutScreen() {
                       // shows the working max as what's coming up next.
                       <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{next.label} · {previewWeight(next)} lbs · {next.targetReps} reps</div>
                     ) : upNextIsNewExercise ? (
-                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{nextEx.sets} sets · {nextEx.targetReps} reps</div>
+                      <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>{predictedNextEx.sets} sets · {predictedNextEx.targetReps} reps</div>
                     ) : (
                       <div style={{ fontSize: 13, color: theme.textDim, marginTop: 3 }}>Last set done — nice work</div>
                     )}
@@ -1795,7 +1968,17 @@ function WorkoutScreen() {
             Skip rest — I'm ready
           </button>
 
+          {/* "Switch exercise" entry point, rest-screen version — new this
+              session. Someone might realize mid-rest that they'd rather do a
+              different exercise next (e.g. the equipment they need just
+              opened up, or the one they need is now taken). */}
+          <button onClick={() => setShowExerciseList(true)}
+            style={{ width: "100%", background: "transparent", border: "none", padding: "8px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+            Or switch to a different exercise
+          </button>
+
         </div>
+        {renderExerciseListSheet()}
       </Layout>
     );
   }
@@ -1829,6 +2012,20 @@ function WorkoutScreen() {
             </div>
           </div>
         )}
+
+        {/* "Switch exercise" entry point — new this session, Bryant's ask:
+            someone's on the equipment you need, so let them jump straight
+            to a different exercise on today's list instead of waiting or
+            picking a random substitute. Put in plain, spelled-out words
+            right at the top, next to the exercise name, so it's impossible
+            to miss — this needs to be obvious, not a hidden feature. */}
+        <div style={{ textAlign: "center", marginBottom: 8 }}>
+          <button onClick={() => setShowExerciseList(true)}
+            style={{ background: "#171920", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "7px 16px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Icon name="clipboard" size={12} style={{ color: a }} />
+            Today's list — switch exercise anytime
+          </button>
+        </div>
 
         {/* Header — exercise name front and center */}
         <div style={{ textAlign: "center", marginBottom: 10 }}>
@@ -2184,6 +2381,8 @@ function WorkoutScreen() {
           </div>
         </div>
       )}
+
+      {renderExerciseListSheet()}
 
     </Layout>
   );
