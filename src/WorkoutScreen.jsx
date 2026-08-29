@@ -2013,20 +2013,6 @@ function WorkoutScreen() {
           </div>
         )}
 
-        {/* "Switch exercise" entry point — new this session, Bryant's ask:
-            someone's on the equipment you need, so let them jump straight
-            to a different exercise on today's list instead of waiting or
-            picking a random substitute. Put in plain, spelled-out words
-            right at the top, next to the exercise name, so it's impossible
-            to miss — this needs to be obvious, not a hidden feature. */}
-        <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <button onClick={() => setShowExerciseList(true)}
-            style={{ background: "#171920", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "7px 16px", fontSize: 12, color: theme.textDim, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <Icon name="clipboard" size={12} style={{ color: a }} />
-            Today's list — switch exercise anytime
-          </button>
-        </div>
-
         {/* Header — exercise name front and center */}
         <div style={{ textAlign: "center", marginBottom: 10 }}>
           <div style={{ fontSize: 10, color: theme.textDim, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 6 }}>
@@ -2228,15 +2214,34 @@ function WorkoutScreen() {
           </div>
         )}
 
-        {/* Bottom actions */}
+        {/* Bottom actions — Bryant's ask (this session): Skip set / Swap /
+            Log reps are all the same "type of card" (the three things you
+            can do with the set in front of you right now), so all three now
+            match on font weight and size (bold, 13px) instead of Skip/Swap
+            being small (10px, not bold) while only Log reps stood out. Log
+            reps keeps its own filled accent background and slightly wider
+            flex -- it's still the one button tapped on literally every set,
+            so it should still read as the main action at a glance, just no
+            longer via a different, smaller font on the other two. */}
         <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
           <button onClick={() => { logSet(0); }}
-            style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
+            style={{ flex: 1, background: "transparent", border: `1px solid rgba(255,255,255,0.15)`, borderRadius: 10, padding: "12px 6px", fontSize: 13, fontWeight: 700, color: theme.textDim, cursor: "pointer", fontFamily: "inherit" }}>Skip set</button>
           <button onClick={() => setShowSwapSheet(true)}
-            style={{ flex: 1, background: "rgba(76,141,255,0.06)", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 10, padding: "9px 6px", fontSize: 10, color: a, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Icon name="swap" size={11} /> Swap</button>
+            style={{ flex: 1, background: "rgba(76,141,255,0.06)", border: `1px solid rgba(76,141,255,0.3)`, borderRadius: 10, padding: "12px 6px", fontSize: 13, fontWeight: 700, color: a, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Icon name="swap" size={13} /> Swap</button>
           <button onClick={handleLogTap}
-            style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "9px 6px", fontSize: 12, color: "#0B1E3D", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Log {displayReps} reps <Icon name="check" size={13} /></button>
+            style={{ flex: 2, background: a, border: "none", borderRadius: 10, padding: "12px 6px", fontSize: 13, color: "#0B1E3D", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>Log {displayReps} reps <Icon name="check" size={14} /></button>
         </div>
+
+        {/* "Switch exercise" entry point — Bryant's ask (this session):
+            moved below the Skip set / Swap / Log reps row instead of up by
+            the exercise name, and styled to match that row's new bold,
+            13px font instead of the smaller pill it used to be. Still in
+            plain, spelled-out words so it's obvious, not hidden. */}
+        <button onClick={() => setShowExerciseList(true)}
+          style={{ width: "100%", marginTop: 6, background: "#171920", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "12px 6px", fontSize: 13, fontWeight: 700, color: theme.textDim, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <Icon name="clipboard" size={13} style={{ color: a }} />
+          Today's list — switch exercise anytime
+        </button>
 
         <div style={{ marginTop: 8, display: "flex", justifyContent: "center", gap: 16, alignItems: "center" }}>
           <div style={{ fontSize: 12, color: theme.textDim, fontWeight: 500 }}>
