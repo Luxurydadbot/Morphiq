@@ -35,8 +35,11 @@ Bryant relayed a real observation from a friend testing the app at the gym: the 
 
 **This feature is now fully verified, not just code-reviewed — safe to consider done.**
 
-**One thing noticed along the way, not touched, still flagged for Bryant (unchanged from before, and re-confirmed live this session):**
-- **Pre-existing bug, not caused by this session's work:** the "Workout complete" screen's per-exercise breakdown (sets/best reps/volume per exercise) filters `loggedSets` by `l.exerciseName` — but logged-set entries only ever store `exIdx`/`setIdx`/`reps`/`weight`/`kind`, never `exerciseName`. Live-testing this session reproduced it directly: the completion screen's top-line stats (6 sets, 1,200 lbs) were correct, but every row in the "Exercise breakdown" list below showed "0 sets · best 0 reps" regardless of what was actually logged. Did not fix it — it's unrelated to what was asked this session and touches different display code. Worth a short follow-up session if Bryant wants it fixed (`src/WorkoutScreen.jsx`, three spots currently reading `l.exerciseName`, need to key off `l.exIdx` instead, same pattern this session's new code already uses).
+**Then Bryant asked to have that pre-existing display bug fixed too (third commit, `656b61c`):** the "Workout complete" screen's per-exercise breakdown, and the in-workout "This exercise" sets-so-far panel, both used to filter `loggedSets` by `l.exerciseName` — but logged-set entries only ever store `exIdx`/`setIdx`/`reps`/`weight`/`kind`, never `exerciseName`, so both displays always came back empty regardless of what was actually logged. Fixed by matching on `l.exIdx` instead (the field that's actually set on every logged entry, and the same field `loggedSetCountForExercise()` already uses elsewhere in this file) — four read sites changed across the two displays, all in `src/WorkoutScreen.jsx`. Left the one legitimate use of `exerciseName` alone: `insertWorkoutLog()`'s write to the separate Supabase `workout_logs` table has its own real `exercise_name` column and was never broken.
+
+**Live-tested this fix too, same session, fresh throwaway account ("BugFixTest," same plain sbcglobal.net address):** logged sets on Goblet squat and watched the in-workout "This exercise" panel go from not appearing at all (the old broken behavior) to showing each logged set correctly as it was added, plus the correct current-set ghost card. Used "Finish workout without them" to reach the completion screen and confirmed the "Exercise breakdown" list now shows "Goblet squat — 3 sets · best 8 reps — 600 lbs" (matching exactly what was logged), while the four untouched exercises correctly show 0 (they genuinely weren't touched — that's correct, not the bug). Test account cleaned up and double-checked gone from Supabase afterward, same as every other test this session.
+
+**This bug is now fixed and live-verified — no longer an open item.**
 
 ## Session 47 recap — carried forward, unchanged
 
@@ -52,18 +55,19 @@ Live-verified Session 44's fixes, fixed a real Meals-screen gap, unified nutriti
 
 ## Files touched this session (final line counts)
 
-Only one file changed this session: `src/WorkoutScreen.jsx` **2,865 → 3,064 → 3,069** across two commits (+204 lines total — the switch-exercise feature itself, plus the small button restyle/reposition). Both diffs reviewed line by line before pushing, nothing accidentally deleted.
+Only one file changed this session: `src/WorkoutScreen.jsx` **2,865 → 3,064 → 3,069 → 3,078** across three commits (+213 lines total — the switch-exercise feature, the button restyle/reposition, and the exerciseName-to-exIdx display fix, which added mostly explanatory comments). All three diffs reviewed line by line before pushing, nothing accidentally deleted.
 
 Untouched this session, still current: `src/shared.jsx` 3,716 (largest, watch this one — do not add to this file without proposing a split first, it's within ~85 lines of the 3,800 hard limit), `src/Morphiq.jsx` 1,755, `src/GymOwnerDashboard.jsx` 927, `src/MealScreen.jsx` 869, `src/ProgressScreen.jsx` 657, `src/OnboardingScreen.jsx` 622, `src/SuperAdminDashboard.jsx` 343, `src/ChatScreen.jsx` 309, `src/CardioScreen.jsx` 295, `src/GymSignupScreen.jsx` 269. `api/` unchanged, still at exactly 12 files (the Vercel Hobby-plan cap) — none near any size concern individually.
 
 ## Latest commit
 
-`73a9784` — "Fix: reposition and restyle the switch-exercise button" (`src/WorkoutScreen.jsx` only). Previous commit this session: `fac2330` — "Feature: switch exercise anytime during a workout."
+`656b61c` — "Fix: exercise-breakdown and sets-logged displays showed 0 sets" (`src/WorkoutScreen.jsx` only). Earlier this session: `73a9784` — "Fix: reposition and restyle the switch-exercise button," and `fac2330` — "Feature: switch exercise anytime during a workout."
 
 ## Confirmed working vs still open
 
 **Built, deployed, AND live-tested end to end this session — fully verified, not just code-reviewed:**
 - The "switch exercise" feature in full: the "Today's list" sheet, jump-to-any-exercise-anytime (including mid-set), per-exercise progress preservation, the corrected "Up next"/"After that" preview, the new checkpoint screen (including its "Finish workout without them" escape hatch), and the restyled/repositioned button row. See Session 48 write-up above for the exact live-test steps and results. Nothing found broken.
+- The exercise-breakdown / "This exercise" display fix (`exerciseName` → `exIdx`) — live-tested with a fresh throwaway account, confirmed both displays now show real numbers instead of always-zero. No longer an open item.
 
 **Confirmed live in prior sessions, via direct database verification, direct visual inspection, and live production endpoint tests — unchanged, still true:**
 - `api/delete-account.js` and the Profile screen's Danger Zone flow — fully live-verified, Session 47 (and exercised again this session to clean up the test account, still works).
@@ -74,9 +78,6 @@ Untouched this session, still current: `src/shared.jsx` 3,716 (largest, watch th
 - The weight chart real-phone swipe test.
 - The cardio timer real-phone lock-screen test.
 - Everything else on the punch list below.
-
-**Confirmed again this session, not fixed, still not urgent:**
-- Pre-existing bug: the "Workout complete" screen's per-exercise breakdown keys off a `loggedSets` field (`exerciseName`) that's never actually set — reproduced directly in this session's live test (top-line stats correct, per-exercise rows all show 0). See Session 48 write-up above for the exact fix if Bryant wants it done.
 
 ## Punch list, in priority order
 
@@ -94,7 +95,7 @@ Untouched this session, still current: `src/shared.jsx` 3,716 (largest, watch th
 
 **RULED OUT — do not re-propose without new information:** camera/video-based AI form-checking (Session 44 research).
 
-**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only); the "blank exercise weight saves as 20 lbs instead of staying blank" quirk; the "Workout complete" screen's per-exercise breakdown silently shows empty because it keys off a `loggedSets` field that's never populated (see Session 48 above) — a real bug, but cosmetic/display-only, not urgent.
+**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only); the "blank exercise weight saves as 20 lbs instead of staying blank" quirk. **Resolved this session, removed from this list:** the "Workout complete" screen's per-exercise breakdown and in-workout "This exercise" panel used to silently show empty/zero — fixed and live-verified, see Session 48 above.
 
 ## Technical notes carried forward
 
@@ -102,7 +103,7 @@ Untouched this session, still current: `src/shared.jsx` 3,716 (largest, watch th
 
 **AT&T/Yahoo Mail does not support "+" sub-addressing.** A "+" tag on an sbcglobal.net/AT&T/Yahoo address (e.g. `name+tag@sbcglobal.net`) silently fails to deliver — no bounce, no error, it just never arrives. Never use a "+" alias on Bryant's real sbcglobal.net address to test anything — use the plain address, or a genuinely separate inbox. Used the plain address again this session for the "SwitchExTest" live-test account.
 
-**GitHub push access.** Direct/automatic push still broken (git-proxy error, both via `git push` and the GitHub REST API directly). Working method unchanged: Chrome browser tool's "Upload files" page (`github.com/Luxurydadbot/Morphiq/upload/main/<folder>`), staging finished file(s) in `/mnt/user-data/outputs/` first — this exact path is required. Confirmed working cleanly twice more this session (commits `fac2330` and `73a9784`).
+**GitHub push access.** Direct/automatic push still broken (git-proxy error, both via `git push` and the GitHub REST API directly). Working method unchanged: Chrome browser tool's "Upload files" page (`github.com/Luxurydadbot/Morphiq/upload/main/<folder>`), staging finished file(s) in `/mnt/user-data/outputs/` first — this exact path is required. Confirmed working cleanly three more times this session (commits `fac2330`, `73a9784`, and `656b61c`).
 
 **Vercel Hobby plan has a hard cap of 12 serverless functions per deployment.** Unchanged — `api/` is currently at exactly 12 files. Any new backend feature needs either a merge of two more low-traffic files or a decision from Bryant on Vercel Pro ($20/mo).
 
@@ -120,6 +121,6 @@ Untouched this session, still current: `src/shared.jsx` 3,716 (largest, watch th
 
 Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (reads work fine; do NOT use WebFetch for repo file contents). Report every file's line count before doing anything else; none are near the 3,800-line limit (`shared.jsx` is largest and unchanged at 3,716 — do not add to it without proposing a split first). **GitHub push access:** still broken (platform-side git-proxy block) — use the Upload-files browser workaround, staging files in `/mnt/user-data/outputs/` specifically. **`api/` is at exactly 12 files — the Vercel Hobby-plan cap.** **Never use a "+" alias on Bryant's real sbcglobal.net address.**
 
-**The "switch exercise" feature (Session 48) is now fully done — built, restyled per Bryant's feedback, and live-tested end to end in the real app, including the checkpoint screen's escape hatch and the true workout-completion screen.** No further action needed unless Bryant reports something new. Next priority is the standing app-store roadmap (privacy policy/ToS blocked on the business entity, Android Studio never opened by a human) or whatever Bryant raises first.
+**The "switch exercise" feature (Session 48) is now fully done — built, restyled per Bryant's feedback, and live-tested end to end in the real app, including the checkpoint screen's escape hatch and the true workout-completion screen.** The old "0 sets" display bug Bryant asked about is also fixed and live-verified now — not just flagged anymore. No further action needed on either unless Bryant reports something new. Next priority is the standing app-store roadmap (privacy policy/ToS blocked on the business entity, Android Studio never opened by a human) or whatever Bryant raises first.
 
-Remind Bryant: this session finished exactly what he asked for. Members can now tap "Today's list" during a workout to jump to any exercise at any time (even mid-set), so being blocked by gym equipment no longer means picking a random substitute or waiting around. If they skip one and finish the rest, the app gently offers to jump them into the leftover exercise instead of silently ending the workout — and there's a "finish without it" option too if they'd rather stop. The button row was also cleaned up per his feedback: Skip set / Swap / Log reps / Today's list now all match in bold, and Today's list sits below the other three instead of up top. All of this was clicked through live in the real app this session and everything worked correctly on the first pass. Also re-confirmed (not fixed): the pre-existing, unrelated display bug where the workout-complete screen's per-exercise breakdown always shows "0 sets" even though the total stats above it are correct. Everything else — privacy policy/ToS (blocked on the business entity), Android Studio, the 12-function cap — unchanged from before.
+Remind Bryant: this session finished exactly what he asked for, twice over. Members can now tap "Today's list" during a workout to jump to any exercise at any time (even mid-set), so being blocked by gym equipment no longer means picking a random substitute or waiting around. If they skip one and finish the rest, the app gently offers to jump them into the leftover exercise instead of silently ending the workout — and there's a "finish without it" option too if they'd rather stop. The button row was also cleaned up per his feedback: Skip set / Swap / Log reps / Today's list now all match in bold, and Today's list sits below the other three instead of up top. Then, on his follow-up ask, the old display bug got fixed too: the "This exercise" panel during a workout and the per-exercise breakdown on the completion screen now show real numbers instead of always reading zero. All of this was clicked through live in the real app this session and everything worked correctly. Everything else — privacy policy/ToS (blocked on the business entity), Android Studio, the 12-function cap — unchanged from before.
