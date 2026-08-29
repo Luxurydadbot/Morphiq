@@ -1683,7 +1683,13 @@ function WorkoutScreen() {
           <div style={{ width: "100%", background: "#171920", borderRadius: 12, padding: "10px 14px", marginBottom: overloadApplied ? 10 : "1.5rem" }}>
             <div style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Exercise breakdown</div>
             {exercises.map((ex, i) => {
-              const exSets = loggedSets.filter(l => l.exerciseName === ex.name);
+              // Fix (session 49): this used to match on l.exerciseName, but
+              // logged-set entries only ever store exIdx/setIdx/reps/weight/
+              // kind (see logSet() and the session-48 resolveNextExercise
+              // work) -- exerciseName was never actually set, so this always
+              // came back empty. Match on exIdx instead, same field every
+              // other per-exercise lookup in this file already uses.
+              const exSets = loggedSets.filter(l => l.exIdx === i);
               const bestReps = exSets.length > 0 ? Math.max(...exSets.map(l => l.reps)) : 0;
               const totalExVol = exSets.reduce((acc, l) => acc + l.reps * l.weight, 0);
               return (
@@ -2132,12 +2138,15 @@ function WorkoutScreen() {
           </div>
         )}
 
-        {/* Sets logged this exercise — shows after first set is done */}
-        {loggedSets.filter(l => l.exerciseName === ex.name).length > 0 && (
+        {/* Sets logged this exercise — shows after first set is done.
+            Fix (session 49): matched on l.exerciseName before, which is
+            never set on a logged-set entry (see the "Exercise breakdown"
+            fix above for the same root cause) -- match on exIdx instead. */}
+        {loggedSets.filter(l => l.exIdx === safeExIdx).length > 0 && (
           <div style={{ background: "#171920", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}>
             <div style={{ fontSize: 9, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>This exercise</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {loggedSets.filter(l => l.exerciseName === ex.name).map((l, i) => (
+              {loggedSets.filter(l => l.exIdx === safeExIdx).map((l, i) => (
                 <div key={i} style={{ background: "#212429", borderRadius: 8, padding: "5px 9px", textAlign: "center" }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: l.reps > 0 ? a : theme.textFaint }}>
                     {l.reps > 0 ? `${l.reps} reps` : "skipped"}
@@ -2147,7 +2156,7 @@ function WorkoutScreen() {
               ))}
               {/* Ghost card for current set */}
               <div style={{ background: "#212429", border: `1px dashed rgba(76,141,255,0.3)`, borderRadius: 8, padding: "5px 9px", textAlign: "center", opacity: 0.5 }}>
-                <div style={{ fontSize: 11, color: a }}>Set {loggedSets.filter(l => l.exerciseName === ex.name).length + 1}</div>
+                <div style={{ fontSize: 11, color: a }}>Set {loggedSets.filter(l => l.exIdx === safeExIdx).length + 1}</div>
                 <div style={{ fontSize: 9, color: theme.textDim, marginTop: 1 }}>current</div>
               </div>
             </div>
