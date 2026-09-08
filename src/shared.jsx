@@ -2901,11 +2901,25 @@ function Layout({ children, activeNav = "home", chatTarget = "chat" }) {
       {children}
       <div style={{ textAlign: "center", fontSize: 11, color: theme.textFaint, padding: ".6rem", marginBottom: "3.5rem" }}><PoweredByHypergentiq /></div>
 
-      <div className="mq-pulse-ring" style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: "rgba(76,141,255,0.18)" }} />
-      <button onClick={() => navigate(chatTarget)} style={{ position: "absolute", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: a, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {/* Bug fix (naming cleanup session): both the floating chat bubble and
+          the bottom nav bar below used to be position:"absolute", which
+          anchors to this screen's own content box -- not the phone screen.
+          Since {children} can be taller than one screen, that meant both of
+          these scrolled away with the page on any long screen and only
+          reappeared once you scrolled all the way to the bottom. Switched to
+          position:"fixed" (anchors to the actual viewport instead) so both
+          stay visible the whole time, on every screen, matching the "always
+          visible" rule for the chat button and members' request for an
+          always-visible nav bar. zIndex:20 matches the level already used
+          elsewhere (see WorkoutScreen.jsx) for things that should float
+          above normal content but stay under full-screen sheets, which use
+          zIndex:30 -- so opening a sheet still correctly covers both of
+          these rather than leaving them poking out on top. */}
+      <div className="mq-pulse-ring" style={{ position: "fixed", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: "rgba(76,141,255,0.18)", zIndex: 20 }} />
+      <button onClick={() => navigate(chatTarget)} style={{ position: "fixed", bottom: "4.8rem", right: "1.25rem", width: 52, height: 52, borderRadius: "50%", background: a, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20 }}>
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2C6.03 2 2 5.8 2 10.5c0 1.8.55 3.5 1.5 4.9L2 20l4.8-1.4A9.2 9.2 0 0011 19c4.97 0 9-3.8 9-8.5S15.97 2 11 2z" fill="#0B1E3D" /><circle cx="7.5" cy="10.5" r="1.2" fill={a} /><circle cx="11" cy="10.5" r="1.2" fill={a} /><circle cx="14.5" cy="10.5" r="1.2" fill={a} /></svg>
       </button>
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "#111", borderTop: `0.5px solid ${theme.borderSubtle}`, borderRadius: "0 0 20px 20px", display: "flex" }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#111", borderTop: `0.5px solid ${theme.borderSubtle}`, borderRadius: "0 0 20px 20px", display: "flex", zIndex: 20 }}>
         {[["home", "Home"], ["workout", "Workout"], ["meals", "Meals"], ["progress", "Progress"]].map(([id, label]) => (
           <button key={id} onClick={() => navigate(id)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: ".75rem .5rem", background: "none", border: "none", cursor: "pointer", color: activeNav === id ? a : theme.textFaint, fontFamily: "inherit" }}>
             <NavIcon id={id} /><span style={{ fontSize: 10, letterSpacing: ".04em" }}>{label}</span>
