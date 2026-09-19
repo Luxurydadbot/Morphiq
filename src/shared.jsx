@@ -538,6 +538,31 @@ const sb = {
     } catch { return null; }
   },
 
+  // Fetches every WORKING set (set_number > 0) from the last time this
+  // exercise was trained -- the most recent date before today it appears --
+  // powers the per-exercise recap card's "vs last time" rollup (Session 51
+  // recap card work). A single exercise rarely has more than a handful of
+  // working sets, so pulling a modest batch ordered newest-first and keeping
+  // only the rows that share the most recent date is simpler and cheaper
+  // than a second round-trip just to look up that date first.
+  async getLastSessionSetsForExercise(supabaseUserId, exerciseName) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return [];
+      const today = localDateStr();
+      const name = encodeURIComponent(exerciseName);
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${name}&set_number=gt.0&workout_date=lt.${today}&order=workout_date.desc,set_number.asc&limit=20`,
+        { headers: SB_GET() }
+      );
+      if (!res.ok) return [];
+      const rows = await res.json();
+      if (!rows || rows.length === 0) return [];
+      const mostRecentDate = rows[0].workout_date;
+      return rows.filter(r => r.workout_date === mostRecentDate).map(r => ({ weight: r.weight, reps: r.reps }));
+    } catch { return []; }
+  },
+
   // ── CARDIO LOGS ───────────────────────────────────────────────────────────
   async insertCardioLog(supabaseUserId, { activityType, durationMinutes, calories }) {
     try {

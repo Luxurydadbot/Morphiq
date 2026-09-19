@@ -306,6 +306,27 @@ function formatWeightDelta(planLbs, actualLbs, unit) {
   return `${delta > 0 ? "+" : ""}${delta} ${unit} from plan`;
 }
 
+// ── Per-exercise recap card (Session 52) ─────────────────────────────────────
+// Rolls up a list of {weight, reps} working sets into total volume (the
+// standard weight x reps measure of how much work was done) and the heaviest
+// single set. Used for both today's just-finished sets and last time's sets,
+// so the two are always compared apples-to-apples.
+function sumWorkingSets(sets) {
+  return sets.reduce((acc, s) => ({
+    volume: acc.volume + (s.weight || 0) * (s.reps || 0),
+    topWeight: Math.max(acc.topWeight, s.weight || 0),
+  }), { volume: 0, topWeight: 0 });
+}
+// One short, rule-based encouragement line off the volume comparison -- no AI
+// call, instant and free. Always forward-looking, never guilt-inducing on a
+// lighter day (Bryant's own house rule -- no guilt language, stay positive).
+function recapEncouragement(hasHistory, deltaVolume) {
+  if (!hasHistory) return "First time logging this one — today's numbers are your new baseline.";
+  if (deltaVolume > 0) return "Nice increase — keep that momentum going.";
+  if (deltaVolume < 0) return "A touch lighter than last time — that happens, recovery is part of the process.";
+  return "Right in line with last time — solid, consistent work.";
+}
+
 function WorkoutScreen() {
   const { navigate, user, setUser, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData, selectedDayOverride, setSelectedDayOverride } = useApp();
   const a = gymBranding.accent;
@@ -641,6 +662,24 @@ function WorkoutScreen() {
   // "Last time" history — loaded from Supabase when exercise changes
   // null = loading, false = no history found, object = { weight, reps, date }
   const [lastSetHistory, setLastSetHistory] = useState(null);
+  // Session 52 — per-exercise recap card: true if ANY set logged during the
+  // CURRENT exercise was a PR (isPR above only reflects the single most-
+  // recently-logged set, reset every set -- this accumulates across the
+  // whole exercise instead). Reuses the same sb.getPersonalRecord() check
+  // logSet() already runs per set, so the recap card's PR badge costs zero
+  // extra database calls. Resets whenever the exercise changes.
+  const [exercisePRHit, setExercisePRHit] = useState(false);
+  useEffect(() => { setExercisePRHit(false); }, [exIdx]);
+  // The per-exercise recap card itself (Session 52) — null while no recap is
+  // pending/loading, an object once today's numbers are known. "comparing"
+  // stays true while the last-time comparison is still being fetched, so the
+  // card can show today's numbers immediately and fill in the comparison a
+  // moment later rather than blocking on the network.
+  const [recapData, setRecapData] = useState(null);
+  // What to actually do once the member dismisses the recap card -- the
+  // exact same {kind, idx} shape resolveNextExercise() already returns,
+  // just applied a moment later instead of immediately.
+  const [pendingTransition, setPendingTransition] = useState(null);
   // TEMP DIAGNOSTIC (June 2026) — workouts stuck on "Saving..." with no visible
   // cause. Holds the specific failure reason from insertWorkoutLog so it can be
   // shown on screen instead of failing silently. Remove once the save bug is fixed.
@@ -1149,7 +1188,7 @@ function WorkoutScreen() {
         if (ok && currentSpec.kind !== "warmup" && displayWeight > 0) {
           sb.getPersonalRecord(supabaseUser.id, ex.name).then(prevBest => {
             // If no previous record exists OR current weight beats it → it's a PR
-            if (prevBest === null || displayWeight > prevBest) setIsPR(true);
+            if (prevBest === null || displayWeight > prevBest) { setIsPR(true); setExercisePRHit(true); }
           }).catch(() => {});
         }
       }).catch((e) => { setSavingToCloud(false); setSaveFailReason("THROW:" + (e?.message || e)); });
@@ -1160,6 +1199,26 @@ function WorkoutScreen() {
     // timer on the next screen. Now rest starts immediately; the "fix it"
     // correction and PR banner live inside the rest screen instead.)
     goToRestOrNudge();
+  }
+
+  // Applies the actual "what's next" transition ({kind:"done"|"exercise"|
+  // "checkpoint"}, from resolveNextExercise()) -- pulled out of advanceSet()
+  // so both the normal path and dismissRecap() (Session 52, below) run the
+  // exact same logic instead of risking the two drifting apart.
+  function applyTransition(predicted) {
+    if (predicted.kind === "done") {
+      setState("done");
+    } else if (predicted.kind === "exercise") {
+      // Nothing was skipped — seamless auto-continue, same as before.
+      setExIdx(predicted.idx);
+      setSetIdx(0);
+      setState("active");
+    } else {
+      // Something else on today's list still needs finishing and it isn't
+      // simply "the next one" — pause and let the member pick, instead of
+      // silently guessing. See the "checkpoint" screen below.
+      setState("checkpoint");
+    }
   }
 
   function advanceSet() {
@@ -1183,19 +1242,43 @@ function WorkoutScreen() {
     setNudgeSource(null);
     nudgeAcceptedRef.current = false;
     const predicted = resolveNextExercise(exIdx);
-    if (predicted.kind === "done") {
-      setState("done");
-    } else if (predicted.kind === "exercise") {
-      // Nothing was skipped — seamless auto-continue, same as before.
-      setExIdx(predicted.idx);
-      setSetIdx(0);
-      setState("active");
-    } else {
-      // Something else on today's list still needs finishing and it isn't
-      // simply "the next one" — pause and let the member pick, instead of
-      // silently guessing. See the "checkpoint" screen below.
-      setState("checkpoint");
+
+    // Session 52 — per-exercise recap card. Bryant's call: show a quick
+    // "how'd that go vs last time" card before actually moving on, right
+    // when an exercise finishes (not at the very end of the whole workout).
+    // Needs at least one WORKING set logged this exercise (always true here
+    // in practice -- this branch only runs after logging the plan's last
+    // set) and a signed-in member (nothing to compare against otherwise) --
+    // skip straight to the normal transition if either is missing rather
+    // than showing an empty card.
+    const todaysWorkingSets = loggedSets.filter(l => l.exIdx === exIdx && l.kind !== "warmup");
+    if (todaysWorkingSets.length === 0 || !supabaseUser?.id) {
+      applyTransition(predicted);
+      return;
     }
+    const todayTotals = sumWorkingSets(todaysWorkingSets);
+    setPendingTransition(predicted);
+    // Show today's numbers right away; "comparing: true" means the last-time
+    // comparison is still loading, filled in a moment later below rather
+    // than making the card wait on the network before it can appear at all.
+    setRecapData({ exerciseName: ex.name, today: todayTotals, comparing: true, last: null, prHit: exercisePRHit });
+    setState("recap");
+    sb.getLastSessionSetsForExercise(supabaseUser.id, ex.name).then(lastSets => {
+      const last = lastSets && lastSets.length > 0 ? sumWorkingSets(lastSets) : null;
+      setRecapData(prev => prev ? { ...prev, comparing: false, last } : prev);
+    }).catch(() => {
+      setRecapData(prev => prev ? { ...prev, comparing: false, last: null } : prev);
+    });
+  }
+
+  // Dismisses the recap card and finally applies the transition that was
+  // waiting behind it (see advanceSet() above). No auto-timeout on this card
+  // on purpose -- Bryant's call: it stays up until actually read and closed.
+  function dismissRecap() {
+    const predicted = pendingTransition;
+    setRecapData(null);
+    setPendingTransition(null);
+    if (predicted) applyTransition(predicted);
   }
 
   function skipRest() {
@@ -1799,6 +1882,59 @@ function WorkoutScreen() {
             </div>
           )}
           <button onClick={() => { recordWorkoutComplete(); navigate("home"); }} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Back to dashboard <Icon name="arrow-right" size={15} /></button>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Per-exercise recap card — Session 52. Shown right when an exercise's
+  // sets finish, before moving to whatever's next (another exercise, the
+  // checkpoint picker, or the done screen — see advanceSet()/dismissRecap()
+  // above, which decide that part). Bryant's ask: a quick "coach's report
+  // card" — not a lot of reading, honest numbers, always forward-looking
+  // (never guilt language on a lighter day, matching the app's design
+  // rules), and no auto-dismiss — stays up until actually closed.
+  if (state === "recap" && recapData) {
+    const { exerciseName, today, comparing, last, prHit } = recapData;
+    const hasHistory = !comparing && !!last;
+    const deltaVolume = hasHistory ? today.volume - last.volume : 0;
+    // Show the recap in whichever unit this exercise is currently set to
+    // (Session 51) -- same conversion the weight card itself uses, so these
+    // numbers never contradict what was just seen set-by-set. Volume is a
+    // weight number too (weight x reps), so it converts the same way.
+    const todayVolumeDisplay = unit === "kg" ? lbsToKgDisplay(today.volume) : today.volume;
+    const lastVolumeDisplay = hasHistory ? (unit === "kg" ? lbsToKgDisplay(last.volume) : last.volume) : null;
+    const deltaVolumeDisplay = unit === "kg" ? Math.round((deltaVolume / LB_PER_KG) * 10) / 10 : deltaVolume;
+    return (
+      <Layout activeNav="workout" chatTarget="chat_workout">
+        <div className="mq-fade" style={{ padding: "2rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1 }}>
+          <div style={{ marginBottom: 12, color: a }}><Icon name="clipboard" size={32} /></div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 4 }}>{exerciseName} — done <Icon name="check" size={16} style={{ verticalAlign: "-2px", marginLeft: 2 }} /></div>
+          {prHit && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#0B1E3D", border: `1px solid ${a}`, borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 700, color: a, marginBottom: 12 }}>
+              <Icon name="sparkle" size={12} /> New personal record today
+            </div>
+          )}
+          {/* The actual "report card" numbers -- one comparison, kept to a
+              single readable line rather than a full stat breakdown, per
+              Bryant's ask to not make this a lot of reading. */}
+          <div style={{ width: "100%", background: "#212429", borderRadius: 14, padding: "16px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: theme.text, lineHeight: 1.1 }}>{todayVolumeDisplay.toLocaleString()} {unit}</div>
+            <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>total weight moved today</div>
+            {comparing ? (
+              <div style={{ fontSize: 12, color: theme.textDim }}>Comparing to last time…</div>
+            ) : hasHistory ? (
+              <div style={{ fontSize: 12, color: deltaVolume > 0 ? theme.success : theme.textDim }}>
+                {deltaVolumeDisplay === 0 ? "Same as" : `${deltaVolumeDisplay > 0 ? "+" : ""}${deltaVolumeDisplay.toLocaleString()} ${unit} vs`} last time ({lastVolumeDisplay.toLocaleString()} {unit})
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: theme.textDim }}>No earlier session on this exercise yet</div>
+            )}
+          </div>
+          {!comparing && (
+            <div style={{ fontSize: 13, color: theme.textDim, marginBottom: "1.5rem" }}>{recapEncouragement(hasHistory, deltaVolume)}</div>
+          )}
+          <button onClick={dismissRecap} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Continue <Icon name="arrow-right" size={15} /></button>
         </div>
       </Layout>
     );
