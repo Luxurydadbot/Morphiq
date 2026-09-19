@@ -234,26 +234,40 @@ function TrendLine({ entries, valueKey, color, starDates, unit }) {
           <text x={valueLabelX} y={last[1] - 4} textAnchor={valueLabelAnchor} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={color} fontWeight="600">{chartData[chartData.length - 1][valueKey]}</text>
 
           {/* Touch-and-hold value bubble -- see handlePointerDown/Move above.
-              Drawn last so it sits on top of every line/star/label. */}
+              Drawn last so it sits on top of every line/star/label.
+              Fix (live-tested by Bryant): the first version sat only 12 units
+              from the touched point, which on a real phone is well inside a
+              thumb's own contact area -- the finger was covering the very
+              text it revealed. The svg's viewBox width is always set equal
+              to its own rendered pixel width (see width={scrollable ? W :
+              "100%"} above, where W is either that fixed pixel value or the
+              measured container width) -- so 1 viewBox unit is ~1 real
+              device pixel here, meaning GAP below is directly readable as
+              "how many real pixels of clearance." GAP=44 plus the taller
+              bubble puts the readable text roughly 70-80px from the touch
+              point, clear of a normal fingertip. Bigger bubble/text too, per
+              Bryant's "blow it up" ask. */}
           {activeIdx !== null && chartData[activeIdx] && (() => {
             const p = points[activeIdx];
             const d = chartData[activeIdx];
             const dateLabel = new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
             const text = `${dateLabel} · ${d[valueKey]} ${unit || ""}`.trim();
-            const bubbleW = Math.max(56, text.length * 5.4 + 14);
-            const bubbleH = 20;
+            const GAP = 44;      // clearance between the touched point and the near edge of the bubble
+            const DOT_GAP = 10;  // small gap between the dot's own circle and the connector line
+            const bubbleW = Math.max(84, text.length * 7.6 + 26);
+            const bubbleH = 30;
             let bx = p[0] - bubbleW / 2;
             bx = Math.max(2, Math.min(bx, W - 2 - bubbleW));
-            const above = p[1] - 12 - bubbleH >= -6; // flip below the point if there's no room above
-            const by = above ? p[1] - 12 - bubbleH : p[1] + 12;
-            const lineY1 = above ? by + bubbleH : p[1] + 6;
-            const lineY2 = above ? p[1] - 6 : by;
+            const above = p[1] - GAP - bubbleH >= -20; // flip below the point if there's no room above
+            const by = above ? p[1] - GAP - bubbleH : p[1] + GAP;
+            const lineY1 = above ? by + bubbleH : p[1] + DOT_GAP;
+            const lineY2 = above ? p[1] - DOT_GAP : by;
             return (
               <g pointerEvents="none">
-                <line x1={p[0]} y1={lineY1} x2={p[0]} y2={lineY2} stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="2,2" />
-                <circle cx={p[0]} cy={p[1]} r="5.5" fill={color} stroke="#121316" strokeWidth="2" />
-                <rect x={bx} y={by} width={bubbleW} height={bubbleH} rx="6" fill="#0B0D11" stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
-                <text x={bx + bubbleW / 2} y={by + bubbleH / 2 + 3.5} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#EDEEF0" fontWeight="600">{text}</text>
+                <line x1={p[0]} y1={lineY1} x2={p[0]} y2={lineY2} stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeDasharray="2,3" />
+                <circle cx={p[0]} cy={p[1]} r="7" fill={color} stroke="#121316" strokeWidth="2.5" />
+                <rect x={bx} y={by} width={bubbleW} height={bubbleH} rx="8" fill="#0B0D11" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
+                <text x={bx + bubbleW / 2} y={by + bubbleH / 2 + 4.5} textAnchor="middle" fontSize="13" fontFamily="'Inter', system-ui, sans-serif" fill="#EDEEF0" fontWeight="700">{text}</text>
               </g>
             );
           })()}
