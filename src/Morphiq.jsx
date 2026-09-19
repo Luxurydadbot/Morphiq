@@ -184,7 +184,7 @@ function AppProvider({ children }) {
       const cachedData = !planSource ? getCachedPlanData() : null;
       const resolvedPlan = planSource?.plan || cachedData?.plan || null;
       const resolvedUser = planSource
-        ? { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial", lastWorkoutDayIndex: profile.last_workout_day_index }
+        ? { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: profile.unit || "imperial", exerciseUnits: profile.exercise_units || {}, lastWorkoutDayIndex: profile.last_workout_day_index }
         : cachedData?.user || null;
 
       if (resolvedPlan && resolvedUser) {
@@ -365,7 +365,7 @@ function AppProvider({ children }) {
       }
 
       if (profile?.plan) {
-        const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: "imperial", lastWorkoutDayIndex: profile.last_workout_day_index };
+        const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: profile.unit || "imperial", exerciseUnits: profile.exercise_units || {}, lastWorkoutDayIndex: profile.last_workout_day_index };
         setUser(u);
         // Patch missing weekStartDate — if the plan was saved without it, fill in today
         // so the 7-day check has something to work from. Save back to Supabase immediately.

@@ -269,8 +269,28 @@ function getSwapOptions(ex, equipment) {
   ].slice(0, 4);
 }
 
+// ── Manual weight entry: kg/lbs conversion (Session 51) ─────────────────────
+// Every weight is stored in the database as pounds, always -- Bryant's own
+// decision, confirmed in Session 49. kg is purely a display/input convenience
+// layered on top of that single source of truth; no schema change for the
+// weight number itself. Converting a typed/stepped kg value INTO the stored
+// pound number always rounds to the nearest whole pound, so a stored weight
+// never drifts into a fractional-pound value no plate or dumbbell actually
+// has (Session 51 decision).
+const LB_PER_KG = 2.2046226218;
+function kgToLbsRounded(kg) {
+  return Math.round(kg * LB_PER_KG);
+}
+// Converts a stored (whole-pound) weight back to kg for display only -- one
+// decimal place is plenty precise for a number nobody steps from directly
+// (the kg stepper below works in clean kg steps and converts on the way OUT).
+function lbsToKgDisplay(lbs) {
+  return Math.round((lbs / LB_PER_KG) * 10) / 10;
+}
+const KG_STEP = 2.5; // clean per-tap step size in kg mode (Bryant's choice, Session 51)
+
 function WorkoutScreen() {
-  const { navigate, user, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData, selectedDayOverride, setSelectedDayOverride } = useApp();
+  const { navigate, user, setUser, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData, selectedDayOverride, setSelectedDayOverride } = useApp();
   const a = gymBranding.accent;
 
   // ── Mid-workout progress persistence ──────────────────────────────
@@ -557,6 +577,11 @@ function WorkoutScreen() {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [repCount, setRepCount] = useState(null); // null = not set yet, number = user typed/adjusted
   const [weightOverride, setWeightOverride] = useState(null); // null = use plan/nudge weight, number = member manually adjusted this set's weight
+  // Manual weight entry (Session 51): tapping the big weight number turns it
+  // into a real input for a moment. Reset any time the set/exercise changes
+  // so a half-typed edit never carries over into the next set.
+  const [editingWeight, setEditingWeight] = useState(false);
+  useEffect(() => { setEditingWeight(false); }, [exIdx, setIdx]);
   // Whether the big-jump confirm banner is showing -- set right before
   // logging, not on every keystroke, so tapping +/- repeatedly doesn't
   // flash a warning mid-adjustment.
@@ -918,6 +943,50 @@ function WorkoutScreen() {
   // the JSX below; this just does the arithmetic once per render either way,
   // cheap enough not to bother memoizing further.
   const plateBreakdownText = formatPlateBreakdown(getPlateBreakdown(displayWeight));
+
+  // Which unit (kg/lbs) this exercise is shown/entered in. Per-exercise, not
+  // a single global setting (Bryant confirmed real gyms mix units exercise-
+  // to-exercise). Falls back to the member's profile-level default the first
+  // time an exercise has no remembered unit yet.
+  const exerciseUnits = user?.exerciseUnits || {};
+  const profileDefaultUnit = user?.unit === "metric" ? "kg" : "lbs";
+  const unit = exerciseUnits[ex.name] || profileDefaultUnit;
+  // Value actually shown in the big number, converted for display only —
+  // displayWeight itself (used for logging/plate-math) always stays in lbs.
+  const displayValue = unit === "kg" ? lbsToKgDisplay(displayWeight) : displayWeight;
+
+  // +/- stepper: steps in whichever unit is active, using a clean amount for
+  // that unit (5 lbs, or 2.5 kg) rather than converting a lb step into an odd
+  // kg number. Always converts back to a rounded whole-pound value to store.
+  function stepWeight(dir) {
+    if (unit === "kg") {
+      const nextKg = Math.max(0, lbsToKgDisplay(displayWeight) + dir * KG_STEP);
+      setWeightOverride(kgToLbsRounded(nextKg));
+    } else {
+      setWeightOverride(Math.max(0, displayWeight + dir * (ex.weightIncrement || 5)));
+    }
+  }
+
+  // Commits a typed weight (tap-to-type on the big number). Whatever unit is
+  // active, the typed number is in that unit — convert to whole pounds to
+  // store, same rounding rule as the stepper.
+  function commitTypedWeight(raw) {
+    const n = parseFloat(raw);
+    setEditingWeight(false);
+    if (isNaN(n) || n < 0) return;
+    setWeightOverride(unit === "kg" ? kgToLbsRounded(n) : Math.round(n));
+  }
+
+  // Flips the unit for THIS exercise only and remembers it for next time —
+  // updates local state immediately (instant switch, no waiting on the
+  // network) and saves to Supabase fire-and-forget, same pattern used
+  // everywhere else in this app for a non-critical preference save.
+  function handleUnitChange(newUnit) {
+    if (newUnit === unit) return;
+    const updated = { ...exerciseUnits, [ex.name]: newUnit };
+    setUser(prev => ({ ...prev, exerciseUnits: updated }));
+    if (supabaseUser?.id) sb.saveExerciseUnits(supabaseUser.id, updated).catch(() => {});
+  }
 
   // Keep shared context updated so ChatScreen always knows exactly where we are
   useEffect(() => {
@@ -2068,12 +2137,46 @@ function WorkoutScreen() {
             <div style={{ fontSize: 12, color: theme.textDim, marginBottom: 4 }}>Weight this set</div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
               {/* Minus — lets a member drop the weight for this set without touching the plan */}
-              <button onClick={() => setWeightOverride(Math.max(0, displayWeight - (ex.weightIncrement || 5)))}
+              <button onClick={() => stepWeight(-1)}
                 style={{ width: 30, height: 30, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 18, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>−</button>
-              <div style={{ fontSize: 60, fontWeight: 700, color: isWarmupSet ? theme.text : a, lineHeight: 1 }}>{displayWeight} <span style={{ fontSize: 20, color: theme.textDim }}>lbs</span></div>
+              {/* Tap-to-type (Session 51): tapping the number swaps it for a real
+                  input, styled to look identical at rest so it never looks
+                  bolted-on. A dotted underline at rest is the only hint it's
+                  tappable, plus the small caption below. */}
+              {editingWeight ? (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  autoFocus
+                  defaultValue={displayValue}
+                  onFocus={e => e.target.select()}
+                  onBlur={e => commitTypedWeight(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }}
+                  style={{ width: 130, fontSize: 60, fontWeight: 700, color: isWarmupSet ? theme.text : a, lineHeight: 1, background: "transparent", border: "none", borderBottom: "1.5px dotted rgba(255,255,255,0.35)", outline: "none", textAlign: "center", fontFamily: "inherit", padding: 0, MozAppearance: "textfield" }}
+                />
+              ) : (
+                <div onClick={() => setEditingWeight(true)} style={{ cursor: "pointer" }}>
+                  <span style={{ fontSize: 60, fontWeight: 700, color: isWarmupSet ? theme.text : a, lineHeight: 1, borderBottom: "1.5px dotted rgba(255,255,255,0.25)" }}>{displayValue}</span> <span style={{ fontSize: 20, color: theme.textDim }}>{unit}</span>
+                </div>
+              )}
               {/* Plus — bump the weight for this set only; logged as-is, plan target is untouched */}
-              <button onClick={() => setWeightOverride(displayWeight + (ex.weightIncrement || 5))}
+              <button onClick={() => stepWeight(1)}
                 style={{ width: 30, height: 30, borderRadius: "50%", background: "#0F1A28", border: "1px solid rgba(255,255,255,0.12)", fontSize: 18, color: theme.textDim, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0, lineHeight: 1, padding: 0 }}>+</button>
+            </div>
+            {!editingWeight && (
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>Tap the number to type a weight</div>
+            )}
+            {/* Per-exercise kg/lbs switch (Session 51) — each exercise remembers
+                its OWN last-used unit independently, since real gyms mix units
+                exercise-to-exercise. Falls back to the profile default the
+                first time an exercise has no remembered unit yet. */}
+            <div style={{ display: "flex", justifyContent: "center", gap: 4, marginTop: 8 }}>
+              {["lbs", "kg"].map(u => (
+                <button key={u} onClick={() => handleUnitChange(u)}
+                  style={{ fontSize: 11, fontWeight: 700, padding: "4px 14px", borderRadius: 20, border: unit === u ? "none" : "1px solid rgba(255,255,255,0.12)", background: unit === u ? a : "transparent", color: unit === u ? "#0B1E3D" : theme.textDim, cursor: "pointer", fontFamily: "inherit", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  {u}
+                </button>
+              ))}
             </div>
             {isWarmupSet && weightOverride !== null && !isLastWarmupSet ? (
               // Reassurance, not a warning: early warm-up sets are SUPPOSED to
@@ -2102,8 +2205,10 @@ function WorkoutScreen() {
                 pin-loaded). Shown for both warm-up and working sets since a
                 member has to load the actual bar either way. Computed
                 client-side, no AI call — see getPlateBreakdown() in
-                shared.jsx. */}
-            {isBarbellExercise(ex.name) && plateBreakdownText && (
+                shared.jsx. lbs-only (Session 51): the math assumes US
+                45/25/10/5/2.5 lb plates, which doesn't apply in kg mode —
+                hidden there rather than showing a wrong plate count. */}
+            {unit === "lbs" && isBarbellExercise(ex.name) && plateBreakdownText && (
               <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 4 }}>{plateBreakdownText}</div>
             )}
           </div>

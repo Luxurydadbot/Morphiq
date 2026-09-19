@@ -202,6 +202,25 @@ const sb = {
     } catch { return false; }
   },
 
+  // Persists the member's per-exercise unit-preference map (kg vs lbs
+  // remembered independently per exercise name, Session 51). The caller
+  // merges the changed exercise into the map client-side and passes the
+  // WHOLE map -- simplest correct way to update one key of a JSONB column
+  // over PostgREST without a raw SQL merge. Fire-and-forget: a failed save
+  // just means that exercise falls back to the profile default next time.
+  async saveExerciseUnits(supabaseUserId, exerciseUnitsMap) {
+    try {
+      const profileId = await this.getProfileId(supabaseUserId);
+      if (!profileId) return false;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${profileId}`, {
+        method: "PATCH",
+        headers: SB_HEADERS(),
+        body: JSON.stringify({ exercise_units: exerciseUnitsMap }),
+      });
+      return res.ok;
+    } catch { return false; }
+  },
+
   async upsertProfile(supabaseUserId, userData, planData, gymId = "demo-gym") {
     try {
       const body = {
