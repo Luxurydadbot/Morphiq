@@ -19,13 +19,13 @@ Bryant approved building the two features Session 49 had designed but not built,
 
 **Database change made this session (confirmed with Bryant before writing any code):** checked the live schema first, per the app's own database rules. Found `profiles.unit` already existed (text, default `'imperial'`) but nothing in the app actually read or wrote it — it was hardcoded to `"imperial"` in a few places instead, so it wasn't really wired up yet. Now wired up for real, as the profile-level fallback default. Nothing anywhere tracked a per-exercise remembered unit, so one new column was added: `profiles.exercise_units` (jsonb, default `{}`) — a small map like `{"Barbell squat": "kg"}`, one entry per exercise the member has switched. No existing column, table, or data was touched or removed.
 
-**Files touched, final line counts:** `src/WorkoutScreen.jsx` 3,078 → **3,183** (+105 — the tap-to-type input, the unit switch, the stepper/rounding logic, all inline in the existing "Weight this set" card, nothing else in the file touched), `src/shared.jsx` 3,730 → **3,749** (+19 — one new small `sb.saveExerciseUnits()` function, mirrors the existing `sb.updateLastWorkoutDayIndex()` pattern exactly), `src/Morphiq.jsx` 1,755 → **1,755** (net 0 — two single-line edits, carrying the profile's real `unit` and new `exercise_units` value into the app's user object instead of hardcoding `"imperial"`).
+**Files touched, final line counts:** `src/WorkoutScreen.jsx` 3,078 → **3,200** (+122 across two commits — the tap-to-type input, the unit switch, the stepper/rounding logic, and the caption-text fix below, all inline in the existing "Weight this set" card, nothing else in the file touched), `src/shared.jsx` 3,730 → **3,749** (+19 — one new small `sb.saveExerciseUnits()` function, mirrors the existing `sb.updateLastWorkoutDayIndex()` pattern exactly), `src/Morphiq.jsx` 1,755 → **1,755** (net 0 — two single-line edits, carrying the profile's real `unit` and new `exercise_units` value into the app's user object instead of hardcoding `"imperial"`).
 
 **⚠️ `shared.jsx` headroom is getting tight: 3,749 / 3,800 hard limit — only ~51 lines left.** The next feature that needs a new shared helper should go straight to `WorkoutScreen.jsx` (or wherever it's actually used) instead, or Bryant should be asked about a split, before `shared.jsx` gets anywhere near the hard limit.
 
-**Verified before pushing:** `esbuild` clean parse on all three changed files, the new `saveExerciseUnits` try/catch opens and closes correctly, the full "Weight this set" card was read back after editing to confirm it renders correctly, line-count deltas above are all intentional (not accidental deletions). **NOT yet live-tested by Bryant on a real phone or in the running app** — this is the very first thing to check next session.
+**Verified before pushing:** `esbuild` clean parse on all changed files each time, the new `saveExerciseUnits` try/catch opens and closes correctly, the full "Weight this set" card was read back after each edit to confirm it renders correctly, line-count deltas above are all intentional (not accidental deletions).
 
-**Known limitation, not addressed this session (worth a follow-up polish pass, not a bug):** a few small caption lines under the weight number ("Still ramping to X lbs", "+5 lbs from plan", etc.) always say "lbs" regardless of which unit is active, since those describe the plan's own lb-based target rather than the number the member is looking at. Left alone this session to keep the change tightly scoped to what was actually designed and approved.
+**Live-tested by Bryant the same session — confirmed working, with one bug caught and fixed on the spot:** the small caption lines under the weight number ("Still ramping to X lbs", "+5 lbs from plan", "Warm-up weight · ramping to X lbs") were still always saying "lbs" even in kg mode — they describe the plan's own lb-based target, which hadn't been converted for display. Fixed in a same-session follow-up commit (`b9dec5c`): two new small helper functions, `formatWeightValue()` and `formatWeightDelta()`, convert these captions to the active unit the same way the main number already did. Everything else about the feature (tap-to-type, the unit switch and its memory, the kg stepper, plate-math hidden in kg mode) was confirmed working as designed on Bryant's first live pass — no other issues reported.
 
 ## Session 50 — Workouts-tab progress charts + tap-and-hold value tooltip (fully built, pushed, AND live-tested — confirmed working by Bryant)
 
@@ -53,41 +53,36 @@ Live-tested account deletion end-to-end on the real production app, live-verifie
 
 ## Latest commit
 
-`0581df5` — "Feature: manual weight entry + per-exercise kg/lbs unit memory" (`src/WorkoutScreen.jsx`, `src/shared.jsx`, `src/Morphiq.jsx`). Pushed via the GitHub web-upload workaround (direct git/API push is still blocked this session too).
+`b9dec5c` — "Fix: weight-card captions now convert to kg in kg mode" (`src/WorkoutScreen.jsx`), a same-session follow-up to `0581df5` — "Feature: manual weight entry + per-exercise kg/lbs unit memory" (`src/WorkoutScreen.jsx`, `src/shared.jsx`, `src/Morphiq.jsx`). Both pushed via the GitHub web-upload workaround (direct git/API push is still blocked this session too).
 
 ## Confirmed working vs still open
 
-**Built and pushed this session — NOT yet live-tested in the real running app:**
-- Manual weight entry (tap-to-type) + per-exercise kg/lbs switch with memory, kg-mode stepper, kg-mode plate-math hidden. See Session 51 write-up above.
-
-**Built, pushed, AND live-tested/confirmed working this session (Session 50, recorded late — see above):**
-- Workouts-tab Weight/Reps trend charts with PR stars, real horizontal scroll, and the tap-and-hold value tooltip. Bryant confirmed on a real device: "Works perfect."
+**Built, pushed, AND live-tested/confirmed working this session:**
+- Manual weight entry (tap-to-type) + per-exercise kg/lbs switch with memory, kg-mode stepper, kg-mode plate-math hidden, all caption text now unit-aware too. See Session 51 write-up above — Bryant tested live, caught one caption-text bug, fixed same session.
+- Workouts-tab Weight/Reps trend charts with PR stars, real horizontal scroll, and the tap-and-hold value tooltip (Session 50, recorded late — see above). Bryant confirmed on a real device: "Works perfect."
 
 **Confirmed live in prior sessions — unchanged, still true:** the "switch exercise" feature and its checkpoint screen (Session 48), the exercise-breakdown/"This exercise" display fix (Session 48), `api/delete-account.js` and the Danger Zone flow (Session 47), the post-onboarding "Plan ready" screen (Session 47), the weekly detection engine tested against production with synthetic data but not yet a real member's multi-week history (Session 47).
 
 **NOT yet verified / still open:**
-- This session's weight-entry + kg/lbs feature (Session 51 — brand new, needs a real-device pass).
 - Session 49's nav bar / chat button fix — still carried forward, still nobody has live-tested it.
 - The cardio timer real-phone lock-screen test.
 - Everything else on the punch list below.
 
 ## Punch list, in priority order
 
-**FIRST — live-test this session's weight-entry + kg/lbs feature on a real device.** Tap the weight number to type a value, confirm it saves correctly. Flip an exercise to kg, confirm the number converts, the +/- stepper moves in clean 2.5 kg steps, and the plate-math line disappears. Flip back to lbs, confirm the plate-math line reappears and the stepper is back to 5 lb steps. Start a workout on a different day and confirm the exercise you switched to kg is still in kg (the memory persisted), while an exercise you never touched is still in lbs.
+**FIRST — still needs a live scroll-through: Session 49's nav bar/chat button fix.** Quick: open the app, scroll down on any screen with enough content, confirm both stay put. This has now been carried forward three sessions in a row without ever actually being clicked through live — worth doing this even briefly before anything else piles on top of it.
 
-**SECOND — also still needs a live scroll-through: Session 49's nav bar/chat button fix.** Quick: open the app, scroll down on any screen with enough content, confirm both stay put. This has now been carried forward three sessions in a row without ever actually being clicked through live — worth doing this even briefly before anything else piles on top of it.
+**SECOND — build the per-exercise recap card**, the third and last item from the Session 49 design batch: triggers when a member finishes all the sets of ONE exercise (not the whole workout), comparing that exercise's performance today against the last time it was logged. The app already fetches this exact comparison live during a workout (same data that powers the existing "last time: X lbs × Y reps" line), so this is mostly a new short summary card plus a rollup calculation at the point an exercise finishes — not new data plumbing from scratch. Natural hook point: `resolveNextExercise()` in `WorkoutScreen.jsx`, the single source of truth for "what happens after this exercise's sets run out."
 
-**THIRD — build the per-exercise recap card**, the third and last item from the Session 49 design batch: triggers when a member finishes all the sets of ONE exercise (not the whole workout), comparing that exercise's performance today against the last time it was logged. The app already fetches this exact comparison live during a workout (same data that powers the existing "last time: X lbs × Y reps" line), so this is mostly a new short summary card plus a rollup calculation at the point an exercise finishes — not new data plumbing from scratch. Natural hook point: `resolveNextExercise()` in `WorkoutScreen.jsx`, the single source of truth for "what happens after this exercise's sets run out."
+**THIRD — unblock the privacy policy and terms of service.** Both drafts exist now. Both are still blocked on Bryant forming a real legal business entity, after which both documents need to go to an actual lawyer together.
 
-**FOURTH — unblock the privacy policy and terms of service.** Both drafts exist now. Both are still blocked on Bryant forming a real legal business entity, after which both documents need to go to an actual lawyer together.
+**FOURTH — App Store groundwork, next concrete step: open the Android project in real Android Studio at least once.** The GitHub Actions check proves the app compiles and is currently passing, but nobody has run it on a device or emulator yet. Capgo live-update pipeline still not started.
 
-**FIFTH — App Store groundwork, next concrete step: open the Android project in real Android Studio at least once.** The GitHub Actions check proves the app compiles and is currently passing, but nobody has run it on a device or emulator yet. Capgo live-update pipeline still not started.
+**FIFTH — cardio timer real-phone test.** Session 40's wall-clock fix still hasn't been live-tapped by Bryant with the screen genuinely locking.
 
-**SIXTH — cardio timer real-phone test.** Session 40's wall-clock fix still hasn't been live-tapped by Bryant with the screen genuinely locking.
+**SIXTH — wearable sync (Apple HealthKit/Fitbit).** Unchanged, still not scoped.
 
-**SEVENTH — wearable sync (Apple HealthKit/Fitbit).** Unchanged, still not scoped.
-
-**EIGHTH through ELEVENTH — unchanged, still open:** live-test `WarmupTest` full week start-to-finish (tied to `cafe75designs+customtest2@gmail.com`, not Bryant's real email); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion, see DECISIONS.md); expand exercise variety beyond primary/variation binary swap; the weight-loss/cardio redesign's still-undecided open questions from DECISIONS.md; voice input on the cardio quick-log and the "Other" activity type haven't been live-tested; the manual/voice cardio-logging path's calorie accuracy (no body weight passed to the AI estimate).
+**SEVENTH through TENTH — unchanged, still open:** live-test `WarmupTest` full week start-to-finish (tied to `cafe75designs+customtest2@gmail.com`, not Bryant's real email); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion, see DECISIONS.md); expand exercise variety beyond primary/variation binary swap; the weight-loss/cardio redesign's still-undecided open questions from DECISIONS.md; voice input on the cardio quick-log and the "Other" activity type haven't been live-tested; the manual/voice cardio-logging path's calorie accuracy (no body weight passed to the AI estimate).
 
 **RULED OUT — do not re-propose without new information:** camera/video-based AI form-checking (Session 44 research).
 
@@ -123,10 +118,10 @@ Live-tested account deletion end-to-end on the real production app, live-verifie
 
 Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (reads work fine even without a working token, since the repo is public; do NOT use WebFetch for repo file contents). Report every file's line count before doing anything else. **`shared.jsx` is now at 3,749 / 3,800 — only ~51 lines of headroom left; the next new shared helper should probably land in whichever screen file actually uses it instead, or ask Bryant about a split.** **GitHub push access:** still broken (platform-side git-proxy block) — use the Upload-files browser workaround, staging file(s) at `/mnt/user-data/uploads/` specifically (not `/outputs/`). **`api/` is at exactly 12 counted functions — the Vercel Hobby-plan cap.** **Never use a "+" alias on Bryant's real sbcglobal.net address.**
 
-**This session (Session 51) built and pushed one feature, not yet live-tested:** manual weight entry (tap the number to type it) plus a per-exercise LBS/KG switch that remembers each exercise's own last-used unit, a 2.5 kg stepper step in kg mode, and the plate-math helper hidden in kg mode. Storage never changed — every weight is still saved in pounds. One new database column was added: `profiles.exercise_units` (jsonb), plus the pre-existing but previously-unused `profiles.unit` column is now actually wired up as the profile-level default.
+**This session (Session 51) built, pushed, AND live-tested: manual weight entry** (tap the number to type it) plus a per-exercise LBS/KG switch that remembers each exercise's own last-used unit, a 2.5 kg stepper step in kg mode, and the plate-math helper hidden in kg mode. Storage never changed — every weight is still saved in pounds. One new database column was added: `profiles.exercise_units` (jsonb), plus the pre-existing but previously-unused `profiles.unit` column is now actually wired up as the profile-level default. Bryant tested live and caught one bug (caption text under the number still said "lbs" in kg mode) — fixed same session, confirmed nothing else was wrong.
 
 **Also newly recorded this session, but was actually built and live-tested last session (Session 50) — was missing from this file before now:** the Workouts-tab Weight/Reps trend charts with PR stars and the tap-and-hold value tooltip. Bryant confirmed on a real device: "Works perfect." Fully done, nothing further needed here.
 
-Next priority: live-test Session 51's weight-entry + kg/lbs feature (first thing), then the long-overdue nav-bar scroll-through from Session 49, then build the third and last Session-49-designed feature — the per-exercise recap card. Full spec is above under Session 49 recap history and the punch list.
+Next priority: the long-overdue nav-bar scroll-through from Session 49 (quick), then build the third and last Session-49-designed feature — the per-exercise recap card. Full spec is above under Session 49 recap history and the punch list.
 
-Remind Bryant: the weight-entry + kg/lbs feature is live but untested on a real device — worth checking the tap-to-type, the unit switch memory, and the kg stepper before considering it done. Also gently flag that the nav bar/chat button fix from two sessions ago (Session 49) still hasn't had its live scroll-through either.
+Remind Bryant: the weight-entry + kg/lbs feature is fully live-tested and working now, nothing further needed there. Still gently flag that the nav bar/chat button fix from two sessions ago (Session 49) still hasn't had its live scroll-through.
