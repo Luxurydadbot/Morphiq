@@ -83,14 +83,23 @@ function computeTrendStars(history, repMax) {
 // no-visible-scrollbar behavior and the same right-edge label-clipping fixes
 // as WeightChart (shared.jsx) so it behaves identically to the app's
 // existing chart -- see WeightChart's own comments for why each fix exists.
-function TrendLine({ entries, valueKey, color, starDates }) {
+// Touch-and-hold a dot to see its exact date + value in a small bubble
+// (requested by Bryant, Session 50 follow-up) -- most dots have no visible
+// date label (see showLabel/LABEL_MIN_GAP below), so this is the only way to
+// read an unlabeled point's real value. Bubble follows the finger while
+// pressed and disappears on release; doesn't block the existing horizontal
+// swipe-to-scroll gesture since it never calls preventDefault.
+function TrendLine({ entries, valueKey, color, starDates, unit }) {
   const H = 84, PAD = 10;
   const POINT_SPACING = 34;
   const LABEL_MIN_GAP = 26;
   const FALLBACK_W = 260;
   const containerRef = useRef(null);
   const scrollRef = useRef(null);
+  const svgRef = useRef(null);
+  const pressedRef = useRef(false);
   const [containerWidth, setContainerWidth] = useState(null);
+  const [activeIdx, setActiveIdx] = useState(null);
   const hasData = entries && entries.length > 0;
   const chartData = hasData ? (entries.length === 1 ? [entries[0], entries[0]] : entries) : [];
   const neededW = hasData ? PAD * 2 + (chartData.length - 1) * POINT_SPACING : 0;
@@ -135,15 +144,64 @@ function TrendLine({ entries, valueKey, color, starDates }) {
   const valueLabelAnchor = last[0] + 6 > W - PAD - 20 ? "end" : "start";
   const gradId = "tl-" + valueKey;
 
+  // Maps a touch/mouse position to the nearest data point. The svg's
+  // rendered box is always the same size as the viewBox (W x H) whether it's
+  // pinned to a fixed scrollable width or stretched to fill the container --
+  // see the width={scrollable ? W : "100%"} line below -- so this scale
+  // factor is 1 in both cases, but computed rather than assumed in case a
+  // future change ever makes that untrue.
+  function nearestPointIndex(clientX) {
+    if (!svgRef.current) return null;
+    const rect = svgRef.current.getBoundingClientRect();
+    if (!rect.width) return null;
+    const scale = W / rect.width;
+    const localX = (clientX - rect.left) * scale;
+    let nearest = 0, nearestDist = Infinity;
+    points.forEach((p, i) => {
+      const d = Math.abs(p[0] - localX);
+      if (d < nearestDist) { nearestDist = d; nearest = i; }
+    });
+    return nearest;
+  }
+  function handlePointerDown(e) {
+    pressedRef.current = true;
+    const idx = nearestPointIndex(e.clientX);
+    if (idx !== null) setActiveIdx(idx);
+  }
+  function handlePointerMove(e) {
+    if (!pressedRef.current) return;
+    const idx = nearestPointIndex(e.clientX);
+    if (idx !== null) setActiveIdx(idx);
+  }
+  function clearActive() {
+    pressedRef.current = false;
+    setActiveIdx(null);
+  }
+
   return (
     <div ref={containerRef}>
       <style>{`.mq-trendline-scroll::-webkit-scrollbar { display: none; }`}</style>
       <div
         ref={scrollRef}
         className="mq-trendline-scroll"
-        style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" } : undefined}
+        // touchAction:"pan-x" tells the browser this element only ever pans
+        // horizontally -- the standard fix for a horizontally-scrollable
+        // element sitting inside a vertically-scrolling page sometimes not
+        // getting a clean horizontal swipe on mobile (gesture disambiguation
+        // otherwise defaults toward the page's own vertical scroll).
+        style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", touchAction: "pan-x" } : { touchAction: "pan-x" }}
       >
-        <svg width={scrollable ? W : "100%"} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+        <svg
+          ref={svgRef}
+          width={scrollable ? W : "100%"}
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ display: "block", overflow: "visible", touchAction: "pan-x" }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={clearActive}
+          onPointerCancel={clearActive}
+          onPointerLeave={clearActive}
+        >
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity="0.2" />
@@ -174,6 +232,31 @@ function TrendLine({ entries, valueKey, color, starDates }) {
             return <text key={i} x={labelX} y={H - 3} textAnchor={anchor} fontSize="8" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{label}</text>;
           })}
           <text x={valueLabelX} y={last[1] - 4} textAnchor={valueLabelAnchor} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={color} fontWeight="600">{chartData[chartData.length - 1][valueKey]}</text>
+
+          {/* Touch-and-hold value bubble -- see handlePointerDown/Move above.
+              Drawn last so it sits on top of every line/star/label. */}
+          {activeIdx !== null && chartData[activeIdx] && (() => {
+            const p = points[activeIdx];
+            const d = chartData[activeIdx];
+            const dateLabel = new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            const text = `${dateLabel} · ${d[valueKey]} ${unit || ""}`.trim();
+            const bubbleW = Math.max(56, text.length * 5.4 + 14);
+            const bubbleH = 20;
+            let bx = p[0] - bubbleW / 2;
+            bx = Math.max(2, Math.min(bx, W - 2 - bubbleW));
+            const above = p[1] - 12 - bubbleH >= -6; // flip below the point if there's no room above
+            const by = above ? p[1] - 12 - bubbleH : p[1] + 12;
+            const lineY1 = above ? by + bubbleH : p[1] + 6;
+            const lineY2 = above ? p[1] - 6 : by;
+            return (
+              <g pointerEvents="none">
+                <line x1={p[0]} y1={lineY1} x2={p[0]} y2={lineY2} stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="2,2" />
+                <circle cx={p[0]} cy={p[1]} r="5.5" fill={color} stroke="#121316" strokeWidth="2" />
+                <rect x={bx} y={by} width={bubbleW} height={bubbleH} rx="6" fill="#0B0D11" stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
+                <text x={bx + bubbleW / 2} y={by + bubbleH / 2 + 3.5} textAnchor="middle" fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill="#EDEEF0" fontWeight="600">{text}</text>
+              </g>
+            );
+          })()}
         </svg>
       </div>
     </div>
@@ -461,14 +544,14 @@ function ProgressScreen() {
                       <div style={{ fontSize:13, fontWeight:700, color:a }}>{lastPt.weight} lbs</div>
                     </div>
                     <div style={{ marginBottom:14 }}>
-                      <TrendLine entries={history} valueKey="weight" color={a} starDates={weightStars} />
+                      <TrendLine entries={history} valueKey="weight" color={a} starDates={weightStars} unit="lbs" />
                     </div>
 
                     <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:4 }}>
                       <div style={{ fontSize:10, letterSpacing:"1.2px", fontWeight:600, color:"#D7DAE0", textTransform:"uppercase" }}>Reps</div>
                       <div style={{ fontSize:13, fontWeight:700, color:"#D7DAE0" }}>{lastPt.reps} reps</div>
                     </div>
-                    <TrendLine entries={history} valueKey="reps" color="#D7DAE0" starDates={repsStars} />
+                    <TrendLine entries={history} valueKey="reps" color="#D7DAE0" starDates={repsStars} unit="reps" />
 
                     <div style={{ fontSize:10, color:"#3A3D44", textAlign:"center", padding:"10px 0 10px", fontStyle:"italic" }}>Scroll either chart with your finger to see older sessions</div>
                   </div>
