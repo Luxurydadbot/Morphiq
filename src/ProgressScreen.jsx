@@ -246,7 +246,15 @@ function TrendLine({ entries, valueKey, color, starDates, unit }) {
               "how many real pixels of clearance." GAP=44 plus the taller
               bubble puts the readable text roughly 70-80px from the touch
               point, clear of a normal fingertip. Bigger bubble/text too, per
-              Bryant's "blow it up" ask. */}
+              Bryant's "blow it up" ask.
+              Fix #2 (live-tested by Bryant): this used to flip to BELOW the
+              point whenever there wasn't room above, which felt
+              inconsistent -- sometimes above, sometimes below. Always draws
+              above now. The svg has overflow:"visible" set (see the <svg>
+              tag above) specifically so this is safe even for a point near
+              the very top of the chart -- the bubble is free to extend past
+              the chart's own small box without being clipped; it's a
+              momentary overlay, not part of the chart's permanent layout. */}
           {activeIdx !== null && chartData[activeIdx] && (() => {
             const p = points[activeIdx];
             const d = chartData[activeIdx];
@@ -258,10 +266,9 @@ function TrendLine({ entries, valueKey, color, starDates, unit }) {
             const bubbleH = 30;
             let bx = p[0] - bubbleW / 2;
             bx = Math.max(2, Math.min(bx, W - 2 - bubbleW));
-            const above = p[1] - GAP - bubbleH >= -20; // flip below the point if there's no room above
-            const by = above ? p[1] - GAP - bubbleH : p[1] + GAP;
-            const lineY1 = above ? by + bubbleH : p[1] + DOT_GAP;
-            const lineY2 = above ? p[1] - DOT_GAP : by;
+            const by = p[1] - GAP - bubbleH; // always above the point now
+            const lineY1 = by + bubbleH;
+            const lineY2 = p[1] - DOT_GAP;
             return (
               <g pointerEvents="none">
                 <line x1={p[0]} y1={lineY1} x2={p[0]} y2={lineY2} stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeDasharray="2,3" />
