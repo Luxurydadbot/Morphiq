@@ -1,4 +1,4 @@
-# Hypergentiq — Session 51 master handoff
+# Hypergentiq — Session 52 master handoff
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
@@ -6,7 +6,29 @@ This file is the handoff. At the start of every session, fetch this file from th
 
 Unchanged this session — this session's work (below) was member-facing feature work, not app-store-roadmap work. Step list: (1) fix PWA gaps — done, Session 30, (2) add Capacitor + generate native projects — done (Session 25), still never opened in Android Studio/Xcode by a human, (3) set up Capgo live-update pipeline — still open, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service), (6) privacy policy — hard gate for both stores, still blocked on Bryant forming a real legal business entity before it can be finalized and sent to a lawyer, (7) terms of service — same status as privacy policy, (8) account deletion — built Session 46, live-verified working Session 47, (9) store listing assets (icon done, need screenshots + descriptions), (10) confirm no Apple IAP conflict, (11) submit.
 
-## Session 51 — manual weight entry + per-exercise kg/lbs unit memory (built and pushed, NOT yet live-tested)
+## Session 52 — per-exercise recap card (built and pushed, NOT yet live-tested)
+
+The third and last feature from the original Session 49 design batch. Bryant's brief this time, given live in chat rather than as a pre-made mockup: treat it like a "coach's report card" — capture wins/losses, a short positive suggestion, don't make it a lot of reading, and don't auto-dismiss it (needs a real close/continue button).
+
+**Design decisions made this session, confirmed with Bryant before building:**
+- **Shows per-exercise, not once at the end of the whole workout.** Right when the last set of an exercise is logged, before moving on to whatever's next — confirmed directly ("I think it should be at the end of each exercise... at the end of benching, the card should show up").
+- **One comparison, not a stat dump.** Total weight moved today (sets × reps × weight, standard "volume") vs. the same total from the last time that exercise was logged, plus a personal-record badge if today beat an all-time best on this exercise. Kept to one number + one line, per Bryant's "don't want a ton of reading."
+- **Tone matches the app's existing no-guilt-language rule** (already a standing design rule, not a new one): a lighter day than last time is framed gently and forward-looking ("that happens, recovery is part of the process"), never as a failure. A heavier day gets genuine positive reinforcement. First time ever logging an exercise gets a "that's your new baseline" framing instead of a comparison that doesn't exist yet.
+- **No auto-dismiss.** A real "Continue" button, stays on screen until tapped — exactly as Bryant asked.
+
+**What was built, in one commit (`7ac9a25`):**
+- A new card, shown as its own screen (same pattern as the existing "checkpoint" screen), that appears the instant an exercise's last set is logged. Shows the exercise name, a PR badge if one was hit today, the total weight moved today, a comparison to last time (or "no earlier session yet" the first time), and one short encouraging line — then a "Continue" button that moves on to whatever would have happened next (the next exercise, the exercise-picker checkpoint, or the workout-complete screen — unchanged from before, just delayed until the card is dismissed).
+- Respects the per-exercise kg/lbs unit choice from Session 51 — the recap shows in whichever unit that exercise is currently set to, same as the weight card itself, so the numbers never contradict what was just seen set-by-set.
+- The personal-record badge costs zero extra database calls — it reuses the exact same check the app already runs after every set to decide whether to show the small in-set "PR" tag, just remembered across the whole exercise instead of reset every set.
+- One new small database read was added (no new tables or columns — this only reads existing `workout_logs` rows): `sb.getLastSessionSetsForExercise()`, which fetches the most recent prior session's sets for one exercise so today's totals have something to compare against.
+
+**Files touched, final line counts:** `src/WorkoutScreen.jsx` 3,200 → **3,336** (+136 — the recap card screen, the comparison math, and the small state additions that hook it into the existing "what happens after this exercise" logic, all new code, nothing else in the file touched), `src/shared.jsx` 3,749 → **3,774** (+25 — the one new read-only `getLastSessionSetsForExercise()` function).
+
+**🚨 `shared.jsx` is now at 3,774 / 3,800 hard limit — only ~26 lines of headroom left, full stop.** The very next thing that needs even a small new shared helper should NOT go into `shared.jsx` — it needs to either land in whichever screen file actually uses it, or Bryant needs to decide how to split `shared.jsx` into smaller files first. This is no longer a "worth watching" heads-up — it is functionally full.
+
+**Verified before pushing:** `esbuild` clean parse on both changed files, the new `getLastSessionSetsForExercise` try/catch opens and closes correctly, the full recap screen and the `advanceSet()`/`dismissRecap()` logic were read back after editing to confirm they render and transition correctly, line-count deltas above are intentional (not accidental deletions). Traced through the one subtle timing risk (whether the just-logged final set is actually in `loggedSets` by the time the recap reads it) against how the existing rest-timer/checkpoint code already handles the same timing — confirmed safe by the same pattern, not a new risk. **NOT yet live-tested by Bryant on a real phone or in the running app** — first thing to check next session.
+
+## Session 51 — manual weight entry + per-exercise kg/lbs unit memory (built, pushed, and live-tested — confirmed working)
 
 Bryant approved building the two features Session 49 had designed but not built, in this order: (1) the Workouts-tab chart redesign (turned out to actually be the more recent, correct "last session" — see Session 50 below, which hadn't made it into this file yet), (2) manual weight entry + kg/lbs, (3) a per-exercise recap card (still not started). This session built #2.
 
@@ -53,26 +75,30 @@ Live-tested account deletion end-to-end on the real production app, live-verifie
 
 ## Latest commit
 
-`b9dec5c` — "Fix: weight-card captions now convert to kg in kg mode" (`src/WorkoutScreen.jsx`), a same-session follow-up to `0581df5` — "Feature: manual weight entry + per-exercise kg/lbs unit memory" (`src/WorkoutScreen.jsx`, `src/shared.jsx`, `src/Morphiq.jsx`). Both pushed via the GitHub web-upload workaround (direct git/API push is still blocked this session too).
+`7ac9a25` — "Feature: per-exercise recap card comparing today to last time" (`src/WorkoutScreen.jsx`, `src/shared.jsx`). Pushed via the GitHub web-upload workaround (direct git/API push is still blocked this session too).
 
 ## Confirmed working vs still open
 
-**Built, pushed, AND live-tested/confirmed working this session:**
-- Manual weight entry (tap-to-type) + per-exercise kg/lbs switch with memory, kg-mode stepper, kg-mode plate-math hidden, all caption text now unit-aware too. See Session 51 write-up above — Bryant tested live, caught one caption-text bug, fixed same session.
+**Built and pushed this session — NOT yet live-tested in the real running app:**
+- The per-exercise recap card. See Session 52 write-up above.
+
+**Built, pushed, AND live-tested/confirmed working:**
+- Manual weight entry (tap-to-type) + per-exercise kg/lbs switch with memory, kg-mode stepper, kg-mode plate-math hidden, all caption text now unit-aware too (Session 51). Bryant tested live, caught one caption-text bug, fixed same session.
 - Workouts-tab Weight/Reps trend charts with PR stars, real horizontal scroll, and the tap-and-hold value tooltip (Session 50, recorded late — see above). Bryant confirmed on a real device: "Works perfect."
 
 **Confirmed live in prior sessions — unchanged, still true:** the "switch exercise" feature and its checkpoint screen (Session 48), the exercise-breakdown/"This exercise" display fix (Session 48), `api/delete-account.js` and the Danger Zone flow (Session 47), the post-onboarding "Plan ready" screen (Session 47), the weekly detection engine tested against production with synthetic data but not yet a real member's multi-week history (Session 47).
 
 **NOT yet verified / still open:**
+- This session's per-exercise recap card (Session 52 — brand new, needs a real-device pass).
 - Session 49's nav bar / chat button fix — still carried forward, still nobody has live-tested it.
 - The cardio timer real-phone lock-screen test.
 - Everything else on the punch list below.
 
 ## Punch list, in priority order
 
-**FIRST — still needs a live scroll-through: Session 49's nav bar/chat button fix.** Quick: open the app, scroll down on any screen with enough content, confirm both stay put. This has now been carried forward three sessions in a row without ever actually being clicked through live — worth doing this even briefly before anything else piles on top of it.
+**FIRST — live-test this session's per-exercise recap card on a real device.** Finish all the sets of an exercise and confirm the card actually appears before moving to the next exercise (or the checkpoint screen, or the done screen, whichever applies). Confirm the total-weight-today number and the "vs last time" comparison look right, that a genuine PR shows the badge, that the very first time logging a brand-new exercise shows the "new baseline" wording instead of a broken comparison, and that the card only goes away when you actually tap Continue — never on its own.
 
-**SECOND — build the per-exercise recap card**, the third and last item from the Session 49 design batch: triggers when a member finishes all the sets of ONE exercise (not the whole workout), comparing that exercise's performance today against the last time it was logged. The app already fetches this exact comparison live during a workout (same data that powers the existing "last time: X lbs × Y reps" line), so this is mostly a new short summary card plus a rollup calculation at the point an exercise finishes — not new data plumbing from scratch. Natural hook point: `resolveNextExercise()` in `WorkoutScreen.jsx`, the single source of truth for "what happens after this exercise's sets run out."
+**SECOND — also still needs a live scroll-through: Session 49's nav bar/chat button fix.** Quick: open the app, scroll down on any screen with enough content, confirm both stay put. This has now been carried forward four sessions in a row without ever actually being clicked through live — worth doing this even briefly before anything else piles on top of it.
 
 **THIRD — unblock the privacy policy and terms of service.** Both drafts exist now. Both are still blocked on Bryant forming a real legal business entity, after which both documents need to go to an actual lawyer together.
 
@@ -89,6 +115,10 @@ Live-tested account deletion end-to-end on the real production app, live-verifie
 **LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only); the "blank exercise weight saves as 20 lbs instead of staying blank" quirk.
 
 ## Technical notes carried forward
+
+**🚨 `shared.jsx` is essentially full: 3,774 / 3,800 hard limit, ~26 lines left.** Do not add anything new to `shared.jsx` next session without either (a) confirming it truly must be shared across multiple screen files and there's no room any other way, or (b) proposing a split to Bryant first, per the app's own file-size rules. A single new helper function with a comment could tip this over the hard limit.
+
+**`loggedSets` (state) vs. `loggedSetsRef.current` (ref) — when each is safe to read.** `WorkoutScreen.jsx` keeps both in sync on every logged set. Code that runs in the SAME synchronous tick as `logSet()` (e.g. `goToRestOrNudge()`, called directly from inside `logSet()`) must read `loggedSetsRef.current`, not the `loggedSets` state — the state update from that same `logSet()` call hasn't been committed to a fresh render yet, so the state closure would still show the OLD list missing the set just logged. Code that only runs later, after at least one more render has happened (rest-timer countdown reaching zero, a button click, `advanceSet()`) can safely read the `loggedSets` state directly, since by then it reflects the latest commit. Session 52's recap card reads the state (not the ref) inside `advanceSet()`, deliberately, after confirming `advanceSet()` is only ever called this "later" way — worth remembering next time something new needs to read what was "just logged."
 
 **Two "last session" handoffs existed at once going into this session — the cause, and the fix.** Session 50 (the chart redesign) was fully designed, built, live-tested, and confirmed working by Bryant, but its handoff only ever got written to a Claude Project doc (`claude/session-notes-2026-09-18-workouts-tab-redesign.md`), never committed here to `HANDOFF.md`. This file still said "Session 49" at the start of this session, so the two sources disagreed about what "last session" even meant. **Going forward: this file is the only source of truth for session handoffs — a Project doc is fine as working notes mid-session, but the end-of-session commit to this file is mandatory every time, no exceptions, even if a project doc already has the same content.**
 
@@ -116,12 +146,12 @@ Live-tested account deletion end-to-end on the real production app, live-verifie
 
 ## Paste this at the start of your next session
 
-Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (reads work fine even without a working token, since the repo is public; do NOT use WebFetch for repo file contents). Report every file's line count before doing anything else. **`shared.jsx` is now at 3,749 / 3,800 — only ~51 lines of headroom left; the next new shared helper should probably land in whichever screen file actually uses it instead, or ask Bryant about a split.** **GitHub push access:** still broken (platform-side git-proxy block) — use the Upload-files browser workaround, staging file(s) at `/mnt/user-data/uploads/` specifically (not `/outputs/`). **`api/` is at exactly 12 counted functions — the Vercel Hobby-plan cap.** **Never use a "+" alias on Bryant's real sbcglobal.net address.**
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (reads work fine even without a working token, since the repo is public; do NOT use WebFetch for repo file contents). Report every file's line count before doing anything else. **`shared.jsx` is now at 3,774 / 3,800 — only ~26 lines of headroom left. Do not add anything new to it without proposing a split to Bryant first — it is essentially full.** **GitHub push access:** still broken (platform-side git-proxy block) — use the Upload-files browser workaround, staging file(s) at `/mnt/user-data/uploads/` specifically (not `/outputs/`). **`api/` is at exactly 12 counted functions — the Vercel Hobby-plan cap.** **Never use a "+" alias on Bryant's real sbcglobal.net address.**
 
-**This session (Session 51) built, pushed, AND live-tested: manual weight entry** (tap the number to type it) plus a per-exercise LBS/KG switch that remembers each exercise's own last-used unit, a 2.5 kg stepper step in kg mode, and the plate-math helper hidden in kg mode. Storage never changed — every weight is still saved in pounds. One new database column was added: `profiles.exercise_units` (jsonb), plus the pre-existing but previously-unused `profiles.unit` column is now actually wired up as the profile-level default. Bryant tested live and caught one bug (caption text under the number still said "lbs" in kg mode) — fixed same session, confirmed nothing else was wrong.
+**This session (Session 52) built and pushed the per-exercise recap card** — the third and last feature from the original Session 49 design batch. Shows right when an exercise's sets finish (not at the end of the whole workout — Bryant confirmed this explicitly), comparing today's total weight moved on that exercise to the last time it was logged, with a PR badge when earned, one short encouraging line (never guilt language, matching house rules), and a real "Continue" button — no auto-dismiss. Respects each exercise's kg/lbs unit choice from Session 51. **NOT yet live-tested — this is the first thing to check next session.**
 
-**Also newly recorded this session, but was actually built and live-tested last session (Session 50) — was missing from this file before now:** the Workouts-tab Weight/Reps trend charts with PR stars and the tap-and-hold value tooltip. Bryant confirmed on a real device: "Works perfect." Fully done, nothing further needed here.
+**Also confirmed working and fully done, no action needed:** manual weight entry + per-exercise kg/lbs (Session 51, live-tested and one bug already fixed), and the Workouts-tab trend charts + tap-and-hold tooltip (Session 50, live-tested, "Works perfect").
 
-Next priority: the long-overdue nav-bar scroll-through from Session 49 (quick), then build the third and last Session-49-designed feature — the per-exercise recap card. Full spec is above under Session 49 recap history and the punch list.
+Next priority: live-test this session's recap card (first thing), then the long-overdue nav-bar scroll-through from Session 49 (still not done, four sessions running). After that, everything designed from the original Session 49 batch is built — next real feature work needs a fresh conversation with Bryant about what's next.
 
-Remind Bryant: the weight-entry + kg/lbs feature is fully live-tested and working now, nothing further needed there. Still gently flag that the nav bar/chat button fix from two sessions ago (Session 49) still hasn't had its live scroll-through.
+Remind Bryant: the per-exercise recap card is live but untested on a real device — worth finishing an exercise and checking it before considering it done. Also: `shared.jsx` has almost no room left, so the next new feature that needs shared logic may need a file-split conversation first.
