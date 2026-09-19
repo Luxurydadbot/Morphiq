@@ -288,6 +288,23 @@ function lbsToKgDisplay(lbs) {
   return Math.round((lbs / LB_PER_KG) * 10) / 10;
 }
 const KG_STEP = 2.5; // clean per-tap step size in kg mode (Bryant's choice, Session 51)
+// Formats a single stored (lbs) weight for display in whichever unit is
+// active -- e.g. "185 lbs" or "83.9 kg". Session 51 follow-up: the small
+// caption lines under the weight number were still always saying "lbs" even
+// in kg mode (Bryant flagged this the first time he tried kg mode live).
+function formatWeightValue(lbsValue, unit) {
+  return unit === "kg" ? `${lbsToKgDisplay(lbsValue)} kg` : `${lbsValue} lbs`;
+}
+// Formats a "+X unit from plan" style delta between two stored (lbs) values,
+// converting the DIFFERENCE to whichever unit is active rather than
+// converting each side separately and subtracting (avoids compounding
+// rounding -- e.g. two kg-rounded numbers a whole kg apart could otherwise
+// show a 0.9 or 1.1 delta instead of a clean 1).
+function formatWeightDelta(planLbs, actualLbs, unit) {
+  const deltaLbs = actualLbs - planLbs;
+  const delta = unit === "kg" ? Math.round((deltaLbs / LB_PER_KG) * 10) / 10 : deltaLbs;
+  return `${delta > 0 ? "+" : ""}${delta} ${unit} from plan`;
+}
 
 function WorkoutScreen() {
   const { navigate, user, setUser, gymBranding, plan, supabaseUser, setWorkoutContext, pendingAISwap, setPendingAISwap, historicalData, loadHistoricalData, selectedDayOverride, setSelectedDayOverride } = useApp();
@@ -2183,22 +2200,22 @@ function WorkoutScreen() {
               // feel light -- that's the point. Reacting to that the same way
               // a real working-set miss gets reacted to would be treating
               // normal, working-as-intended behavior as a problem.
-              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Warm-ups aren't meant to feel heavy — that's normal. Still ramping to {ex.weight} lbs.</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Warm-ups aren't meant to feel heavy — that's normal. Still ramping to {formatWeightValue(ex.weight, unit)}.</div>
             ) : isWarmupSet ? (
-              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Warm-up weight · ramping to {ex.weight} lbs</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Warm-up weight · ramping to {formatWeightValue(ex.weight, unit)}</div>
             ) : nudgeAcceptedRef.current ? (
               <div style={{ fontSize: 12, color: theme.success, marginTop: 6 }}><Icon name="bolt" size={12} style={{ verticalAlign: "-1px", marginRight: 2 }} /> Progressive overload applied</div>
             ) : weightOverride !== null ? (
-              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Adjusted{displayWeight !== currentSpec.weight ? ` · ${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan` : ""}</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>Adjusted{displayWeight !== currentSpec.weight ? ` · ${formatWeightDelta(currentSpec.weight, displayWeight, unit)}` : ""}</div>
             ) : readiness && readiness !== "ok" && displayWeight !== currentSpec.weight ? (
               // Readiness check-in adjustment, no manual override or accepted
               // nudge on top of it -- explain the number rather than let it
               // silently look like a plan change (falls through to the
-              // generic "X lbs from plan" wording otherwise, which is
+              // generic "X unit from plan" wording otherwise, which is
               // technically accurate but doesn't say why).
               <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>{readiness === "rough" ? "Lightened today — you checked in rough" : "Bumped up today — you checked in great"}</div>
             ) : (
-              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>{displayWeight === currentSpec.weight ? "Today's target" : `${displayWeight > currentSpec.weight ? "+" : ""}${displayWeight - currentSpec.weight} lbs from plan`}</div>
+              <div style={{ fontSize: 12, color: theme.textDim, marginTop: 6 }}>{displayWeight === currentSpec.weight ? "Today's target" : formatWeightDelta(currentSpec.weight, displayWeight, unit)}</div>
             )}
             {/* Plate-math breakdown — barbell exercises only (dumbbells/
                 kettlebells are a single fixed implement, most machines are
