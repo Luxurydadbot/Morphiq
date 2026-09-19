@@ -12,7 +12,7 @@ import {
   sb, theme, css, AppContext, DEFAULT_USER, SESSION_KEY, isGymBlocked,
   isMultiDayPlan, getAutoWorkoutDayIndex, calcMacros,
   setSessionCookie, getSessionCookie, clearSessionCookie,
-  localDateStr, buildPlan, progressPlan,
+  localDateStr, buildPlan, progressPlan, buildSetDetails,
   SUPABASE_URL, SB_GET, getAuthToken,
   MicIcon, VoiceBtn, Pill, Spinner, NavIcon, Layout, Icon, PoweredByHypergentiq, GymLogo,
   GOAL_OPTIONS, GOAL_ICONS, EQUIPMENT_OPTIONS,
@@ -425,11 +425,85 @@ function AppProvider({ children }) {
   // Checks if 7+ days have passed since weekStartDate — if so, silently generates next week.
   // Week progression — fully code-driven, no API call
   // Called when session restores and plan is 7+ days old
+  // Session 52 v2 -- mid-week weight sync. checkAndGenerateNextWeek() only
+  // regenerates the plan (via progressPlan() below) once 7+ days have
+  // passed -- deliberately, since progressPlan() also advances weekNumber
+  // and the deload timer, which must only happen at a real week boundary.
+  // That left a real gap Bryant flagged: if a member manually drops the
+  // weight on an exercise mid-week (say 85 -> 75 lbs) and repeats that same
+  // exercise again before the week rolls over, the plan's stored number was
+  // still the old 85, so the next session silently suggested starting back
+  // at 85 instead of the weight actually lifted last time.
+  //
+  // This is a narrow, separate fix, not a rerun of progressPlan(): it only
+  // ever pulls a stored exercise weight DOWN to match the most recently
+  // logged actual weight, never up -- raising the weight stays exclusively
+  // progressPlan()'s job (the 2-for-2 rule, applied at the weekly
+  // boundary), so this can never hand out an unearned increase. Reuses
+  // sb.getExerciseHistory() (already built for the progress chart) -- no
+  // new Supabase call, and no changes to shared.jsx (which is nearly at
+  // its line-count limit this session).
+  function syncMidWeekWeights(uid, currentPlan, currentUser) {
+    try {
+      const flatExercises = currentPlan.exercises || [];
+      const dayExercises = (currentPlan.customDays || []).flatMap(day => day.exercises || []);
+      const uniqueNames = [...new Set([...flatExercises, ...dayExercises].map(e => e.name))];
+      if (uniqueNames.length === 0) return;
+      const goal = currentUser?.goal || "general_fitness";
+
+      Promise.all(uniqueNames.map(name =>
+        sb.getExerciseHistory(uid, name).then(history => ({
+          name,
+          lastWeight: history && history.length > 0 ? history[history.length - 1].weight : null,
+        }))
+      )).then(results => {
+        const lastWeightByName = {};
+        results.forEach(r => { if (r.lastWeight) lastWeightByName[r.name] = r.lastWeight; });
+
+        let changed = false;
+        // Regenerates setDetails (the actual per-set ramp/pyramid table)
+        // whenever the weight changes, same rule progressPlan() uses --
+        // except for loadStyle 'custom', where the member hand-typed every
+        // row themselves, so this leaves those numbers alone.
+        function syncOne(ex) {
+          const lastWeight = lastWeightByName[ex.name];
+          if (!lastWeight || lastWeight >= ex.weight) return ex;
+          changed = true;
+          const shouldRegenerateSetDetails = ex.loadStyle !== "custom";
+          return {
+            ...ex,
+            weight: lastWeight,
+            setDetails: shouldRegenerateSetDetails ? buildSetDetails(ex.sets, ex.reps, lastWeight, ex.loadStyle, goal) : ex.setDetails,
+          };
+        }
+
+        const nextPlan = {
+          ...currentPlan,
+          exercises: currentPlan.exercises ? currentPlan.exercises.map(syncOne) : currentPlan.exercises,
+          customDays: currentPlan.customDays ? currentPlan.customDays.map(day => ({ ...day, exercises: (day.exercises || []).map(syncOne) })) : currentPlan.customDays,
+        };
+
+        if (changed) {
+          setPlan(nextPlan);
+          sb.upsertProfile(uid, currentUser, nextPlan).catch(() => {});
+          console.log("[Morphiq] Mid-week weight sync applied — one or more exercises adjusted down to last actual weight");
+        }
+      }).catch(() => {});
+    } catch (e) { console.log("[Morphiq] Mid-week weight sync skipped:", e.message); }
+  }
+
   function checkAndGenerateNextWeek(uid, currentPlan, currentUser) {
     try {
       if (!currentPlan?.weekStartDate) return;
+      if (!uid || uid.startsWith("sim-")) return;
       const daysSince = Math.floor((Date.now() - new Date(currentPlan.weekStartDate)) / 86400000);
-      if (daysSince < 7) return;
+      if (daysSince < 7) {
+        // Still mid-week — the full weekly progression below doesn't run
+        // yet, but the narrow down-only weight sync still should (see
+        // syncMidWeekWeights() above for why this is a separate function).
+        syncMidWeekWeights(uid, currentPlan, currentUser);
+        return;
+      }
       // Fetch workout logs then run local progression engine.
       // Session 11: switched from sb.getWorkoutLogs(uid, 30) to
       // sb.getWorkoutLogsForProgression(uid) -- the old call had no
@@ -439,7 +513,6 @@ function AppProvider({ children }) {
       // even the existing 2-for-2 rule) once a member has more than a
       // few exercises in rotation. See getWorkoutLogsForProgression() in
       // shared.jsx for the full explanation.
-      if (!uid || uid.startsWith("sim-")) return;
       sb.getWorkoutLogsForProgression(uid).then(logs => {
         const nextPlan = progressPlan(currentPlan, logs || [], currentUser);
         setPlan(nextPlan);

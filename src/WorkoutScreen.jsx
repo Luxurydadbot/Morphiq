@@ -306,7 +306,7 @@ function formatWeightDelta(planLbs, actualLbs, unit) {
   return `${delta > 0 ? "+" : ""}${delta} ${unit} from plan`;
 }
 
-// ── Per-exercise recap card (Session 52) ─────────────────────────────────────
+// ── Per-exercise recap card (Session 52, redesigned per Bryant's feedback) ──
 // Rolls up a list of {weight, reps} working sets into total volume (the
 // standard weight x reps measure of how much work was done) and the heaviest
 // single set. Used for both today's just-finished sets and last time's sets,
@@ -317,14 +317,124 @@ function sumWorkingSets(sets) {
     topWeight: Math.max(acc.topWeight, s.weight || 0),
   }), { volume: 0, topWeight: 0 });
 }
-// One short, rule-based encouragement line off the volume comparison -- no AI
-// call, instant and free. Always forward-looking, never guilt-inducing on a
-// lighter day (Bryant's own house rule -- no guilt language, stay positive).
-function recapEncouragement(hasHistory, deltaVolume) {
-  if (!hasHistory) return "First time logging this one — today's numbers are your new baseline.";
-  if (deltaVolume > 0) return "Nice increase — keep that momentum going.";
-  if (deltaVolume < 0) return "A touch lighter than last time — that happens, recovery is part of the process.";
-  return "Right in line with last time — solid, consistent work.";
+
+// Matches today's working sets to last time's sets by position (set 1 vs
+// set 1, set 2 vs set 2, ...) so the card can show a real per-set breakdown,
+// not just one aggregate number. Not a perfect match if the member did a
+// different number of sets than last time, but good enough for an
+// at-a-glance table -- any set with nothing to compare against just shows
+// "no match" rather than guessing.
+function computeSetDeltas(todaySets, lastSets) {
+  const rows = [];
+  const n = Math.max(todaySets.length, lastSets ? lastSets.length : 0);
+  for (let i = 0; i < n; i++) {
+    const t = todaySets[i] || null;
+    const l = lastSets && lastSets[i] ? lastSets[i] : null;
+    rows.push({
+      setNum: i + 1,
+      todayWeight: t ? t.weight : null,
+      todayReps: t ? t.reps : null,
+      lastWeight: l ? l.weight : null,
+      lastReps: l ? l.reps : null,
+      deltaWeight: t && l ? t.weight - l.weight : null,
+    });
+  }
+  return rows;
+}
+// "Mixed" means some sets beat last time and some fell short in the same
+// session -- worth calling out differently than a clean overall up or down.
+function isMixedResult(setRows) {
+  const deltas = setRows.map(r => r.deltaWeight).filter(d => d !== null && d !== 0);
+  return deltas.some(d => d > 0) && deltas.some(d => d < 0);
+}
+
+// Plateau check -- Bryant's ask: look at the last few sessions on this
+// exercise and flag it if the weight genuinely hasn't moved. Reuses
+// sb.getExerciseHistory() (already built for the progress chart, ascending
+// by date) so this needs zero new Supabase calls. Because today's own set
+// save is fire-and-forget, it may or may not have landed in the database
+// yet when this runs -- so the most recent history row is dropped either
+// way rather than trusted, and today's weight (already known locally, no
+// network needed) is compared against the 3 CONFIRMED prior sessions
+// before it. Only flags a plateau when today matches too, so it takes 4
+// flat sessions in a row (today + 3 prior) to trigger -- a real, not
+// borderline, plateau.
+function detectPlateau(history, todayTopWeight) {
+  if (!history || history.length === 0 || !todayTopWeight) return false;
+  const confirmedPrior = history.slice(0, -1).slice(-3).map(h => h.weight);
+  if (confirmedPrior.length < 3) return false;
+  const allSame = confirmedPrior.every(w => w === confirmedPrior[0]);
+  return allSame && todayTopWeight === confirmedPrior[0];
+}
+
+// Which coaching category this recap falls into -- plateau takes priority
+// (it's the most actionable signal), then a fresh PR, then per-set mixed
+// results, then the plain up/flat/down read on total volume.
+function recapCategory({ hasHistory, prHit, isPlateau, isMixed, deltaVolume }) {
+  if (isPlateau) return "plateau";
+  if (!hasHistory) return "first";
+  if (prHit) return "pr";
+  if (isMixed) return "mixed";
+  if (deltaVolume > 0) return "up";
+  if (deltaVolume < 0) return "down";
+  return "flat";
+}
+
+// A bank of several trainer-voice phrasings per category instead of one
+// canned line -- Bryant's explicit ask for tips with real coaching value,
+// and his hard requirement that they not feel like the same message every
+// time. Always forward-looking, never guilt language on a lighter or flat
+// day (the app's own no-guilt design rule).
+const TIP_BANK = {
+  pr: [
+    "New PR on {ex} — that's real progress. Bank it and move into the next lift with confidence.",
+    "That's the heaviest you've ever logged on {ex}. No need to chase it again right away — trust the plan and keep building.",
+    "PR today on {ex}. One great session doesn't need repeating every time — just keep showing up the same way.",
+  ],
+  up: [
+    "Every set matched or beat last time — that's what progress actually looks like. Keep loading it the same way next time.",
+    "You added real work today without any set falling apart. This weight still has room to grow.",
+    "Reps held steady while the weight went up — exactly the pattern that builds strength over time.",
+    "Solid step up from last time. No need to jump again next session — let your body catch up to this weight first.",
+  ],
+  flat: [
+    "Right in line with last time — solid, repeatable work. Consistency like this is what makes the next jump stick.",
+    "Same numbers as last time, and that's a fine session — not every week needs to be a personal best.",
+    "Matched last time exactly. If the reps felt easier than before, that's often the sign the next small jump is ready.",
+  ],
+  mixed: [
+    "Your first sets were strong but the last one dropped off — a normal sign you found today's real limit, not a problem.",
+    "Good early sets, a lighter finish. That's what fatigue is supposed to look like by your last set.",
+    "Mixed bag today — some sets up, one down. Look at the trend over a few sessions, not any single one, before changing anything.",
+  ],
+  down: [
+    "A bit lighter today. One off day doesn't undo the work you've put in — show up the same way next time.",
+    "Dipped slightly here — could be sleep, stress, or just a hard week. Worth a normal effort next time before reading into it.",
+    "Lighter than last time, and that's a normal part of training, not a setback.",
+  ],
+  plateau: [
+    "This is your third session in a row in the same range on {ex}. Worth trying one lighter session — same weight, a couple fewer reps — before pushing for more.",
+    "{ex} has been flat for a few sessions now. Usually that means a small change helps: an extra rest day, one lighter week, or a different rep range — not just repeating the same numbers.",
+    "A few weeks flat on {ex}. A real trainer's move here: back off about 10% for one session, then come back at it fresh next time.",
+  ],
+  first: [
+    "First time logging {ex} — today's numbers are your baseline. Everything from here gets measured against this.",
+    "New exercise, no comparison yet. Just note how it felt today and build from here.",
+  ],
+};
+// Deterministic (not random) variant picker -- Bryant's requirement: tips
+// must not feel like the same canned line every time, but true randomness
+// can coin-flip-repeat the same line back to back, which would feel like a
+// glitch. Hashing the category + exercise name + today's date picks one
+// stable variant for the whole day and a different one on other days, with
+// no network call or AI cost.
+function pickTipVariant(category, exerciseName, dateStr) {
+  const bank = TIP_BANK[category] || TIP_BANK.up;
+  const seed = `${category}:${exerciseName}:${dateStr}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  const idx = Math.abs(hash) % bank.length;
+  return bank[idx].replace(/\{ex\}/g, exerciseName);
 }
 
 function WorkoutScreen() {
@@ -1259,15 +1369,24 @@ function WorkoutScreen() {
     const todayTotals = sumWorkingSets(todaysWorkingSets);
     setPendingTransition(predicted);
     // Show today's numbers right away; "comparing: true" means the last-time
-    // comparison is still loading, filled in a moment later below rather
-    // than making the card wait on the network before it can appear at all.
-    setRecapData({ exerciseName: ex.name, today: todayTotals, comparing: true, last: null, prHit: exercisePRHit });
+    // comparison (and plateau check) are still loading, filled in a moment
+    // later below rather than making the card wait on the network before it
+    // can appear at all.
+    setRecapData({ exerciseName: ex.name, today: todayTotals, todaySets: todaysWorkingSets, comparing: true, last: null, lastSets: null, plateau: false, prHit: exercisePRHit });
     setState("recap");
-    sb.getLastSessionSetsForExercise(supabaseUser.id, ex.name).then(lastSets => {
+    // Two independent reads in parallel: last session's actual sets (for the
+    // per-set table) and the longer exercise history (for the plateau
+    // check, see detectPlateau() above) -- both already-existing sb
+    // functions, no new Supabase code needed.
+    Promise.all([
+      sb.getLastSessionSetsForExercise(supabaseUser.id, ex.name),
+      sb.getExerciseHistory(supabaseUser.id, ex.name),
+    ]).then(([lastSets, history]) => {
       const last = lastSets && lastSets.length > 0 ? sumWorkingSets(lastSets) : null;
-      setRecapData(prev => prev ? { ...prev, comparing: false, last } : prev);
+      const plateau = detectPlateau(history, todayTotals.topWeight);
+      setRecapData(prev => prev ? { ...prev, comparing: false, last, lastSets: lastSets || [], plateau } : prev);
     }).catch(() => {
-      setRecapData(prev => prev ? { ...prev, comparing: false, last: null } : prev);
+      setRecapData(prev => prev ? { ...prev, comparing: false, last: null, lastSets: [], plateau: false } : prev);
     });
   }
 
@@ -1895,7 +2014,7 @@ function WorkoutScreen() {
   // (never guilt language on a lighter day, matching the app's design
   // rules), and no auto-dismiss — stays up until actually closed.
   if (state === "recap" && recapData) {
-    const { exerciseName, today, comparing, last, prHit } = recapData;
+    const { exerciseName, today, todaySets, comparing, last, lastSets, plateau, prHit } = recapData;
     const hasHistory = !comparing && !!last;
     const deltaVolume = hasHistory ? today.volume - last.volume : 0;
     // Show the recap in whichever unit this exercise is currently set to
@@ -1905,22 +2024,38 @@ function WorkoutScreen() {
     const todayVolumeDisplay = unit === "kg" ? lbsToKgDisplay(today.volume) : today.volume;
     const lastVolumeDisplay = hasHistory ? (unit === "kg" ? lbsToKgDisplay(last.volume) : last.volume) : null;
     const deltaVolumeDisplay = unit === "kg" ? Math.round((deltaVolume / LB_PER_KG) * 10) / 10 : deltaVolume;
+    const setRows = hasHistory ? computeSetDeltas(todaySets, lastSets) : [];
+    const isMixed = hasHistory && isMixedResult(setRows);
+    const isPlateau = !comparing && !!plateau;
+    const category = comparing ? null : recapCategory({ hasHistory, prHit, isPlateau, isMixed, deltaVolume });
+    const tipText = category ? pickTipVariant(category, exerciseName, localDateStr()) : null;
+    const isWarnTip = category === "plateau";
     return (
       <Layout activeNav="workout" chatTarget="chat_workout">
-        <div className="mq-fade" style={{ padding: "2rem 1.25rem 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1 }}>
-          <div style={{ marginBottom: 12, color: a }}><Icon name="clipboard" size={32} /></div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 4 }}>{exerciseName} — done <Icon name="check" size={16} style={{ verticalAlign: "-2px", marginLeft: 2 }} /></div>
+        <div className="mq-fade" style={{ padding: "2rem 1.25rem 1.5rem", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", flex: 1, overflowY: "auto" }}>
+          {/* A circular checkmark badge, not the old clipboard icon -- Bryant
+              flagged that clipboard icon as reading like a confusing battery
+              symbol at this size. */}
+          <div style={{ marginBottom: 12, width: 44, height: 44, borderRadius: "50%", background: "#212429", border: `2px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", color: a }}>
+            <Icon name="check" size={22} />
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, marginBottom: 4 }}>{exerciseName} — done</div>
           {prHit && (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#0B1E3D", border: `1px solid ${a}`, borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 700, color: a, marginBottom: 12 }}>
               <Icon name="sparkle" size={12} /> New personal record today
             </div>
           )}
-          {/* The actual "report card" numbers -- one comparison, kept to a
-              single readable line rather than a full stat breakdown, per
-              Bryant's ask to not make this a lot of reading. */}
-          <div style={{ width: "100%", background: "#212429", borderRadius: 14, padding: "16px 14px", marginBottom: 14 }}>
+          {isPlateau && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: theme.amberDim, border: `1px solid ${theme.amber}`, borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 700, color: theme.amber, marginBottom: 12 }}>
+              <Icon name="alert" size={12} /> Holding steady a few sessions
+            </div>
+          )}
+          {/* Total volume, with a one-line plain-English definition under it
+              (Bryant's ask) so nobody's left guessing what the number means. */}
+          <div style={{ width: "100%", background: "#212429", borderRadius: 14, padding: "16px 14px", marginBottom: 10 }}>
             <div style={{ fontSize: 28, fontWeight: 700, color: theme.text, lineHeight: 1.1 }}>{todayVolumeDisplay.toLocaleString()} {unit}</div>
-            <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 8 }}>total weight moved today</div>
+            <div style={{ fontSize: 11, color: theme.textDim, marginBottom: 4 }}>total weight moved today</div>
+            <div style={{ fontSize: 10, color: theme.textFaint, marginBottom: 8 }}>Total volume = weight × reps, added up across today's sets.</div>
             {comparing ? (
               <div style={{ fontSize: 12, color: theme.textDim }}>Comparing to last time…</div>
             ) : hasHistory ? (
@@ -1931,10 +2066,32 @@ function WorkoutScreen() {
               <div style={{ fontSize: 12, color: theme.textDim }}>No earlier session on this exercise yet</div>
             )}
           </div>
-          {!comparing && (
-            <div style={{ fontSize: 13, color: theme.textDim, marginBottom: "1.5rem" }}>{recapEncouragement(hasHistory, deltaVolume)}</div>
+          {/* Real per-set breakdown -- today's weight x reps against last
+              time's, set by set, so there's actual value here beyond one
+              aggregate number (Bryant's explicit ask). */}
+          {hasHistory && setRows.length > 0 && (
+            <div style={{ width: "100%", marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: theme.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6, textAlign: "left" }}>Set by set vs last time</div>
+              {setRows.map(row => (
+                <div key={row.setNum} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", background: "#181A1E", borderRadius: 8, marginBottom: 4, fontSize: 12, gap: 6 }}>
+                  <span style={{ color: theme.textDim, minWidth: 38, textAlign: "left" }}>Set {row.setNum}</span>
+                  <span style={{ color: theme.text, flex: 1, textAlign: "left" }}>{row.todayWeight != null ? `${formatWeightValue(row.todayWeight, unit)} × ${row.todayReps}` : "—"}</span>
+                  <span style={{ color: theme.textFaint, flex: 1, textAlign: "left" }}>{row.lastWeight != null ? `was ${formatWeightValue(row.lastWeight, unit)} × ${row.lastReps}` : "no match"}</span>
+                  <span style={{ color: row.deltaWeight > 0 ? theme.success : row.deltaWeight < 0 ? theme.textDim : theme.textFaint, fontWeight: 600, minWidth: 40, textAlign: "right" }}>
+                    {row.deltaWeight != null ? formatWeightDelta(row.lastWeight, row.todayWeight, unit).replace(" from plan", "") : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
-          <button onClick={dismissRecap} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>Continue <Icon name="arrow-right" size={15} /></button>
+          {/* The tip -- real coaching value instead of one canned line,
+              picked from TIP_BANK above (varies day to day, see
+              pickTipVariant()). Plateau tips get the amber warning
+              treatment so they visually stand out from a normal note. */}
+          {!comparing && tipText && (
+            <div style={{ width: "100%", background: isWarnTip ? theme.amberDim : "transparent", border: isWarnTip ? `1px solid ${theme.amber}` : "none", borderRadius: 10, padding: isWarnTip ? "10px 12px" : 0, fontSize: 13, color: isWarnTip ? theme.amber : theme.textDim, marginBottom: "1.5rem", textAlign: "left", lineHeight: 1.4 }}>{tipText}</div>
+          )}
+          <button onClick={dismissRecap} style={{ width: "100%", background: a, color: "#0B1E3D", border: "none", borderRadius: 14, padding: "1rem", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, marginTop: "auto" }}>Continue <Icon name="arrow-right" size={15} /></button>
         </div>
       </Layout>
     );
