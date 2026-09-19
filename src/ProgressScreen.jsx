@@ -6,6 +6,180 @@ import {
   PERSONAL_BESTS, WEIGHT_DATA_MOCK, Icon,
 } from "./shared.jsx";
 
+// ═══════════════════════════════════════════════════════════════════
+// Workouts-tab trend charts (Session 50 design, approved via a Claude
+// Design mockup — see HANDOFF.md). Kept local to this file rather than
+// added to shared.jsx, which has almost no headroom left under the
+// 3,800-line hard limit.
+// ═══════════════════════════════════════════════════════════════════
+
+// One entry per exercise per calendar day: that day's heaviest working set
+// (highest weight; ties broken by higher reps) supplies BOTH the Weight
+// point and the Reps point for the day, so the two stacked charts always
+// describe one real set rather than mixing numbers from different sets on
+// the same day. Confirmed with Bryant before building (HANDOFF.md Session
+// 50). Same "working set only" convention as the totalVol calc elsewhere
+// on this screen: set_number > 0 excludes warm-ups.
+function buildExerciseDailyHistory(strengthLogs) {
+  const byExercise = {};
+  (strengthLogs || []).forEach(row => {
+    if (!row.exercise_name || !(row.set_number > 0)) return;
+    if (typeof row.weight !== "number" || typeof row.reps !== "number") return;
+    const exMap = byExercise[row.exercise_name] || (byExercise[row.exercise_name] = {});
+    const existing = exMap[row.workout_date];
+    if (!existing || row.weight > existing.weight || (row.weight === existing.weight && row.reps > existing.reps)) {
+      exMap[row.workout_date] = { date: row.workout_date, weight: row.weight, reps: row.reps };
+    }
+  });
+  const result = {};
+  Object.keys(byExercise).forEach(name => {
+    result[name] = Object.values(byExercise[name]).sort((a, b) => a.date.localeCompare(b.date));
+  });
+  return result;
+}
+
+// Reps-star target: the plan's CURRENT repMax for this exercise (the same
+// number progressPlan()'s 2-for-2 rule compares against, shared.jsx) --
+// workout_logs doesn't store a per-set rep target historically, so this
+// applies today's plan target across the exercise's whole history. A
+// reasonable simplification: repMax for a given exercise rarely changes
+// except at a plan rotation.
+function getRepMaxLookup(plan) {
+  const map = {};
+  (plan?.exercises || []).forEach(e => {
+    if (e?.name && map[e.name] === undefined) map[e.name] = e.repMax ?? ((e.reps || 0) + 2);
+  });
+  (plan?.customDays || []).forEach(day => {
+    (day?.exercises || []).forEach(e => {
+      if (e?.name && map[e.name] === undefined) map[e.name] = e.repMax ?? ((e.reps || 0) + 2);
+    });
+  });
+  return map;
+}
+
+// Weight star = a genuine all-time PR on this lift (heaviest ever), not
+// every minor uptick. Reps star = the first session hitting the top of the
+// rep range at that same weight -- the same moment the app's own
+// progression rule would bump next week's weight (see getRepMaxLookup).
+function computeTrendStars(history, repMax) {
+  const weightStars = new Set();
+  const repsStars = new Set();
+  let maxWeightSoFar = -Infinity;
+  const firstHitAtWeight = new Set();
+  history.forEach(pt => {
+    if (pt.weight > maxWeightSoFar) {
+      weightStars.add(pt.date);
+      maxWeightSoFar = pt.weight;
+    }
+    if (typeof repMax === "number" && pt.reps >= repMax && !firstHitAtWeight.has(pt.weight)) {
+      firstHitAtWeight.add(pt.weight);
+      repsStars.add(pt.date);
+    }
+  });
+  return { weightStars, repsStars };
+}
+
+// TrendLine -- one scrollable line chart (weight OR reps). Same real-scroll/
+// no-visible-scrollbar behavior and the same right-edge label-clipping fixes
+// as WeightChart (shared.jsx) so it behaves identically to the app's
+// existing chart -- see WeightChart's own comments for why each fix exists.
+function TrendLine({ entries, valueKey, color, starDates }) {
+  const H = 84, PAD = 10;
+  const POINT_SPACING = 34;
+  const LABEL_MIN_GAP = 26;
+  const FALLBACK_W = 260;
+  const containerRef = useRef(null);
+  const scrollRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(null);
+  const hasData = entries && entries.length > 0;
+  const chartData = hasData ? (entries.length === 1 ? [entries[0], entries[0]] : entries) : [];
+  const neededW = hasData ? PAD * 2 + (chartData.length - 1) * POINT_SPACING : 0;
+  const availableW = containerWidth || FALLBACK_W;
+  const scrollable = hasData && neededW > availableW;
+  const W = scrollable ? neededW : availableW;
+
+  useEffect(() => {
+    function measure() { if (containerRef.current) setContainerWidth(containerRef.current.clientWidth); }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  useEffect(() => {
+    if (scrollable && scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+  }, [scrollable, chartData.length]);
+
+  if (!hasData) {
+    return <div ref={containerRef} style={{ fontSize: 11, color: "#6E7480", textAlign: "center", padding: "16px 0" }}>Not enough history yet</div>;
+  }
+
+  const vals = chartData.map(d => d[valueKey]);
+  const minV = Math.min(...vals) - 1;
+  const maxV = Math.max(...vals) + 1;
+  const xStep = (W - PAD * 2) / Math.max(chartData.length - 1, 1);
+  const toY = v => PAD + ((maxV - v) / (maxV - minV)) * (H - PAD * 2 - 12);
+  const points = chartData.map((d, i) => [PAD + i * xStep, toY(d[valueKey])]);
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const areaPath = linePath + ` L${points[points.length-1][0].toFixed(1)},${H-12} L${PAD},${H-12} Z`;
+  const last = points[points.length - 1];
+
+  let lastLabelX = -Infinity;
+  const showLabel = chartData.map((d, i) => {
+    const isEdge = i === 0 || i === chartData.length - 1;
+    const x = points[i][0];
+    if (isEdge || x - lastLabelX >= LABEL_MIN_GAP) { lastLabelX = x; return true; }
+    return false;
+  });
+
+  const valueLabelX = Math.min(last[0] + 6, W - PAD);
+  const valueLabelAnchor = last[0] + 6 > W - PAD - 20 ? "end" : "start";
+  const gradId = "tl-" + valueKey;
+
+  return (
+    <div ref={containerRef}>
+      <style>{`.mq-trendline-scroll::-webkit-scrollbar { display: none; }`}</style>
+      <div
+        ref={scrollRef}
+        className="mq-trendline-scroll"
+        style={scrollable ? { overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" } : undefined}
+      >
+        <svg width={scrollable ? W : "100%"} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+              <stop offset="100%" stopColor={color} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={areaPath} fill={`url(#${gradId})`} />
+          <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          {points.map((p, i) => (
+            <circle key={i} cx={p[0]} cy={p[1]} r="3.5"
+              fill={i === points.length - 1 ? color : "#212429"} stroke={color} strokeWidth="1.5" />
+          ))}
+          {chartData.map((d, i) => (
+            starDates.has(d.date) ? (
+              <path key={"star" + i}
+                d="M0,-3.5 L1.03,-1.08 L3.5,-1.08 L1.44,0.38 L2.16,2.83 L0,1.33 L-2.16,2.83 L-1.44,0.38 L-3.5,-1.08 L-1.03,-1.08 Z"
+                fill="#F59E0B" transform={`translate(${points[i][0]},${points[i][1] - 9})`} />
+            ) : null
+          ))}
+          {chartData.map((d, i) => {
+            if (!showLabel[i]) return null;
+            const x = points[i][0];
+            const nearRight = x > W - PAD - 16;
+            const nearLeft = x < PAD + 16;
+            const anchor = nearRight ? "end" : nearLeft ? "start" : "middle";
+            const labelX = nearRight ? Math.min(x + 8, W - PAD) : nearLeft ? Math.max(x - 8, PAD) : x;
+            const label = new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            return <text key={i} x={labelX} y={H - 3} textAnchor={anchor} fontSize="8" fontFamily="'Inter', system-ui, sans-serif" fill="#6E7480">{label}</text>;
+          })}
+          <text x={valueLabelX} y={last[1] - 4} textAnchor={valueLabelAnchor} fontSize="9" fontFamily="'Inter', system-ui, sans-serif" fill={color} fontWeight="600">{chartData[chartData.length - 1][valueKey]}</text>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 function ProgressScreen() {
   const { navigate, gymBranding, supabaseUser, user, plan, historicalData, loadHistoricalData } = useApp();
   const a = gymBranding.accent;
@@ -18,6 +192,7 @@ function ProgressScreen() {
   const [selectedExercise, setSelectedExercise] = useState(null); // exercise name tapped for strength chart
   const [exerciseHistory, setExerciseHistory] = useState([]);     // chart data for selected exercise
   const [exerciseHistoryLoading, setExerciseHistoryLoading] = useState(false);
+  const [chartExercise, setChartExercise] = useState(null); // exercise picked in the Workouts-tab hero chart (Session 50)
   useEffect(() => {
     if (!supabaseUser?.id) return;
     setLogsLoading(true);
@@ -254,12 +429,77 @@ function ProgressScreen() {
         {tab === "workouts" && (
           <div className="mq-fade">
             {(() => {
-              // Total volume = sum of weight × reps across all working sets (exclude warm-ups: set_number > 0)
-              const totalVol = useRealWorkoutData
-                ? strengthLogs.filter(r => r.set_number > 0).reduce((acc, r) => acc + (r.weight || 0) * (r.reps || 0), 0)
-                : null;
-              const volDisplay = logsLoading ? "..." : totalVol !== null ? totalVol.toLocaleString() + " lbs" : "—";
+              // Session 50 redesign: the Workouts tab opens directly on a
+              // chart instead of a flat log -- two stacked, real-scroll
+              // charts (Weight, Reps) for one exercise at a time, picked via
+              // the pills below. See HANDOFF.md Session 50 for the full
+              // approved design and buildExerciseDailyHistory/
+              // computeTrendStars above for how the numbers and stars are
+              // derived from the same workout_logs rows the rest of this
+              // screen already uses.
+              if (!useRealWorkoutData) return null; // no history yet -- the "No sessions yet" empty state below covers this
+              const exerciseHistoryMap = buildExerciseDailyHistory(strengthLogs);
+              const exerciseNames = Object.keys(exerciseHistoryMap).sort((x, y) => {
+                const lastX = exerciseHistoryMap[x][exerciseHistoryMap[x].length - 1]?.date || "";
+                const lastY = exerciseHistoryMap[y][exerciseHistoryMap[y].length - 1]?.date || "";
+                return lastY.localeCompare(lastX); // most-recently-logged exercise first
+              });
+              if (exerciseNames.length === 0) return null;
+              const activeExercise = (chartExercise && exerciseHistoryMap[chartExercise]) ? chartExercise : exerciseNames[0];
+              const history = exerciseHistoryMap[activeExercise];
+              const repMaxLookup = getRepMaxLookup(plan);
+              const { weightStars, repsStars } = computeTrendStars(history, repMaxLookup[activeExercise]);
+              const lastPt = history[history.length - 1];
+              return (
+                <>
+                  <div style={{ background:"#212429", borderRadius:14, padding:"16px 16px 8px", marginBottom:14 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:theme.text, marginBottom:2 }}>{activeExercise} — progress over time</div>
+                    <div style={{ fontSize:11, color:"#6E7480", marginBottom:14 }}>Same dates, two plain numbers. A small star marks a real personal best — heaviest weight yet, or the first time you hit your target reps at that weight.</div>
+
+                    <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:4 }}>
+                      <div style={{ fontSize:10, letterSpacing:"1.2px", fontWeight:600, color:a, textTransform:"uppercase" }}>Weight</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:a }}>{lastPt.weight} lbs</div>
+                    </div>
+                    <div style={{ marginBottom:14 }}>
+                      <TrendLine entries={history} valueKey="weight" color={a} starDates={weightStars} />
+                    </div>
+
+                    <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:4 }}>
+                      <div style={{ fontSize:10, letterSpacing:"1.2px", fontWeight:600, color:"#D7DAE0", textTransform:"uppercase" }}>Reps</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#D7DAE0" }}>{lastPt.reps} reps</div>
+                    </div>
+                    <TrendLine entries={history} valueKey="reps" color="#D7DAE0" starDates={repsStars} />
+
+                    <div style={{ fontSize:10, color:"#3A3D44", textAlign:"center", padding:"10px 0 10px", fontStyle:"italic" }}>Scroll either chart with your finger to see older sessions</div>
+                  </div>
+
+                  <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4, marginBottom:14 }}>
+                    {exerciseNames.map(name => (
+                      <button key={name} onClick={() => setChartExercise(name)}
+                        style={{
+                          flexShrink:0, padding:"8px 16px", borderRadius:20, fontSize:12,
+                          fontWeight: name === activeExercise ? 700 : 500,
+                          color: name === activeExercise ? "#0B1E3D" : "#9BA0AA",
+                          background: name === activeExercise ? a : "transparent",
+                          border: name === activeExercise ? "none" : "1px solid rgba(255,255,255,0.10)",
+                          whiteSpace:"nowrap", cursor:"pointer", fontFamily:"inherit",
+                        }}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+            {(() => {
               const workoutsDisplay = logsLoading ? "..." : totalWorkouts > 0 ? String(totalWorkouts) : "0";
+              // "Total volume lifted" tile swapped for a week-streak tile (Session
+              // 50) -- Bryant's call: volume answers "how much weight did I move,"
+              // not "am I getting stronger," which is what he actually cares about.
+              // historicalData.weekStreak is already computed elsewhere (Morphiq.jsx,
+              // getWeekStreakFromDates() in shared.jsx) from real Supabase workout
+              // dates going back up to a year -- reused as-is here, not new logic.
+              const streakDisplay = logsLoading ? "..." : (historicalData?.weekStreak ?? 0);
               return (
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
                   <div style={{ background:"#212429", borderRadius:12, padding:"10px 12px" }}>
@@ -267,8 +507,8 @@ function ProgressScreen() {
                     <div style={{ fontSize:10, color:"#6E7480", marginTop:2 }}>Sessions logged</div>
                   </div>
                   <div style={{ background:"#212429", borderRadius:12, padding:"10px 12px" }}>
-                    <div style={{ fontSize:20, fontWeight:700, color:"#F59E0B" }}>{volDisplay}</div>
-                    <div style={{ fontSize:10, color:"#6E7480", marginTop:2 }}>Total volume lifted</div>
+                    <div style={{ fontSize:20, fontWeight:700, color:"#F59E0B" }}>{streakDisplay} <span style={{ fontSize:12 }}>week streak</span></div>
+                    <div style={{ fontSize:10, color:"#6E7480", marginTop:2 }}>Hit your target days in a row</div>
                   </div>
                 </div>
               );
