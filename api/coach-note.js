@@ -17,8 +17,11 @@ async function handler(req, res) {
     name, goal, weeklyDone, weeklyTarget, streak, totalWorkouts,
     weightChange, lastSession, weekNumber, allDone, seed,
     lastSessionExercises, nextWorkoutType, nextWorkoutExercises,
-    weightTrend, nutritionAdherence,
+    weightTrend, nutritionAdherence, trainingMode,
   } = body;
+  // Session 53: "Log my own" members run their own routine and asked for no
+  // suggestions -- the note must not prescribe weights, reps or session targets.
+  const isLog = trainingMode === "log";
 
   const firstName = (name || "there").split(" ")[0];
 
@@ -81,7 +84,7 @@ WHAT YOU KNOW ABOUT THEM:
 - Goal: ${goal || "get fit"}
 - ${lastWorkoutDetail}
 - ${nextNote}
-- Week ${weekNumber || 1}, ${weeklyDone} of ${weeklyTarget} sessions done this week${allDone ? " — completed all sessions" : ""}
+- ${isLog ? `${weeklyDone || 0} sessions logged this week (they set their own schedule — no weekly target)` : `Week ${weekNumber || 1}, ${weeklyDone} of ${weeklyTarget} sessions done this week${allDone ? " — completed all sessions" : ""}`}
 - Total sessions: ${totalWorkouts || 0}
 - Streak: ${streak || 0} days
 - ${weightNote}
@@ -89,11 +92,16 @@ WHAT YOU KNOW ABOUT THEM:
 - ${adherenceNote}
 - Seed: ${seed}
 
-WRITE ONE SENTENCE, max 20 words. Examples of the RIGHT tone:
+${isLog ? `IMPORTANT: ${firstName} uses LOG MODE — they run their own routine and chose NOT to get suggestions. Never prescribe a weight, rep count, set count or session target, and never tell them what to do next. Instead make a short, factual, encouraging observation about what they've actually logged (a number from last session, consistency, a lift that went up).
+
+WRITE ONE SENTENCE, max 20 words. Examples of the RIGHT tone for log mode:
+- "Seated leg curl hit 75lbs × 7 last session — your best set there in six weeks."
+- "Three sessions logged this week — your most consistent week this month."
+- "Leg press at 185lbs for 10 last time — a solid number to come back to."` : `WRITE ONE SENTENCE, max 20 words. Examples of the RIGHT tone:
 - "Your squat weight went up last session — go one more rep on the first set today."
 - "Three sessions logged this week. One more and you've hit your target."
 - "You haven't lifted since Tuesday — a short session today beats skipping entirely."
-- "Goblet squat at 35lbs last time — try 40lbs on the first set and drop back if needed."
+- "Goblet squat at 35lbs last time — try 40lbs on the first set and drop back if needed."`}
 
 NEVER write:
 - Motivational slogans or quotes
@@ -102,7 +110,7 @@ NEVER write:
 - Greetings or ${firstName}'s name
 - Questions
 
-If you have their last session data or the next workout's exercises — reference a specific exercise, weight, or rep count. That is always more useful than anything generic.
+If you have their last session data or the next workout's exercises — reference a specific exercise, weight, or rep count. That is always more useful than anything generic.${isLog ? " (Log mode: describe what they did — never what they should do.)" : ""}
 
 Write only the message. No quotes, no labels, no preamble.`;
 

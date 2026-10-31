@@ -9,7 +9,7 @@ import { saveTrainingPrefs } from "./TrainingStyle.jsx";
 import { LATEST_UPDATE } from "./WhatsNew.jsx";
 
 function OnboardingScreen() {
-  const { navigate, setUser, setPlan, plan, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
+  const { navigate, setUser, setPlan, plan, gymBranding, supabaseUser, supabaseUserIdRef, signOut } = useApp();
   const ob = theme.ob;
   const a = gymBranding.accent || ob.teal;
   const [step, setStep] = useState(0);
@@ -197,6 +197,16 @@ function OnboardingScreen() {
           <button onClick={() => name.trim().length >= 2 && setStep('choose')} disabled={name.trim().length < 2} style={{ ...s.tealBtn(name.trim().length < 2), marginTop: 12, padding: 12, fontSize: 13 }}>
             Let's go, {name.trim() || "..."} <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px", marginLeft: 2 }} />
           </button>
+          {/* Session 53: signing in with the wrong email lands here (no profile on
+              that email). Show which email is signed in, with a way out, so nobody
+              accidentally builds a second, empty account. Seen live with Bryant. */}
+          {supabaseUser?.email && signOut && (
+            <div style={{ textAlign: "center", marginTop: 18, fontSize: 12, color: ob.body, lineHeight: 1.6 }}>
+              Signed in as <span style={{ color: ob.white }}>{supabaseUser.email}</span>
+              <br />Already have an account?{" "}
+              <button onClick={signOut} style={{ background: "none", border: "none", color: a, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: ob.font, padding: "8px 2px" }}>Use a different email</button>
+            </div>
+          )}
         </div>}
 
         {step === 'choose' && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>

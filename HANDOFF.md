@@ -1,10 +1,24 @@
-# Hypergentiq — Session 53 master handoff
+# Hypergentiq — Session 53 master handoff (incl. live test + fixes)
 
 This file is the handoff. At the start of every session, fetch this file from the repo along with the src/ and api/ files — it replaces pasting a handoff into chat by hand. **MANDATORY fetch method — git clone only, see Technical notes below.**
 
 ## STANDING GOAL — App Store + Google Play submission roadmap (carry forward every session, do not delete until fully checked off)
 
 Unchanged this session — this session's work (below) was member-facing feature work, not app-store-roadmap work. Step list: (1) fix PWA gaps — done, Session 30, (2) add Capacitor + generate native projects — done (Session 25), still never opened in Android Studio/Xcode by a human, (3) set up Capgo live-update pipeline — still open, (4) Android path (Bryant needs a Google Play Console account, $25), (5) iOS path (needs a Mac on macOS Sequoia 15.6+ for Xcode 26, or a cloud Mac build service), (6) privacy policy — hard gate for both stores, still blocked on Bryant forming a real legal business entity before it can be finalized and sent to a lawyer, (7) terms of service — same status as privacy policy, (8) account deletion — built Session 46, live-verified working Session 47, (9) store listing assets (icon done, need screenshots + descriptions), (10) confirm no Apple IAP conflict, (11) submit.
+
+## Session 53 (part 2) — live end-user test on Bryant's real account + fixes for everything found
+
+Claude drove the live app in Bryant's Chrome (signed in by Bryant as **cafe75designs@gmail.com — his real member account**; note bcarbonell@sbcglobal.net has NO profile — signing in with it lands in onboarding). Tested: Profile switch + nudges toggle + What's new link, pop-up, Home card, routines (create/reorder/edit/delete/save-from-freestyle), exercise picker + search + custom names, set logging (pre-fill, typing, +/-, compare notes), rest timer, comeback + nudge, resume after reload, Progress charts, swap sheet. Account restored afterwards (coach, nudges off, no routines; morning in-progress workout untouched). **Voice input could not be tested by Claude (no microphone) — Bryant should try "135 for 8" on his phone.**
+
+**Test sets left on Bryant's account (dated Oct 31 2026, profile 67db3a9a-…):** Seated leg curl 70×10, 75×7, 75×5; Leg press 130×10; "Claude test hammer curl" 20×10 (workout_logs ids 70a59135…, e75b4151…, 37af3524…, d1c005ff…, plus the hammer-curl row). Bryant was asked whether to delete them — check his answer before assuming.
+
+**Fixed after the test (one commit):**
+- Log mode: "It's been 6 weeks ~~ago~~ since" wording; nudge now uses one baseline (last time's first set) for "back to X" and "Keep X"; smarter pre-fill (follows last time's ramp when today matches it, otherwise repeats today's previous set); Next/Add exercise stays visible while the rest timer runs; finishing with nothing logged asks "End without saving?" and never marks a routine done; sets already logged for an exercise earlier TODAY are pulled in (labelled "earlier today", numbering continues, no stale Welcome back, Log set waits for that load so set numbers can't collide); set card auto-centres after each set + bottom spacer so the floating chat button doesn't cover the reps "+".
+- Coach-only content in log mode: `api/coach-note.js` now gets `trainingMode` and, in log mode, is told never to prescribe weights/reps/targets (observations only); coach-note cache key includes mode; Home "This week" tile shows just the count in log mode (no "/4").
+- Older bugs: **Total workouts** (Home) and **Sessions logged** (Progress) counted only days within the last 60 sets, so the number DROPPED after logging (seen live 19→17) — now counted from the full-year date list; Progress "Recent sessions" were all hard-coded "Full body" — now named from the real exercises; Progress exercise-pill row scrollbar hidden; **swap sheet** now works for custom-plan exercises (pattern from the exercise itself → exercises-table name lookup → name-based guess incl. a calf rule) and fetches 40 rows before the equipment filter instead of 6 (old: dumbbell users rarely got dumbbell results); onboarding's first screen shows "Signed in as <email> · Use a different email" (sign-out) so a wrong-email login can't silently create a second empty account.
+- Verified: esbuild on all files, full-app bundle, jsdom simulation of ramp / comeback / same-day / empty-finish / rest-timer scenarios, guessPattern checked on Bryant's real exercise names.
+
+**Files (lines):** LogWorkoutScreen.jsx 708 → 777, Morphiq.jsx 1,844 → 1,856, OnboardingScreen.jsx 641 → 651, ProgressScreen.jsx 1,001 → 1,009, WorkoutScreen.jsx 3,497 → 3,520, api/coach-note.js 138 → 146. shared.jsx untouched (3,774).
 
 ## Session 53 — Log mode ("Log my own") + "What's new" pop-up (built, NOT yet live-tested)
 

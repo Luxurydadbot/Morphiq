@@ -559,7 +559,11 @@ function AppProvider({ children }) {
 
       // Unique workout dates sorted descending
       const dates = [...new Set(workoutLogs.map(r => r.workout_date))].sort((a,b) => b.localeCompare(a));
-      const totalWorkouts = dates.length;
+      // Bug fix (Session 53): this used to be dates.length -- unique days found
+      // in only the 60 most recent SETS -- so logging new sets pushed older days
+      // out of that window and the total went DOWN after a workout (19 -> 17,
+      // seen live). Count from the full-year date list loaded for the streak.
+      const totalWorkouts = new Set([...dates, ...mergedStreakDates]).size;
 
       // Week streak — driven by real Supabase workout dates (up to a year
       // back via the dedicated getWorkoutDatesForStreak query above), not the
@@ -1010,7 +1014,10 @@ function HomeDashboardScreen() {
   // picks a different day (so the exercise-specific advice always matches
   // whatever day is actually showing, instead of staying pinned to
   // whichever day happened to be active when the note was first generated).
-  const coachDayKey = isMultiDay ? `d${activeDayIdx}` : "single";
+  // Session 53: log-mode members get their own note (no plan targets), and
+  // switching modes gets a fresh note instead of today's cached one.
+  const coachLogMode = isLogMode(user);
+  const coachDayKey = coachLogMode ? "log" : (isMultiDay ? `d${activeDayIdx}` : "single");
   const coachNoteKey = `morphiq_coach_note_${supabaseUser?.id || "anon"}_${localDateStr()}_${coachDayKey}`;
   const [coachMsg, setCoachMsg] = useState(() => {
     // On first render, try to load from today's cache immediately (no flash)
@@ -1058,8 +1065,9 @@ function HomeDashboardScreen() {
         // raw exercise list, which caused the original wrong-exercise bug.
         // This note now regenerates whenever the selected day changes
         // (see coachNoteKey above), so it stays matched to the right day.
-        nextWorkoutType: workoutType || null,
-        nextWorkoutExercises: upcomingExercises?.slice(0, 3).map(e => e.name).join(", ") || null,
+        nextWorkoutType: coachLogMode ? null : (workoutType || null),
+        nextWorkoutExercises: coachLogMode ? null : (upcomingExercises?.slice(0, 3).map(e => e.name).join(", ") || null),
+        trainingMode: coachLogMode ? "log" : "coach",
       }),
     })
       .then(r => r.json())
@@ -1136,8 +1144,9 @@ function HomeDashboardScreen() {
         nutritionAdherence: historicalData?.nutritionAdherence,
         seed: Math.floor(Math.random() * 10000),
         lastSessionExercises: exerciseSummary,
-        nextWorkoutType: workoutType || null,
-        nextWorkoutExercises: nextWorkout,
+        nextWorkoutType: coachLogMode ? null : (workoutType || null),
+        nextWorkoutExercises: coachLogMode ? null : nextWorkout,
+        trainingMode: coachLogMode ? "log" : "coach",
       }),
     })
       .then(r => r.json())
@@ -1315,7 +1324,10 @@ function HomeDashboardScreen() {
         <div style={sL}>Your progress</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
           {[
-            [`${weeklyDone}/${weeklyTarget}`, "This week", weeklyDone >= weeklyTarget ? a : null],
+            // Session 53: log mode has no weekly target -- just the count.
+            coachLogMode
+              ? [`${weeklyDone}`, weeklyDone === 1 ? "Workout this week" : "Workouts this week", null]
+              : [`${weeklyDone}/${weeklyTarget}`, "This week", weeklyDone >= weeklyTarget ? a : null],
             [`${totalWorkouts}`, "Total workouts", null],
             [weightChangeLabel, "Since you started", parseFloat(weightChange) <= 0 ? a : "#F87171"],
           ].map(([v, l, c]) => (

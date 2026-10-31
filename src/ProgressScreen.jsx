@@ -326,13 +326,19 @@ function ProgressScreen() {
     });
     return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map(s => ({
       date: new Date(s.date + "T12:00:00").toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" }),
-      name: "Full body", sets: s.sets,
+      // Session 53: named from the session's real exercises (was always the
+      // hard-coded "Full body", wrong for split days and for log mode).
+      name: (() => { const ex = [...s.exercises]; return ex.length <= 1 ? (ex[0] || "Workout") : ex.length === 2 ? `${ex[0]} + ${ex[1]}` : `${ex[0]} + ${ex.length - 1} more`; })(),
+      sets: s.sets,
       vol: s.totalVol > 0 ? s.totalVol.toLocaleString() + " lbs" : "—", pbs: 0,
     }));
   })() : [];
 
   // Count ALL unique workout dates (strength OR cardio), not just the 5 shown in the recent list
-  const totalWorkouts = useRealWorkoutData ? new Set(realLogs.map(r => r.workout_date)).size : 0;
+  // Bug fix (Session 53): prefer the full-year count from loadHistoricalData --
+  // realLogs is only the 60 most recent sets, so this number used to shrink
+  // as new workouts pushed older days out of that window.
+  const totalWorkouts = historicalData?.totalWorkouts ?? (useRealWorkoutData ? new Set(realLogs.map(r => r.workout_date)).size : 0);
 
   const realPBs = useRealWorkoutData ? (() => {
     const best = {};
@@ -577,7 +583,9 @@ function ProgressScreen() {
                     <div style={{ fontSize:10, color:"#3A3D44", textAlign:"center", padding:"10px 0 10px", fontStyle:"italic" }}>Scroll either chart with your finger to see older sessions</div>
                   </div>
 
-                  <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4, marginBottom:14 }}>
+                  {/* Session 53: scrollbar hidden (was a visible white bar on desktop), same as the charts above. */}
+                  <style>{`.mq-pill-scroll::-webkit-scrollbar { display: none; }`}</style>
+                  <div className="mq-pill-scroll" style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4, marginBottom:14, scrollbarWidth:"none", msOverflowStyle:"none" }}>
                     {exerciseNames.map(name => (
                       <button key={name} onClick={() => setChartExercise(name)}
                         style={{

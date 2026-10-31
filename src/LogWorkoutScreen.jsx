@@ -33,6 +33,14 @@ function shortDate(dateStr) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
+// "6 weeks" (no "ago") -- for "It's been 6 weeks since…". Fix from live test:
+// the card used to read "It's been 6 weeks ago since…".
+function durationLabel(days) {
+  if (days <= 1) return "a day";
+  if (days < 14) return `${days} days`;
+  if (days < 60) return `${Math.round(days / 7)} weeks`;
+  return `${Math.round(days / 30)} months`;
+}
 function agoLabel(days) {
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
@@ -51,22 +59,30 @@ function comebackSuggestion(weight, gapDays) {
   return w < weight ? { weight: w, pct: Math.round(pct * 100) } : null;
 }
 
-// Every working set from the most recent PRIOR day this exercise was done.
-// Like sb.getLastSessionSetsForExercise() in shared.jsx, but also returns the
-// date (needed for "Last time · Mon, Oct 27" and the comeback check).
+// Every working set from the most recent PRIOR day this exercise was done
+// (like sb.getLastSessionSetsForExercise() in shared.jsx, plus the date, for
+// "Last time · Mon, Oct 27" and the comeback check) -- AND any sets already
+// logged for it TODAY (an earlier workout, or coach mode), so a second visit
+// the same day continues at the right set number instead of restarting at
+// Set 1 with a stale "Welcome back" (found in live testing).
 async function fetchLastSession(supabaseUserId, exerciseName) {
   try {
     const profileId = await sb.getProfileId(supabaseUserId);
     if (!profileId) return null;
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${encodeURIComponent(exerciseName)}&set_number=gt.0&workout_date=lt.${localDateStr()}&order=workout_date.desc,set_number.asc&limit=30`,
+      `${SUPABASE_URL}/rest/v1/workout_logs?user_id=eq.${profileId}&exercise_name=eq.${encodeURIComponent(exerciseName)}&set_number=gt.0&workout_date=lte.${localDateStr()}&order=workout_date.desc,set_number.asc&limit=40`,
       { headers: SB_GET() }
     );
     if (!res.ok) return null;
     const rows = await res.json();
     if (!Array.isArray(rows) || rows.length === 0) return null;
-    const date = rows[0].workout_date;
-    return { date, sets: rows.filter(r => r.workout_date === date).map(r => ({ weight: Number(r.weight) || 0, reps: Number(r.reps) || 0 })) };
+    const today = localDateStr();
+    const toSet = (r) => ({ weight: Number(r.weight) || 0, reps: Number(r.reps) || 0 });
+    const todaySets = rows.filter(r => r.workout_date === today).map(toSet);
+    const prior = rows.filter(r => r.workout_date !== today);
+    if (prior.length === 0) return { date: null, sets: [], todaySets };
+    const date = prior[0].workout_date;
+    return { date, sets: prior.filter(r => r.workout_date === date).map(toSet), todaySets };
   } catch { return null; }
 }
 
@@ -252,7 +268,8 @@ function RoutineEditor({ routine, names, onSave, onDelete, onCancel, a }) {
 
 // ── Summary view after "Finish workout" ──────────────────────────────────
 function SummaryView({ session, onSaveRoutine, onDone, a }) {
-  const done = session.exercises.filter(e => e.sets.length > 0);
+  // Only sets logged in THIS workout (not ones carried over from earlier today).
+  const done = session.exercises.map(e => ({ ...e, sets: e.sets.filter(st => !st.earlier) })).filter(e => e.sets.length > 0);
   const totalSets = done.reduce((n, e) => n + e.sets.length, 0);
   const [routineName, setRoutineName] = useState("");
   const [saved, setSaved] = useState(false);
@@ -320,7 +337,7 @@ function useRestTimer() {
 }
 
 // ── Session view: logging sets for one exercise at a time ────────────────
-function SessionView({ session, setSession, names, onFinish, a }) {
+function SessionView({ session, setSession, names, onFinish, onDiscard, a }) {
   const { user, supabaseUser } = useApp();
   const uid = supabaseUser?.id;
   const ex = session.exercises[session.idx];
@@ -332,8 +349,12 @@ function SessionView({ session, setSession, names, onFinish, a }) {
   const [nudgeAnswered, setNudgeAnswered] = useState({});
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const setCardRef = useRef(null);
   const rest = useRestTimer();
-  const last = ex ? lastByName[ex.name] : undefined; // undefined = still loading, null = never done
+  const loaded = ex ? lastByName[ex.name] : undefined; // undefined = still loading
+  // null = never done before today. Today-only history behaves like "first time".
+  const last = loaded === undefined ? undefined : (loaded && loaded.date ? loaded : null);
 
   // Load "last time" for the current exercise (cached per exercise name).
   useEffect(() => {
@@ -343,14 +364,38 @@ function SessionView({ session, setSession, names, onFinish, a }) {
     return () => { cancelled = true; };
   }, [ex?.name, uid]);
 
-  // Pre-fill weight + reps: today's previous set's weight, last time's reps
-  // for this set number -- so most sets are a single tap on "Log set".
+  // After each logged set, bring the next-set card to the middle of the screen,
+  // clear of the floating chat button (it covered the reps "+" in live testing).
+  useEffect(() => {
+    if (!ex || ex.sets.length === 0) return;
+    try { setCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+  }, [ex?.sets.length]);
+
+  // Sets already logged for this exercise earlier TODAY count as today's sets,
+  // so numbering continues (Set 4, not Set 1) and no "Welcome back" shows.
+  useEffect(() => {
+    if (!ex || ex.seeded || ex.sets.length > 0 || loaded === undefined) return;
+    const earlier = loaded?.todaySets || [];
+    updateExercise(e => ({ ...e, seeded: true, sets: e.sets.length ? e.sets : earlier.map(t => ({ ...t, status: "saved", earlier: true })) }));
+  }, [ex?.name, loaded]);
+
+  // Pre-fill weight + reps so most sets are a single tap on "Log set":
+  //  - first set: last time's first set
+  //  - later sets: if today's previous set MATCHED last time's same set, keep
+  //    following last time (so a ramp like 130 -> 155 -> 185 carries on);
+  //    otherwise (lighter comeback day, different weight) repeat today's
+  //    previous set. Fix from live testing: it used to mix today's weight with
+  //    last time's reps (e.g. 5 reps at a lighter weight) and ignore ramps.
   useEffect(() => {
     if (!ex) return;
     const i = ex.sets.length;
-    const lastSet = last?.sets?.[i] || last?.sets?.[last.sets.length - 1];
+    const lastSets = last?.sets || [];
     const prevToday = ex.sets[i - 1];
-    if (prevToday) { setWeight(String(prevToday.weight)); setReps(String(lastSet?.reps ?? prevToday.reps)); }
+    const prevLast = lastSets[i - 1];
+    const lastSet = lastSets[i] || lastSets[lastSets.length - 1];
+    const onTrack = prevToday && prevLast && prevToday.weight === prevLast.weight && prevToday.reps >= prevLast.reps;
+    if (prevToday && onTrack && lastSets[i]) { setWeight(String(lastSets[i].weight)); setReps(String(lastSets[i].reps)); }
+    else if (prevToday) { setWeight(String(prevToday.weight)); setReps(String(prevToday.reps)); }
     else if (lastSet) { setWeight(String(lastSet.weight)); setReps(String(lastSet.reps)); }
     else { setWeight(""); setReps(""); }
     setHeard("");
@@ -367,7 +412,7 @@ function SessionView({ session, setSession, names, onFinish, a }) {
   }
 
   function logSet(wOverride, rOverride) {
-    if (!ex) return;
+    if (!ex || loaded === undefined) return;
     const w = Math.round(Number(wOverride ?? weight));
     const r = Math.round(Number(rOverride ?? reps));
     if (!(w >= 0) || !(r > 0)) return;
@@ -430,13 +475,20 @@ function SessionView({ session, setSession, names, onFinish, a }) {
   const stepWeight = (d) => setWeight(w => String(Math.max(0, (Number(w) || 0) + d)));
   const stepReps = (d) => setReps(r => String(Math.max(1, (Number(r) || 0) + d)));
   const isLastExercise = session.idx >= session.exercises.length - 1;
+  // Waits for this exercise's history (incl. today's earlier sets) to load, so
+  // set numbers can't collide with sets logged earlier today.
+  const canLog = Number(reps) > 0 && weight !== "" && loaded !== undefined;
+  const newSetsThisSession = session.exercises.reduce((n, e) => n + e.sets.filter(st => !st.earlier).length, 0);
 
   // Comeback: this exercise hasn't been done in 2+ weeks.
   const gapDays = last?.date ? daysBetween(last.date) : 0;
   const isComeback = gapDays >= COMEBACK_MIN_DAYS;
-  const topLastWeight = last?.sets?.length ? Math.max(...last.sets.map(s => s.weight)) : 0;
+  // One baseline everywhere in the nudge: last time's FIRST set (what the
+  // weight field is pre-filled with). It used to say "back to 85" (heaviest
+  // set) next to "Keep 80" (first set) -- found in live testing.
+  const baseWeight = last?.sets?.[0]?.weight || 0;
   const suggestion = isComeback && user.nudgesEnabled && ex?.sets.length === 0 && !nudgeAnswered[ex?.name]
-    ? comebackSuggestion(last?.sets?.[0]?.weight || topLastWeight, gapDays) : null;
+    ? comebackSuggestion(baseWeight, gapDays) : null;
 
   if (!ex) {
     return (
@@ -463,7 +515,7 @@ function SessionView({ session, setSession, names, onFinish, a }) {
           <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(245,181,71,0.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#F5B547" }}><Icon name="refresh" size={16} /></div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: theme.text, marginBottom: 3 }}>Welcome back!</div>
-            <div style={{ fontSize: 13, color: "#D7CBB3", lineHeight: 1.45 }}>It's been {agoLabel(gapDays)} since your last {ex.name.toLowerCase()} session. Your numbers are right where you left them.</div>
+            <div style={{ fontSize: 13, color: "#D7CBB3", lineHeight: 1.45 }}>It's been {durationLabel(gapDays)} since your last {ex.name.toLowerCase()} session. Your numbers are right where you left them.</div>
           </div>
         </div>
       )}
@@ -491,12 +543,12 @@ function SessionView({ session, setSession, names, onFinish, a }) {
       {/* Light nudge -- only when the setting is on and before the first set */}
       {suggestion && (
         <div style={{ background: "#172338", border: "1px solid rgba(76,141,255,0.35)", borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
-          <div style={{ fontSize: 14, color: "#D7DAE0", lineHeight: 1.45, marginBottom: 12 }}>Want to ease in? Starting around <b style={{ color: theme.text }}>{suggestion.weight} lbs</b> (about {suggestion.pct}% lighter) usually gets you back to {topLastWeight} within a couple of weeks.</div>
+          <div style={{ fontSize: 14, color: "#D7DAE0", lineHeight: 1.45, marginBottom: 12 }}>Want to ease in? Starting around <b style={{ color: theme.text }}>{suggestion.weight} lbs</b> (about {suggestion.pct}% lighter) usually gets you back to {baseWeight} within a couple of weeks.</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => { setWeight(String(suggestion.weight)); setNudgeAnswered(m => ({ ...m, [ex.name]: true })); }}
               style={{ flex: 1, height: 44, borderRadius: 10, background: a, color: "#0B1E3D", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Use {suggestion.weight}</button>
             <button onClick={() => setNudgeAnswered(m => ({ ...m, [ex.name]: true }))}
-              style={{ ...S.outlineBtn, flex: 1, color: "#D7DAE0", fontWeight: 600, fontSize: 14 }}>Keep {weight || topLastWeight}</button>
+              style={{ ...S.outlineBtn, flex: 1, color: "#D7DAE0", fontWeight: 600, fontSize: 14 }}>Keep {baseWeight}</button>
           </div>
         </div>
       )}
@@ -506,7 +558,7 @@ function SessionView({ session, setSession, names, onFinish, a }) {
         const ls = last?.sets?.[k];
         const beat = ls && (s.weight > ls.weight || (s.weight === ls.weight && s.reps > ls.reps));
         const matched = ls && s.weight === ls.weight && s.reps === ls.reps;
-        const note = beat ? (s.weight > ls.weight ? `+${s.weight - ls.weight} lbs vs last time` : `+${s.reps - ls.reps} rep${s.reps - ls.reps === 1 ? "" : "s"} vs last time`) : matched ? "matched last time" : "";
+        const note = s.earlier ? "earlier today" : beat ? (s.weight > ls.weight ? `+${s.weight - ls.weight} lbs vs last time` : `+${s.reps - ls.reps} rep${s.reps - ls.reps === 1 ? "" : "s"} vs last time`) : matched ? "matched last time" : "";
         return (
           <div key={k} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 4px" }}>
             <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#172338", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: a }}><Icon name="check" size={12} /></div>
@@ -519,7 +571,7 @@ function SessionView({ session, setSession, names, onFinish, a }) {
       })}
 
       {/* Current set */}
-      <div style={{ background: "#171920", border: "1px solid rgba(76,141,255,0.35)", borderRadius: 14, padding: "14px 16px 16px", margin: "8px 0 14px" }}>
+      <div ref={setCardRef} style={{ background: "#171920", border: "1px solid rgba(76,141,255,0.35)", borderRadius: 14, padding: "14px 16px 16px", margin: "8px 0 14px" }}>
         <div style={{ ...S.label, color: a, marginBottom: 10 }}>Set {ex.sets.length + 1}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <div>
@@ -541,7 +593,7 @@ function SessionView({ session, setSession, names, onFinish, a }) {
             </div>
           </div>
         </div>
-        {last?.sets?.length > 0 && ex.sets.length === 0 && <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 12 }}>Filled in from last time — change only what's different.</div>}
+        {last?.sets?.length > 0 && ex.sets.length === 0 && Number(weight) === baseWeight && <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 12 }}>Filled in from last time — change only what's different.</div>}
       </div>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}>
@@ -549,12 +601,14 @@ function SessionView({ session, setSession, names, onFinish, a }) {
           style={{ width: 56, height: 56, borderRadius: "50%", background: a, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
           <MicIcon size={22} color="#0B1E3D" />
         </button>
-        <button onClick={() => logSet()} disabled={!(Number(reps) > 0) || weight === ""}
-          style={{ flex: 1, height: 56, borderRadius: 12, background: a, color: "#0B1E3D", border: "none", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: Number(reps) > 0 && weight !== "" ? 1 : 0.4 }}>Log set</button>
+        <button onClick={() => logSet()} disabled={!canLog}
+          style={{ flex: 1, height: 56, borderRadius: 12, background: a, color: "#0B1E3D", border: "none", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: canLog ? 1 : 0.4 }}>Log set</button>
       </div>
       <div style={{ fontSize: 12, color: heard ? a : theme.textMuted, textAlign: "center", marginBottom: 14, minHeight: 16 }}>{listening ? "Listening…" : heard || "Or tap the mic and say “135 for 8”"}</div>
 
-      {rest.running ? (
+      {/* Next/Add exercise stays visible while resting (it used to disappear --
+          exactly when you'd want to move on; found in live testing). */}
+      {rest.running && (
         <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: theme.textMuted }}>Rest</div>
@@ -563,15 +617,29 @@ function SessionView({ session, setSession, names, onFinish, a }) {
           <button onClick={() => rest.add(30)} style={{ ...S.outlineBtn, padding: "0 12px" }}>+30s</button>
           <button onClick={rest.stop} style={{ ...S.outlineBtn, padding: "0 12px" }}>Skip</button>
         </div>
-      ) : (
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={rest.start} style={{ ...S.outlineBtn, flex: 1 }}>Start rest timer</button>
-          {isLastExercise
-            ? <button onClick={() => setPicking(true)} style={{ ...S.outlineBtn, flex: 1 }}>+ Add exercise</button>
-            : <button onClick={() => setSession(s => ({ ...s, idx: s.idx + 1 }))} style={{ ...S.outlineBtn, flex: 1 }}>Next exercise</button>}
-        </div>
       )}
-      <button onClick={onFinish} style={{ ...S.outlineBtn, width: "100%", color: a, borderColor: "rgba(76,141,255,0.45)", marginBottom: 8 }}>Finish workout</button>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {!rest.running && <button onClick={rest.start} style={{ ...S.outlineBtn, flex: 1 }}>Start rest timer</button>}
+        {isLastExercise
+          ? <button onClick={() => setPicking(true)} style={{ ...S.outlineBtn, flex: 1 }}>+ Add exercise</button>
+          : <button onClick={() => setSession(s => ({ ...s, idx: s.idx + 1 }))} style={{ ...S.outlineBtn, flex: 1 }}>Next exercise</button>}
+      </div>
+      {/* Finishing with nothing logged asks first instead of showing a trophy
+          and "0 sets", and never marks a routine as done (live-test fix). */}
+      {confirmEmpty ? (
+        <div style={{ ...S.card, marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Nothing logged yet</div>
+          <div style={{ fontSize: 13, color: theme.textMuted, lineHeight: 1.5, marginBottom: 12 }}>End this workout without saving anything?</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setConfirmEmpty(false)} style={{ ...S.outlineBtn, flex: 1 }}>Keep going</button>
+            <button onClick={onDiscard} style={{ ...S.outlineBtn, flex: 1, color: a, borderColor: "rgba(76,141,255,0.45)", fontWeight: 600 }}>End workout</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => (newSetsThisSession > 0 ? onFinish() : setConfirmEmpty(true))} style={{ ...S.outlineBtn, width: "100%", color: a, borderColor: "rgba(76,141,255,0.45)", marginBottom: 8 }}>Finish workout</button>
+      )}
+      {/* Room to scroll the set card clear of the floating chat button. */}
+      <div aria-hidden="true" style={{ height: 64 }} />
 
       {showList && (
         <div style={S.sheetWrap} onClick={() => setShowList(false)}>
@@ -663,7 +731,8 @@ function LogWorkoutScreen() {
         onDelete={(r) => { saveRoutines(routines.filter(x => x.id !== r.id)); setEditing(null); }} />
     );
   } else if (view === "session" && session) {
-    body = <SessionView session={session} setSession={setSession} names={names} onFinish={finish} a={a} />;
+    body = <SessionView session={session} setSession={setSession} names={names} onFinish={finish} a={a}
+      onDiscard={() => { setSession(null); setView("start"); }} />;
   } else if (view === "summary" && session) {
     body = <SummaryView session={session} a={a} onDone={done}
       onSaveRoutine={(name, exercises) => saveRoutines([...routines, { id: newId(), name, exercises, lastDone: localDateStr() }])} />;

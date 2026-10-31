@@ -1599,51 +1599,74 @@ function WorkoutScreen() {
   // Queries exercises table for same pattern + equipment, excludes current exercise.
   // Falls back to hardcoded getSwapOptions() if Supabase returns nothing.
   useEffect(() => {
-    if (!showSwapSheet) { setSwapDbResults(null); return; }
-    const pattern = (ex?.pattern || "").toLowerCase();
-    const equip   = (user?.equipment || "dumbbell").toLowerCase();
-    if (!pattern || pattern === "custom") {
-      // Custom exercises have no pattern in the DB — skip the query, use fallback
-      setSwapDbResults(null);
-      return;
-    }
+    if (!showSwapSheet) { setSwapDbResults(null); setSwapDbLoading(false); return; }
+    const equip = (user?.equipment || "dumbbell").toLowerCase();
+    let cancelled = false;
+    // Session 53: custom-plan exercises carry no pattern, so this lookup used to
+    // be skipped for them entirely (built-in list every time). Now: use the
+    // exercise's own pattern, else look its name up in the exercises table,
+    // else guess from the name (order matters: "leg curl" is a hinge, "leg
+    // press" a squat). Only if all three fail does it fall back.
+    const guessPattern = (n) => {
+      const t = (n || "").toLowerCase();
+      if (/calf|calve/.test(t)) return "accessory";
+      if (/deadlift|rdl|romanian|hip thrust|good morning|swing|leg curl|hamstring|glute bridge/.test(t)) return "hinge";
+      if (/squat|lunge|leg press|step.?up|leg extension|hack/.test(t)) return "squat";
+      if (/row|pull|chin|lat |pulldown|curl|face pull|shrug/.test(t)) return "pull";
+      if (/press|push.?up|dip|fly|chest|tricep|raise/.test(t)) return "push";
+      if (/plank|crunch|\bab|carry|pallof|twist/.test(t)) return "core";
+      return "";
+    };
+    const resolvePattern = async () => {
+      const own = (ex?.pattern || "").toLowerCase();
+      if (own && own !== "custom") return own;
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/exercises?select=pattern&name=ilike.${encodeURIComponent(ex?.name || "")}&limit=1`, { headers: SB_HEADERS() });
+        const rows = await r.json();
+        if (Array.isArray(rows) && rows[0]?.pattern) return rows[0].pattern.toLowerCase();
+      } catch {}
+      return guessPattern(ex?.name);
+    };
     setSwapDbLoading(true);
-    const encoded = encodeURIComponent(ex.name);
-    const url = `${SUPABASE_URL}/rest/v1/exercises?select=name,muscle_group,pattern,equipment,difficulty`
-      + `&is_active=eq.true`
-      + `&pattern=eq.${encodeURIComponent(pattern)}`
-      + `&name=neq.${encoded}`
-      + `&limit=6`;
-    // Bug fix (Session 53): this used to pass SB_HEADERS itself -- a FUNCTION --
-    // instead of calling it, so no login/API headers were ever sent and this
-    // lookup always failed, silently falling back to the hardcoded swap list.
-    // SB_HEADERS must be CALLED (SB_HEADERS()) to build fresh headers each time.
-    fetch(url, { headers: SB_HEADERS() })
-      .then(r => r.json())
-      .then(rows => {
-        if (!Array.isArray(rows) || rows.length === 0) {
-          setSwapDbResults(null); // trigger fallback
-          return;
-        }
-        // Filter to matching equipment first; if that leaves fewer than 2, include all
-        const equipMatches = rows.filter(r =>
-          (r.equipment || "").toLowerCase() === equip
-        );
-        const finalRows = equipMatches.length >= 2 ? equipMatches : rows;
-        // Shape into the same format doSwap() expects
-        setSwapDbResults(finalRows.map(r => ({
-          name:       r.name,
-          muscle:     r.muscle_group,
-          pattern:    r.pattern,
-          sets:       ex.sets,
-          targetReps: ex.targetReps,
-          weight:     ex.weight,  // keep current weight — member has context
-          rpe:        ex.rpe,
-          alternative: null,
-        })));
-      })
-      .catch(() => setSwapDbResults(null)) // silent fallback on network error
-      .finally(() => setSwapDbLoading(false));
+    resolvePattern().then(pattern => {
+      if (cancelled) return null;
+      if (!pattern) { setSwapDbResults(null); return null; } // nothing to match on -- fallback
+      const url = `${SUPABASE_URL}/rest/v1/exercises?select=name,muscle_group,pattern,equipment,difficulty`
+        + `&is_active=eq.true`
+        + `&pattern=eq.${encodeURIComponent(pattern)}`
+        + `&name=neq.${encodeURIComponent(ex.name)}`
+        + `&limit=40`; // wide enough that the equipment filter below has real choices
+      // Bug fix (Session 53): this used to pass SB_HEADERS itself -- a FUNCTION --
+      // instead of calling it, so no login/API headers were ever sent and this
+      // lookup always failed, silently falling back to the hardcoded swap list.
+      // SB_HEADERS must be CALLED (SB_HEADERS()) to build fresh headers each time.
+      return fetch(url, { headers: SB_HEADERS() })
+        .then(r => r.json())
+        .then(rows => {
+          if (cancelled) return;
+          if (!Array.isArray(rows) || rows.length === 0) {
+            setSwapDbResults(null); // trigger fallback
+            return;
+          }
+          // Matching equipment first; if that leaves fewer than 2, include all
+          const equipMatches = rows.filter(r => (r.equipment || "").toLowerCase() === equip);
+          const finalRows = (equipMatches.length >= 2 ? equipMatches : rows).slice(0, 6);
+          // Shape into the same format doSwap() expects
+          setSwapDbResults(finalRows.map(r => ({
+            name:       r.name,
+            muscle:     r.muscle_group,
+            pattern:    r.pattern,
+            sets:       ex.sets,
+            targetReps: ex.targetReps,
+            weight:     ex.weight,  // keep current weight — member has context
+            rpe:        ex.rpe,
+            alternative: null,
+          })));
+        });
+    })
+      .catch(() => { if (!cancelled) setSwapDbResults(null); }) // silent fallback on network error
+      .finally(() => { if (!cancelled) setSwapDbLoading(false); });
+    return () => { cancelled = true; };
   }, [showSwapSheet]);
 
   function simulateListen() {
