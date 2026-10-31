@@ -28,7 +28,7 @@ Claude drove the live app in Bryant's Chrome (signed in by Bryant as **cafe75des
 
 **Files (lines):** LogWorkoutScreen.jsx 708 → 777, Morphiq.jsx 1,844 → 1,856, OnboardingScreen.jsx 641 → 651, ProgressScreen.jsx 1,001 → 1,009, WorkoutScreen.jsx 3,497 → 3,520, api/coach-note.js 138 → 146. shared.jsx untouched (3,774).
 
-## Session 53 — Log mode ("Log my own") + "What's new" pop-up (built, NOT yet live-tested)
+## Session 53 — Log mode ("Log my own") + "What's new" pop-up (built, live-tested by Claude on Bryant's account — see part 2)
 
 Bryant asked for a second way to use the app: experienced lifters who run their own routine and just want it remembered, vs. the existing coached experience. Designed first as an interactive mockup (Claude Design canvas: https://claude.ai/artifact/YCNQ63dadw3geW8PMWyda1 — 6 tappable screens), approved, then built. Full decision record also in the claude.ai project doc `claude/session-53-log-mode-and-whats-new-design.md`.
 
@@ -106,7 +106,7 @@ Bryant approved building the two features Session 49 had designed but not built,
 
 **Files touched, final line count:** `src/ProgressScreen.jsx` 657 → **1,001** (+344).
 
-## Session 49 recap — carried forward, unchanged
+## Session 49 recap — nav bar fix seen working in Session 53 live test
 
 Fixed the bottom nav bar and floating chat button so they stay visible while scrolling (both were using `position:"absolute"` instead of `"fixed"` in `Layout()`, `shared.jsx`) — **still not yet live-tested by Bryant**, carried forward again this session since nothing has confirmed it live yet.
 
