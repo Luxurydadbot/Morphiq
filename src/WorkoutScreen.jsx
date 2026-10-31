@@ -1614,7 +1614,11 @@ function WorkoutScreen() {
       + `&pattern=eq.${encodeURIComponent(pattern)}`
       + `&name=neq.${encoded}`
       + `&limit=6`;
-    fetch(url, { headers: SB_HEADERS })
+    // Bug fix (Session 53): this used to pass SB_HEADERS itself -- a FUNCTION --
+    // instead of calling it, so no login/API headers were ever sent and this
+    // lookup always failed, silently falling back to the hardcoded swap list.
+    // SB_HEADERS must be CALLED (SB_HEADERS()) to build fresh headers each time.
+    fetch(url, { headers: SB_HEADERS() })
       .then(r => r.json())
       .then(rows => {
         if (!Array.isArray(rows) || rows.length === 0) {
