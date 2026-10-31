@@ -23,6 +23,10 @@ import {
   WeightChart, StreakCalendar, getWeekStreakFromDates, MacroBar,
 } from "./shared.jsx";
 import { computeWeightTrend, computeNutritionAdherence } from "./coachSignals.js";
+// Session 53: log mode ("Log my own") + "What's new" pop-up, each in its own file.
+import { profileTrainingFields, isLogMode, TrainingStyleSection } from "./TrainingStyle.jsx";
+import { LogWorkoutScreen, LogModeHomeCard } from "./LogWorkoutScreen.jsx";
+import { WhatsNewAuto, WhatsNewPopup } from "./WhatsNew.jsx";
 
 const useApp = () => useContext(AppContext);
 
@@ -184,7 +188,7 @@ function AppProvider({ children }) {
       const cachedData = !planSource ? getCachedPlanData() : null;
       const resolvedPlan = planSource?.plan || cachedData?.plan || null;
       const resolvedUser = planSource
-        ? { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: profile.unit || "imperial", exerciseUnits: profile.exercise_units || {}, lastWorkoutDayIndex: profile.last_workout_day_index }
+        ? { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: profile.unit || "imperial", exerciseUnits: profile.exercise_units || {}, lastWorkoutDayIndex: profile.last_workout_day_index, ...profileTrainingFields(profile) }
         : cachedData?.user || null;
 
       if (resolvedPlan && resolvedUser) {
@@ -365,7 +369,7 @@ function AppProvider({ children }) {
       }
 
       if (profile?.plan) {
-        const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: profile.unit || "imperial", exerciseUnits: profile.exercise_units || {}, lastWorkoutDayIndex: profile.last_workout_day_index };
+        const u = { name: profile.name, goal: profile.goal, sex: profile.sex, height: profile.height, weight: profile.weight, age: profile.age, daysPerWeek: profile.days_per_week, injuries: profile.injuries || "", unit: profile.unit || "imperial", exerciseUnits: profile.exercise_units || {}, lastWorkoutDayIndex: profile.last_workout_day_index, ...profileTrainingFields(profile) };
         setUser(u);
         // Patch missing weekStartDate — if the plan was saved without it, fill in today
         // so the 7-day check has something to work from. Save back to Supabase immediately.
@@ -1165,6 +1169,8 @@ function HomeDashboardScreen() {
 
   return (
     <Layout activeNav="home">
+    {/* Session 53: "What's new" pop-up -- shows once per update, Home only (never mid-workout). See WhatsNew.jsx. */}
+    <WhatsNewAuto />
     {syncIssue && (
       <div style={{ margin: "1rem 1.25rem 0", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, padding: "0.75rem 1rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <div style={{ fontSize: 13, color: theme.red }}>Could not sync your latest progress. Showing your last saved plan.</div>
@@ -1213,6 +1219,9 @@ function HomeDashboardScreen() {
           </div>
         </div>
       )}
+      {/* Session 53: log-mode members run their own routine, so the plan-based
+          "Your next workout" card below is swapped for LogModeHomeCard. */}
+      {isLogMode(user) ? <LogModeHomeCard /> : (
       <div style={{ padding: "1.25rem 1.25rem 0" }}>
         <div style={sL}>Your next workout</div>
         <div style={{ background: theme.surface, border: `0.5px solid ${allDone ? theme.border : theme.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -1288,6 +1297,7 @@ function HomeDashboardScreen() {
           )}
         </div>
       </div>
+      )}
       {/* Persistent cardio quick-access -- deliberately separate from the
           card above and NOT gated to a lose_fat goal or a scheduled cardio
           day. Matches the pattern researched for top apps (Strava's Record
@@ -1401,6 +1411,7 @@ function ProfileScreen() {
   // only one of these views can ever be showing at once.
   const [deleteState, setDeleteState] = useState("idle"); // idle | confirming | deleting
   const [deleteError, setDeleteError] = useState("");
+  const [showWhatsNew, setShowWhatsNew] = useState(false); // Session 53: re-open the "What's new" pop-up
 
   // Local selections — initialised from live data
   const [selectedGoal,  setSelectedGoal]  = useState(user.goal || "lose_fat");
@@ -1616,6 +1627,10 @@ function ProfileScreen() {
           )}
         </div>
 
+        {/* Session 53: training style (Coach me / Log my own) + Light nudges. See TrainingStyle.jsx. */}
+        <TrainingStyleSection onShowWhatsNew={() => setShowWhatsNew(true)} />
+        <WhatsNewPopup open={showWhatsNew} onClose={() => setShowWhatsNew(false)} />
+
         {/* Body stats — read-only */}
         <div style={sL}>Body Stats</div>
         <div style={{ background: "#212429", borderRadius: 14, padding: "0 14px", marginBottom: 16 }}>
@@ -1790,7 +1805,7 @@ function BillingBlockedScreen() {
 }
 
 function AppRouter() {
-  const { screen } = useApp();
+  const { screen, user } = useApp();
   if (screen === "auth") return <AuthScreen />;
   if (screen === "gym_signup") return <GymSignupScreen />;
   if (screen === "network_error") return <NetworkErrorScreen />;
@@ -1798,7 +1813,8 @@ function AppRouter() {
   if (screen === "loading") return <LoadingScreen />;
   if (screen === "onboarding") return <OnboardingScreen />;
   if (screen === "plan") return <PlanOverviewScreen />;
-  if (screen === "workout") return <WorkoutScreen />;
+  // Session 53: log-mode members get their own workout screen; coach mode unchanged.
+  if (screen === "workout") return isLogMode(user) ? <LogWorkoutScreen /> : <WorkoutScreen />;
   if (screen === "custom_plan") return <CustomPlanScreen />;
   if (screen === "meals") return <MealPlanScreen />;
   if (screen === "progress") return <ProgressScreen />;

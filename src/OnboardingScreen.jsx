@@ -5,6 +5,8 @@ import {
   Pill, Spinner, Icon, PoweredByHypergentiq,
   buildPlan, calcMacros, clearWorkoutProgress,
 } from "./shared.jsx";
+import { saveTrainingPrefs } from "./TrainingStyle.jsx";
+import { LATEST_UPDATE } from "./WhatsNew.jsx";
 
 function OnboardingScreen() {
   const { navigate, setUser, setPlan, plan, gymBranding, supabaseUser, supabaseUserIdRef } = useApp();
@@ -74,7 +76,9 @@ function OnboardingScreen() {
       try {
         const parsed = buildPlan(profileForPlan, macrosForPlan);
         if (!cancelled) {
-          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, cardioDaysPerWeek: goal === "lose_fat" ? cardioDaysPerWeek : 0, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced" };
+          const userData = { name, goal, sex, height: `${heightFt}′ ${heightIn || "0"}″`, weight: `${weight} lbs`, age, daysPerWeek, cardioDaysPerWeek: goal === "lose_fat" ? cardioDaysPerWeek : 0, injuries, equipment, unit, trainingHistory, recentActivity, restPref, fitnessLevel: trainingHistory === "new" ? "Beginner" : trainingHistory === "some" ? "Intermediate" : recentActivity === "returning" ? "Rebuilding" : "Advanced",
+            // Session 53: training style + new-member defaults (they skip the "What's new" pop-up).
+            trainingMode: routeChoice === "log" ? "log" : "coach", nudgesEnabled: false, routines: [], lastSeenUpdate: LATEST_UPDATE.id };
           // Cache plan locally FIRST so it's never lost, even if the save below fails —
           // this is a safety net, not a substitute for confirming the cloud save succeeded.
           const _saveUid = supabaseUserIdRef?.current || supabaseUser?.id;
@@ -98,6 +102,8 @@ function OnboardingScreen() {
             // shared.jsx for the full story -- same fix applied to
             // CustomPlanScreen's savePlan() in WorkoutScreen.jsx).
             clearWorkoutProgress(_saveUid);
+            // Session 53: save the training style picked on the "How would you like to train?" screen.
+            saveTrainingPrefs(_saveUid, { training_mode: userData.trainingMode, last_seen_update: LATEST_UPDATE.id }).catch(() => {});
             // Profile row now exists — safe to write the starting weight
             const startingWeight = parseFloat(weight);
             if (startingWeight > 0) {
@@ -197,7 +203,7 @@ function OnboardingScreen() {
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: a, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 4 }}>Your plan</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: ob.white }}>How would you like to train?</div>
-            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Both paths track your progress and adjust your weights automatically</div>
+            <div style={{ fontSize: 11, color: ob.muted, marginTop: 3 }}>Every option tracks your progress — pick how much guidance you want</div>
           </div>
           <button onClick={() => { setRouteChoice("ai"); setStep(1); }}
             style={{ background: ob.tealDk, border: `1.5px solid ${a}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", marginBottom: 10, width: "100%" }}>
@@ -215,6 +221,17 @@ function OnboardingScreen() {
               <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>Enter your exercises, sets, reps, and starting weights — we handle the rest</div>
             </div>
           </button>
+          {/* Session 53: log mode -- no plan-driven workouts, just remembers last time.
+              Still goes through the goal/body questions so meals get real calorie/protein targets. */}
+          <button onClick={() => { setRouteChoice("log"); setStep(1); }}
+            style={{ background: ob.card, border: "1.5px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", width: "100%", marginTop: 10 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: ob.muted }}><Icon name="pencil" size={22} /></div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: ob.white }}>Just log my workouts</div>
+              <div style={{ fontSize: 11, color: ob.muted, marginTop: 2 }}>I know what I'm doing — remember what I lifted last time, no suggestions</div>
+            </div>
+          </button>
+          <div style={{ fontSize: 11, color: ob.muted, marginTop: 12, textAlign: "center" }}>You can switch anytime in your profile.</div>
         </div>}
 
         {step === 1 && <div className="mq-fade" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
@@ -551,7 +568,9 @@ function OnboardingScreen() {
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               <div style={{ width: 28, height: 28, borderRadius: "50%", background: ob.tealDk, border: `1.5px solid ${a}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: a, fontWeight: 700, flexShrink: 0 }}>AI</div>
               <div style={{ background: ob.card, borderRadius: "12px 12px 12px 4px", padding: "9px 12px", fontSize: 13, color: ob.body, lineHeight: 1.55, flex: 1 }}>
-                {goal === "lose_fat"
+                {routeChoice === "log"
+                  ? `${name}, you're set up to log your own workouts. I'll remember every set, so you always know the number to beat. Here are your daily nutrition targets.`
+                  : goal === "lose_fat"
                   ? (cardioDaysPerWeek > 0
                       ? `${name}, you're all set. ${daysPerWeek} lifting days plus ${cardioDaysPerWeek} cardio days a week is the sweet spot for fat loss — enough to burn, enough rest to recover. Here's exactly what week one looks like.`
                       : `${name}, you're all set. ${daysPerWeek} days a week is the sweet spot for fat loss — enough to burn, enough rest to recover. Here's exactly what week one looks like.`)
@@ -562,8 +581,8 @@ function OnboardingScreen() {
             </div>
           </div>
 
-          {/* ── Workout days card — slides in third ── */}
-          <div style={{ opacity: revealStep >= 3 ? 1 : 0, transform: revealStep >= 3 ? "translateY(0)" : "translateY(8px)", transition: "opacity .4s ease, transform .4s ease", marginBottom: 8 }}>
+          {/* ── Workout days card — slides in third (hidden in log mode: no plan-driven workouts) ── */}
+          <div style={{ display: routeChoice === "log" ? "none" : "block", opacity: revealStep >= 3 ? 1 : 0, transform: revealStep >= 3 ? "translateY(0)" : "translateY(8px)", transition: "opacity .4s ease, transform .4s ease", marginBottom: 8 }}>
             <div style={{ background: ob.card, borderRadius: 12, padding: "10px 12px" }}>
               <div style={{ fontSize: 10, color: ob.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Workouts — {plan.workoutType}</div>
               {(plan.workoutDays || []).map((day, i, arr) => (
@@ -603,10 +622,10 @@ function OnboardingScreen() {
           {/* ── Start Day 1 CTA — slides in last with glow ── */}
           <div style={{ opacity: revealStep >= 5 ? 1 : 0, transform: revealStep >= 5 ? "translateY(0)" : "translateY(10px)", transition: "opacity .5s ease, transform .5s ease", marginTop: "auto" }}>
             <button
-              onClick={() => navigate("plan")}
+              onClick={() => navigate(routeChoice === "log" ? "home" : "plan")}
               style={{ ...s.tealBtn(false), padding: "13px 10px", fontSize: 14, fontWeight: 700, borderRadius: 14, boxShadow: `0 0 28px rgba(76,141,255,0.4)`, letterSpacing: "0.2px" }}
             >
-              Start Day 1 <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px" }} />
+              {routeChoice === "log" ? "Let's go" : "Start Day 1"} <Icon name="arrow-right" size={13} style={{ verticalAlign: "-2px" }} />
             </button>
 
           </div>
