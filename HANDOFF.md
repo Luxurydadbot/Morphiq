@@ -120,49 +120,48 @@ Live-tested account deletion end-to-end on production, live-verified the post-on
 
 ## Latest commit
 
-`41aac48` — "Fix: swap-exercise sheet now actually loads suggestions from the exercises table" (`src/WorkoutScreen.jsx`), right after `ec04a23` — "Feature: log mode (Log my own), saved routines, welcome-back easing, What's new pop-up". Both confirmed live on Vercel (deployment READY, production).
+`f30a090` — "Docs: Session 53 -- iPhone build check live on GitHub Actions; Apple account next steps". Session 53's app/code commits, all live on Vercel (READY) and with both the Android and iOS build checks green: `ec04a23` (log mode + What's new), `41aac48` (swap-sheet headers fix), `b2d3cd0` (everything found in the live test), `c0c86da` (iOS build check workflow).
 
-**GitHub push access is FIXED (Session 53).** Bryant reconnected GitHub in claude.ai Settings → Connectors, and a plain `git push origin HEAD:main` from a `git clone` of the repo now works directly — no more browser Upload-files workaround. Commit identity used: Claude <noreply@anthropic.com>. If push ever breaks again, the first fix to try is reconnecting GitHub there.
+**GitHub push access is FIXED (Session 53).** Bryant reconnected GitHub in claude.ai Settings → Connectors; a plain commit + `git push origin HEAD:main` from a `git clone` now works directly — no browser Upload-files workaround. Commit identity: Claude <noreply@anthropic.com>. If push ever breaks again, first fix: reconnect GitHub there. `gh` CLI also works (e.g. `gh run list --repo Luxurydadbot/Morphiq`).
+
+**Bryant's real member account is `cafe75designs@gmail.com`** (profile id 67db3a9a-3d48-414a-a975-2d28ab52172f, ~220 sets). `bcarbonell@sbcglobal.net` has NO profile (signing in with it lands in onboarding — an empty auth row now exists for it from Session 53, harmless).
 
 ## Confirmed working vs still open
 
-**Built and pushed this session — NOT yet live-tested in the real running app:**
-- The redesigned per-exercise recap card (per-set breakdown, plateau detection, varied tips, fixed icon, volume explainer). See Session 52 v2 write-up above. (The original v1 version was never tested and is now superseded — no need to test it separately.)
-- The mid-week weight sync fix (`syncMidWeekWeights()`), built alongside it.
+**Live-tested by Claude in the real app on Bryant's account this session (Chrome at phone width):** log mode end to end (Profile switch + Light nudges, What's new pop-up + reopen link, Home card + Resume after reload, routines create/reorder/edit/delete/save-from-freestyle, exercise picker + search + custom names, set logging with real "last time" data, compare notes, rest timer, comeback + nudge, Progress charts picking up log-mode sets), then the fixes for everything found (re-checked live: Total workouts = 34 matching the DB, Progress session names + hidden pill scrollbar, swap sheet showing DB dumbbell options on Bryant's custom plan; log-mode fixes verified in a jsdom simulation). **Also effectively verified: Session 49's nav bar / chat button stay fixed while scrolling** (seen on long Profile and Progress screens) — a real-phone glance is still nice but no longer urgent.
 
-**Built, pushed, AND live-tested/confirmed working:**
-- Manual weight entry (tap-to-type) + per-exercise kg/lbs switch with memory, kg-mode stepper, kg-mode plate-math hidden, all caption text now unit-aware too (Session 51).
-- Workouts-tab Weight/Reps trend charts with PR stars, real horizontal scroll, and the tap-and-hold value tooltip (Session 50). Bryant confirmed: "Works perfect."
-
-**Confirmed live in prior sessions — unchanged, still true:** the "switch exercise" feature and its checkpoint screen (Session 48), the exercise-breakdown/"This exercise" display fix (Session 48), `api/delete-account.js` and the Danger Zone flow (Session 47), the post-onboarding "Plan ready" screen (Session 47), the weekly detection engine tested against production with synthetic data but not yet a real member's multi-week history (Session 47).
+**Built, pushed, AND live-tested/confirmed working earlier:** manual weight entry + per-exercise kg/lbs (Session 51); Workouts-tab Weight/Reps charts + tap-and-hold tooltip (Session 50, "Works perfect"); switch exercise + checkpoint screen (48); account deletion (47); Plan-ready screen (47); weekly detection engine (47, synthetic data only).
 
 **NOT yet verified / still open:**
-- This session's redesigned recap card and the mid-week weight sync fix — both brand new, need a real-device pass.
-- Session 49's nav bar / chat button fix — still carried forward, still nobody has live-tested it.
-- The cardio timer real-phone lock-screen test.
-- Everything else on the punch list below.
+- **Voice logging in log mode** ("135 for 8") — Claude can't use a microphone; Bryant to try on his phone.
+- Session 52's rebuilt recap card + mid-week weight sync (`syncMidWeekWeights()`) — need a real-device pass in coach mode.
+- New-member onboarding "Just log my workouts" path and the "Use a different email" link — need a brand-new email to test (Claude can't create accounts).
+- Coach-note wording in log mode (prompt changed; the AI's actual output not yet seen live).
+- Cardio timer real-phone lock-screen test.
+
+**Pending decision:** Claude logged 5 test sets on Bryant's real account on Oct 31 2026 (Seated leg curl 70×10, 75×7, 75×5; Leg press 130×10; "Claude test hammer curl" 20×10 — the hammer curl now shows as the FIRST chart on his Progress screen). Bryant was asked several times whether to delete them and **hasn't answered yet — ask again; only delete on a clear yes** (only those 5 rows; his two incline-bench warm-ups from that morning stay).
 
 ## Punch list, in priority order
 
-**FIRST — live-test Session 53's log mode + "What's new" pop-up.** (1) Log in as an existing member → the pop-up should appear once on Home; close it, reload, it should NOT come back; Profile → "What's new" reopens it. (2) Profile → Training style → "Log my own" → Home card changes to "Ready when you are"; Workout tab opens the log-mode screen. (3) Freestyle: add an exercise you've done before → "Last time" shows with date and pre-filled numbers; log a few sets (tap and voice "135 for 8"); try the rest timer; Finish → save as a routine. (4) Start that routine next time. (5) Turn Light nudges on and pick an exercise not done in 2+ weeks → Welcome back + "Use / Keep". (6) Switch back to "Coach me" → everything as before. (7) New-signup onboarding → "Just log my workouts" path.
+**FIRST — get Bryant's yes/no on deleting the 5 test sets** (see above), then have him try **voice logging** in log mode on his phone.
 
-**THEN — live-test Session 52's rebuilt recap card and the mid-week weight sync, on a real device.** For the recap card: finish an exercise and confirm the per-set breakdown table looks right (today vs. last time, per set), the volume explainer sentence reads clearly, the new checkmark badge (not the old clipboard icon) shows, a genuine PR still shows its badge, and — if possible — repeat an exercise enough times at the same weight to see the plateau badge and its amber styling actually fire. Also check the tip text on a couple of different exercises/days if possible, to sanity-check the variety. For the weight sync: manually drop a weight mid-session on an exercise, then reopen the app before a full week passes and confirm the next suggested starting weight reflects the lower number instead of reverting.
+**SECOND — coach-mode welcome-back easing** (designed + approved, not built): on a 2+ week gap per exercise, apply ~10% (2–4 weeks) / ~15% (4+ weeks) lighter automatically with a short "Welcome back" message — must be reconciled with `progressPlan()`'s 2-for-2 rule and Session 52's `syncMidWeekWeights()` before writing code. Also log-mode kg support (log mode is lbs-only; Session 51's per-exercise kg memory not wired in).
 
-**SECOND — also still needs a live scroll-through: Session 49's nav bar/chat button fix.** Quick: open the app, scroll down on any screen with enough content, confirm both stay put. Carried forward five sessions in a row now without ever actually being clicked through live.
+**THIRD — live-test Session 52's recap card + mid-week weight sync** on a real device (finish an exercise → per-set table, checkmark badge, volume explainer, PR badge; repeat an exercise at the same weight to see the amber plateau badge; drop a weight mid-week and confirm the next suggestion follows the lower number).
 
-**THIRD — unblock the privacy policy and terms of service.** Both drafts exist now. Both are still blocked on Bryant forming a real legal business entity, after which both documents need to go to an actual lawyer together.
+**FOURTH — App Store, Apple side: step 2 waits on Bryant** — Apple Developer Program ($99/yr, ideally in the business's name once the entity exists) → App Store Connect app record (`com.hypergentiq.app`) → App Store Connect API key (Issuer ID, Key ID, .p8). Then Claude adds GitHub secrets + a signed archive → TestFlight job. Full detail: Session 53 (part 3) above and the project doc `claude/app-store-apple-build-progress.md`.
 
-**FOURTH — App Store groundwork, next concrete step: open the Android project in real Android Studio at least once.** The GitHub Actions check proves the app compiles and is currently passing, but nobody has run it on a device or emulator yet. Capgo live-update pipeline still not started.
+**FIFTH — unblock the privacy policy and terms of service.** Drafts exist; blocked on Bryant forming a legal business entity, then a lawyer. Hard gate for both stores.
 
-**FIFTH — cardio timer real-phone test.** Session 40's wall-clock fix still hasn't been live-tapped by Bryant with the screen genuinely locking.
+**SIXTH — Android/Google Play:** $25 Play Console account; open the Android project in Android Studio once. Capgo live updates not started (Capgo Solo $14/mo also includes build minutes).
 
-**SIXTH — wearable sync (Apple HealthKit/Fitbit).** Unchanged, still not scoped.
+**SEVENTH — cardio timer real-phone test; wearable sync (HealthKit/Fitbit) still unscoped.**
 
-**SEVENTH through TENTH — unchanged, still open:** live-test `WarmupTest` full week start-to-finish (tied to `cafe75designs+customtest2@gmail.com`, not Bryant's real email); get Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (needs its own discussion, see DECISIONS.md); expand exercise variety beyond primary/variation binary swap; the weight-loss/cardio redesign's still-undecided open questions from DECISIONS.md; voice input on the cardio quick-log and the "Other" activity type haven't been live-tested; the manual/voice cardio-logging path's calorie accuracy (no body weight passed to the AI estimate).
+**EIGHTH through TENTH — unchanged, still open:** live-test `WarmupTest` full week (tied to `cafe75designs+customtest2@gmail.com`); Bryant's sign-off on the compound/isolation warm-up split; exercise diagrams/animations (deferred); personal trainer market segment (see DECISIONS.md); expand exercise variety beyond primary/variation swap; weight-loss/cardio redesign open questions (DECISIONS.md); cardio quick-log voice + "Other" type untested; manual/voice cardio calorie accuracy (no body weight passed to the AI).
 
 **RULED OUT — do not re-propose without new information:** camera/video-based AI form-checking (Session 44 research).
 
-**LOWER PRIORITY / OPS.** Unchanged: one unidentified blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()` still carry the retired placeholder name — cosmetic only); the "blank exercise weight saves as 20 lbs instead of staying blank" quirk.
+**LOWER PRIORITY / OPS:** one blank-named test profile row in Supabase; naming cleanup (GitHub repo, live URL, `Morphiq.jsx`/`function Morphiq()`, Supabase localStorage keys `morphiq_*` still carry the retired name — cosmetic); "blank exercise weight saves as 20 lbs" quirk; `MASTER_HANDOFF.md` in the repo root is an old file superseded by this HANDOFF.md (offered to mark it retired — Bryant hasn't decided); bump `actions/checkout`/`setup-node` to newer majors in both workflows (Node 20 deprecation warning); Home coach note said "No sessions logged yet" and "0 of 4 this week" while only warm-up (set_number 0) sets existed that day — worth a look; `/api/chat` (AI chat) doesn't know about log mode yet.
 
 ## Technical notes carried forward
 
@@ -200,14 +199,10 @@ Live-tested account deletion end-to-end on production, live-verified the post-on
 
 ## Paste this at the start of your next session
 
-Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (reads work fine even without a working token, since the repo is public; do NOT use WebFetch for repo file contents). Report every file's line count before doing anything else. **`shared.jsx` is at 3,774 / 3,800 — only ~26 lines of headroom left. Do not add anything new to it without proposing a split to Bryant first — it is essentially full.** **GitHub push access: WORKS as of Session 53** (after Bryant reconnected GitHub in claude.ai Settings → Connectors) — commit and `git push origin HEAD:main` from the clone. The old browser Upload-files workaround is no longer needed. **`api/` is at exactly 12 counted functions — the Vercel Hobby-plan cap.** **Never use a "+" alias on Bryant's real sbcglobal.net address.**
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone https://github.com/Luxurydadbot/Morphiq.git` (do NOT use WebFetch for repo file contents). Also read the claude.ai project doc `claude/app-store-apple-build-progress.md` if the session touches the App Store. Report every file's line count before doing anything else. Line counts at end of Session 53: shared.jsx **3,774** (only ~26 lines left — propose a split before adding anything), WorkoutScreen.jsx 3,520, Morphiq.jsx 1,856, ProgressScreen.jsx 1,009, GymOwnerDashboard 927, MealScreen 869, LogWorkoutScreen 777, OnboardingScreen 651, SuperAdminDashboard 343, ChatScreen 309, CardioScreen 295, GymSignupScreen 269, coachSignals.js 159, TrainingStyle.jsx 115, WhatsNew.jsx 100; api/coach-note.js 146; workflows android-build.yml 60, ios-build.yml 71. **GitHub push WORKS** (commit + `git push origin HEAD:main`; `gh` CLI works too). **`api/` is at exactly 12 counted functions — the Vercel Hobby cap.** **Never use a "+" alias on Bryant's real sbcglobal.net address.** Bryant's real member login is **cafe75designs@gmail.com**.
 
-**This session (Session 53) built log mode + the "What's new" pop-up** (see the Session 53 write-up at the top). New files: `TrainingStyle.jsx`, `LogWorkoutScreen.jsx`, `WhatsNew.jsx`; small edits to `Morphiq.jsx` and `OnboardingScreen.jsx`; four new `profiles` columns (`training_mode`, `nudges_enabled`, `routines`, `last_seen_update`). **Not live-tested yet — first thing next session (checklist in the punch list).** Still open from design: coach-mode welcome-back easing (needs reconciling with `progressPlan()` + `syncMidWeekWeights()`), kg support in log mode.
+**Session 53 summary:** built log mode ("Log my own": freestyle + saved routines, last-time pre-fill, voice, manual rest timer, welcome-back + optional nudges, switchable in Profile) and a "What's new" pop-up (new files TrainingStyle.jsx, LogWorkoutScreen.jsx, WhatsNew.jsx; 4 new `profiles` columns); fixed the swap sheet (headers bug + now works for custom plans); Claude live-tested everything on Bryant's account and fixed all findings (wording, nudge numbers, ramp-aware pre-fill, rest timer layout, empty-finish confirm, same-day sets, coach note respects log mode, Total workouts no longer shrinks, Progress session names, wrong-email exit on onboarding); fixed GitHub push access; added a free iPhone build check on GitHub Actions (passing). Everything is live.
 
-**Session 52 v2 (still untested):** rebuilt per-exercise recap card + `syncMidWeekWeights()` mid-week weight fix.
+Next priority: ask Bryant (again) whether to delete the 5 test sets from Oct 31; have him try voice logging; then build coach-mode welcome-back easing (reconcile with `progressPlan()` + `syncMidWeekWeights()` first). Apple step 2 waits on his Apple Developer account / business entity.
 
-**Also confirmed working and fully done, no action needed:** manual weight entry + per-exercise kg/lbs (Session 51), and the Workouts-tab trend charts + tap-and-hold tooltip (Session 50, "Works perfect").
-
-Next priority: live-test Session 53's log mode + What's new pop-up (checklist in punch list), then Session 52's recap card + mid-week weight sync, then the long-overdue Session 49 nav-bar scroll-through. Next build: coach-mode welcome-back easing.
-
-Remind Bryant: log mode, the What's new pop-up, the rebuilt recap card and the mid-week weight sync are all live but untested on a real device — worth finishing an exercise (and ideally repeating one a few times to see the plateau badge) before considering either done. Also: `shared.jsx` has almost no room left, so the next new feature that needs shared logic may need a file-split conversation first.
+Remind Bryant: the 5 test sets question is still open (the made-up "Claude test hammer curl" is the first chart on his Progress screen); voice logging needs a quick try on his phone; and the App Store path's next step is his — the Apple Developer account, ideally once the business entity exists.
