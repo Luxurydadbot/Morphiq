@@ -98,7 +98,9 @@ Live-tested account deletion end-to-end on production, live-verified the post-on
 
 ## Latest commit
 
-Session 53: one commit adding `src/TrainingStyle.jsx`, `src/LogWorkoutScreen.jsx`, `src/WhatsNew.jsx` and updating `src/Morphiq.jsx`, `src/OnboardingScreen.jsx` and this file — "Feature: log mode (Log my own), saved routines, welcome-back easing, What's new pop-up". Pushed via the GitHub web-upload workaround. Direct push is still refused: this session's repo-access check said Claude has no GitHub access for the repo — fixable by installing/reconnecting the Claude GitHub App (claude.ai Settings → Connectors → GitHub). Previous app commit: `6d76ff6` (Session 52 recap card v2).
+`41aac48` — "Fix: swap-exercise sheet now actually loads suggestions from the exercises table" (`src/WorkoutScreen.jsx`), right after `ec04a23` — "Feature: log mode (Log my own), saved routines, welcome-back easing, What's new pop-up". Both confirmed live on Vercel (deployment READY, production).
+
+**GitHub push access is FIXED (Session 53).** Bryant reconnected GitHub in claude.ai Settings → Connectors, and a plain `git push origin HEAD:main` from a `git clone` of the repo now works directly — no more browser Upload-files workaround. Commit identity used: Claude <noreply@anthropic.com>. If push ever breaks again, the first fix to try is reconnecting GitHub there.
 
 ## Confirmed working vs still open
 
@@ -176,7 +178,7 @@ Session 53: one commit adding `src/TrainingStyle.jsx`, `src/LogWorkoutScreen.jsx
 
 ## Paste this at the start of your next session
 
-Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (reads work fine even without a working token, since the repo is public; do NOT use WebFetch for repo file contents). Report every file's line count before doing anything else. **`shared.jsx` is at 3,774 / 3,800 — only ~26 lines of headroom left. Do not add anything new to it without proposing a split to Bryant first — it is essentially full.** **GitHub push access:** still broken (platform-side git-proxy block, confirmed again — even a plain GET now returns 403) — use the Upload-files browser workaround, staging file(s) at `/mnt/user-data/uploads/` specifically (not `/outputs/`). **`api/` is at exactly 12 counted functions — the Vercel Hobby-plan cap.** **Never use a "+" alias on Bryant's real sbcglobal.net address.**
+Fetch `HANDOFF.md`, `DECISIONS.md`, and all `src/`/`api/` files fresh via `git clone` (reads work fine even without a working token, since the repo is public; do NOT use WebFetch for repo file contents). Report every file's line count before doing anything else. **`shared.jsx` is at 3,774 / 3,800 — only ~26 lines of headroom left. Do not add anything new to it without proposing a split to Bryant first — it is essentially full.** **GitHub push access: WORKS as of Session 53** (after Bryant reconnected GitHub in claude.ai Settings → Connectors) — commit and `git push origin HEAD:main` from the clone. The old browser Upload-files workaround is no longer needed. **`api/` is at exactly 12 counted functions — the Vercel Hobby-plan cap.** **Never use a "+" alias on Bryant's real sbcglobal.net address.**
 
 **This session (Session 53) built log mode + the "What's new" pop-up** (see the Session 53 write-up at the top). New files: `TrainingStyle.jsx`, `LogWorkoutScreen.jsx`, `WhatsNew.jsx`; small edits to `Morphiq.jsx` and `OnboardingScreen.jsx`; four new `profiles` columns (`training_mode`, `nudges_enabled`, `routines`, `last_seen_update`). **Not live-tested yet — first thing next session (checklist in the punch list).** Still open from design: coach-mode welcome-back easing (needs reconciling with `progressPlan()` + `syncMidWeekWeights()`), kg support in log mode.
 
