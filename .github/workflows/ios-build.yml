@@ -1,0 +1,71 @@
+# iPhone (iOS) build check
+#
+# Bryant, Oct 31 2026 (Session 53): step 1 of the App Store path, using
+# GitHub Actions instead of buying a Mac. Apple only allows iPhone apps to be
+# built on a Mac, so this borrows one of GitHub's Mac machines (free for
+# public repositories) on every push to main and proves the iPhone app still
+# compiles -- same idea as the Android build check next to this file.
+#
+# It does NOT publish anything, and it doesn't need an Apple account yet: it
+# builds for the iPhone Simulator with code signing switched off.
+#
+# Step 2 (later, once Bryant has an Apple Developer account, ideally in the
+# business's name): add a second job that signs the app and uploads it to
+# TestFlight / App Store Connect, using Apple keys stored as GitHub
+# "secrets" (never written into this file). See HANDOFF.md.
+#
+# If this ever goes red, check the Actions tab on GitHub for the error -- it
+# means something in the last push broke the iPhone build specifically (the
+# web app itself may still be fine).
+name: iOS build check
+
+"on":
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# A newer push cancels an older iPhone build still running (saves Mac time).
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    # macOS 26 on Apple Silicon -- comes with current Xcode, which Apple
+    # requires for App Store uploads.
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the web app
+        run: npm run build
+        env:
+          CI: false
+
+      - name: Sync web build into the iPhone project
+        run: npx cap sync ios
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build iPhone app (Simulator, unsigned)
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/App/build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
